@@ -45,6 +45,14 @@ jobs:
             bash -n "$f"
           done
 
+      # The POSIX spawn path is the only one a mac/Linux user ever touches, and
+      # they touch it before the repo exists. Parse, lint, and run its --help.
+      - name: POSIX bootstrap script parses, lints, and runs
+        run: |
+          bash -n bootstrap/new-claude-project.sh
+          shellcheck bootstrap/new-claude-project.sh
+          bash bootstrap/new-claude-project.sh --help > /dev/null
+
       - name: Codex skill adapters are current
         run: node .claude/scripts/sync-codex-skills.mjs --check
 
