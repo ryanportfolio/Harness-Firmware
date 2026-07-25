@@ -19,8 +19,10 @@ condensed.
   namespaces) are unchanged so existing installs keep working.
 - Restructured `README.md` around what the layer is, how to install it, and
   what it costs to keep loaded.
-- `/init-project` now asks before turning on a prose mode instead of assuming
-  one, and offers a minimal skill preset for projects that want a small
+- `/init-project` now asks which prose mode a project wants instead of assuming
+  silently. `caveman ultra` remains the inherited default; `lite`, `full`, and
+  `normal` are one answer away, and `README.md` documents changing it later.
+  The skill also offers a minimal skill preset for projects that want a small
   always-loaded surface.
 
 ### Added

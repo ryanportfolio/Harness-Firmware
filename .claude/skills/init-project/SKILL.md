@@ -34,7 +34,7 @@ Plain chat, numbered (popup tools are banned). Only ask what's actually unknown 
 3. **Sandbox capabilities:** can sessions in this environment run installs, builds, type-checks, tests meaningfully? Can the user reach a dev server the session starts? Is there a browser?
 4. **Authoritative verification:** what's the final word that a change works — local test suite, CI, a deploy log?
 5. **Hard lines:** anything that must ALWAYS go through the user (installs, migrations, deploys, destructive ops)?
-6. **Prose mode:** how should replies read: **normal** (default), or the `caveman` compression at **lite**, **full**, or **ultra**? The template ships caveman ultra because its maintainer wants it; a spawned project starts normal unless the user asks otherwise.
+6. **Prose mode:** how should replies read: the `caveman` compression at **ultra** (default, inherited from the template), **full**, **lite**, or **normal** prose? Say what ultra means in one line -- terse, articles dropped, code and error strings verbatim, security and irreversible-action confirmations still plain -- so a first-time user can choose knowingly. Keep ultra if the user has no preference.
 7. **Skill preset:** **full** (every starter skill, minus the profile pruning below) or **minimal** (drops the twelve situational extras; the core-loop and discipline skills stay)? Default full. Offer minimal when the user cares about per-turn context weight.
 
 If the user doesn't know yet (brand-new project), write the honest default: "not yet decided — ask before installs/migrations/deploys" and move on. Don't stall setup on undecided infrastructure.
@@ -56,8 +56,9 @@ The prose default is asserted twice: `CLAUDE.md` (project memory) and `.claude/h
 
 The hook's caveman parts are wrapped in three marked blocks: `caveman:directive` (the `print_caveman_directive` function), `caveman:reminder` (its bullet inside `print_skill_reminders`), and `caveman:call` (the call near the bottom). Each is `# >>> <id>:begin ... # <<< <id>:end`.
 
+- **ultra** (default): both files already ship this. Change nothing.
+- **lite / full**: keep both places and rewrite the level in both: the CLAUDE.md heading plus its first line, and in the hook the `caveman ultra` text, the `args: "ultra"` argument, and the `/caveman ultra` in the reminder bullet. The shipped descriptor ("terse, abbreviated, arrows for causality") describes ultra, so match it to the chosen level (see `.claude/skills/caveman/SKILL.md` intensity table).
 - **normal**: delete the `## Default prose mode: caveman ultra` section from `CLAUDE.md`, and delete all three marked hook blocks, marker comments included. Leave the `caveman` skill installed unless Step 5 prunes it; the user can still invoke it on demand, it just isn't the default.
-- **lite / full / ultra**: keep both places and rewrite the level in both: the CLAUDE.md heading plus its first line, and in the hook the `caveman ultra` text, the `args: "ultra"` argument, and the `/caveman ultra` in the reminder bullet. The shipped descriptor ("terse, abbreviated, arrows for causality") describes ultra, so match it to the chosen level (see `.claude/skills/caveman/SKILL.md` intensity table).
 
 Verify: `grep -rn "caveman" CLAUDE.md .claude/hooks/session-start.sh` returns either nothing (normal) or the same level everywhere. Then `bash -n .claude/hooks/session-start.sh`.
 
@@ -137,7 +138,7 @@ Verify that no `FILL IN` markers or template-only paths from Step 3 remain. In C
 - Don't initialize a canonical or forked `AI-Firmware` (formerly `claude-starter`) template checkout; its markers and template assets are intentional.
 - Don't leave template CI or distribution files in a spawned project.
 - Don't let `CLAUDE.md` and the session-start hook disagree about prose mode; half-removed caveman is worse than either setting.
-- Don't assume the caveman default: the template keeps it, spawned projects start normal unless the user picks it.
+- Don't silently drop caveman: ultra is the inherited default and stays unless the user picks another level. Equally, don't keep it without offering the choice -- an unexplained terse agent reads as broken to a first-time user.
 - Don't delete skills past the minimal list to look tidy, and don't run the preset without confirming the list first. A deleted skill that `CLAUDE.md` or the session-start hook still names is an every-turn instruction to invoke something that isn't there.
 - Don't pad the reference files with boilerplate prose — they're lookup tables for future sessions, not documentation theater.
 - Don't copy full skills into `.agents/skills/` — generated adapters keep
