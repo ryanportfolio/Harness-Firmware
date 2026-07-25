@@ -63,7 +63,10 @@ function readMetadata(skillDir, skillPath) {
     if (!descriptionMatch) continue;
 
     const value = descriptionMatch[1].trim();
-    if (value === ">" || value === "|") {
+    // Block scalars carry an optional chomping indicator: >, >-, >+, |, |-, |+.
+    // Matching only the bare forms reads the indicator itself as the
+    // description, which shipped `description: ">-"` adapters to Codex.
+    if (/^[>|][-+]?$/.test(value)) {
       const block = [];
       for (index += 1; index < lines.length; index += 1) {
         if (/^\S/.test(lines[index])) {
@@ -72,7 +75,7 @@ function readMetadata(skillDir, skillPath) {
         }
         block.push(lines[index]);
       }
-      description = foldBlock(block, value);
+      description = foldBlock(block, value[0]);
     } else {
       description = parseScalar(value);
     }

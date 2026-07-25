@@ -42,6 +42,9 @@ fetch_with_retry() {
   return 1
 }
 
+# >>> caveman:directive:begin (managed by /init-project; delete the whole block,
+# markers included, when prose mode is "normal" -- keep it in sync with the
+# "Default prose mode" section of CLAUDE.md) >>>
 # Print the caveman-ultra session default to STDOUT.
 #
 # CRITICAL: this goes to stdout, NOT stderr. SessionStart injects context only
@@ -63,6 +66,7 @@ persists across this and every future session until the user says "stop caveman"
     and ambiguous multi-step sequences drop to plain prose, then resume caveman.
 CAVEMAN
 }
+# <<< caveman:directive:end <<<
 
 # Print the fixed "universal skills" reminder block.
 # Cross-cutting skills that apply to most sessions regardless of task; project-
@@ -71,7 +75,14 @@ CAVEMAN
 print_skill_reminders() {
   cat >&2 <<'SKILLS'
 [SessionStart] Universal skills. Invoke proactively when the trigger fires:
+SKILLS
+  # >>> caveman:reminder:begin (managed by /init-project; delete the whole block,
+  # markers included, when prose mode is "normal") >>>
+  cat >&2 <<'SKILLS'
   - caveman                       → FIRST, at session start: /caveman ultra (default prose mode)
+SKILLS
+  # <<< caveman:reminder:end <<<
+  cat >&2 <<'SKILLS'
   - applying-best-practices       → BEFORE non-trivial edits (features, refactors, perf, bug fixes)
   - recall                        → BEFORE work in unfamiliar areas; /recall save <text> after gotchas
   - verification-before-completion → BEFORE claiming work is done / committing / opening a PR
@@ -165,9 +176,12 @@ check_plugin_overlap() {
   fi
 }
 
+# >>> caveman:call:begin (managed by /init-project; delete the whole block,
+# markers included, when prose mode is "normal") >>>
 # Inject the caveman-ultra default into context FIRST (stdout), before any git
 # work or branch-specific exit. Independent of git state, so it runs every path.
 print_caveman_directive
+# <<< caveman:call:end <<<
 
 # Weekly template drift nudge (quiet no-op when template is unreachable).
 check_starter_drift
