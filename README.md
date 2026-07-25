@@ -45,8 +45,9 @@ deploy sections, seeds reference files, prunes irrelevant skills, removes
 spawn-only template files, and commits the setup. Two of its questions matter
 early:
 
-- **prose mode.** Default is normal prose. Terse `caveman` mode is opt-in per
-  project, never inherited from the template.
+- **prose mode.** Default is terse `caveman ultra`, inherited from the template.
+  Pick `normal` at the prompt for ordinary prose. See
+  [prose mode](#prose-mode) to change it later.
 - **skill preset.** `full` ships everything. `minimal` keeps the core loop and
   the discipline skills and drops the extras.
 
@@ -62,6 +63,39 @@ early:
 For a fresh project, ask Codex to initialize the starter or select the
 `init-project` skill. Its adapter delegates to the same canonical workflow
 Claude Code uses.
+
+## prose mode
+
+The template answers in terse `caveman ultra` by default: replies drop articles
+and filler, code and error strings stay verbatim, and security warnings and
+irreversible-action confirmations drop back to plain prose automatically. It
+reads oddly at first and saves real tokens once you're used to it.
+
+Two files assert it, and they must agree:
+
+- `CLAUDE.md`, the `## Default prose mode: caveman ultra` section.
+- `.claude/hooks/session-start.sh`, three blocks marked
+  `# >>> caveman:directive:begin` / `caveman:reminder` / `caveman:call`.
+
+To change it:
+
+- **At setup:** answer `normal`, or `lite` / `full` / `ultra`, when
+  `/init-project` asks. It edits both files for you.
+- **Later, softer level:** replace `ultra` with `lite` or `full` in both files.
+  The intensity table in `.claude/skills/caveman/SKILL.md` describes each.
+- **Later, off entirely:** delete that `CLAUDE.md` section and the three marked
+  hook blocks, marker comments included. The `caveman` skill stays installed, so
+  `/caveman` still works on demand; it just isn't the default.
+- **For one session only:** say "stop caveman" or "normal mode".
+
+Check the two files agree afterward:
+
+```bash
+grep -rn caveman CLAUDE.md .claude/hooks/session-start.sh
+```
+
+Either nothing comes back, or the same level everywhere. A half-removed caveman
+is worse than either setting.
 
 ## check your install
 
