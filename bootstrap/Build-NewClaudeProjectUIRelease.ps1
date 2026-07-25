@@ -35,7 +35,13 @@ try {
     }
     [IO.Compression.ZipFile]::ExtractToDirectory($snapshotArchive, $templateStage)
 
-    foreach ($templateOnlyPath in @('bootstrap', '.claude-plugin', '.github\workflows\validate-template.yml', 'README.md')) {
+    # Derived from NewProjectCore so the snapshot cannot drift from the spawn
+    # path. README.md is stripped here too: the spawn path replaces it with a
+    # stub rather than deleting it.
+    Import-Module -Force (Join-Path $PSScriptRoot 'NewProjectCore.psm1')
+    $templateOnlyPaths = @(Get-NewProjectTemplateOnlyPath) + @('README.md')
+
+    foreach ($templateOnlyPath in $templateOnlyPaths) {
         $fullPath = Join-Path $templateStage $templateOnlyPath
         if (Test-Path -LiteralPath $fullPath) {
             Remove-Item -Recurse -Force -LiteralPath $fullPath
