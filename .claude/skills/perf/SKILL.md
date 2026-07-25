@@ -1,15 +1,10 @@
 ---
 name: perf
 description: >-
-  Measure, diagnose and A/B web performance with a real browser engine (headless
-  Chrome over the DevTools Protocol) instead of guessing. Use when the user says
-  "why is this site slow", "improve the PageSpeed / Lighthouse score", "measure
-  performance", "check Core Web Vitals / LCP / FCP / CLS / TBT", "profile the
-  homepage", "did that optimization actually help", "/perf", or asks to optimize
-  load time on any URL. Also use BEFORE shipping any change that touches
-  bundling, chunk splitting, preload/prefetch hints, lazy loading, fonts or
-  images - this skill exists because those changes routinely measure worse than
-  doing nothing.
+  Measure and A/B web performance with headless Chrome instead of
+  guessing. Use for slow sites, Lighthouse/PageSpeed scores, Core Web Vitals
+  (LCP/FCP/CLS/TBT), /perf, and BEFORE shipping bundling, lazy-loading, font,
+  or image changes.
 ---
 
 # perf

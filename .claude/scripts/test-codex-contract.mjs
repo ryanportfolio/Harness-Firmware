@@ -37,7 +37,7 @@ function frontmatter(relativePath) {
     const index = lines.findIndex((line) => line.startsWith(`${key}:`));
     if (index < 0) return "";
     const raw = lines[index].slice(key.length + 1).trim();
-    if (raw === ">" || raw === "|") {
+    if (/^[>|][-+]?$/.test(raw)) {
       const block = [];
       for (let cursor = index + 1; cursor < lines.length && /^\s/.test(lines[cursor]); cursor += 1) {
         block.push(lines[cursor].trim());

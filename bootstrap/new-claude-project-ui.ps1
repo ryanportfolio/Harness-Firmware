@@ -266,7 +266,7 @@ $xaml = @'
       </Border>
       <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
         <TextBlock Text="New Claude Project" Foreground="#1C1B1A" FontSize="21" FontWeight="SemiBold"/>
-        <TextBlock Text="Scaffold a private repo from the claude-starter template"
+        <TextBlock Text="Scaffold a private repo from the Harness Firmware template"
                    Foreground="#8A847C" FontSize="12.5" Margin="0,2,0,0"/>
       </StackPanel>
     </StackPanel>

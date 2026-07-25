@@ -55,7 +55,15 @@ try {
     )) {
         Assert-True (Test-Path -LiteralPath (Join-Path $target $required) -PathType Leaf) "Generated project is missing $required"
     }
-    foreach ($forbidden in @('bootstrap', '.claude-plugin', '.github\workflows\validate-template.yml', '.tmp-video-7m')) {
+    foreach ($forbidden in @(
+        'bootstrap',
+        '.claude-plugin',
+        '.github\workflows\validate-template.yml',
+        '.github\ISSUE_TEMPLATE',
+        'CHANGELOG.md',
+        'CONTRIBUTING.md',
+        '.tmp-video-7m'
+    )) {
         Assert-True (-not (Test-Path -LiteralPath (Join-Path $target $forbidden))) "Generated project retained $forbidden"
     }
 

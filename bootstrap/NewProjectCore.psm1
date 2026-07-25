@@ -7,10 +7,17 @@ $script:RequiredProjectFiles = @(
     '.claude\scripts\sync-codex-skills.mjs'
 )
 
+# Mirrors TEMPLATE_ONLY_PATHS in new-claude-project.sh and the Step 3 deletion
+# list in .claude\skills\init-project\SKILL.md. Keep all three in sync. These
+# files maintain or distribute the template itself; a spawned project must not
+# inherit them as if they were its own history, process, or support links.
 $script:TemplateOnlyPaths = @(
     'bootstrap',
     '.claude-plugin',
-    '.github\workflows\validate-template.yml'
+    '.github\workflows\validate-template.yml',
+    '.github\ISSUE_TEMPLATE',
+    'CHANGELOG.md',
+    'CONTRIBUTING.md'
 )
 
 function Write-NewProjectLog {
@@ -130,7 +137,7 @@ function Resolve-NewProjectLocalTemplate {
         }
     }
 
-    throw 'No local template snapshot was found. Re-extract the complete release ZIP or run from the claude-starter repository.'
+    throw 'No local template snapshot was found. Re-extract the complete release ZIP or run from the Harness Firmware repository.'
 }
 
 function Assert-NewProjectContract {
@@ -157,6 +164,26 @@ function Assert-NewProjectContract {
     }
 }
 
+function Remove-NewProjectEmptyGithubDirectories {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Target
+    )
+
+    # Removing the workflow and the issue templates can empty .github\ out. Only
+    # delete directories that are actually empty, so a project that ships its
+    # own workflows keeps them.
+    foreach ($relativePath in @('.github\workflows', '.github')) {
+        $fullPath = Join-Path $Target $relativePath
+        if (Test-Path -LiteralPath $fullPath -PathType Container) {
+            $remaining = @(Get-ChildItem -LiteralPath $fullPath -Force)
+            if ($remaining.Count -eq 0) {
+                Remove-Item -Force -LiteralPath $fullPath
+            }
+        }
+    }
+}
+
 function Remove-NewProjectLocalTemplateFiles {
     param(
         [Parameter(Mandatory = $true)]
@@ -178,6 +205,8 @@ function Remove-NewProjectLocalTemplateFiles {
     if (Test-Path -LiteralPath $readmePath) {
         Remove-Item -Force -LiteralPath $readmePath
     }
+
+    Remove-NewProjectEmptyGithubDirectories -Target $Target
 }
 
 function Copy-NewProjectTemplate {
@@ -218,8 +247,8 @@ function Copy-NewProjectTemplate {
     else {
         $copy = Invoke-NewProjectNative -File 'robocopy' -Arguments @(
             $TemplateRoot, $Target, '/E',
-            '/XD', '.git', 'bootstrap', '.claude-plugin', '.tmp*', 'dist', 'build', '.worktrees', 'worktrees',
-            '/XF', '.git', 'README.md', 'validate-template.yml'
+            '/XD', '.git', 'bootstrap', '.claude-plugin', 'ISSUE_TEMPLATE', '.tmp*', 'dist', 'build', '.worktrees', 'worktrees',
+            '/XF', '.git', 'README.md', 'validate-template.yml', 'CHANGELOG.md', 'CONTRIBUTING.md'
         ) -LogAction $LogAction -Tone 'dim' -QuietOutput
         if ($copy.ExitCode -ge 8) {
             throw "Template copy failed (robocopy exit $($copy.ExitCode))."
@@ -257,10 +286,10 @@ function Remove-NewProjectTemplateFiles {
     )
 
     Write-NewProjectLog $LogAction 'Stripping template-only files and replacing README.md ...' 'out'
-    $removeArgs = @(
-        '-C', $Target, 'rm', '-rq', '--ignore-unmatch', '--',
-        'bootstrap', '.claude-plugin', '.github/workflows/validate-template.yml', 'README.md'
-    )
+    $trackedTemplateOnly = @($script:TemplateOnlyPaths | ForEach-Object { $_ -replace '\\', '/' })
+    $removeArgs = @('-C', $Target, 'rm', '-rq', '--ignore-unmatch', '--') +
+        $trackedTemplateOnly +
+        @('README.md')
     $remove = Invoke-NewProjectNative -File 'git' -Arguments $removeArgs -LogAction $LogAction -Tone 'dim'
     if ($remove.ExitCode -ne 0) {
         throw 'Failed to remove template-only files from the cloned repository.'
@@ -272,6 +301,8 @@ function Remove-NewProjectTemplateFiles {
             Remove-Item -Recurse -Force -LiteralPath $fullPath
         }
     }
+
+    Remove-NewProjectEmptyGithubDirectories -Target $Target
 
     Initialize-NewProjectReadme -Target $Target -Name $Name
     $add = Invoke-NewProjectNative -File 'git' -Arguments @('-C', $Target, 'add', 'README.md') -LogAction $LogAction -Tone 'dim'
@@ -382,7 +413,7 @@ function Invoke-NewProject {
     $addAll = Invoke-NewProjectNative -File 'git' -Arguments @('-C', $target, 'add', '-A') -LogAction $LogAction -Tone 'dim'
     if ($addAll.ExitCode -ne 0) { throw 'Failed to stage the local template copy.' }
     $commitLocal = Invoke-NewProjectNative -File 'git' -Arguments @(
-        '-C', $target, 'commit', '-qm', 'Initialize from claude-starter template'
+        '-C', $target, 'commit', '-qm', 'Initialize from Harness Firmware template'
     ) -LogAction $LogAction
     if ($commitLocal.ExitCode -ne 0) { throw 'Failed to commit the local template copy.' }
 

@@ -12,7 +12,7 @@ Run it ONCE per spawned project. If `grep -c "FILL IN" CLAUDE.md` returns 0, the
 
 Check `git remote get-url origin` before changing files. If it points to `ryanportfolio/AI-Firmware` (or the old name `ryanportfolio/claude-starter`), this is the canonical template: do not initialize, delete template assets, prune skills, or rewrite its generic defaults. Explain that the markers are intentional and stop.
 
-If the repo still has the canonical `# Agent firmware` README plus both `bootstrap/` and `.claude-plugin/`, ask whether this is a template checkout or maintenance fork versus a spawned project, regardless of its origin name. Do not delete those assets until the user confirms it is spawned. Their answer is authoritative; repository names alone are ambiguous.
+If the repo still has a canonical template README (`# Harness Firmware`, or `# Agent firmware` in a checkout made before the rename) plus both `bootstrap/` and `.claude-plugin/`, ask whether this is a template checkout or maintenance fork versus a spawned project, regardless of its origin name. Do not delete those assets until the user confirms it is spawned. Their answer is authoritative; repository names alone are ambiguous.
 
 ## Step 1: Detect the stack (no questions yet)
 
@@ -34,6 +34,8 @@ Plain chat, numbered (popup tools are banned). Only ask what's actually unknown 
 3. **Sandbox capabilities:** can sessions in this environment run installs, builds, type-checks, tests meaningfully? Can the user reach a dev server the session starts? Is there a browser?
 4. **Authoritative verification:** what's the final word that a change works — local test suite, CI, a deploy log?
 5. **Hard lines:** anything that must ALWAYS go through the user (installs, migrations, deploys, destructive ops)?
+6. **Prose mode:** how should replies read: **normal** (default), or the `caveman` compression at **lite**, **full**, or **ultra**? The template ships caveman ultra because its maintainer wants it; a spawned project starts normal unless the user asks otherwise.
+7. **Skill preset:** **full** (every starter skill, minus the profile pruning below) or **minimal** (drops the twelve situational extras; the core-loop and discipline skills stay)? Default full. Offer minimal when the user cares about per-turn context weight.
 
 If the user doesn't know yet (brand-new project), write the honest default: "not yet decided — ask before installs/migrations/deploys" and move on. Don't stall setup on undecided infrastructure.
 
@@ -42,8 +44,22 @@ If the user doesn't know yet (brand-new project), write the honest default: "not
 - Replace the **verification** FILL IN section with the real answer from Step 2 (what this sandbox can/can't verify, what the authoritative signal is, what to flag-as-risk instead of claim).
 - Replace the **Environment & Deploy Target** FILL IN section with the deploy target, install policy, migration policy, and hard lines.
 - Delete the `STARTER TEMPLATE NOTE` comment block and every `FILL IN` comment.
-- Delete `.claude-plugin/`, `bootstrap/`, and `.github/workflows/validate-template.yml` — they maintain or distribute the template and must not run in spawned projects. Remove empty `.github/workflows/` and `.github/` directories afterward.
+- Delete the template-only paths — they maintain, document, or distribute the template itself and must not ship as if they were this project's own history, process, or support links:
+  `.claude-plugin/`, `bootstrap/`, `.github/workflows/validate-template.yml`, `.github/ISSUE_TEMPLATE/`, `CHANGELOG.md`, `CONTRIBUTING.md`.
+  Then remove `.github/workflows/` and `.github/` if those deletions left them empty (a project that ships its own workflows keeps them).
+  This list is mirrored in `bootstrap/new-claude-project.sh` (`TEMPLATE_ONLY_PATHS`) and `bootstrap/NewProjectCore.psm1` (`$script:TemplateOnlyPaths`); the three must agree.
 - Keep the section structure — future sessions navigate by those headings.
+
+## Step 3b: Apply the prose mode (two files, keep them agreeing)
+
+The prose default is asserted twice: `CLAUDE.md` (project memory) and `.claude/hooks/session-start.sh` (injected context at session start). A mismatch is a bug: the hook wins in practice while the user reads CLAUDE.md, so they argue forever.
+
+The hook's caveman parts are wrapped in three marked blocks: `caveman:directive` (the `print_caveman_directive` function), `caveman:reminder` (its bullet inside `print_skill_reminders`), and `caveman:call` (the call near the bottom). Each is `# >>> <id>:begin ... # <<< <id>:end`.
+
+- **normal**: delete the `## Default prose mode: caveman ultra` section from `CLAUDE.md`, and delete all three marked hook blocks, marker comments included. Leave the `caveman` skill installed unless Step 5 prunes it; the user can still invoke it on demand, it just isn't the default.
+- **lite / full / ultra**: keep both places and rewrite the level in both: the CLAUDE.md heading plus its first line, and in the hook the `caveman ultra` text, the `args: "ultra"` argument, and the `/caveman ultra` in the reminder bullet. The shipped descriptor ("terse, abbreviated, arrows for causality") describes ultra, so match it to the chosen level (see `.claude/skills/caveman/SKILL.md` intensity table).
+
+Verify: `grep -rn "caveman" CLAUDE.md .claude/hooks/session-start.sh` returns either nothing (normal) or the same level everywhere. Then `bash -n .claude/hooks/session-start.sh`.
 
 ## Step 4: Seed the reference files
 
@@ -65,6 +81,24 @@ If the user doesn't know yet (brand-new project), write the honest default: "not
 
 The table is a floor, not a ceiling — offer obvious extras ("no frontend planned, also drop `humanizer`? it's for prose deliverables"). Each `off` saves its description from every turn (`bash .claude/scripts/context-weight.sh` shows per-skill weight); takes effect next session.
 
+**Skill preset.** The Step 2 answer decides how much survives the profile pruning:
+
+- **full**: keep everything the profile table left; nothing further to do.
+- **minimal**: delete the situational extras from `.claude/skills/` and keep the core-loop and discipline tiers. The extras are `advocate`, `conflict`, `enhance-prompt`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `humanizer`, `lab`, `perf`, `purposeful-writing`, `why`, plus `caveman` unless Step 2 chose a caveman prose mode (delete it otherwise). These are the same three tiers `README.md` lists; keep the wording in both places agreeing.
+
+Do not delete past the extras. The core-loop and discipline skills are named by the always-loaded layer, so cutting into them reproduces the bug Step 3b exists to prevent.
+
+Deletion is the same mechanism as the template-asset removal in Step 3: remove the skill directory outright. It is stronger than `"off"`: the folder is gone, so drop the now-dead `skillOverrides` keys instead of leaving them pointing at nothing. Say the two consequences out loud before deleting: the weekly drift check will count the removed files as template drift, and getting a skill back means `/sync-starter` (recoverable, not permanent).
+
+Confirm the list with the user before deleting: minimal is a taste call, and a skill they wanted back mid-project is friction.
+
+**Keep the always-loaded files honest.** Two files name skills every turn and must not point at a deleted folder:
+
+- `.claude/hooks/session-start.sh` — `print_skill_reminders` lists `applying-best-practices`, `recall`, `verification-before-completion`, `systematic-debugging`, `test-driven-development`, `brainstorming`, `safe-ship`, `impartial-review` (all survive minimal), plus the `caveman` bullet Step 3b already manages. If the profile table or an extra offer removed any of those, delete its bullet too.
+- `CLAUDE.md` — the "Welcome correction" line ends with `/why`. `why` is an extra, so minimal deletes it: drop that `/why` reference in the same pass.
+
+Verify: `grep -rn "/why" CLAUDE.md` returns nothing, and for each other deleted skill `grep -rn "<name>" CLAUDE.md .claude/hooks/session-start.sh` turns up no line telling a session to invoke it. Read the hits rather than counting them — names like `lab` and `perf` also occur as ordinary words. Then `bash -n .claude/hooks/session-start.sh`.
+
 **Best-practices catalog.** Open `.claude/skills/applying-best-practices/SKILL.md` — it ships as a generic web/TS baseline:
 
 - Non-web or non-JS project → cut the React/bundle/query-cache sections entirely; keep the discipline section and the Async/IO + JS-perf generics that still apply (or their ecosystem equivalents).
@@ -73,14 +107,15 @@ The table is a floor, not a ceiling — offer obvious extras ("no frontend plann
 
 ## Step 6: README
 
-If `README.md` is the spawn stub (`# <name>` only) or still starts with the canonical `# Agent firmware` heading, ask the user for a one-line project description and replace it minimally: name, one-liner, how to run (from `commands.md`). Don't write aspirational docs for code that doesn't exist.
+If `README.md` is the spawn stub (`# <name>` only) or still starts with a canonical template heading (`# Harness Firmware`, or the pre-rename `# Agent firmware`), ask the user for a one-line project description and replace it minimally: name, one-liner, how to run (from `commands.md`). Don't write aspirational docs for code that doesn't exist.
 
 ## Step 6b: Sync Codex skill adapters
 
 Run `node .claude/scripts/sync-codex-skills.mjs --write` after applying the
-profile. The generator mirrors active skill metadata into thin
+profile and the preset. The generator mirrors active skill metadata into thin
 `.agents/skills/` adapters while leaving the canonical Claude skills unchanged.
-Disabled skills are omitted according to `skillOverrides`.
+Disabled skills are omitted according to `skillOverrides`; skills deleted by the
+preset lose their adapters in the same pass.
 
 ## Step 7: Wire the starter remote
 
@@ -101,6 +136,9 @@ Verify that no `FILL IN` markers or template-only paths from Step 3 remain. In C
 - Don't leave any `FILL IN` marker behind. `grep -n "FILL IN" CLAUDE.md` must return nothing at the end.
 - Don't initialize a canonical or forked `AI-Firmware` (formerly `claude-starter`) template checkout; its markers and template assets are intentional.
 - Don't leave template CI or distribution files in a spawned project.
+- Don't let `CLAUDE.md` and the session-start hook disagree about prose mode; half-removed caveman is worse than either setting.
+- Don't assume the caveman default: the template keeps it, spawned projects start normal unless the user picks it.
+- Don't delete skills past the minimal list to look tidy, and don't run the preset without confirming the list first. A deleted skill that `CLAUDE.md` or the session-start hook still names is an every-turn instruction to invoke something that isn't there.
 - Don't pad the reference files with boilerplate prose — they're lookup tables for future sessions, not documentation theater.
 - Don't copy full skills into `.agents/skills/` — generated adapters keep
   `.claude/skills/` as the single source of truth for both runtimes.
