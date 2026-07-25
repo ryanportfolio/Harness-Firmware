@@ -6,10 +6,6 @@ A portable operating layer for AI coding agents: standing rules, on-demand
 skills, committed memory, session hooks, and sync scripts. Claude Code gets the
 full system. Codex gets a safe boundary in `AGENTS.md` and the same playbooks.
 
-It began as `claude-starter` and shipped briefly as AI Firmware. The frame that
-stuck is firmware: the small layer the agent harness boots before it touches
-your code. The repo URL keeps the old name.
-
 ## 60-second quickstart
 
 ### skills only (start here)
@@ -22,7 +18,9 @@ Adds the skill set to a project you already have. Nothing else changes.
 ```
 
 Plugin skills are namespaced, for example `/claude-starter:recall`. This path
-needs the repository to be public.
+needs the repository to be public. The `AI-Firmware` URL and the
+`claude-starter` plugin id are the repo's older names, kept so existing
+installs keep working.
 
 ### full template
 
