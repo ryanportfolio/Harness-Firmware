@@ -424,4 +424,10 @@ function Invoke-NewProject {
     }
 }
 
-Export-ModuleMember -Function Test-NewProjectName, Get-NewProjectMode, Invoke-NewProject
+function Get-NewProjectTemplateOnlyPath {
+    # The single source of truth for callers outside this module, so the
+    # release builder cannot drift from the spawn path.
+    return $script:TemplateOnlyPaths
+}
+
+Export-ModuleMember -Function Test-NewProjectName, Get-NewProjectMode, Invoke-NewProject, Get-NewProjectTemplateOnlyPath
