@@ -322,7 +322,7 @@ function Invoke-NewProject {
         [Parameter(Mandatory = $true)]
         [string]$Dest,
 
-        [string]$Template = 'ryanportfolio/AI-Firmware',
+        [string]$Template = 'ryanportfolio/Harness-Firmware',
         [string]$LocalTemplate,
         [switch]$LocalOnly,
         [scriptblock]$LogAction

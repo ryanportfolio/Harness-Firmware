@@ -1,6 +1,6 @@
 # Harness Firmware
 
-[![validate-template](https://github.com/ryanportfolio/AI-Firmware/actions/workflows/validate-template.yml/badge.svg)](https://github.com/ryanportfolio/AI-Firmware/actions/workflows/validate-template.yml)
+[![validate-template](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml/badge.svg)](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml)
 
 A portable operating layer for AI coding agents: standing rules, on-demand
 skills, committed memory, session hooks, and sync scripts. Claude Code gets the
@@ -13,14 +13,13 @@ full system. Codex gets a safe boundary in `AGENTS.md` and the same playbooks.
 Adds the skill set to a project you already have. Nothing else changes.
 
 ```text
-/plugin marketplace add ryanportfolio/AI-Firmware
+/plugin marketplace add ryanportfolio/Harness-Firmware
 /plugin install claude-starter@claude-starter
 ```
 
 Plugin skills are namespaced, for example `/claude-starter:recall`. This path
-needs the repository to be public. The `AI-Firmware` URL and the
-`claude-starter` plugin id are the repo's older names, kept so existing
-installs keep working.
+needs the repository to be public. The `claude-starter` plugin id is the repo's
+original name, kept so existing installs keep working.
 
 ### full template
 
@@ -33,7 +32,7 @@ starter sync. Projects spawned this way get the skills without the namespace.
 - Windows one-click: double-click `bootstrap/New-ClaudeProject.cmd`.
 - Windows CLI: `.\bootstrap\new-claude-project.ps1 -Name my-app -Dest C:\code`
 - Windows visual launcher: download and extract
-  [`New-ClaudeProject-UI.zip`](https://github.com/ryanportfolio/AI-Firmware/releases/latest/download/New-ClaudeProject-UI.zip),
+  [`New-ClaudeProject-UI.zip`](https://github.com/ryanportfolio/Harness-Firmware/releases/latest/download/New-ClaudeProject-UI.zip),
   then double-click `New-ClaudeProject-UI.cmd`. Keep the extracted launcher,
   PowerShell module, and `template/` folder together; the bundled snapshot makes
   local-only creation work without GitHub access.

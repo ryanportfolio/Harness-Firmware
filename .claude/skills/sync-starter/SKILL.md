@@ -4,14 +4,14 @@ description: Use when the user asks to pull template improvements into a spawned
 
 # sync-starter — two-way sync with the claude-starter template
 
-Spawned projects freeze the template at spawn date; the template keeps improving. This skill closes the gap in both directions. Template repo: `ryanportfolio/AI-Firmware` (formerly `claude-starter`; the old URL redirects, but use the new one).
+Spawned projects freeze the template at spawn date; the template keeps improving. This skill closes the gap in both directions. Template repo: `ryanportfolio/Harness-Firmware` (formerly `claude-starter`; the old URL redirects, but use the new one).
 
 ## Direction A: Pull template improvements into this project
 
 ### Step 1: Wire the remote (once)
 
 ```
-git remote get-url starter || git remote add starter https://github.com/ryanportfolio/AI-Firmware.git
+git remote get-url starter || git remote add starter https://github.com/ryanportfolio/Harness-Firmware.git
 git fetch starter
 ```
 
@@ -55,8 +55,8 @@ When a skill fix / new skill / hook improvement made in THIS project is generic 
 
 1. **Genericize first.** Strip project-specific names, paths, URLs, stack assumptions — the same scrub discipline the template was built with. If it can't be genericized, it doesn't go back.
 2. **Get the change to the template repo:**
-   - If this machine has the template checked out locally (e.g. `~/code/AI-Firmware`), apply the change there directly.
-   - Otherwise clone it to scratch: `git clone https://github.com/ryanportfolio/AI-Firmware .tmp/AI-Firmware`, apply, push from there.
+   - If this machine has the template checked out locally (e.g. `~/code/Harness-Firmware`), apply the change there directly.
+   - Otherwise clone it to scratch: `git clone https://github.com/ryanportfolio/Harness-Firmware .tmp/Harness-Firmware`, apply, push from there.
 3. Commit to the template on a branch, push, open the PR (or commit to main directly if the user says so — template is solo-maintained). **Never direct-to-main for `bootstrap/`, `.claude/hooks/`, or `settings.json`**, whatever the user says: those are the spawn-critical surface, and the `validate-template` Action's `generator-smoke` job exists because spawn time is the worst possible moment for them to fail. Skill or doc prose is a different blast radius; a broken `.ps1` is not.
    - CI gates **both** `push` and `pull_request`, so direct-to-main is still checked — just after the change is live to everyone spawning a project, which is why PR is the default.
    - That dual trigger means a PR shows two check runs and sits at `mergeStateStatus: UNSTABLE` until the second finishes. Wait for it (`gh run watch <id> --exit-status`); don't merge on the first green.

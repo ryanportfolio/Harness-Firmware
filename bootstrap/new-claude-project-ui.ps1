@@ -31,7 +31,7 @@ $script:CoreModulePath = Join-Path $script:ScriptDir 'NewProjectCore.psm1'
 Import-Module -Force -Name $script:CoreModulePath
 
 $DefaultDest = Join-Path $HOME 'code'
-$DefaultTmpl = 'ryanportfolio/AI-Firmware'
+$DefaultTmpl = 'ryanportfolio/Harness-Firmware'
 $NameRegex   = '^[a-zA-Z0-9._-]+$'
 
 # --- cross-thread channel: a synchronized queue of message hashtables --------

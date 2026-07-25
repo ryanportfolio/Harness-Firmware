@@ -21,8 +21,8 @@
 
 set -euo pipefail
 
-TEMPLATE='ryanportfolio/AI-Firmware'
-TEMPLATE_URL='https://github.com/ryanportfolio/AI-Firmware.git'
+TEMPLATE='ryanportfolio/Harness-Firmware'
+TEMPLATE_URL='https://github.com/ryanportfolio/Harness-Firmware.git'
 
 # Mirrors $script:TemplateOnlyPaths in NewProjectCore.psm1 and the Step 3
 # deletion list in .claude/skills/init-project/SKILL.md. Keep all three in sync.
