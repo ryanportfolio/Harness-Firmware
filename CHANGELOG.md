@@ -41,6 +41,14 @@ condensed.
   Both parsers are fixed and the `perf` description now fits the 240-char
   contract limit.
 
+## [1.1.3]
+
+### Fixed
+
+- `/sync-starter` guards the spawn-critical surface (`bootstrap/`,
+  `.claude/hooks/`, `settings.json`) from direct-to-main commits and ships the
+  post-squash branch re-sync fix to plugin installs.
+
 ## [1.1.2]
 
 ### Added
