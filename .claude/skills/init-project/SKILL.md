@@ -10,7 +10,7 @@ Run it ONCE per spawned project. If `grep -c "FILL IN" CLAUDE.md` returns 0, the
 
 ## Step 0: Confirm this is a spawned project
 
-Check `git remote get-url origin` before changing files. If it points to `ryanportfolio/AI-Firmware` (or the old name `ryanportfolio/claude-starter`), this is the canonical template: do not initialize, delete template assets, prune skills, or rewrite its generic defaults. Explain that the markers are intentional and stop.
+Check `git remote get-url origin` before changing files. If it points to `ryanportfolio/Harness-Firmware` (or the old name `ryanportfolio/claude-starter`), this is the canonical template: do not initialize, delete template assets, prune skills, or rewrite its generic defaults. Explain that the markers are intentional and stop.
 
 If the repo still has a canonical template README (`# Harness Firmware`, or `# Agent firmware` in a checkout made before the rename) plus both `bootstrap/` and `.claude-plugin/`, ask whether this is a template checkout or maintenance fork versus a spawned project, regardless of its origin name. Do not delete those assets until the user confirms it is spawned. Their answer is authoritative; repository names alone are ambiguous.
 
@@ -121,7 +121,7 @@ preset lose their adapters in the same pass.
 ## Step 7: Wire the starter remote
 
 ```
-git remote get-url starter || git remote add starter https://github.com/ryanportfolio/AI-Firmware.git
+git remote get-url starter || git remote add starter https://github.com/ryanportfolio/Harness-Firmware.git
 ```
 
 This pre-wires `/sync-starter` and lets the session-start hook surface template drift ("starter differs on N files"). Remotes are local git config, not committed — mention that a new clone on another machine needs this line re-run (or the hook's URL-fallback fetch covers it when credentials allow).
@@ -135,7 +135,7 @@ Verify that no `FILL IN` markers or template-only paths from Step 3 remain. In C
 - Don't invent deploy facts or sandbox capabilities — wrong kernel rules are worse than FILL IN markers. Ask, or write the honest "undecided" default.
 - Don't run installs just to probe the stack — read manifests instead.
 - Don't leave any `FILL IN` marker behind. `grep -n "FILL IN" CLAUDE.md` must return nothing at the end.
-- Don't initialize a canonical or forked `AI-Firmware` (formerly `claude-starter`) template checkout; its markers and template assets are intentional.
+- Don't initialize a canonical or forked `Harness-Firmware` (formerly `AI-Firmware`, originally `claude-starter`) template checkout; its markers and template assets are intentional.
 - Don't leave template CI or distribution files in a spawned project.
 - Don't let `CLAUDE.md` and the session-start hook disagree about prose mode; half-removed caveman is worse than either setting.
 - Don't silently drop caveman: ultra is the inherited default and stays unless the user picks another level. Equally, don't keep it without offering the choice -- an unexplained terse agent reads as broken to a first-time user.

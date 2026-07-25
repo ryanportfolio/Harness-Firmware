@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Contributing guide
-    url: https://github.com/ryanportfolio/AI-Firmware/blob/main/CONTRIBUTING.md
+    url: https://github.com/ryanportfolio/Harness-Firmware/blob/main/CONTRIBUTING.md
     about: Dev loop, PR conventions, and what a good skill PR contains.

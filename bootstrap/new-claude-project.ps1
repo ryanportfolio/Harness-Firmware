@@ -9,7 +9,7 @@
 param(
     [string]$Name,
     [string]$Dest = "$HOME\code",
-    [string]$Template = 'ryanportfolio/AI-Firmware',
+    [string]$Template = 'ryanportfolio/Harness-Firmware',
     [switch]$LocalOnly
 )
 
