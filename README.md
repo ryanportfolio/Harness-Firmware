@@ -146,6 +146,7 @@ local deltas.
   `subagent-driven-development`, `dispatching-parallel-agents`,
   `using-git-worktrees`, `using-superpowers`, `writing-skills`,
   `applying-best-practices`, `finishing-a-development-branch`.
+- **Measurement:** `perf`.
 - **Craft:** `humanizer`.
 
 ## safety model

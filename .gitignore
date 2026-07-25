@@ -4,6 +4,10 @@
 # Per-machine Claude Code settings
 .claude/settings.local.json
 
+# Throwaway localhost TLS cert minted on demand by the perf skill's h2 test
+# server. Regenerated whenever it is missing; never belongs in a commit.
+.claude/skills/perf/.localhost-*.pem
+
 # Env / secrets
 .env
 .env.local
