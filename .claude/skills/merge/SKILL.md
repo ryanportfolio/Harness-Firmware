@@ -52,13 +52,26 @@ If `mergeable` is `CONFLICTING` or the merge is blocked by divergence:
 ```
 gh pr merge <number> --squash
 ```
-- `--squash` → squash-merge is the **default** for this repo; the PR's commits collapse into one commit on `main`.
+- `--squash` → the PR's commits collapse into one commit on `main`. This is what the user means by `/merge`; use it as the first and only attempt, and don't probe other methods first.
+- Many repos allow squash *only*. Trying `--merge` there fails outright with `GraphQL: Merge commits are not allowed on this repository. (mergePullRequest)`, and `--rebase` fails the same way when rebase merging is off. To see what a repo permits: `gh api repos/{owner}/{repo} --jq '{merge:.allow_merge_commit,squash:.allow_squash_merge,rebase:.allow_rebase_merge}'`.
+- Resulting history is `<title> (#1234)`, not `Merge pull request #...`. Don't infer the method from existing history and don't "match" an older style.
 - **No `--delete-branch`** — the one session branch is kept until the session is done.
 - **No `--merge` / `--rebase`** unless the user explicitly asked — squash is the default.
 - **No `--admin`** — do not bypass branch protection or failing required checks. If the merge is blocked by checks/protection, report why and stop (pause the cycle for that task); do not force it.
 
-### 7. Report
-Confirm the merge landed, give the PR URL, note the branch was kept. If anything blocked it (failing checks, protection, unresolved/ambiguous conflict), report the exact `gh`/`git` output and the reason — never claim success you did not verify.
+### 7. Re-sync the session branch (squash-specific, do NOT skip)
+A squash-merge lands the branch's work on `main` as **one new commit whose parents do not include the branch's commits**. The session branch is therefore instantly divergent, and its original commits are still not ancestors of `main`. Because this skill reuses ONE branch for the whole session, this happens after *every* merge, not just once. Reusing the branch for the next task without syncing makes the next PR's three-dot diff replay work that already landed, which surfaces as phantom conflicts or as silently re-applying superseded content.
+
+After each successful squash-merge, before starting the next task:
+```
+git fetch origin && git merge origin/main
+```
+The incoming squash commit carries content identical to what the branch already has, so this is normally clean. Resolve anything that does conflict under the step 5 rules (unambiguous only), then `git push`.
+
+Sanity check that it worked: `git diff origin/main --stat` should be empty, or show only work that genuinely hasn't merged yet.
+
+### 8. Report
+Confirm the merge landed, give the PR URL, note the branch was kept. Verify before claiming: `git fetch origin && git log origin/main --oneline -1` should show the squash commit — a locally-stale `origin/main` will otherwise show the *previous* PR and make a successful merge look like it did not land. If anything blocked it (failing checks, protection, unresolved/ambiguous conflict), report the exact `gh`/`git` output and the reason — never claim success you did not verify.
 
 ## Why no per-merge confirm
 
@@ -81,6 +94,7 @@ Turn the mode OFF when the user says "stop merge", "stop auto-merge", "normal mo
 - Don't push straight to `main` via `git push` — always integrate through `gh pr merge`.
 - Don't delete the branch (`--delete-branch`) — one branch for the whole session.
 - Don't switch away from squash (to `--merge`/`--rebase`) on your own — squash is the default; other methods need an explicit ask.
+- Don't reuse the session branch for the next task without the step 7 re-sync — squash leaves it divergent every time.
 - Don't bypass protections/checks (`--admin`) without an explicit ask — report the block and stop.
 - Don't guess on semantic merge conflicts — resolve the unambiguous ones, stop and ask on the rest.
-- Don't fabricate success — report the real `gh pr merge` / `git merge` outcome.
+- Don't fabricate success — report the real `gh pr merge` / `git merge` outcome, checked against freshly-fetched refs.
