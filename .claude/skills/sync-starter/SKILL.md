@@ -57,7 +57,11 @@ When a skill fix / new skill / hook improvement made in THIS project is generic 
 2. **Get the change to the template repo:**
    - If this machine has the template checked out locally (e.g. `~/code/AI-Firmware`), apply the change there directly.
    - Otherwise clone it to scratch: `git clone https://github.com/ryanportfolio/AI-Firmware .tmp/AI-Firmware`, apply, push from there.
-3. Commit to the template on a branch, push, open the PR (or commit to main directly if the user says so — template is solo-maintained).
+3. Commit to the template on a branch, push, open the PR (or commit to main directly if the user says so — template is solo-maintained). **Never direct-to-main for `bootstrap/`, `.claude/hooks/`, or `settings.json`**, whatever the user says: those are the spawn-critical surface, and the `validate-template` Action's `generator-smoke` job exists because spawn time is the worst possible moment for them to fail. Skill or doc prose is a different blast radius; a broken `.ps1` is not.
+   - CI gates **both** `push` and `pull_request`, so direct-to-main is still checked — just after the change is live to everyone spawning a project, which is why PR is the default.
+   - That dual trigger means a PR shows two check runs and sits at `mergeStateStatus: UNSTABLE` until the second finishes. Wait for it (`gh run watch <id> --exit-status`); don't merge on the first green.
+   - The template allows squash only: `gh pr merge <n> --squash`.
+   - If the change touched a skill, run `node .claude/scripts/sync-codex-skills.mjs --check` and include any regenerated adapters — CI fails on stale ones.
 4. **Bump the plugin version** when the change touches the shared surface (`.claude/skills`, `.claude/hooks`, `.claude/settings.json`): edit `version` in the template's `.claude-plugin/plugin.json` — patch for fixes, minor for new skills. Plugin installs only receive updates when this number changes; spawned projects get changes via Direction A regardless.
 5. Mention that other spawned projects pick it up via Direction A.
 
