@@ -17,9 +17,9 @@ Adds the skill set to a project you already have. Nothing else changes.
 /plugin install claude-starter@claude-starter
 ```
 
-Plugin skills are namespaced, for example `/claude-starter:recall`. This path
-needs the repository to be public. The `claude-starter` plugin id is the repo's
-original name, kept so existing installs keep working.
+Plugin skills are namespaced, for example `/claude-starter:recall`. The plugin
+id stays `claude-starter` so existing installs keep working. This path needs the
+repository to be public.
 
 ### full template
 
@@ -58,15 +58,14 @@ early:
    the user explicitly asks in the current Codex session.
 
 For a fresh project, ask Codex to initialize the starter or select the
-`init-project` skill. Its adapter delegates to the same canonical workflow
-Claude Code uses.
+`init-project` skill. Its adapter delegates to the same workflow Claude Code
+uses.
 
 ## prose mode
 
 The template answers in terse `caveman ultra` by default: replies drop articles
-and filler, code and error strings stay verbatim, and security warnings and
-irreversible-action confirmations drop back to plain prose automatically. It
-reads oddly at first and saves real tokens once you're used to it.
+and filler, code and error strings stay word for word, and security warnings and
+irreversible-action confirmations drop back to plain prose automatically.
 
 Two files assert it, and they must agree:
 
@@ -91,8 +90,7 @@ Check the two files agree afterward:
 grep -rn caveman CLAUDE.md .claude/hooks/session-start.sh
 ```
 
-Either nothing comes back, or the same level everywhere. A half-removed caveman
-is worse than either setting.
+Either nothing comes back, or the same level everywhere.
 
 ## check your install
 
@@ -123,29 +121,25 @@ the skill description line item by about a third.
 
 ## why this exists
 
-A coding agent needs habits. It also needs restraint.
-
-If everything goes into the prompt, every turn gets heavier. If nothing is
-stored, every project repeats the same mistakes. If Claude-specific automation
-leaks into Codex, useful defaults become unsafe commands.
+Everything you put in the prompt makes every turn heavier. Everything you leave
+out, a project relearns the hard way. And Claude-specific automation that leaks
+into Codex turns useful defaults into unsafe commands.
 
 So the work is split: the kernel stays small and always loaded, skills hold the
 long playbooks until a task calls for them, reference files keep project memory
 out of the transcript, hooks handle cheap startup checks, and sync scripts move
 reusable improvements between projects.
 
-One repo learns. The next repo should not start dumb.
-
 ## runtime boundary
 
 | Runtime | Entry point | Use it for |
 |---|---|---|
 | Claude Code | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/`, `.claude/skills/` | The full template: kernel rules, slash skills, project memory, session hook, plugin path, and Claude-specific workflow rules. |
-| Codex | `AGENTS.md`, `.agents/skills/` | A safe compatibility layer plus native skill discovery, backed by the unchanged canonical Claude workflows. |
+| Codex | `AGENTS.md`, `.agents/skills/` | A safe compatibility layer plus native skill discovery, backed by the same Claude workflows, unchanged. |
 
 Codex discovers thin adapters under `.agents/skills/`. Each adapter delegates to
-the matching canonical `.claude/skills/` workflow, so both runtimes use one
-source of truth. `AGENTS.md` defines the safety boundary. Codex does not run
+the matching `.claude/skills/` workflow, so both runtimes use one source of
+truth. `AGENTS.md` defines the safety boundary. Codex does not run
 Claude SessionStart hooks. The template intentionally has no project Codex hook:
 `AGENTS.md` already loads natively, while command hooks add a separate trust and
 platform-failure surface.
@@ -156,7 +150,7 @@ platform-failure surface.
 |---|---|
 | `CLAUDE.md` | Claude Code kernel rules loaded every turn: verification, git workflow, subagent discipline, and context restraint. Two placeholder sections are filled per project by `/init-project`. |
 | `AGENTS.md` | Codex boundary. Inherits project facts without inheriting Claude-only hooks or automatic git behavior. |
-| `.claude/skills/` | Canonical Markdown playbooks used by Claude Code and Codex. |
+| `.claude/skills/` | The Markdown playbooks themselves, used by Claude Code and Codex. |
 | `.agents/skills/` | Generated Codex-native adapters; metadata only, no duplicated workflow bodies. |
 | `.claude/reference/` | Durable project memory: secrets, architecture, pitfalls, commands, tech stack, and deployment notes. |
 | `.claude/hooks/session-start.sh` | Claude Code SessionStart hook for drift checks, overlap warnings, and Claude-specific defaults. |
@@ -179,13 +173,10 @@ Use the template while you work, then feed the useful parts back into it.
 - `/optimize-context` is the playbook for cutting context that no longer earns
   its place.
 
-Capture the lesson, keep it out of the kernel unless it must load every turn,
-and make useful generic work travel.
-
 ## skill set
 
-Three tiers. `/init-project` offers a `minimal` preset that ships the first two
-and drops the extras, which keeps the per-turn description cost down.
+Three tiers. The `minimal` preset in `/init-project` keeps the first two and
+drops the extras listed below.
 
 - **Core loop** (project lifecycle and shipping): `init-project`, `recall`,
   `learning`, `sync-starter`, `optimize-context`, `addskill`, `safe-ship`, `pr`,
@@ -200,8 +191,8 @@ and drops the extras, which keeps the per-turn description cost down.
   `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `humanizer`, `lab`,
   `perf`, `purposeful-writing`, `why`.
 
-See `.claude/skills/PROVENANCE.md` for forked skill provenance, licenses, and
-local deltas.
+`.claude/skills/PROVENANCE.md` records where the forked skills came from, their
+licenses, and what changed here.
 
 ## safety model
 
