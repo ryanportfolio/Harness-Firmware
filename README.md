@@ -165,7 +165,6 @@ platform-failure surface.
 Use the template while you work, then feed the useful parts back into it.
 
 - `/recall save <text>` records a project gotcha in the right reference file.
-- `/learning` captures what mattered after a multi-attempt debug arc.
 - `/sync-starter` moves a generic improvement back to the template or pulls a
   template improvement into a spawned project.
 - `bash .claude/scripts/context-weight.sh` shows what the always-loaded layer
@@ -179,17 +178,16 @@ Three tiers. The `minimal` preset in `/init-project` keeps the first two and
 drops the extras listed below.
 
 - **Core loop** (project lifecycle and shipping): `init-project`, `recall`,
-  `learning`, `sync-starter`, `optimize-context`, `addskill`, `safe-ship`, `pr`,
+  `sync-starter`, `optimize-context`, `addskill`, `safe-ship`, `pr`,
   `merge`.
 - **Discipline** (how work gets done): `brainstorming`, `writing-plans`,
-  `executing-plans`, `systematic-debugging`, `test-driven-development`,
-  `verification-before-completion`, `impartial-review`,
-  `applying-best-practices`, `finishing-a-development-branch`,
+  `executing-plans`, `systematic-debugging`, `impartial-review`,
+  `finishing-a-development-branch`,
   `subagent-driven-development`, `dispatching-parallel-agents`,
-  `using-git-worktrees`, `using-superpowers`, `writing-skills`.
+  `using-superpowers`, `writing-skills`.
 - **Extras** (situational): `advocate`, `caveman`, `conflict`, `enhance-prompt`,
   `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `humanizer`, `lab`,
-  `perf`, `purposeful-writing`, `why`.
+  `purposeful-writing`, `why`.
 
 `.claude/skills/PROVENANCE.md` records where the forked skills came from, their
 licenses, and what changed here.
