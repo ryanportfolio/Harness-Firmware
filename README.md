@@ -103,21 +103,20 @@ and any `FILL IN` markers survived `/init-project`.
 
 ## what the always-loaded layer costs
 
-Measured on this template at version 1.2.0 with
-`bash .claude/scripts/context-weight.sh`:
+Measured on this template with `bash .claude/scripts/context-weight.sh`:
 
 | Always-loaded piece | Per turn |
 |---|---|
 | `CLAUDE.md` kernel (5.5 KB) | ~1,400 tokens |
-| 35 skill descriptions in the available-skills list | ~1,400 tokens |
-| **Total (file-measurable)** | **~2,800 tokens** |
+| 20 skill descriptions in the available-skills list | ~800 tokens |
+| **Total (file-measurable)** | **~2,200 tokens** |
 
 `doctor.mjs` reports the same measure over repo files only; `context-weight.sh`
 also counts your machine-global `~/.claude/CLAUDE.md`. MCP tool lists,
 marketplace skill descriptions, and per-machine auto-memory are not measured by
 either; check those in session. Run it in your own project before deciding a
 rule deserves the kernel. The `minimal` preset drops the extras tier, cutting
-the skill description line item by about a third.
+the skill description line item by about half.
 
 ## why this exists
 
