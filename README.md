@@ -178,14 +178,10 @@ Three tiers. The `minimal` preset in `/init-project` keeps the first two and
 drops the extras listed below.
 
 - **Core loop** (project lifecycle and shipping): `init-project`, `recall`,
-  `sync-starter`, `optimize-context`, `addskill`, `safe-ship`, `pr`,
-  `merge`.
+  `sync-starter`, `optimize-context`, `addskill`, `merge`.
 - **Discipline** (how work gets done): `brainstorming`, `writing-plans`,
-  `executing-plans`, `systematic-debugging`, `impartial-review`,
-  `finishing-a-development-branch`,
-  `subagent-driven-development`, `dispatching-parallel-agents`,
-  `using-superpowers`, `writing-skills`.
-- **Extras** (situational): `advocate`, `caveman`, `conflict`, `enhance-prompt`,
+  `impartial-review`, `writing-skills`.
+- **Extras** (situational): `advocate`, `caveman`, `enhance-prompt`,
   `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `humanizer`, `lab`,
   `purposeful-writing`, `why`.
 

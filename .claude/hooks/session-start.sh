@@ -84,9 +84,7 @@ SKILLS
   # <<< caveman:reminder:end <<<
   cat >&2 <<'SKILLS'
   - recall                        → BEFORE work in unfamiliar areas; /recall save <text> after gotchas
-  - systematic-debugging          → ON any bug, test failure, or unexpected behavior
   - brainstorming                 → BEFORE designing new features or behavior changes
-  - safe-ship                     → BEFORE pushing / opening a PR
   - impartial-review              → AFTER substantive changes, before merging
 SKILLS
 }

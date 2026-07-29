@@ -35,7 +35,7 @@ This is the Codex boundary for repositories using the AI Operating System starte
 - `.claude/skills/` is canonical; `.agents/skills/` contains Codex adapters. Treat `$ARGUMENTS` as invocation input.
 - Read relevant `.claude/reference/` material before unfamiliar work and `.agents/CODEX-SKILL-COMPATIBILITY.md` before adapted, gated, or dangerous skills.
 - After canonical skill changes run `node .claude/scripts/sync-codex-skills.mjs --write`.
-- Tool mapping: `.claude/skills/using-superpowers/references/codex-tools.md`.
+- Tool mapping: `.agents/codex-tools.md`.
 
 ## Starter Maintenance
 
