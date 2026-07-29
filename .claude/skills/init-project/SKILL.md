@@ -69,7 +69,7 @@ Verify: `grep -rn "caveman" CLAUDE.md .claude/hooks/session-start.sh` returns ei
 - `deployment.md` — the deploy answers from Step 2.
 - Leave `pitfalls.md` / `architecture.md` / `secrets.md` skeletal — they fill organically via `/recall save`.
 
-## Step 5: Apply the profile — prune skills + tune best-practices
+## Step 5: Apply the profile — prune skills
 
 **Skill pruning.** The profile from Step 2 disables skills that will never fire in this project, via `skillOverrides` in committed `.claude/settings.json` (`"off"` = hidden from the picker AND the per-turn skills list; re-enable any time by removing the key). Project skills use the bare directory name as the key:
 
@@ -78,14 +78,14 @@ Verify: `grep -rn "caveman" CLAUDE.md .claude/hooks/session-start.sh` returns ei
 | web-app | — (full set) |
 | backend / CLI / library | `forge-repo-ui-skill`, `lab` |
 | data / notebooks | `forge-repo-ui-skill`, `lab` |
-| writing / docs | `forge-repo-ui-skill`, `lab`, `test-driven-development`, `subagent-driven-development` |
+| writing / docs | `forge-repo-ui-skill`, `lab`, `subagent-driven-development` |
 
 The table is a floor, not a ceiling — offer obvious extras ("no frontend planned, also drop `humanizer`? it's for prose deliverables"). Each `off` saves its description from every turn (`bash .claude/scripts/context-weight.sh` shows per-skill weight); takes effect next session.
 
 **Skill preset.** The Step 2 answer decides how much survives the profile pruning:
 
 - **full**: keep everything the profile table left; nothing further to do.
-- **minimal**: delete the situational extras from `.claude/skills/` and keep the core-loop and discipline tiers. The extras are `advocate`, `conflict`, `enhance-prompt`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `humanizer`, `lab`, `perf`, `purposeful-writing`, `why`, plus `caveman` unless Step 2 chose a caveman prose mode (delete it otherwise). These are the same three tiers `README.md` lists; keep the wording in both places agreeing.
+- **minimal**: delete the situational extras from `.claude/skills/` and keep the core-loop and discipline tiers. The extras are `advocate`, `conflict`, `enhance-prompt`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `humanizer`, `lab`, `purposeful-writing`, `why`, plus `caveman` unless Step 2 chose a caveman prose mode (delete it otherwise). These are the same three tiers `README.md` lists; keep the wording in both places agreeing.
 
 Do not delete past the extras. The core-loop and discipline skills are named by the always-loaded layer, so cutting into them reproduces the bug Step 3b exists to prevent.
 
@@ -95,16 +95,10 @@ Confirm the list with the user before deleting: minimal is a taste call, and a s
 
 **Keep the always-loaded files honest.** Two files name skills every turn and must not point at a deleted folder:
 
-- `.claude/hooks/session-start.sh` — `print_skill_reminders` lists `applying-best-practices`, `recall`, `verification-before-completion`, `systematic-debugging`, `test-driven-development`, `brainstorming`, `safe-ship`, `impartial-review` (all survive minimal), plus the `caveman` bullet Step 3b already manages. If the profile table or an extra offer removed any of those, delete its bullet too.
+- `.claude/hooks/session-start.sh` — `print_skill_reminders` lists `recall`, `systematic-debugging`, `brainstorming`, `safe-ship`, `impartial-review` (all survive minimal), plus the `caveman` bullet Step 3b already manages. If the profile table or an extra offer removed any of those, delete its bullet too.
 - `CLAUDE.md` — the "Welcome correction" line ends with `/why`. `why` is an extra, so minimal deletes it: drop that `/why` reference in the same pass.
 
-Verify: `grep -rn "/why" CLAUDE.md` returns nothing, and for each other deleted skill `grep -rn "<name>" CLAUDE.md .claude/hooks/session-start.sh` turns up no line telling a session to invoke it. Read the hits rather than counting them — names like `lab` and `perf` also occur as ordinary words. Then `bash -n .claude/hooks/session-start.sh`.
-
-**Best-practices catalog.** Open `.claude/skills/applying-best-practices/SKILL.md` — it ships as a generic web/TS baseline:
-
-- Non-web or non-JS project → cut the React/bundle/query-cache sections entirely; keep the discipline section and the Async/IO + JS-perf generics that still apply (or their ecosystem equivalents).
-- Web project → trim to the actual stack (e.g. drop query-cache rules if there's no query library yet; note the framework's idioms).
-- Empty repo → leave as-is, note in the file that it's untuned.
+Verify: `grep -rn "/why" CLAUDE.md` returns nothing, and for each other deleted skill `grep -rn "<name>" CLAUDE.md .claude/hooks/session-start.sh` turns up no line telling a session to invoke it. Read the hits rather than counting them — names like `lab` also occur as ordinary words. Then `bash -n .claude/hooks/session-start.sh`.
 
 ## Step 6: README
 
