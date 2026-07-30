@@ -5,6 +5,8 @@
 A portable operating layer for AI coding agents: standing rules, on-demand
 skills, committed memory, session hooks, and sync scripts. Claude Code gets the
 full system. Codex gets a safe boundary in `AGENTS.md` and the same playbooks.
+It compounds: when work hits a gotcha, one command saves the lesson as
+committed project memory, and every later session starts with it loaded.
 
 ## 60-second quickstart
 
@@ -129,6 +131,28 @@ long playbooks until a task calls for them, reference files keep project memory
 out of the transcript, hooks handle cheap startup checks, and sync scripts move
 reusable improvements between projects.
 
+## work loop
+
+The loop is the point. An agent with no durable memory relearns the same
+gotcha in every session; here you write it down once and it stays fixed. Each
+lesson gets a named home (`.claude/reference/` for project facts, the
+`CLAUDE.md` kernel for cross-cutting rules), travels with the repo, and is
+loaded before the work that needs it. Use the template while you work, then
+feed the useful parts back into it:
+
+- `/recall save <text>` records a project gotcha in the right reference file.
+- `/sync-starter` moves a generic improvement back to the template, so every
+  future project starts with it, or pulls a template improvement into a
+  spawned project.
+- `bash .claude/scripts/context-weight.sh` shows what the always-loaded layer
+  costs per turn.
+- `/optimize-context` is the playbook for cutting context that no longer earns
+  its place.
+
+The last two keep the loop honest: every saved rule costs tokens on every
+turn, so lessons that stop earning their place get pruned instead of piling
+up.
+
 ## runtime boundary
 
 | Runtime | Entry point | Use it for |
@@ -158,18 +182,6 @@ platform-failure surface.
 | `.claude/settings.json` | Claude Code hook wiring plus a Bash permission allowlist. |
 | `.claude-plugin/` | Claude plugin and marketplace manifests. Template-only for spawned projects. |
 | `bootstrap/` | Project creation, fork retargeting, and machine setup scripts. |
-
-## work loop
-
-Use the template while you work, then feed the useful parts back into it.
-
-- `/recall save <text>` records a project gotcha in the right reference file.
-- `/sync-starter` moves a generic improvement back to the template or pulls a
-  template improvement into a spawned project.
-- `bash .claude/scripts/context-weight.sh` shows what the always-loaded layer
-  costs per turn.
-- `/optimize-context` is the playbook for cutting context that no longer earns
-  its place.
 
 ## skill set
 
