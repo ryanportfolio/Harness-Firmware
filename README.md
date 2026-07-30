@@ -131,12 +131,11 @@ long playbooks until a task calls for them, reference files keep project memory
 out of the transcript, hooks handle cheap startup checks, and sync scripts move
 reusable improvements between projects.
 
-The design follows what is becoming standard practice for skill libraries:
-progressive disclosure (lightweight descriptions always loaded, full playbooks
-only on invocation), descriptions written as routing signals ("use when the
-user says...") rather than documentation, and library governance — named
-provenance for every forked skill, periodic usage audits that prune what stops
-earning its place, and a measured context budget for the always-loaded layer.
+This matches emerging practice for skill libraries. Only the short
+descriptions load every turn; the full playbook loads when a skill is invoked.
+Each description says when to reach for the skill, which is what routes
+requests to it. Every skill carries a recorded origin, a periodic usage audit,
+and a measured context cost.
 
 ## work loop
 
