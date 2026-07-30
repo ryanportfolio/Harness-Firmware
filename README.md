@@ -131,6 +131,13 @@ long playbooks until a task calls for them, reference files keep project memory
 out of the transcript, hooks handle cheap startup checks, and sync scripts move
 reusable improvements between projects.
 
+The design follows what is becoming standard practice for skill libraries:
+progressive disclosure (lightweight descriptions always loaded, full playbooks
+only on invocation), descriptions written as routing signals ("use when the
+user says...") rather than documentation, and library governance — named
+provenance for every forked skill, periodic usage audits that prune what stops
+earning its place, and a measured context budget for the always-loaded layer.
+
 ## work loop
 
 The loop is the point. An agent with no durable memory relearns the same
@@ -197,7 +204,9 @@ drops the extras listed below.
   `purposeful-writing`, `why`.
 
 `.claude/skills/PROVENANCE.md` records where the forked skills came from, their
-licenses, and what changed here.
+licenses, and what changed here. Together the tiers, the provenance file, and
+the `doctor.mjs` audits act as library governance: every skill has a known
+origin, an intent-based description, and a periodic reason to keep existing.
 
 ## safety model
 
