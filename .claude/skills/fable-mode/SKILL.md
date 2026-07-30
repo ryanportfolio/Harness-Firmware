@@ -131,7 +131,7 @@ Any one of these: stop, go back to that gate.
 
 - This is a method skill, not a workflow. It changes how you execute the current task; it produces no
   files of its own.
-- It stacks with task-specific skills (/proveit, /verify, /code-review). Those are the "how to check"
+- It stacks with task-specific skills (/impartial-review, /code-review). Those are the "how to check"
   tools; this is the discipline of when to reach for them.
 - Don't apply it to trivial work. Forcing all five gates onto a two-minute edit is its own failure
   mode.
