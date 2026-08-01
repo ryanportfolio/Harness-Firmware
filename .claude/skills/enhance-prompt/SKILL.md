@@ -16,7 +16,7 @@ Look past surface wording:
 
 - "Review X" → usually audit + propose, not edit. Phase it.
 - "Add feature X" → needs scope, edge cases, UI placement
-- "Fix bug X" → needs repro steps, current vs expected behavior
+- "Fix bug X" → needs repro steps, current vs expected behavior; test infra exists → have receiver write a failing repro test before fixing, full suite green after
 - "Refactor X" → needs scope boundaries (which files, which patterns to keep)
 - "Make it better / cleaner / faster" → needs concrete success criteria
 
@@ -46,9 +46,10 @@ Craft rules for prompt body:
 - **Long pasted content top, task bottom.** 1k+ tokens of logs/docs/data → material first, instructions/question after — measurably better responses. Very long docs → add "quote the relevant parts before answering."
 - **Role line only if it changes behavior.** "You are a senior security engineer reviewing for OWASP Top 10" focuses the review; "You are a helpful assistant" dead weight.
 - **Examples when format matters.** Specific deliverable shape (severity-tagged findings, table layout) → 1-2 short `<example>` tags beat prose description. Obvious format → skip.
-- **Self-check for verifiable work.** "Before you finish, verify the change against [the failing test / a type-check / the listed criteria]". Match check to task; no generic "double-check your work" bolted onto everything.
+- **Self-check for verifiable work.** Phrase as stopping condition: "Don't finish until [the failing test passes / the type-check is clean / the listed criteria are met]" — redefines done as verified output, not produced output. Match check to task; no generic "double-check your work" bolted onto everything.
 - **General solutions, not test-passers.** Tests/specific examples present → add: "Implement the actual logic that solves the problem generally — do not hard-code values or special-case the given examples. If a test or requirement is itself wrong, say so rather than working around it."
 - **Grounding for codebase questions.** Task = answering questions about existing code → add "read the relevant files before making claims about them; don't speculate about code you haven't opened."
+- **Default skeleton for non-trivial prompts.** Context → task → constraints → verification → output format. Cold receiver scans labeled sections faster than interleaved prose. Short/simple task → skip, no ceremony.
 
 ## 4: Phase risky work
 
@@ -68,7 +69,7 @@ Always include:
 
 - **Artifacts to produce** (file edits, markdown audit, new component, verification script, etc.)
 - **Format if structured output expected** (table layout, severity-tagged list, JSON shape, fenced sections with specific headings)
-- **Verification step** — type-check, screenshot, dry-run script — matched to task
+- **Verification step** — type-check, screenshot, dry-run script — matched to task. Research/claims tasks: verify each claim against a primary source; no unverified claims in the deliverable
 - **Scope guards** — common: "don't refactor unrelated files", "don't add tests unless asked", "don't install packages without confirmation", "don't change user-facing copy outside the listed strings". Gold-plating-prone task → add: "keep the solution minimal — no extra abstractions, configurability, or defensive code beyond what the task needs."
 - **Escape hatch** — receiver hits genuine blocker (missing access, contradictory requirement, `<TODO>` unresolved) → should stop and ask, not guess. One line: "If anything here is ambiguous or blocked, ask before proceeding rather than guessing."
 
