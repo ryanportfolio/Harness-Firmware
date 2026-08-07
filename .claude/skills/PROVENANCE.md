@@ -16,6 +16,7 @@ LICENSE/NOTICE files in the skill folder.
 | `writing-skills` | obra/superpowers | MIT (in folder) | Stock |
 | `caveman` | Community token-compression pattern (viral skill, author attribution unclear) | Reimplemented here | Intensity tiers (lite/full/ultra), output budget, auto-clarity carve-outs, persistence rules |
 | `humanizer` | Community "humanizer" de-AI-writing pattern | Reimplemented here | patterns.md tell catalog; voice-matching; review-only mode |
+| `refine` | Concept from [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) Continual Harness `/refine` (MIT); no code or text vendored | Reimplemented here | Trajectory friction classes; delegates edits to recall/writing-skills; commit-per-edit as rollback snapshot |
 
 ## Homegrown (this repo)
 
