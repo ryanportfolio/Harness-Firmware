@@ -23,7 +23,8 @@ Completion bar: every user correction and every backed-out action in the traject
 
 ## Step 2: Smallest edit per friction
 
-- One friction → one smallest edit → one commit. The commit message quotes the trajectory evidence. The commit is the rollback snapshot.
+- One friction → one smallest edit → one commit. The commit message quotes the trajectory evidence. The commit is the rollback snapshot. Stage only the harness files that edit touched; the task's own in-flight work never rides along.
+- If a code or config change would remove the friction outright, propose that instead of documenting the workaround. A note telling the next session to pass a flag is worse than the flag being unnecessary.
 - A skill that misfired is a description bug, not a one-off judgment error. Judgment executes descriptions; fix the trigger surface. Where writing-skills exists it governs the edit and its test loop applies. Without it, still verify: hand a fresh subagent the descriptions plus the scenario that misfired, confirm it now routes correctly, and confirm a neighbouring scenario does not over-fire.
 - Where recall exists, rediscoveries route through it and its format and commit rules apply.
 - A correction whose rule already exists → no edit. Attention failure is not a documentation gap; duplicating the rule weakens the kernel.
@@ -34,5 +35,5 @@ Completion bar: every user correction and every backed-out action in the traject
 
 - "One-off judgment error" about a skill misfire → it is a description bug; fix it.
 - Several frictions bundled into one commit → rollback granularity lost.
-- New kernel rule for something area-specific → reference file instead.
+- New kernel rule for something area-specific → reference file instead. Repo has no reference file → create one or accept the kernel line, but do not stall.
 - An edit without quoted evidence → not evidence-backed; don't make it.
