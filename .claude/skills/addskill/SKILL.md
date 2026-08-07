@@ -1,5 +1,5 @@
 ---
-description: Use when the user asks to add, install, or create a repo-local skill that must work in future Claude Code and Codex sessions.
+description: Use whenever a repo-local skill is being added, installed, or created for future Claude Code and Codex sessions, whether the user asked or you decided to write one; writing-skills covers authoring, not this repo's install contract.
 ---
 
 # Add skill — install a skill into this repo
