@@ -1,5 +1,5 @@
 ---
-description: Use when a session or major task is wrapping up ("wrap up", "that's everything", "done for today"), when the user invokes /refine, or right after any task where friction occurred: wasted tool calls rediscovering a fact, a skill that fired wrongly or never fired, or a correction from the user.
+description: Use when a session or task is wrapping up ("wrap up", "that's everything", "done for today"), when the user invokes /refine, or after any task with friction: calls wasted rediscovering a fact, a skill that misfired, a user correction.
 ---
 
 # refine: post-task harness pass
