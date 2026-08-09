@@ -134,8 +134,7 @@ reusable improvements between projects.
 This matches emerging practice for skill libraries. Only the short
 descriptions load every turn; the full playbook loads when a skill is invoked.
 Each description says when to reach for the skill, which is what routes
-requests to it. Every skill carries a recorded origin, a periodic usage audit,
-and a measured context cost.
+requests to it.
 
 ## work loop
 
@@ -206,25 +205,33 @@ drops the extras listed below.
   `purposeful-writing`, `why`.
 
 `.claude/skills/PROVENANCE.md` records where the forked skills came from, their
-licenses, and what changed here. Together the tiers, the provenance file, and
-the `doctor.mjs` audits act as library governance: every skill has a known
-origin, an intent-based description, and a periodic reason to keep existing.
+licenses, and what changed here.
 
-## safety model
+## what's different here
 
-This template is supposed to travel, so defaults must stay safe outside one
-person's machine.
+Plenty of repos ship a folder of skills. The parts here that are hard to find
+elsewhere:
 
-- Runtime-specific rules stay runtime-specific. Claude hooks and Claude popup
-  constraints do not become Codex standing orders.
-- Template files must not ship private checkout paths, maintainer-only workflow
-  mandates, secrets, tokens, or local-machine assumptions.
-- Git automation stages explicit paths and protects against direct pushes to
-  `main`, force-pushes, secret files, and unverified completion claims.
-- Installs, migrations, deploys, deletes, branch merges, and edits outside the
-  current workspace require explicit user authority for the current session.
-- Verification claims must name the check that actually ran. If the real signal
-  is CI, deploy logs, or the user's machine, say that instead of pretending.
+- **Every rule has a running cost, and it is measured.** `context-weight.sh`
+  prints the per-turn token price of the always-loaded layer, skill by skill;
+  `doctor.mjs` audits usage; `/optimize-context` is the pruning playbook. A
+  rule stays only while it earns its cost.
+- **The harness corrects itself.** `/refine` ends a task by mining the session
+  for friction and committing the smallest edit that prevents a repeat. Each
+  fix lands in the rule, skill, or memory entry that caused the miss, one
+  commit apiece, so any of them rolls back alone.
+- **One skill body, two runtimes.** Codex adapters are generated from the
+  canonical `.claude/skills/` copies and contract-tested, so the playbooks
+  cannot drift apart.
+- **Improvements travel the fleet.** `/recall save` pins a lesson to the repo
+  it was learned in; `/sync-starter` moves the generic ones back to the
+  template, so every project spawned later starts with them.
+- **Skills are governed like a library.** Recorded origin and license per
+  skill, trigger-based routing descriptions, and a periodic usage audit that
+  removes what nothing invokes.
+
+The safety rules that used to live here moved to `CONTRIBUTING.md`, next to
+the PR checklist that enforces them.
 
 ## forking this template
 

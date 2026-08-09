@@ -33,11 +33,27 @@ and say what it buys.
 - Squash merge.
 - Shipped files are ASCII-only. Validation fails on anything else.
 - No secrets, tokens, private checkout paths, or maintainer-only assumptions in
-  shipped files. See the safety model section in `README.md`.
+  shipped files. See the safety rules below.
 - Skills follow the `writing-skills` skill: trigger-first descriptions, no
   filler, and a stated way to tell the skill worked.
 - Update `CHANGELOG.md` under an unreleased or upcoming version heading when
   the change is user-visible.
+
+## safety rules for shipped files
+
+This template is supposed to travel, so defaults must stay safe outside one
+person's machine.
+
+- Runtime-specific rules stay runtime-specific. Claude hooks and Claude popup
+  constraints do not become Codex standing orders.
+- Template files must not ship private checkout paths, maintainer-only workflow
+  mandates, secrets, tokens, or local-machine assumptions.
+- Git automation stages explicit paths and protects against direct pushes to
+  `main`, force-pushes, secret files, and unverified completion claims.
+- Installs, migrations, deploys, deletes, branch merges, and edits outside the
+  current workspace require explicit user authority for the current session.
+- Verification claims must name the check that actually ran. If the real signal
+  is CI, deploy logs, or the user's machine, say that instead of pretending.
 
 ## submitting a new skill
 

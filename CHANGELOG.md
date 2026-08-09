@@ -9,6 +9,23 @@ Version boundaries before 1.2.0 are reconstructed from git history rather than
 release tags, so the grouping is approximate. Anything older than 1.0.0 is
 condensed.
 
+## [Unreleased]
+
+### Added
+
+- `refine` skill: post-task pass that mines the session for friction and
+  commits the smallest edit that prevents a repeat (concept port of
+  prime-agent's Continual Harness).
+- `long-horizon` skill: Manager/Executor/Auditor rounds with audit-gated
+  durable state for tasks bigger than one context window (concept port of
+  AMAP-ML's LongHorizon-Harness).
+
+### Changed
+
+- `README.md`: the safety model section became "what's different here", the
+  template's differentiators; the safety rules moved to `CONTRIBUTING.md`
+  beside the PR checklist that enforces them.
+
 ## [1.2.0] - 2026-07-25
 
 ### Changed
