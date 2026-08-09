@@ -110,8 +110,8 @@ Measured on this template with `bash .claude/scripts/context-weight.sh`:
 | Always-loaded piece | Per turn |
 |---|---|
 | `CLAUDE.md` kernel (5.5 KB) | ~1,400 tokens |
-| 20 skill descriptions in the available-skills list | ~800 tokens |
-| **Total (file-measurable)** | **~2,200 tokens** |
+| 22 skill descriptions in the available-skills list | ~930 tokens |
+| **Total (file-measurable)** | **~2,300 tokens** |
 
 `doctor.mjs` reports the same measure over repo files only; `context-weight.sh`
 also counts your machine-global `~/.claude/CLAUDE.md`. MCP tool lists,
@@ -147,6 +147,9 @@ loaded before the work that needs it. Use the template while you work, then
 feed the useful parts back into it:
 
 - `/recall save <text>` records a project gotcha in the right reference file.
+- `/refine` closes a task by mining the session for friction (wasted
+  rediscovery, a skill that misfired, a correction you had to make) and
+  applying the smallest edit that prevents a repeat, one commit per fix.
 - `/sync-starter` moves a generic improvement back to the template, so every
   future project starts with it, or pulls a template improvement into a
   spawned project.
@@ -195,9 +198,9 @@ Three tiers. The `minimal` preset in `/init-project` keeps the first two and
 drops the extras listed below.
 
 - **Core loop** (project lifecycle and shipping): `init-project`, `recall`,
-  `sync-starter`, `optimize-context`, `addskill`, `merge`.
+  `refine`, `sync-starter`, `optimize-context`, `addskill`, `merge`.
 - **Discipline** (how work gets done): `brainstorming`, `writing-plans`,
-  `impartial-review`, `writing-skills`.
+  `long-horizon`, `impartial-review`, `writing-skills`.
 - **Extras** (situational): `advocate`, `caveman`, `enhance-prompt`,
   `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `humanizer`, `lab`,
   `purposeful-writing`, `why`.
@@ -269,6 +272,9 @@ listed in `CHANGELOG.md`.
 MIT. See `LICENSE`.
 
 Several skills are forked from upstream work, notably Jesse Vincent's
-`superpowers` skills (MIT). `.claude/skills/PROVENANCE.md` tracks forked origins,
-licenses, and local changes. Per-skill LICENSE and NOTICE files ship in
+`superpowers` skills (MIT). Two are concept ports that copy no upstream code
+or text: `refine` from Prime Intellect's `prime-agent` Continual Harness and
+`long-horizon` from AMAP-ML's `LongHorizon-Harness` (both MIT).
+`.claude/skills/PROVENANCE.md` tracks forked origins, licenses, and local
+changes. Per-skill LICENSE and NOTICE files ship in
 third-party skill folders when required.
