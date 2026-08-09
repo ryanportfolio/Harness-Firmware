@@ -35,7 +35,7 @@ Plain chat, numbered (popup tools are banned). Only ask what's actually unknown 
 4. **Authoritative verification:** what's the final word that a change works — local test suite, CI, a deploy log?
 5. **Hard lines:** anything that must ALWAYS go through the user (installs, migrations, deploys, destructive ops)?
 6. **Prose mode:** how should replies read: the `caveman` compression at **ultra** (default, inherited from the template), **full**, **lite**, or **normal** prose? Say what ultra means in one line -- terse, articles dropped, code and error strings verbatim, security and irreversible-action confirmations still plain -- so a first-time user can choose knowingly. Keep ultra if the user has no preference.
-7. **Skill preset:** **full** (every starter skill, minus the profile pruning below) or **minimal** (drops the twelve situational extras; the core-loop and discipline skills stay)? Default full. Offer minimal when the user cares about per-turn context weight.
+7. **Skill preset:** **full** (every starter skill, minus the profile pruning below) or **minimal** (drops the situational extras; the core-loop and discipline skills stay)? Default full. Offer minimal when the user cares about per-turn context weight.
 
 If the user doesn't know yet (brand-new project), write the honest default: "not yet decided — ask before installs/migrations/deploys" and move on. Don't stall setup on undecided infrastructure.
 
