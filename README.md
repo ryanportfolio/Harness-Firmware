@@ -134,8 +134,7 @@ reusable improvements between projects.
 This matches emerging practice for skill libraries. Only the short
 descriptions load every turn; the full playbook loads when a skill is invoked.
 Each description says when to reach for the skill, which is what routes
-requests to it. Every skill carries a recorded origin, a periodic usage audit,
-and a measured context cost.
+requests to it.
 
 ## work loop
 
@@ -206,25 +205,31 @@ drops the extras listed below.
   `purposeful-writing`, `why`.
 
 `.claude/skills/PROVENANCE.md` records where the forked skills came from, their
-licenses, and what changed here. Together the tiers, the provenance file, and
-the `doctor.mjs` audits act as library governance: every skill has a known
-origin, an intent-based description, and a periodic reason to keep existing.
+licenses, and what changed here.
 
-## safety model
+## what's different here
 
-This template is supposed to travel, so defaults must stay safe outside one
-person's machine.
+Plenty of repos ship a folder of skills. This one is built around durable
+memory, and it measures, prunes, and self-corrects what it carries:
 
-- Runtime-specific rules stay runtime-specific. Claude hooks and Claude popup
-  constraints do not become Codex standing orders.
-- Template files must not ship private checkout paths, maintainer-only workflow
-  mandates, secrets, tokens, or local-machine assumptions.
-- Git automation stages explicit paths and protects against direct pushes to
-  `main`, force-pushes, secret files, and unverified completion claims.
-- Installs, migrations, deploys, deletes, branch merges, and edits outside the
-  current workspace require explicit user authority for the current session.
-- Verification claims must name the check that actually ran. If the real signal
-  is CI, deploy logs, or the user's machine, say that instead of pretending.
+- **Durable memory, committed.** `.claude/reference/` holds project facts
+  (architecture, pitfalls, commands, deploy) as files in the repo, so what a
+  project has learned travels to every machine, sandbox, and future session
+  instead of living in one chat history.
+- **`/recall` keeps that memory working.** One command loads the right
+  reference file before unfamiliar work and saves a new gotcha the moment it
+  bites, so a lesson is paid for once.
+- **`/refine` corrects the harness itself.** A finished task gets mined for
+  friction, and the smallest edit that prevents a repeat lands in the rule,
+  skill, or memory entry that caused the miss, one commit apiece, so any fix
+  rolls back alone.
+- **Efficiency is measured, then enforced.** Every always-loaded rule costs
+  tokens on every turn: `context-weight.sh` prints the price skill by skill,
+  `doctor.mjs` audits usage, and `/optimize-context` prunes whatever stops
+  earning its cost.
+
+The safety rules that used to live here moved to `CONTRIBUTING.md`, next to
+the PR checklist that enforces them.
 
 ## forking this template
 
