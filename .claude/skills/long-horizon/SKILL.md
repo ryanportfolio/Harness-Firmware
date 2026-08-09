@@ -13,8 +13,9 @@ per round is what keeps quality flat while the task grows.
 `.tmp/long-horizon/<task-slug>/state.md` (gitignored scratch), created before round one:
 
 ```markdown
-# Goal
-<one paragraph + the check that proves it done>
+# Contract  (written before round one, never edited after)
+Goal: <one paragraph>
+Acceptance: <the checks that prove it done, as a list>
 
 # Verified progress
 - <claim> — evidence: <file/command/output the auditor saw>
@@ -23,22 +24,27 @@ per round is what keeps quality flat while the task grows.
 1. <step sized for one fresh context>
 
 # Audit log
-- round N: <step> — pass/fail, <one-line evidence>
+- round N: <step> — <status>/<integrity>/<contract>, <one-line evidence>
 ```
 
-Only audit-passed results enter **Verified progress**. If a state file already exists for this
-task, resume from it; the workspace plus that file is the whole truth, whatever any earlier
-session claimed.
+Only audit-passed results enter **Verified progress**. An existing state file for this task
+wins: resume from it; that file plus the workspace is the whole truth.
 
 ## Round loop
 
-1. **Plan** — read the state file, pick ONE remaining step, write a brief: goal excerpt, the
-   step, its done-check, and only the verified facts that step needs.
+1. **Plan** — read the state file, pick ONE remaining step, write a brief: contract excerpt,
+   the step, its done-check, and only the verified facts that step needs.
 2. **Execute** — spawn a fresh subagent with the brief alone. It does the step and reports what
    changed and how to check it.
-3. **Audit** — spawn a second fresh subagent given only the done-check and workspace paths. It
-   inspects the real environment (files, tests, logs) and returns pass/fail with evidence. The
-   executor's report is a claim; the auditor's inspection is the evidence.
+3. **Audit** — spawn a second fresh subagent given only the contract's acceptance checks, the
+   step's done-check, and workspace paths. It inspects the real environment (files, tests,
+   logs) and returns three verdicts with evidence:
+   - status: complete / incomplete / blocked
+   - integrity: clean / suspect / violation — clean only when its own inspection explicitly
+     supports it (artifacts exist, edits stayed in the step's scope); unclear evidence = suspect
+   - contract: aligned / drifted — justified against the frozen acceptance checks
+   The executor's report is a claim; the auditor's inspection is the evidence. Only
+   complete + clean + aligned enters Verified progress.
 4. **Integrate** — pass: move the step into Verified progress with the auditor's evidence.
    Fail: Verified progress stays intact; append the audit findings and schedule rework with
    those findings in the next brief.
@@ -55,8 +61,12 @@ what remains.
 
 - Subagents inherit the session model or run Sonnet; the kernel's no-Haiku floor applies.
 - Size each step so one fresh context finishes it: one slice, one migration, one bug.
-- Audit independence is the point — pass/fail comes from the auditor's own inspection, and
-  auditing runs in a fresh subagent, never in this Manager context.
+- Audit independence is the point — verdicts come from the auditor's own inspection in a
+  fresh subagent, never from this Manager context.
 - Executors and auditors follow fable-mode discipline inside their round; fable-mode governs
   one context, this skill governs work spanning many.
 - Under ~3 dependent steps: skip the harness, run fable-mode directly.
+- Cap rounds at 2× the initial Remaining count (floor 5). Cap hit → stop and report Verified
+  vs Remaining honestly.
+- Auditor blocked or a step needs a decision only the user owns → stop and ask; a guessed
+  answer poisons every later round's verified state.
