@@ -209,26 +209,24 @@ licenses, and what changed here.
 
 ## what's different here
 
-Plenty of repos ship a folder of skills. The parts here that are hard to find
-elsewhere:
+Plenty of repos ship a folder of skills. This one is built around durable
+memory, and it measures, prunes, and self-corrects what it carries:
 
-- **Every rule has a running cost, and it is measured.** `context-weight.sh`
-  prints the per-turn token price of the always-loaded layer, skill by skill;
-  `doctor.mjs` audits usage; `/optimize-context` is the pruning playbook. A
-  rule stays only while it earns its cost.
-- **The harness corrects itself.** `/refine` ends a task by mining the session
-  for friction and committing the smallest edit that prevents a repeat. Each
-  fix lands in the rule, skill, or memory entry that caused the miss, one
-  commit apiece, so any of them rolls back alone.
-- **One skill body, two runtimes.** Codex adapters are generated from the
-  canonical `.claude/skills/` copies and contract-tested, so the playbooks
-  cannot drift apart.
-- **Improvements travel the fleet.** `/recall save` pins a lesson to the repo
-  it was learned in; `/sync-starter` moves the generic ones back to the
-  template, so every project spawned later starts with them.
-- **Skills are governed like a library.** Recorded origin and license per
-  skill, trigger-based routing descriptions, and a periodic usage audit that
-  removes what nothing invokes.
+- **Durable memory, committed.** `.claude/reference/` holds project facts
+  (architecture, pitfalls, commands, deploy) as files in the repo, so what a
+  project has learned travels to every machine, sandbox, and future session
+  instead of living in one chat history.
+- **`/recall` keeps that memory working.** One command loads the right
+  reference file before unfamiliar work and saves a new gotcha the moment it
+  bites, so a lesson is paid for once.
+- **`/refine` corrects the harness itself.** A finished task gets mined for
+  friction, and the smallest edit that prevents a repeat lands in the rule,
+  skill, or memory entry that caused the miss, one commit apiece, so any fix
+  rolls back alone.
+- **Efficiency is measured, then enforced.** Every always-loaded rule costs
+  tokens on every turn: `context-weight.sh` prints the price skill by skill,
+  `doctor.mjs` audits usage, and `/optimize-context` prunes whatever stops
+  earning its cost.
 
 The safety rules that used to live here moved to `CONTRIBUTING.md`, next to
 the PR checklist that enforces them.
