@@ -2,13 +2,18 @@
 
 [![validate-template](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml/badge.svg)](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml)
 
-A portable operating layer for AI coding agents: standing rules, on-demand
-skills, committed memory, session hooks, and sync scripts. Claude Code gets the
-full system. Codex gets a safe boundary in `AGENTS.md` and the same playbooks.
-It compounds: when work hits a gotcha, one command saves the lesson as
-committed project memory, and every later session starts with it loaded.
+A portable, repo-resident operating layer for AI coding agents. It puts
+version-controlled guidance, committed project knowledge, and on-demand
+workflows inside each repository. Claude Code gets the full system. Codex gets
+generated adapters and an explicit runtime boundary backed by the same
+canonical playbooks.
 
-## 60-second quickstart
+The compounding loop is deliberate: recall the relevant project facts before
+unfamiliar work, capture new pitfalls as evidence-backed repo knowledge, refine
+the smallest rule or workflow that caused friction, and selectively carry
+generic improvements into future projects.
+
+## quickstart
 
 ### skills only (start here)
 
@@ -41,14 +46,16 @@ starter sync. Projects spawned this way get the skills without the namespace.
 
 `/init-project` detects the stack, asks a short Q&A, fills the verification and
 deploy sections, seeds reference files, prunes irrelevant skills, removes
-spawn-only template files, and commits the setup. Two of its questions matter
-early:
+spawn-only template files, and prepares the result for verification. Git writes
+still follow the active runtime's safety rules and the user's authorization.
+Two of its questions matter early:
 
 - **prose mode.** Default is terse `caveman ultra`, inherited from the template.
   Pick `normal` at the prompt for ordinary prose. See
   [prose mode](#prose-mode) to change it later.
 - **skill preset.** `full` ships everything. `minimal` keeps the core loop and
-  the discipline skills and drops the extras.
+  discipline skills, then shows the situational extras it proposes removing for
+  confirmation.
 
 ### Codex
 
@@ -109,16 +116,19 @@ Measured on this template with `bash .claude/scripts/context-weight.sh`:
 
 | Always-loaded piece | Per turn |
 |---|---|
-| `CLAUDE.md` kernel (5.5 KB) | ~1,400 tokens |
-| 22 skill descriptions in the available-skills list | ~930 tokens |
-| **Total (file-measurable)** | **~2,300 tokens** |
+| `CLAUDE.md` kernel (5,401 bytes) | ~1,350 tokens |
+| 23 skill routing descriptions (3,954 characters) | ~989 tokens |
+| **Total file-based layer (9,355 units / 9.1 KiB)** | **~2,339 tokens** |
 
-`doctor.mjs` reports the same measure over repo files only; `context-weight.sh`
-also counts your machine-global `~/.claude/CLAUDE.md`. MCP tool lists,
-marketplace skill descriptions, and per-machine auto-memory are not measured by
-either; check those in session. Run it in your own project before deciding a
-rule deserves the kernel. The `minimal` preset drops the extras tier, cutting
-the skill description line item by about half.
+The stable byte figures come from Git objects; token figures use roughly four
+characters per token and are not runtime billing measurements.
+`context-weight.sh` measures the checked-out files and also counts your
+machine-global `~/.claude/CLAUDE.md`; MCP tool lists, marketplace skill
+descriptions, and per-machine auto-memory are outside this table. Run it in your
+own project before deciding a rule deserves the kernel. The `minimal` preset
+physically removes confirmed skills and lowers this source-file measure.
+`skillOverrides` do not change the script's file count, so inspect the active
+runtime catalog separately when using overrides.
 
 ## why this exists
 
@@ -138,42 +148,40 @@ requests to it.
 
 ## work loop
 
-The loop is the point. An agent with no durable memory relearns the same
-gotcha in every session; here you write it down once and it stays fixed. Each
-lesson gets a named home (`.claude/reference/` for project facts, the
-`CLAUDE.md` kernel for cross-cutting rules), travels with the repo, and is
-loaded before the work that needs it. Use the template while you work, then
-feed the useful parts back into it:
+The loop is the point. Each lesson gets a named home (`.claude/reference/` for
+project facts, the `CLAUDE.md` kernel for cross-cutting rules), travels with the
+repo, and can be recalled before the work that needs it. Use the template while
+you work, then feed the useful parts back into it:
 
 - `/recall save <text>` records a project gotcha in the right reference file.
 - `/refine` closes a task by mining the session for friction (wasted
-  rediscovery, a skill that misfired, a correction you had to make) and
-  applying the smallest edit that prevents a repeat, one commit per fix.
+  rediscovery, a skill that misfired, a correction you had to make) and mapping
+  it to the smallest reviewable edit that prevents a repeat.
 - `/sync-starter` moves a generic improvement back to the template, so every
   future project starts with it, or pulls a template improvement into a
   spawned project.
-- `bash .claude/scripts/context-weight.sh` shows what the always-loaded layer
-  costs per turn.
+- `bash .claude/scripts/context-weight.sh` estimates the source-file resident
+  weight before and after physical pruning.
 - `/optimize-context` is the playbook for cutting context that no longer earns
   its place.
 
-The last two keep the loop honest: every saved rule costs tokens on every
-turn, so lessons that stop earning their place get pruned instead of piling
-up.
+The last two keep the loop honest: every saved always-loaded rule adds weight
+to every turn, so guidance that stops earning its place gets pruned instead of
+piling up. Reference files remain on demand.
 
 ## runtime boundary
 
 | Runtime | Entry point | Use it for |
 |---|---|---|
 | Claude Code | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/`, `.claude/skills/` | The full template: kernel rules, slash skills, project memory, session hook, plugin path, and Claude-specific workflow rules. |
-| Codex | `AGENTS.md`, `.agents/skills/` | A safe compatibility layer plus native skill discovery, backed by the same Claude workflows, unchanged. |
+| Codex | `AGENTS.md`, `.agents/skills/` | An explicit safety boundary plus generated skill discovery adapters backed by the canonical playbooks. |
 
 Codex discovers thin adapters under `.agents/skills/`. Each adapter delegates to
-the matching `.claude/skills/` workflow, so both runtimes use one source of
-truth. `AGENTS.md` defines the safety boundary. Codex does not run
-Claude SessionStart hooks. The template intentionally has no project Codex hook:
-`AGENTS.md` already loads natively, while command hooks add a separate trust and
-platform-failure surface.
+the matching `.claude/skills/` workflow, so maintainers update one source of
+truth. `AGENTS.md` defines the safety boundary. Codex does not run Claude
+SessionStart hooks, and adapters capability-gate workflows that need tools the
+current runtime does not expose. Shared source does not imply identical runtime
+behavior or feature parity.
 
 ## what's inside
 
@@ -194,7 +202,7 @@ platform-failure surface.
 ## skill set
 
 Three tiers. The `minimal` preset in `/init-project` keeps the first two and
-drops the extras listed below.
+offers to remove a confirmed list from the extras below.
 
 - **Core loop** (project lifecycle and shipping): `init-project`, `recall`,
   `refine`, `sync-starter`, `optimize-context`, `addskill`, `merge`.
@@ -202,31 +210,41 @@ drops the extras listed below.
   `long-horizon`, `impartial-review`, `writing-skills`.
 - **Extras** (situational): `advocate`, `caveman`, `enhance-prompt`,
   `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `humanizer`, `lab`,
-  `purposeful-writing`, `why`.
+  `purposeful-writing`, `why`, `wow-loop`.
 
 `.claude/skills/PROVENANCE.md` records where the forked skills came from, their
 licenses, and what changed here.
 
-## what's different here
+## what makes it powerful
 
-Plenty of repos ship a folder of skills. This one is built around durable
-memory, and it measures, prunes, and self-corrects what it carries:
+Harness Firmware's value is a connected repository lifecycle, not raw skill
+count:
 
-- **Durable memory, committed.** `.claude/reference/` holds project facts
-  (architecture, pitfalls, commands, deploy) as files in the repo, so what a
-  project has learned travels to every machine, sandbox, and future session
-  instead of living in one chat history.
-- **`/recall` keeps that memory working.** One command loads the right
-  reference file before unfamiliar work and saves a new gotcha the moment it
-  bites, so a lesson is paid for once.
-- **`/refine` corrects the harness itself.** A finished task gets mined for
-  friction, and the smallest edit that prevents a repeat lands in the rule,
-  skill, or memory entry that caused the miss, one commit apiece, so any fix
-  rolls back alone.
-- **Efficiency is measured, then enforced.** Every always-loaded rule costs
-  tokens on every turn: `context-weight.sh` prints the price skill by skill,
-  `doctor.mjs` audits usage, and `/optimize-context` prunes whatever stops
-  earning its cost.
+- **Project knowledge survives the chat.** Architecture, commands, deployment
+  facts, and dated pitfalls live in `.claude/reference/`, so they travel with
+  the repository instead of one transcript or one machine.
+- **`/recall` routes knowledge on demand.** It selects the relevant reference
+  topic, reads the real file, cites its lines, and can save a new lesson without
+  bloating the always-loaded kernel.
+- **`/refine` makes correction explicit and reversible.** It mines actual task
+  friction, then maps one rediscovery, misfire, or user correction to the
+  smallest rule, memory, or workflow change that could prevent a repeat.
+- **New repositories start with the operating layer already present.** The
+  bootstrap paths create the repo; `/init-project` detects facts, asks only for
+  unresolved decisions, seeds references, and prunes irrelevant capability.
+- **One playbook source serves two runtime boundaries.** Claude workflows stay
+  canonical. Generated Codex adapters add native discovery, safety guidance,
+  and capability gates without duplicating the workflow bodies.
+- **Detail stays cheap until needed.** Only the kernel and short routing
+  descriptions are always loaded. The current 23 skill bodies total about
+  184 KiB and remain on demand; `/optimize-context` helps remove guidance that
+  no longer earns its cost.
+- **Useful improvements propagate selectively.** `/sync-starter` can move a
+  generic fix into future repositories or pull one back into a spawned project
+  without bulk-overwriting project-specific rules and memory.
+- **Hard work can require independent evidence.** Long-horizon execution,
+  impartial review, and visual audit workflows use fresh contexts and concrete
+  artifacts when the runtime exposes the required tools.
 
 The safety rules that used to live here moved to `CONTRIBUTING.md`, next to
 the PR checklist that enforces them.
