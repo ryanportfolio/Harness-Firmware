@@ -69,7 +69,7 @@ Zero findings from Codex + your spot-check of the highest-risk hunks agrees → 
 | no `.tmp/codex-review.md` after exit 0 | wrong `-o` path or ran from wrong directory → run from repo root, check the path you passed |
 | model rejected / unknown | `gpt-5.6-sol` renamed in a newer CLI → drop `-m`/`-c` to inherit the user's `~/.codex/config.toml` defaults, tell the user |
 | review of stale diff | `--base` given a local branch name → fetch, then pass `origin/<default-branch>` |
-| `windows sandbox: orchestrator_helper_launch_failed` errors in output | Codex sandbox helper missing on the machine → review still completes (the harness computes the diff itself), but the agent could not run exploration commands; treat findings as diff-only and weight your Step 5 verification accordingly |
+| `windows sandbox: orchestrator_helper_launch_failed` errors in output | standalone Codex CLI release is missing its sandbox helper exes → review still completes but diff-only (no exploration commands); fix by copying `codex-windows-sandbox-setup.exe` and `codex-command-runner.exe` from the Codex desktop app's bin dir into the active `releases/<version>/bin/` dir |
 | surprise subscription burn | rerunning or widening scope without asking → one run per request, confirm before rerun |
 
 ## Anti-patterns
