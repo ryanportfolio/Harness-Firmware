@@ -36,7 +36,9 @@ Survey recent conversations for recurring patterns. Run parallel subagents acros
 - Process conventions (worktrees, commits, PRs, review/merge tooling)
 - Meta preferences (fixing skills mid-task, proposing new ones)
 
-Cross-check across slices before elevating a signal. Patterns seen in 2+ slices are high-confidence; lone signals are weak and usually get dropped.
+Have each miner return **preference atoms**, not summaries: trigger, decision rule, quality bar, stop condition, evidence pointer, confidence. Rate confidence per atom: **strong** (explicit user preference, workflow-changing correction, repeated pattern, or direct request to encode behavior), **medium** (accepted workflow or repeated tool/validation preference), **weak** (agent-chosen behavior with no user feedback, or a likely task-specific correction), **contradicted** (evidence points in incompatible directions — ask the user before writing anything based on it).
+
+Cross-check across slices before elevating a signal. Patterns seen in 2+ slices are high-confidence; lone signals are weak and usually get dropped. Contradicted atoms never get codified silently.
 
 ### 2. Ask the user directly
 
@@ -96,4 +98,4 @@ A `-mode` skill is subjective output; a benchmark loop isn't useful here. Vibe-c
 - User wants one narrow workflow captured ("how I write commit messages"): a regular skill, not a mode skill.
 
 ---
-Adapted from the `automate-me` skill in [cursor/plugins pstack](https://github.com/cursor/plugins/tree/main/pstack) (MIT, by poteto).
+Adapted from the `automate-me` skill in [cursor/plugins pstack](https://github.com/cursor/plugins/tree/main/pstack) (MIT, by poteto); preference atoms and confidence scale from cursor-team-kit's `workflow-from-chats` (MIT).

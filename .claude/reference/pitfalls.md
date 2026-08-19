@@ -46,3 +46,18 @@ Prevention protocol (run every time before trusting a preview):
    the edited sources.
 4. Staleness persists after 1–2 → hard reload, unregister service workers, or
    use a fresh browser profile.
+
+## Cross-cutting engineering gotchas (2026-08-18, from cursor-team-kit review)
+
+1. **History rewrites: tree-hash check.** Before any agreed rebase/squash of a
+   pushed branch, capture `ORIGINAL_TREE=$(git rev-parse origin/<branch>^{tree})`;
+   after rewriting, compare with `git rev-parse HEAD^{tree}`. Do not push if the
+   tree changed unintentionally — the rewrite was supposed to reshape history,
+   not content.
+2. **JSON embedded in `<script>` tags.** `JSON.stringify`/`json.dumps` output is
+   not HTML-safe: a `</script>` inside a string terminates the tag early. Escape
+   `<`, `>`, `&` as `\u003c`, `\u003e`, `\u0026` before embedding.
+3. **Backgrounded dev servers: fixed port.** Background shells have no TTY, so
+   server startup messages can sit buffered and unread — with port 0
+   (auto-assign) you can never learn which port was chosen. Always pass an
+   explicit port to servers started in the background.

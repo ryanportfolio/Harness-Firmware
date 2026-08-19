@@ -27,6 +27,8 @@ State the scope you're reviewing in your first sentence so the user can redirect
 
 If you're not sure, dispatch. Subagents are cheap relative to a missed bug.
 
+**Strict quality mode (opt-in):** when the user asks for a "strict", "harsh", "thermo-nuclear", or deep maintainability review, additionally load `strict-quality-rubric.md` from this folder and append it to the Bucket D ("things the author missed") subagent's prompt — missed structural simplifications are exactly its territory. It raises the approval bar to presumptive blockers (code-judo simplifications, 1k-line rule, spaghetti growth) on top of the normal buckets; correctness review is unchanged.
+
 ## Step 3: Dispatch five parallel Sonnet 4.6 review subagents
 
 Send all five `Agent` tool calls **in a single message** so they run concurrently. Each uses:

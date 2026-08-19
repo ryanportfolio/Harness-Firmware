@@ -78,6 +78,18 @@ Coexists with other modes:
 29. **Cut adverbs or use the number.** "runs quickly" → "is fast" or the measurement. "significantly improves" → the measured delta.
 30. **Plain word over fancy synonym.** "utilize" → "use", "leverage" → "use", "facilitate" → "help", "numerous" → "many", "in the event that" → "if".
 
+## Code diffs (`/unslop the diff`)
+
+Code has its own slop. When pointed at a diff (default: against main), remove AI patterns introduced in the branch:
+
+- Extra comments that are unnecessary or inconsistent with local style.
+- Defensive checks or try/catch blocks abnormal for trusted code paths.
+- Casts to `any` used only to bypass type issues.
+- Deeply nested code that early returns would simplify.
+- Other patterns inconsistent with the file and surrounding codebase.
+
+Guardrails: keep behavior unchanged unless fixing a clear bug; minimal focused edits over broad rewrites; summary in 1-3 sentences.
+
 ## Anti-patterns
 
 - Don't drop a fact, caveat, or qualifier to remove a tell. Accuracy beats cleanliness.
@@ -86,4 +98,4 @@ Coexists with other modes:
 - Don't replace humanizer for voice-matching or long-form rewrites; that's its job.
 
 ---
-Adapted from the `unslop` skill in [cursor/plugins pstack](https://github.com/cursor/plugins/tree/main/pstack) (MIT, by poteto).
+Adapted from the `unslop` skill in [cursor/plugins pstack](https://github.com/cursor/plugins/tree/main/pstack) (MIT, by poteto); code-diff section from cursor-team-kit's `deslop` (MIT).
