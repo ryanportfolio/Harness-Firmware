@@ -41,6 +41,8 @@ Two or more verifiers with distinct lenses, each prompted to DISPROVE the work:
 
 Non-negotiables for verifiers: treat implementer claims as untrusted; read every screenshot cited; measure instead of eyeballing (pixel stats, bounding boxes, timings) whenever a finding could be argued; name exact evidence paths; label each finding confirmed or refuted with severity.
 
+Browser-driving rules for anyone (implementer or verifier) touching a live page: perform exactly one structural action per step (click, type, scroll, navigate, resize) with a capture before and after; never coordinate-click without a fresh screenshot taken immediately before; never reuse element references after a navigation or structural change; when several windows/tabs share a debug surface, select the page by a stable app marker (root selector, `data-*` attribute), not tab order — and if nothing matches, list available titles/URLs instead of guessing. Electron/Chromium apps attach via `--remote-debugging-port` + CDP connect.
+
 ## Step 5: Fix and re-verify (the loop)
 
 Confirmed findings go to one fixer whose brief is those findings and nothing else. The fixer reproduces each defect before fixing it and proves each fix with the same evidence discipline. Then verifiers run again against the fixed state. Repeat until a round produces zero confirmed findings or only honestly named residuals with causes. Cap rounds (about 5) and report unresolved residuals plainly rather than looping forever.
