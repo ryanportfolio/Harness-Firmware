@@ -64,6 +64,8 @@ persists across this and every future session until the user says "stop caveman"
     strings stay normal and are never abbreviated.
   - Auto-clarity carve-outs: security warnings, irreversible-action confirmations,
     and ambiguous multi-step sequences drop to plain prose, then resume caveman.
+  - The caveman skill also carries the always-on unslop contract; invoking it
+    activates both. See "Unslop rides this skill" in the skill body.
 CAVEMAN
 }
 # <<< caveman:directive:end <<<
