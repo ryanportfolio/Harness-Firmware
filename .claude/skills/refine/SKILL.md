@@ -17,6 +17,8 @@ Re-read this session's actual events, not your summary of them. List every frict
 | Correction | User corrected your process | The always-loaded instruction file (CLAUDE.md, AGENTS.md, equivalent), only if no rule exists |
 | Stale state | A reference or memory entry proved wrong during the task | Replace or delete the entry |
 
+Mine through three lenses, in order, so one reading style doesn't hide a friction class: judgment (wrong calls, missed checks, corrections), tooling (calls wasted on work a script, permission, or recorded fact would have skipped), divergent (what would a session that took a different approach have avoided; which friction repeats across sessions, not just here).
+
 Read the surface before editing it. This skill installs globally, so the repo in front of you may have none of the files named above.
 
 Completion bar: every user correction and every backed-out action in the trajectory is either listed as friction or explicitly ruled out with a reason.
@@ -25,6 +27,7 @@ Completion bar: every user correction and every backed-out action in the traject
 
 - One friction → one smallest edit → one commit. The commit message quotes the trajectory evidence. The commit is the rollback snapshot. Stage only the harness files that edit touched; the task's own in-flight work never rides along.
 - If a code or config change would remove the friction outright, propose that instead of documenting the workaround. A note telling the next session to pass a flag is worse than the flag being unnecessary.
+- Structural enforcement check, before any prose edit lands: a rule a lint, hook, script, or permission entry can enforce beats prose stating it. Prefer the structural encoding; if it's too big for this pass, note it as the follow-up instead of writing the prose rule.
 - A skill that misfired is a description bug, not a one-off judgment error. Judgment executes descriptions; fix the trigger surface. Where writing-skills exists it governs the edit and its test loop applies. Without it, still verify: hand a fresh subagent the descriptions plus the scenario that misfired, confirm it now routes correctly, and confirm a neighbouring scenario does not over-fire.
 - Where recall exists, rediscoveries route through it and its format and commit rules apply.
 - A correction whose rule already exists → no edit. Attention failure is not a documentation gap; duplicating the rule weakens the kernel.
