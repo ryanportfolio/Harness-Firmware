@@ -76,8 +76,9 @@ print_unslop_directive() {
 [SessionStart] ALWAYS-ON: unslop (per CLAUDE.md). Everything written for humans
 this session passes the unslop pattern check at write time: chat prose, commit
 messages, PR bodies, docs, READMEs, UI text. Write clean first; never generate
-the tell and fix it after. Read .claude/skills/unslop/SKILL.md before the first
-substantial written artifact.
+the tell and fix it after. The core-tells digest is inline in CLAUDE.md
+("Always-on unslop" section) -- already loaded, no read step needed. Full list:
+.claude/skills/unslop/SKILL.md, for /unslop passes.
 UNSLOP
 }
 
