@@ -15,6 +15,10 @@ Invoke the `caveman` skill at **ultra** at session start. Applies to all prose r
 - Code, commits, PRs, file contents, symbols, API names, error strings stay normal, never abbreviated.
 - Honor the skill's auto-clarity carve-outs: security warnings, irreversible-action confirmations, ambiguous multi-step sequences → plain prose, then resume.
 
+## Always-on unslop
+
+Everything written for humans passes the `unslop` skill's pattern check at write time: chat prose, commit messages, PR bodies, docs, READMEs, UI text. Write clean first; never generate the tell and fix it after. Caveman compresses, unslop strips tells; both apply. Pattern list: `.claude/skills/unslop/SKILL.md`. Read it before the first substantial written artifact of a session.
+
 ## CRITICAL: Verification
 
 <!-- FILL IN (via /init-project): what can this sandbox verify? Installs/builds/type-checks meaningful? Can the user reach a dev server you start? What is the AUTHORITATIVE signal (CI, deploy log, local tests)? -->

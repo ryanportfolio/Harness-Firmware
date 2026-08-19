@@ -10,7 +10,7 @@
 
 | Status | Skills |
 |---|---|
-| Native | `brainstorming`, `caveman`, `enhance-prompt`, `forge-repo-ui-skill`, `handoff-audit`, `humanizer`, `purposeful-writing`, `recall`, `refine`, `writing-plans` |
+| Native | `brainstorming`, `caveman`, `enhance-prompt`, `forge-repo-ui-skill`, `handoff-audit`, `humanizer`, `purposeful-writing`, `recall`, `refine`, `unslop`, `writing-plans` |
 | Adapted | `addskill`, `codex-review`, `fable-mode`, `init-project`, `lab`, `optimize-context`, `sync-starter`, `writing-skills` |
 | Capability-gated | `advocate`, `impartial-review`, `long-horizon`, `why`, `wow-loop` |
 | Dangerous | `merge` |
