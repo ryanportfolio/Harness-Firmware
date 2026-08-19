@@ -483,6 +483,16 @@ Different skill types need different test approaches:
 
 **Success criteria:** Agent finds and correctly applies reference information
 
+### Blinding Rules (all test types)
+
+An agent that knows it's being evaluated behaves differently, so test candidates must run blind:
+
+- No `eval`, `test`, `judge`, `experiment`, `rubric`, `score`, `compare`, `benchmark`, or `candidate` in any directory name, file name, or prompt the candidate sees.
+- Sanitize directory and slug names: use project-shaped names a user might pick, not labels like `candidate-1` or `agent-a`.
+- Hold the rubric back from candidates; it exists for the judge only.
+- A judge may know it's judging, but sees outputs by sanitized label only — never by model or variant name. Comparing two variants: one judge scores both sets in a single pass on one scale, blind to which set each came from.
+- Grade compliance from the files the candidate actually read plus the shape of its output, never from the candidate's own claims about what it did.
+
 ## Common Rationalizations for Skipping Testing
 
 | Excuse | Reality |
