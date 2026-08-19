@@ -68,6 +68,19 @@ CAVEMAN
 }
 # <<< caveman:directive:end <<<
 
+# Always-on unslop default. Same stdout rule as the caveman directive above:
+# stdout is injected context, stderr is invisible to Claude. The rule lives in
+# CLAUDE.md; re-assert here so it's acted on from the first written artifact.
+print_unslop_directive() {
+  cat <<'UNSLOP'
+[SessionStart] ALWAYS-ON: unslop (per CLAUDE.md). Everything written for humans
+this session passes the unslop pattern check at write time: chat prose, commit
+messages, PR bodies, docs, READMEs, UI text. Write clean first; never generate
+the tell and fix it after. Read .claude/skills/unslop/SKILL.md before the first
+substantial written artifact.
+UNSLOP
+}
+
 # Print the fixed "universal skills" reminder block.
 # Cross-cutting skills that apply to most sessions regardless of task; project-
 # specific skills are not listed. Claude discovers those from the
@@ -175,6 +188,9 @@ check_plugin_overlap() {
 # work or branch-specific exit. Independent of git state, so it runs every path.
 print_caveman_directive
 # <<< caveman:call:end <<<
+
+# Always-on unslop directive (stdout, every path).
+print_unslop_directive
 
 # Weekly template drift nudge (quiet no-op when template is unreachable).
 check_starter_drift
