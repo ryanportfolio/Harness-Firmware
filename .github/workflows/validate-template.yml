@@ -59,6 +59,12 @@ jobs:
       - name: Codex starter contract is valid
         run: node .claude/scripts/test-codex-contract.mjs
 
+      - name: README facts and generated assets are valid
+        run: node --test scripts/readme/readme.test.mjs
+
+      - name: README generated output is current
+        run: node scripts/readme/verify.mjs
+
       - name: settings.json is valid JSON
         run: python3 -m json.tool .claude/settings.json > /dev/null
 
