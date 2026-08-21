@@ -122,6 +122,8 @@ test("generated README keeps installation early and maps exact picture variants"
   assert.match(readme, /recall → work → verify → refine → reviewed repository change → next task/);
   assert.match(readme, /Success means the doctor reports no failures/);
   assert.ok(readme.indexOf("[Install the skills or start a repository](#quickstart)") < readme.indexOf("## the repository feedback loop"));
+  assert.match(readme, /<summary><strong>Click to open the generated skill memory map<\/strong><\/summary>/);
+  assert.match(readme, new RegExp(`<summary><strong>Click to browse all ${facts.skillCount} skills<\\/strong><\\/summary>`));
   for (const link of requiredLinks) assert.ok(readme.includes(link), `README links ${link}`);
 
   for (const name of panelNames) {
