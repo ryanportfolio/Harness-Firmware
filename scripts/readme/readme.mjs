@@ -81,14 +81,14 @@ Both runtimes read the committed project topics under \`.claude/reference/\`. Wo
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
 <details>
-<summary>Open the generated skill memory map</summary>
+<summary><strong>Click to open the generated skill memory map</strong></summary>
 
 ${picture("skills", `A memory map of ${facts.skillCount} on-demand workflows grouped into ${facts.tierCounts.core} core, ${facts.tierCounts.discipline} discipline, and ${facts.tierCounts.specialist} specialist skills.`)}
 
 </details>
 
 <details>
-<summary>Browse every skill</summary>
+<summary><strong>Click to browse all ${facts.skillCount} skills</strong></summary>
 
 ${skillLists()}
 
