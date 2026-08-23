@@ -60,7 +60,7 @@ a{text-decoration:none}
 <a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/recall"><g transform="translate(570 170)">
 <circle r="34" class="node"/>
 <g><circle cx="-3" cy="-3" r="7" class="glyph"/><path class="glyph" d="M2 2L10 10"/></g>
-<g transform="translate(0 52)"><rect x="-96" y="-14" width="192" height="56" rx="6" class="tagbox"/>
+<g transform="translate(0 52)"><rect x="-98.6" y="-14" width="197.2" height="56" rx="6" class="tagbox"/>
 <text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">1  Recall</tspan></text>
 <text class="tiny mute" text-anchor="middle" y="18">kernel, reference, dead ends</text>
 <text class="ref accent" text-anchor="middle" y="34">/recall · .claude/reference/</text></g>
@@ -78,13 +78,13 @@ a{text-decoration:none}
 <text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">3  Execute</tspan></text>
 <text class="tiny mute" text-anchor="middle" y="18">fresh executor subagent</text>
 <text class="ref accent" text-anchor="middle" y="34">fable-mode discipline</text></g>
-</g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/verify-this"><g transform="translate(461.3 504.7)">
+</g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/codex-review"><g transform="translate(461.3 504.7)">
 <circle r="34" class="node"/>
 <g><circle cx="0" cy="0" r="10" class="glyph"/><path class="glyph" d="M-4 0L-1 3L5-3"/></g>
-<g transform="translate(0 52)"><rect x="-96" y="-14" width="192" height="56" rx="6" class="tagbox"/>
+<g transform="translate(0 52)"><rect x="-140.2" y="-14" width="280.4" height="56" rx="6" class="tagbox"/>
 <text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">4  Audit</tspan></text>
-<text class="tiny mute" text-anchor="middle" y="18">fresh Claude auditor, evidence</text>
-<text class="ref accent" text-anchor="middle" y="34">long-horizon · verify-this</text></g>
+<text class="tiny mute" text-anchor="middle" y="18">fresh auditor or cross-vendor</text>
+<text class="ref accent" text-anchor="middle" y="34">long-horizon · verify-this · codex-review</text></g>
 </g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/long-horizon"><g transform="translate(394.1 297.8)">
 <circle r="34" class="node"/>
 <g><circle cx="-6" cy="-7" r="3.5" class="glyph"/><circle cx="-6" cy="7" r="3.5" class="glyph"/><circle cx="7" cy="0" r="3.5" class="glyph"/><path class="glyph" d="M-6-3.5V3.5M-2.7 7C1 7 3.5 4 3.5 0"/></g>
