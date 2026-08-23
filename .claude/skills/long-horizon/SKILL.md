@@ -36,13 +36,22 @@ wins: resume from it; that file plus the workspace is the whole truth.
 Dead ends are memory too. A failed approach that never gets written down gets re-proposed a
 few rounds later, and re-walking it costs a full round.
 
+## Context boundary
+
+Fresh means the round receives no Manager conversation history. The state file, workspace and
+a standalone brief carry every fact the round needs. Give the executor only its bounded brief;
+give the auditor only the acceptance checks, done-check and workspace paths. The auditor never
+receives the executor's turns or report. If a runtime cannot start without inherited context,
+inherit the smallest recent slice that supplies otherwise unrecoverable data and record why in
+the audit log.
+
 ## Round loop
 
 1. **Plan** — read the state file, pick ONE remaining step, write a brief: contract excerpt,
    the step, its done-check, only the verified facts that step needs, and every dead end that
    touches this step.
-2. **Execute** — spawn a fresh subagent with the brief alone. It does the step and reports what
-   changed and how to check it.
+2. **Execute** — spawn a fresh subagent with the brief alone and no Manager conversation
+   history. It does the step and reports what changed and how to check it.
 3. **Audit** — spawn a second fresh subagent given only the contract's acceptance checks, the
    step's done-check, and workspace paths. It inspects the real environment (files, tests,
    logs) and returns three verdicts with evidence:

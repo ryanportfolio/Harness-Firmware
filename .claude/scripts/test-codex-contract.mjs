@@ -121,6 +121,15 @@ for (const target of [".claude-plugin/", "bootstrap/", ".github/workflows/valida
   if (!initProject.includes(target)) failures.push(`init-project: cleanup contract omits ${target}`);
 }
 
+const longHorizon = read(".claude/skills/long-horizon/SKILL.md");
+if (!longHorizon.includes("conversation history")) {
+  failures.push("long-horizon: canonical workflow does not explicitly isolate round contexts from manager conversation history");
+}
+const longHorizonAdapter = read(".agents/skills/long-horizon/SKILL.md");
+if (!longHorizonAdapter.includes('fork_turns: "none"')) {
+  failures.push('long-horizon: Codex adapter does not map a fresh round to fork_turns: "none"');
+}
+
 const corePath = "bootstrap/NewProjectCore.psm1";
 if (!exists(corePath)) {
   failures.push(`${corePath}: shared project generator is missing`);

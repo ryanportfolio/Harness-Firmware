@@ -13,6 +13,7 @@ Read `../../../.claude/skills/long-horizon/SKILL.md` completely and follow it as
 - Read `../../../.agents/CODEX-SKILL-COMPATIBILITY.md` and apply the status and exceptions for this skill.
 - Translate Claude Code tool names to the available Codex equivalent as described by the repository `AGENTS.md`.
 - Before any Claude `Task`, `Agent`, or `Workflow` step, confirm that the current Codex session exposes the required multi-agent tools. Do not replace independent review with self-review.
+- For `long-horizon` executor and auditor rounds, call `spawn_agent` with `fork_turns: "none"`. Send a standalone brief plus state/workspace paths. A positive recent-turn count is an exception only when required data cannot be recovered from those files; record why in the audit log. `fork_turns: "all"` is not a round default.
 - Skill invocation alone does not authorize commit, push, PR, merge, deploy, migration, dependency installation, or another outward action unless that action is the user's explicit request.
 - Follow Codex system, developer, sandbox, approval, and tool instructions when they differ from the canonical workflow.
 - Keep the canonical Claude skill unchanged unless the user explicitly asks to edit the workflow itself.
