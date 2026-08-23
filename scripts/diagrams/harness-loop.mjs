@@ -27,7 +27,7 @@ const NODES = [
   { deg: 0, num: 1, name: "Recall", sub: "kernel, reference, dead ends", ref: "/recall · .claude/reference/", href: SKILL("recall") },
   { deg: 72, num: 2, name: "Plan", sub: "one step, one brief", ref: "long-horizon · state.md", href: SKILL("long-horizon") },
   { deg: 144, num: 3, name: "Execute", sub: "fresh executor subagent", ref: "fable-mode discipline", href: SKILL("fable-mode") },
-  { deg: 216, num: 4, name: "Audit", sub: "fresh Claude auditor, evidence", ref: "long-horizon · verify-this", href: SKILL("verify-this") },
+  { deg: 216, num: 4, name: "Audit", sub: "fresh auditor or cross-vendor", ref: "long-horizon · verify-this · codex-review", href: SKILL("codex-review") },
   { deg: 288, num: 5, name: "Integrate", sub: "verified progress or dead end", ref: "state.md lineage", href: SKILL("long-horizon") },
 ];
 
@@ -60,10 +60,11 @@ function nodeIcon(name) {
 function loopNodes() {
   return NODES.map((node) => {
     const [x, y] = pos(node.deg).map(fmt);
+    const boxW = Math.max(192, node.ref.length * 6.4 + 18);
     return `<a href="${node.href}"><g transform="translate(${x} ${y})">
 <circle r="34" class="node"/>
 <g>${nodeIcon(node.name)}</g>
-<g transform="translate(0 52)"><rect x="-96" y="-14" width="192" height="56" rx="6" class="tagbox"/>
+<g transform="translate(0 52)"><rect x="${fmt(-boxW / 2)}" y="-14" width="${fmt(boxW)}" height="56" rx="6" class="tagbox"/>
 <text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">${node.num}  ${esc(node.name)}</tspan></text>
 <text class="tiny mute" text-anchor="middle" y="18">${esc(node.sub)}</text>
 <text class="ref accent" text-anchor="middle" y="34">${esc(node.ref)}</text></g>
