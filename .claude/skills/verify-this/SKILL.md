@@ -34,6 +34,12 @@ Do not use this for vague claims like "the code is cleaner". Ask for a measurabl
 - Performance: same-machine baseline/treatment timings or CPU profiles.
 - Memory: heap snapshots before and after the suspected operation.
 
+Prefer the text form of the evidence whenever the fact is text: page text, accessibility
+snapshot, log line, test output, response body. Text diffs exactly and cites in one line, while
+a screenshot of the same fact has to be re-read and described. Screenshot when the claim is
+genuinely visual (layout, spacing, color, motion), and pair it with the text capture when both
+apply.
+
 ## Artifact layout
 
 When safe to write artifacts:

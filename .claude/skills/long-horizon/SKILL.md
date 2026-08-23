@@ -23,6 +23,9 @@ Acceptance: <the checks that prove it done, as a list>
 # Remaining
 1. <step sized for one fresh context>
 
+# Dead ends  (approaches that failed audit; do not retry without new evidence)
+- <approach>: <why it failed, one line>
+
 # Audit log
 - round N: <step> — <status>/<integrity>/<contract>, <one-line evidence>
 ```
@@ -30,10 +33,14 @@ Acceptance: <the checks that prove it done, as a list>
 Only audit-passed results enter **Verified progress**. An existing state file for this task
 wins: resume from it; that file plus the workspace is the whole truth.
 
+Dead ends are memory too. A failed approach that never gets written down gets re-proposed a
+few rounds later, and re-walking it costs a full round.
+
 ## Round loop
 
 1. **Plan** — read the state file, pick ONE remaining step, write a brief: contract excerpt,
-   the step, its done-check, and only the verified facts that step needs.
+   the step, its done-check, only the verified facts that step needs, and every dead end that
+   touches this step.
 2. **Execute** — spawn a fresh subagent with the brief alone. It does the step and reports what
    changed and how to check it.
 3. **Audit** — spawn a second fresh subagent given only the contract's acceptance checks, the
@@ -46,11 +53,40 @@ wins: resume from it; that file plus the workspace is the whole truth.
    The executor's report is a claim; the auditor's inspection is the evidence. Only
    complete + clean + aligned enters Verified progress.
 4. **Integrate** — pass: move the step into Verified progress with the auditor's evidence.
-   Fail: Verified progress stays intact; append the audit findings and schedule rework with
-   those findings in the next brief.
+   Fail: Verified progress stays intact; append the audit findings, add the approach that
+   failed to Dead ends, and schedule rework with those findings in the next brief.
 
 Update the state file every round. Three rounds without a state-file write means drift: stop
 and rebuild the file from the real workspace.
+
+## Stagnation
+
+A round cap stops a stalled run; it does not unstick one. Rounds can fail the same way
+repeatedly while the cap is still far off, so watch for it directly:
+
+- Same step fails audit twice in a row → the next brief must change approach, not retry the
+  old one. Move the failed approach to Dead ends first.
+- Three rounds with nothing new entering Verified progress → stop spawning and rewrite
+  Remaining. The decomposition itself is the suspect, not the executor.
+
+Either trigger optionally escalates to a cross-vendor supervisor. Manager, executor, and
+auditor are all Claude, so they share blindspots, and a shared blindspot is exactly what a
+plateau looks like from the inside. Codex is a different model family that never saw this
+session:
+
+```bash
+codex login status
+```
+
+Logged in → one `codex exec` run (custom prompt, no scope selector) carrying the contract, the
+audit log, and Dead ends, asking for a plateau diagnosis and a different strategy. See the
+`codex-review` skill for the CLI mechanics and its Windows sandbox-helper caveat. Its answer is
+an opinion: check the proposal against the frozen acceptance checks before it rewrites
+Remaining, and drop anything that drifts. Not logged in or the run fails → skip it, the rewrite
+rules above stand on their own.
+
+One consult per trigger. Each run bills the user's Codex subscription, which is why this hangs
+off a stagnation trigger instead of running every round.
 
 ## Completion
 
