@@ -13,6 +13,9 @@ condensed.
 
 ### Added
 
+- `scripts/lib/launch-chrome.mjs`: headed Chrome launcher that puts the
+  window on a display the operator is not using and hands the keyboard
+  back, so the real-GPU browser rule stops interrupting them.
 - `refine` skill: post-task pass that mines the session for friction and
   commits the smallest edit that prevents a repeat (concept port of
   prime-agent's Continual Harness).

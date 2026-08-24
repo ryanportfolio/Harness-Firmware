@@ -43,6 +43,7 @@ Defaults until configured:
 - Never claim visual/UI verification you didn't actually perform.
 - Can't run the authoritative check → flag the risk plainly, don't claim it passes.
 - When verification must happen elsewhere (CI, deploy, user's machine) → say so and stop.
+- Visual/UI checks: headed Chrome on the real GPU (`chromium.launch({ headless: false, channel: 'chrome' })`; fall back to `headless: false` without channel, never to headless). Headless renders WebGL through SwiftShader on the CPU, which burns the machine the session runs on and makes frame timings meaningless. Launch through `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`) so the window lands on a display the operator is not using and the keyboard goes straight back; never minimize the window instead, a minimized window drops to 1 fps. Pass this rule into every subagent prompt that does browser work.
 
 ## Core principles
 
