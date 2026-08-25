@@ -30,17 +30,19 @@ If the repo is EMPTY (fresh spawn, no app code yet), either configure honest und
 Plain chat, numbered (popup tools are banned). Only ask what's actually unknown — skip questions the scaffold already answered:
 
 1. **Profile:** which best describes this project — **web-app** (has UI), **backend/CLI/library** (code, no UI), **data/notebooks**, or **writing/docs**? Lead with the guess detection supports ("scaffold says web-app — confirm?"), only truly ask when the repo is empty.
-2. **Deploy target:** where will this run? (host/platform, database, where secrets live)
-3. **Sandbox capabilities:** can sessions in this environment run installs, builds, type-checks, tests meaningfully? Can the user reach a dev server the session starts? Is there a browser?
-4. **Authoritative verification:** what's the final word that a change works — local test suite, CI, a deploy log?
-5. **Hard lines:** anything that must ALWAYS go through the user (installs, migrations, deploys, destructive ops)?
-6. **Prose mode:** how should replies read: the `caveman` compression at **ultra** (default, inherited from the template), **full**, **lite**, or **normal** prose? Say what ultra means in one line -- terse, articles dropped, code and error strings verbatim, security and irreversible-action confirmations still plain -- so a first-time user can choose knowingly. Keep ultra if the user has no preference.
-7. **Skill preset:** **full** (every starter skill, minus the profile pruning below) or **minimal** (drops the situational extras; the core-loop and discipline skills stay)? Default full. Offer minimal when the user cares about per-turn context weight.
+2. **Direction:** in one or two sentences, what is this product and who is it for? Anything you refuse to compromise on (performance, openness, a platform that must always work)? This fills the "What this project is" section; a directionally briefed model suggests changes that fit instead of changes that merely run.
+3. **Deploy target:** where will this run? (host/platform, database, where secrets live)
+4. **Sandbox capabilities:** can sessions in this environment run installs, builds, type-checks, tests meaningfully? Can the user reach a dev server the session starts? Is there a browser?
+5. **Authoritative verification:** what's the final word that a change works — local test suite, CI, a deploy log?
+6. **Hard lines:** anything that must ALWAYS go through the user (installs, migrations, deploys, destructive ops)?
+7. **Prose mode:** how should replies read: the `caveman` compression at **ultra** (default, inherited from the template), **full**, **lite**, or **normal** prose? Say what ultra means in one line -- terse, articles dropped, code and error strings verbatim, security and irreversible-action confirmations still plain -- so a first-time user can choose knowingly. Keep ultra if the user has no preference.
+8. **Skill preset:** **full** (every starter skill, minus the profile pruning below) or **minimal** (drops the situational extras; the core-loop and discipline skills stay)? Default full. Offer minimal when the user cares about per-turn context weight.
 
 If the user doesn't know yet (brand-new project), write the honest default: "not yet decided — ask before installs/migrations/deploys" and move on. Don't stall setup on undecided infrastructure.
 
 ## Step 3: Fill in CLAUDE.md
 
+- Replace the **What this project is** FILL IN section with the Step 2 direction answer: two or three sentences, the "won't compromise on" list, optional glossary, ~10 lines cap. If the user has no answer yet, delete the section; an empty always-loaded section steers nothing, and a later direct edit can add it back once the product takes shape.
 - Replace the **verification** FILL IN section with the real answer from Step 2 (what this sandbox can/can't verify, what the authoritative signal is, what to flag-as-risk instead of claim).
 - Replace the **Environment & Deploy Target** FILL IN section with the deploy target, install policy, migration policy, and hard lines.
 - Delete the `STARTER TEMPLATE NOTE` comment block and every `FILL IN` comment.
