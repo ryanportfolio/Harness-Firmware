@@ -70,6 +70,7 @@ Zero findings from Codex + your spot-check of the highest-risk hunks agrees → 
 | model rejected / unknown | `gpt-5.6-sol` renamed in a newer CLI → drop `-m`/`-c` to inherit the user's `~/.codex/config.toml` defaults, tell the user |
 | review of stale diff | `--base` given a local branch name → fetch, then pass `origin/<default-branch>` |
 | `windows sandbox: orchestrator_helper_launch_failed` errors in output | standalone Codex CLI release is missing its sandbox helper exes → review still completes but diff-only (no exploration commands); fix by copying `codex-windows-sandbox-setup.exe` and `codex-command-runner.exe` from the Codex desktop app's bin dir into the active `releases/<version>/bin/` dir |
+| every exec exits -1 in 0ms with `windows sandbox: helper_unknown_error: apply deny-read ACLs`; review "completes" with an empty low-confidence report | `~/.codex/.sandbox/deny_read_acl_state.json` corrupted to NUL bytes by a torn write (crash/power loss; upstream openai/codex#28248, unresolved) → confirm `parse deny-read ACL state` lines in `~/.codex/.sandbox/sandbox.<date>.log`, rename the state file to `.corrupt-backup`, rerun; the helper regenerates it. Machine-global: breaks every Codex sandboxed exec in every repo until repaired |
 | surprise subscription burn | rerunning or widening scope without asking → one run per request, confirm before rerun |
 
 ## Anti-patterns
