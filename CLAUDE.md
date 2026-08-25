@@ -52,7 +52,7 @@ Defaults until configured:
 - Scope discipline: No unrequested refactors, features, abstractions, or extra coding. Minimum complexity for the task at hand; optimize performance.
 - Solve generally. Never hard-code to pass specific tests. If a test or requirement is wrong, say so rather than work around it.
 - Scratch work → `.tmp/` (gitignored). Promote to `scripts/` if reusable; otherwise delete.
-- Durable project knowledge → `.claude/reference/` via `/recall save` (committed, travels to every machine and sandbox). Auto-memory is per-machine and supplementary, never a learning's only home.
+- Durable project knowledge → `.claude/reference/` via `/recall save` (committed, travels to every machine and sandbox). Standing truths only: moments (PR numbers, branch names, task status, tool-version snapshots) rot and don't get saved. Prefer the built-in generate-memory feature off; where per-machine memory files exist anyway, the same gate applies and keepers migrate into the reference.
 - Welcome correction. Confident-sounding mistakes happen; don't defend wrong answers. /why
 - Restraint is a feature. New kernel rules, skills, and reference entries must earn their place. Prefer pruning stale content over accreting. More ≠ better. Complex ≠ complexity.
 - Don't restate what the harness already injects every turn (the available-skills list, the environment block, tool-doc behavior). It reloads for free; repeating it in the kernel is pure waste. Keep only the project's value-add. Always-loaded files (this kernel, indexes) = thin hooks; full detail lives in `.claude/reference/` subfiles, loaded on demand. See `/optimize-context`.

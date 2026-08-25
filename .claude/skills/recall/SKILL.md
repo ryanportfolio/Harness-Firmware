@@ -45,7 +45,13 @@ If nothing relevant exists, say so plainly — don't fabricate from memory or gu
 
 ## Step 2: Capture
 
-When the user wants to save a learning:
+When the user wants to save a learning, it first passes the durability gate — three tests, all must hold:
+
+1. **Not findable by reading the code.** If a fresh session would learn it from the codebase itself, the code is the home and the entry is a future duplicate.
+2. **A standing truth, not a moment.** PR numbers, branch names, task status ("X shipped", "Y fixed"), tool-version snapshots, and plan comparisons describe moments; moments rot and don't get saved. A standing decision passes ("we pin X because Y"); the event that produced it does not.
+3. **The user asked for or confirmed the save.** Self-initiated saves get a one-line "worth saving to reference?" check first; a store curated by the agent alone is how stale entries accumulate unread.
+
+A learning that fails the gate either stays unsaved or gets restated as the standing truth inside it. Then:
 
 1. **Pick the topic file.** Use an existing file when the topic fits. Create a new file only if no existing topic fits AND the topic is durable (worth a permanent home, not a one-off).
 2. **Append at the bottom** under a dated header:
