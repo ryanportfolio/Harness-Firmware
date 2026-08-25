@@ -19,6 +19,8 @@ Re-read this session's actual events, not your summary of them. List every frict
 
 Mine through three lenses, in order, so one reading style doesn't hide a friction class: judgment (wrong calls, missed checks, corrections), tooling (calls wasted on work a script, permission, or recorded fact would have skipped), divergent (what would a session that took a different approach have avoided; which friction repeats across sessions, not just here).
 
+For the tooling lens, where `.claude/scripts/memory-audit.mjs` exists, run it: it counts writes against reads for every reference file, memory file, and skill from this machine's session transcripts. Never-read files, dated entries older than six months, and never-invoked skills are pruning candidates to weigh, not automatic deletions; counts are floor estimates and per-machine.
+
 Read the surface before editing it. This skill installs globally, so the repo in front of you may have none of the files named above.
 
 Completion bar: every user correction and every backed-out action in the trajectory is either listed as friction or explicitly ruled out with a reason.
