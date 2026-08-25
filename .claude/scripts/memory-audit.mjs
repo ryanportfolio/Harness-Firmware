@@ -43,15 +43,17 @@ const root = process.cwd();
 const projectsRoot = path.join(os.homedir(), ".claude", "projects");
 const munge = (p) => path.resolve(p).replace(/[^A-Za-z0-9]/g, "-");
 
-// The exact dir for this checkout, plus prefixed siblings: worktrees under the
+// The exact dir for this checkout, plus its worktrees: worktrees under the
 // repo munge to "<repo>--claude-worktrees-<name>" and hold their own history.
+// A bare "-" prefix match would also catch sibling repos ("app-api" beside
+// "app"), crediting their reads here, so only the worktree marker qualifies.
 function transcriptDirs() {
   if (projectDirOverride) return fs.existsSync(projectDirOverride) ? [projectDirOverride] : [];
   if (!fs.existsSync(projectsRoot)) return [];
   const prefix = munge(root);
   return fs
     .readdirSync(projectsRoot)
-    .filter((name) => name === prefix || name.startsWith(`${prefix}-`))
+    .filter((name) => name === prefix || name.startsWith(`${prefix}--claude-worktrees-`))
     .map((name) => path.join(projectsRoot, name));
 }
 
@@ -105,9 +107,14 @@ function classify(name, input, session, timestamp) {
         stats.reference[key].writes += 1;
         session.wrote = true;
       } else {
-        stats.reference[key].reads += 1;
+        const entry = stats.reference[key];
+        entry.reads += 1;
         session.read = true;
-        if (timestamp) stats.reference[key].lastRead = timestamp.slice(0, 10);
+        // ISO timestamps compare as strings; keep the newest, since files
+        // are visited in directory order, not chronological order.
+        if (timestamp && (!entry.lastRead || timestamp > entry.lastRead)) {
+          entry.lastRead = timestamp;
+        }
       }
     } else if (isRead) {
       // Grep/Glob over the whole directory: a read, but not attributable.
@@ -118,9 +125,13 @@ function classify(name, input, session, timestamp) {
   }
 
   // Legacy per-machine auto-memory store: ~/.claude/projects/<dir>/memory/.
+  // Keyed by store dir + basename: the base repo and each worktree can hold
+  // their own store, and merging them by basename alone would let one read
+  // make every same-named copy look used.
   if (norm.includes("/.claude/projects/") && (norm.includes("/memory/") || norm.endsWith("/memory.md"))) {
     const base = norm.slice(norm.lastIndexOf("/") + 1);
-    const entry = (stats.memory[base] ??= { writes: 0, reads: 0 });
+    const store = norm.match(/\/\.claude\/projects\/([^/]+)\//)?.[1] ?? "unknown-store";
+    const entry = (stats.memory[`${store}/${base}`] ??= { writes: 0, reads: 0 });
     if (isWrite) {
       entry.writes += 1;
       session.wrote = true;
@@ -200,7 +211,7 @@ const pad = (s, n) => String(s).padEnd(n);
 console.log(pad("reference file", 36) + pad("writes", 8) + pad("reads", 7) + "last read");
 for (const f of referenceFiles) {
   const r = stats.reference[f];
-  console.log(pad(f, 36) + pad(r.writes, 8) + pad(r.reads, 7) + (r.lastRead ?? "-"));
+  console.log(pad(f, 36) + pad(r.writes, 8) + pad(r.reads, 7) + (r.lastRead?.slice(0, 10) ?? "-"));
 }
 if (stats.referenceDirScans > 0) {
   console.log(`(+${stats.referenceDirScans} directory-level scans, not attributed per file)`);
