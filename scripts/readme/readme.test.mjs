@@ -10,12 +10,12 @@ const variants = ["light", "dark", "narrow-light", "narrow-dark"];
 const requiredLinks = ["GUIDE.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "actions/workflows/validate-template.yml"];
 
 test("README facts match the canonical repository inventory", () => {
-  assert.equal(facts.skillCount, 30);
-  assert.equal(facts.adapterCount, 30);
+  assert.equal(facts.skillCount, 32);
+  assert.equal(facts.adapterCount, 32);
   assert.equal(facts.referenceFileCount, 6);
   assert.deepEqual(facts.runtimeNames, ["Claude Code", "Codex"]);
   assert.equal(facts.runtimeCount, facts.runtimeNames.length);
-  assert.deepEqual(facts.tierCounts, { core: 8, discipline: 8, specialist: 14 });
+  assert.deepEqual(facts.tierCounts, { core: 9, discipline: 8, specialist: 15 });
   assert.deepEqual(facts.inventoryNames, facts.canonicalNames);
   assert.ok(facts.onDemandBytes > facts.residentBytes);
 });
@@ -88,8 +88,8 @@ test("skill memory map draws every skill within its narrow canvas", () => {
     for (const skill of facts.canonicalNames) {
       assert.equal((source.match(new RegExp(`data-skill="${skill}"`, "g")) ?? []).length, 1, `${variant}: ${skill}`);
     }
-    assert.match(source, /data-group-count="8"/);
-    assert.match(source, /data-group-count="14"/);
+    assert.match(source, /data-group-count="9"/);
+    assert.match(source, /data-group-count="15"/);
     if (variant.startsWith("narrow")) {
       const height = Number(source.match(/viewBox="0 0 390 (\d+)"/)?.[1]);
       const bottoms = [...source.matchAll(/data-bottom="(\d+)"/g)].map((match) => Number(match[1]));

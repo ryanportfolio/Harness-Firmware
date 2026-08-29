@@ -1,39 +1,178 @@
 {
   "groups": [
-    { "id": "core", "label": "Core workflows" },
-    { "id": "discipline", "label": "Quality disciplines" },
-    { "id": "specialist", "label": "Specialist tools" }
+    {
+      "id": "core",
+      "label": "Core workflows"
+    },
+    {
+      "id": "discipline",
+      "label": "Quality disciplines"
+    },
+    {
+      "id": "specialist",
+      "label": "Specialist tools"
+    }
   ],
   "skills": [
-    { "name": "init-project", "label": "Initialize", "group": "core" },
-    { "name": "recall", "label": "Recall", "group": "core" },
-    { "name": "addskill", "label": "Add skill", "group": "core" },
-    { "name": "sync-starter", "label": "Sync starter", "group": "core" },
-    { "name": "optimize-context", "label": "Optimize context", "group": "core" },
-    { "name": "refine", "label": "Refine", "group": "core" },
-    { "name": "merge", "label": "Merge", "group": "core" },
-    { "name": "automate-me", "label": "Automate me", "group": "core" },
-    { "name": "brainstorming", "label": "Brainstorm", "group": "discipline" },
-    { "name": "writing-plans", "label": "Plan", "group": "discipline" },
-    { "name": "impartial-review", "label": "Impartial review", "group": "discipline" },
-    { "name": "writing-skills", "label": "Write skills", "group": "discipline" },
-    { "name": "long-horizon", "label": "Long horizon", "group": "discipline" },
-    { "name": "babysit-ci", "label": "Babysit CI", "group": "discipline" },
-    { "name": "codex-review", "label": "Codex review", "group": "discipline" },
-    { "name": "verify-this", "label": "Verify this", "group": "discipline" },
-    { "name": "fable-mode", "label": "Fable mode", "group": "specialist" },
-    { "name": "wow-loop", "label": "Wow loop", "group": "specialist" },
-    { "name": "arena", "label": "Arena", "group": "specialist" },
-    { "name": "lab", "label": "Lab", "group": "specialist" },
-    { "name": "advocate", "label": "Advocate", "group": "specialist" },
-    { "name": "why", "label": "Why", "group": "specialist" },
-    { "name": "enhance-prompt", "label": "Enhance prompt", "group": "specialist" },
-    { "name": "handoff-audit", "label": "Handoff audit", "group": "specialist" },
-    { "name": "humanizer", "label": "Humanizer", "group": "specialist" },
-    { "name": "purposeful-writing", "label": "Purposeful writing", "group": "specialist" },
-    { "name": "forge-repo-ui-skill", "label": "Forge UI skill", "group": "specialist" },
-    { "name": "caveman", "label": "Caveman", "group": "specialist" },
-    { "name": "bro", "label": "Plain English", "group": "specialist" },
-    { "name": "unslop", "label": "Unslop", "group": "specialist" }
+    {
+      "name": "init-project",
+      "label": "Initialize",
+      "group": "core"
+    },
+    {
+      "name": "recall",
+      "label": "Recall",
+      "group": "core"
+    },
+    {
+      "name": "addskill",
+      "label": "Add skill",
+      "group": "core"
+    },
+    {
+      "name": "sync-starter",
+      "label": "Sync starter",
+      "group": "core"
+    },
+    {
+      "name": "optimize-context",
+      "label": "Optimize context",
+      "group": "core"
+    },
+    {
+      "name": "refine",
+      "label": "Refine",
+      "group": "core"
+    },
+    {
+      "name": "merge",
+      "label": "Merge",
+      "group": "core"
+    },
+    {
+      "name": "automate-me",
+      "label": "Automate me",
+      "group": "core"
+    },
+    {
+      "name": "brainstorming",
+      "label": "Brainstorm",
+      "group": "discipline"
+    },
+    {
+      "name": "writing-plans",
+      "label": "Plan",
+      "group": "discipline"
+    },
+    {
+      "name": "impartial-review",
+      "label": "Impartial review",
+      "group": "discipline"
+    },
+    {
+      "name": "writing-skills",
+      "label": "Write skills",
+      "group": "discipline"
+    },
+    {
+      "name": "long-horizon",
+      "label": "Long horizon",
+      "group": "discipline"
+    },
+    {
+      "name": "babysit-ci",
+      "label": "Babysit CI",
+      "group": "discipline"
+    },
+    {
+      "name": "codex-review",
+      "label": "Codex review",
+      "group": "discipline"
+    },
+    {
+      "name": "verify-this",
+      "label": "Verify this",
+      "group": "discipline"
+    },
+    {
+      "name": "fable-mode",
+      "label": "Fable mode",
+      "group": "specialist"
+    },
+    {
+      "name": "wow-loop",
+      "label": "Wow loop",
+      "group": "specialist"
+    },
+    {
+      "name": "arena",
+      "label": "Arena",
+      "group": "specialist"
+    },
+    {
+      "name": "lab",
+      "label": "Lab",
+      "group": "specialist"
+    },
+    {
+      "name": "advocate",
+      "label": "Advocate",
+      "group": "specialist"
+    },
+    {
+      "name": "why",
+      "label": "Why",
+      "group": "specialist"
+    },
+    {
+      "name": "enhance-prompt",
+      "label": "Enhance prompt",
+      "group": "specialist"
+    },
+    {
+      "name": "handoff-audit",
+      "label": "Handoff audit",
+      "group": "specialist"
+    },
+    {
+      "name": "humanizer",
+      "label": "Humanizer",
+      "group": "specialist"
+    },
+    {
+      "name": "purposeful-writing",
+      "label": "Purposeful writing",
+      "group": "specialist"
+    },
+    {
+      "name": "forge-repo-ui-skill",
+      "label": "Forge UI skill",
+      "group": "specialist"
+    },
+    {
+      "name": "caveman",
+      "label": "Caveman",
+      "group": "specialist"
+    },
+    {
+      "name": "bro",
+      "label": "Plain English",
+      "group": "specialist"
+    },
+    {
+      "name": "unslop",
+      "label": "Unslop",
+      "group": "specialist"
+    },
+    {
+      "name": "session-hub",
+      "label": "Session hub",
+      "group": "specialist"
+    },
+    {
+      "name": "adopt-repo",
+      "label": "Adopt repo",
+      "group": "core"
+    }
   ]
 }

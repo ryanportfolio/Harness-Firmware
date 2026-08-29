@@ -4,7 +4,7 @@
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/boot-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/boot-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/boot-dark.svg">
-<img alt="Harness Firmware boots with 30 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
+<img alt="Harness Firmware boots with 32 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
 </picture>
 
 Harness Firmware stores agent instructions, project notes, reusable skills, and verification rules in the repository for Claude Code and Codex.
@@ -57,7 +57,7 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="30 canonical playbooks serve Claude Code directly and Codex through 30 generated adapters, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="32 canonical playbooks serve Claude Code directly and Codex through 32 generated adapters, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
@@ -65,9 +65,9 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 
 Both runtimes read the committed project topics under `.claude/reference/`. Workflow bodies stay canonical under `.claude/skills/`.
 
-## 30 workflows, loaded when called
+## 32 workflows, loaded when called
 
-**8 core · 8 discipline · 14 specialist**
+**9 core · 8 discipline · 15 specialist**
 
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
@@ -78,16 +78,16 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/skills-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/skills-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/skills-dark.svg">
-<img alt="A memory map of 30 on-demand workflows grouped into 8 core, 8 discipline, and 14 specialist skills." src="assets/readme/skills-light.svg" width="100%">
+<img alt="A memory map of 32 on-demand workflows grouped into 9 core, 8 discipline, and 15 specialist skills." src="assets/readme/skills-light.svg" width="100%">
 </picture>
 
 </details>
 
 <details>
-<summary><strong>Click to browse all 30 skills</strong></summary>
+<summary><strong>Click to browse all 32 skills</strong></summary>
 
 <!-- skill-list:start -->
-### core workflows · 8
+### core workflows · 9
 
 - [`init-project`](.claude/skills/init-project/SKILL.md) · Use once in a spawned starter repo when the user asks to initialize or configure it, or when FILL IN markers remain; never auto-run in a claude-starter template checkout.
 - [`recall`](.claude/skills/recall/SKILL.md) · Use before unfamiliar project-area edits, when the user asks what the project knows or its pitfalls, or when saving durable project-specific learning.
@@ -97,19 +97,20 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`refine`](.claude/skills/refine/SKILL.md) · Use when a session or task is wrapping up ("wrap up", "that's everything", "done for today"), when the user invokes /refine, or after any task with friction: calls wasted rediscovering a fact, a skill that misfired, a user correction.
 - [`merge`](.claude/skills/merge/SKILL.md) · Use only when the user explicitly asks to enable session-wide automatic commit, push, PR, and merge; not for one-shot shipping requests.
 - [`automate-me`](.claude/skills/automate-me/SKILL.md) · Use for "automate me", "/automate-me", "create/update my -mode skill", or "turn my preferences / working style into a skill". Mines the current project's transcripts plus direct questions, then drafts a personal <handle>-mode skill.
+- [`adopt-repo`](.claude/skills/adopt-repo/SKILL.md) · Mirror an existing external repo privately under the user's account and overlay the firmware: clone upstream, strip template-only files, privacy-sweep, run init-project. Use on /adopt-repo <url> or 'pull this repo into our firmware'.
 
 ### quality disciplines · 8
 
 - [`brainstorming`](.claude/skills/brainstorming/SKILL.md) · Use when brainstorming or designing a product, interface, workflow, architecture, or behavior change with unresolved goals or material tradeoffs; not for routine or fully specified work.
 - [`writing-plans`](.claude/skills/writing-plans/SKILL.md) · Use when you have a spec or requirements for a multi-step task, before touching code
-- [`impartial-review`](.claude/skills/impartial-review/SKILL.md) · Use when the user asks to review, audit, or stress-test recent code changes with fresh independent agents; requires exposed multi-agent tools.
+- [`impartial-review`](.claude/skills/impartial-review/SKILL.md) · Use when the user asks to review, audit, or stress-test recent code changes with fresh independent agents; requires exposed multi-agent tools or an authenticated Codex CLI.
 - [`writing-skills`](.claude/skills/writing-skills/SKILL.md) · Use when creating new skills, editing existing skills, or verifying skills work before deployment
 - [`long-horizon`](.claude/skills/long-horizon/SKILL.md) · Use for work too big for one context window: long multi-step tasks, progress lost to compaction or failed retries, work spanning hours or sessions, or when the user says /long-horizon or asks to run a task in verified rounds.
 - [`babysit-ci`](.claude/skills/babysit-ci/SKILL.md) · Watch a PR's checks and iterate on failures until green. Use for /babysit-ci, "watch CI", "fix CI", "get the checks green", or when a PR is waiting on failing or pending checks.
 - [`codex-review`](.claude/skills/codex-review/SKILL.md) · Cross-vendor second-opinion review. Drives OpenAI Codex CLI (codex exec review, gpt-5.6-sol, high reasoning) over a PR, branch, commit, or uncommitted diff, then verifies each finding. Trigger: /codex-review, "have Codex/Sol review this".
 - [`verify-this`](.claude/skills/verify-this/SKILL.md) · Verify a claim with fresh local evidence: restate it falsifiably, capture baseline and treatment, compare, return VERIFIED, NOT VERIFIED, or INCONCLUSIVE. Use for /verify-this, "prove it works", "did this fix it", "show me the evidence".
 
-### specialist tools · 14
+### specialist tools · 15
 
 - [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Use proactively for hard layered work with dependent steps, load-bearing unknowns, repeated failures, or verification-sensitive handoff; also when the user asks for Fable mode.
 - [`wow-loop`](.claude/skills/wow-loop/SKILL.md) · Multi-agent perfection loop for any deliverable. Recon, one spec, one implementer, adversarial screenshot-verified critique until an evidence gate passes. Use when the user says /wow-loop, asks for "wow factor" or "dial it to 11".
@@ -125,6 +126,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`caveman`](.claude/skills/caveman/SKILL.md) · Ultra-compressed communication mode. Cuts token usage ~75% by speaking like caveman while keeping full technical accuracy.
 - [`bro`](.claude/skills/bro/SKILL.md) · Restate the assistant's last message in plain human language, no jargon. Use when the user says /bro, "in plain english", "dumb it down", or "what does that actually mean".
 - [`unslop`](.claude/skills/unslop/SKILL.md) · Always-on AI-tell stripper: apply its pattern check to everything written for humans (chat prose, commits, PR bodies, docs, UI text). Also use when the user says /unslop, "unslop this", or points at text or a file to clean.
+- [`session-hub`](.claude/skills/session-hub/SKILL.md) · Coordinate several simultaneous Claude Code sessions on one effort through a shared append-only HTML hub on the user's Desktop. Use on /session-hub, 'open a hub', 'run parallel sessions on this', or when told to join an existing hub.
 <!-- skill-list:end -->
 
 </details>
