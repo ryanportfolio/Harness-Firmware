@@ -16,7 +16,7 @@ D.A.R.E. = Decompose, Audit, Recombine, Experiment. One problem, four steps, eac
 
 The main session is orchestrator only: it holds the user gates, passes artifacts, and never performs a step itself. Each step is one Agent dispatch. Model floor per the kernel (Sonnet or above); give A and E, the skeptic steps, the strongest model available. Artifacts are plain markdown passed verbatim inside the dispatch prompt.
 
-Artifact chain: problem statement, decomposition tree, audit table, surviving blocks, solution set, test plan.
+Artifact chain: problem statement, decomposition tree, audit table, surviving blocks, solution set, test plan. Each artifact targets one page; depth beyond that is available on request, not passed by default. Persist every artifact to `.tmp/dare/<problem-slug>/` as it is produced, so the chain is inspectable and any step can be re-run against its exact input.
 
 ### D: Decompose
 
@@ -28,11 +28,11 @@ Gate: if a deeper problem surfaced, ask the user in plain numbered chat which pr
 
 ### A: Audit
 
-Input: the decomposition tree only. Not the conversation, not D's reasoning.
+Input: the decomposition tree, plus a verification-sources appendix the orchestrator assembles: file paths, URLs, and command names where evidence lives, listed bare with zero interpretation. Not the conversation, not D's reasoning. Without the appendix a fresh auditor cannot check anything and every classification degrades to guesswork.
 
 Dispatch instructions: skeptical red team; every "obvious" block may be hiding a convention until evidence says otherwise. Produce a numbered list of the assumptions hiding in the blocks, ordered most load-bearing first. For each: name it; classify it fact, convention, or unknown from available evidence, verifying with tools where the repo or the web can actually settle it; state what breaks or opens up if it is eliminated; state what changes if it is inverted.
 
-Gate: show the table. The user may reclassify entries before R; their overrides are recorded as such.
+Gate: show the table. The user may reclassify entries before R; their overrides are recorded as such. Running unattended: proceed with A's classifications and mark the table un-reviewed in the final report.
 
 ### R: Recombine
 
@@ -44,7 +44,7 @@ Dispatch instructions: assemble as many solutions as the blocks honestly support
 
 Input: the solutions (or the standing conventional answer) only.
 
-Dispatch instructions: for each solution, the smallest concrete real-world test: what to do, build, or ask, spending the least time, money, effort, and social risk the problem allows. For each test: the result that rules the solution out, the result that keeps it alive, and what is learned about the problem either way. If every test would fail, name the building block to revisit first.
+Dispatch instructions: for each solution, the smallest concrete real-world test: what to do, build, or ask, spending the least time, money, effort, and social risk the problem allows. Prefer a test that discriminates between two or more solutions over separate per-solution tests; evidence per unit cost is the metric. For each test: the result that rules the solution out, the result that keeps it alive, and what is learned about the problem either way. If every test would fail, name the building block to revisit first.
 
 Handoff: tests runnable from this machine execute through `verify-this` (falsifiable restatement, baseline, verdict) rather than being described and left.
 
