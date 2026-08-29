@@ -85,3 +85,25 @@ Both placed modes held 100.5 fps on a 100 Hz panel, same as an unplaced window.
 Notes: `--window-position` applies to the first window of a launch, so one
 launch per run. Placement is Windows-only and degrades to a plain headed launch
 elsewhere. The DIP-to-pixel mapping assumes both displays share a scale factor.
+
+## Playwright MCP plugin browser is a single shared instance (2026-08-29)
+
+The official playwright plugin launches `npx @playwright/mcp@latest` with a
+persistent profile. Two MCP server processes (a main session plus a subagent
+with its own connection) cannot share that profile: the second gets
+"Browser is already in use ... use --isolated" and blocks. Observed as a
+~10-minute deadlock between a verifier subagent and its main session.
+
+Fixes: the template ships `.mcp.json` defining `playwright-iso`
+(`@playwright/mcp@latest --isolated`, in-memory profile, N concurrent agents);
+or drive an independent Chrome via a repo-local `playwright-core` +
+`scripts/lib/launch-chrome.mjs`. Never point a verifier subagent and the main
+session at the shared plugin browser at the same time.
+
+## Bash tool cwd resets between calls (2026-08-29)
+
+The shell tool's working directory does not reliably persist across calls; it
+intermittently resets to the parent workspace directory. Symptoms observed:
+`npx tsc` resolving the dummy "not the tsc command you are looking for"
+package from the wrong directory, and `git add` failing with "fatal: not a git
+repository". Start compound commands with `cd <repo> &&` or use `git -C`.
