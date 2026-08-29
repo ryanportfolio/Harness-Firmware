@@ -104,7 +104,8 @@ what remains.
 
 ## Guardrails
 
-- Subagents inherit the session model or run Sonnet; the kernel's no-Haiku floor applies.
+- Subagents run Opus or Sol or above, never Sonnet, Haiku, or Luna; inheriting the session
+  model is fine when it already meets that floor.
 - Size each step so one fresh context finishes it: one slice, one migration, one bug.
 - Audit independence is the point — verdicts come from the auditor's own inspection in a
   fresh subagent, never from this Manager context.
