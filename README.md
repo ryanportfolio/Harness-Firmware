@@ -127,7 +127,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`caveman`](.claude/skills/caveman/SKILL.md) · Ultra-compressed communication mode. Cuts token usage ~75% by speaking like caveman while keeping full technical accuracy.
 - [`bro`](.claude/skills/bro/SKILL.md) · Restate the assistant's last message in plain human language, no jargon. Use when the user says /bro, "in plain english", "dumb it down", or "what does that actually mean".
 - [`unslop`](.claude/skills/unslop/SKILL.md) · Always-on AI-tell stripper: apply its pattern check to everything written for humans (chat prose, commits, PR bodies, docs, UI text). Also use when the user says /unslop, "unslop this", or points at text or a file to clean.
-- [`session-hub`](.claude/skills/session-hub/SKILL.md) · Coordinate several simultaneous Claude Code sessions on one effort through a shared append-only HTML hub on the user's Desktop. Use on /session-hub, 'open a hub', 'run parallel sessions on this', or when told to join an existing hub.
+- [`session-hub`](.claude/skills/session-hub/SKILL.md) · Coordinate parallel Claude Code sessions via a shared append-only Desktop HTML hub. Use on /session-hub, 'run parallel sessions on this', joining a hub, or proactively when edits or commits this session did not make appear in the checkout.
 <!-- skill-list:end -->
 
 </details>
