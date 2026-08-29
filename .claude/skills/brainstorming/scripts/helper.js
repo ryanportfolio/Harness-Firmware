@@ -1,5 +1,9 @@
 (function() {
-  const WS_URL = 'ws://' + window.location.host;
+  // The session token normally travels via cookie; the query fallback covers
+  // browsers configured to block cookies.
+  const token = new URLSearchParams(window.location.search).get('token');
+  const WS_URL = 'ws://' + window.location.host +
+    (token ? '/?token=' + encodeURIComponent(token) : '');
   let ws = null;
   let eventQueue = [];
 
