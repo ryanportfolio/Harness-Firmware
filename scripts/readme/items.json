@@ -173,6 +173,11 @@
       "name": "adopt-repo",
       "label": "Adopt repo",
       "group": "core"
+    },
+    {
+      "name": "dare",
+      "label": "DARE",
+      "group": "discipline"
     }
   ]
 }
