@@ -178,7 +178,7 @@ function wrapLabel(label, max = 14) {
 
 function skillsPanel(themeName, narrow) {
   const width = narrow ? 390 : 880;
-  const height = narrow ? 1520 : 700;
+  const height = narrow ? 1560 : 700;
   const groups = facts.groups.map((group) => ({
     ...group,
     skills: facts.skills.filter((skill) => skill.group === group.id).sort((a, b) => a.name.localeCompare(b.name)),
