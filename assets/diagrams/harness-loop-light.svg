@@ -1,10 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 760" width="1320" height="760" role="img" aria-label="Harness firmware architecture: inputs feed an audited round loop, a stagnation supervisor intervenes conditionally, candidates pass a CI gate into an updated lineage that feeds lessons back into the firmware.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 670" width="1320" height="670" role="group" aria-label="Harness firmware architecture with links: inputs feed an audited round loop, a stagnation supervisor intervenes conditionally, candidates pass a CI gate into an updated lineage that feeds lessons back into the firmware.">
 <title>Harness firmware · the audited round loop</title>
 <style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif;fill:#1f2328}.mono{font-family:ui-monospace,'SFMono-Regular','Cascadia Mono',Menlo,Consolas,'Liberation Mono',monospace}.ink{fill:#1f2328}.mute{fill:#59636e}.accent{fill:#1a7f37}
 .panel{fill:none;stroke:#d1d9e0;stroke-width:1}
 .node{fill:none;stroke:#1f2328;stroke-width:1.5}
 .tagbox{fill:#ffffff;stroke:#d1d9e0;stroke-width:1}
-.cell{fill:none;stroke:#d1d9e0;stroke-width:1}
 .grid{stroke:#d1d9e0;stroke-width:1;opacity:.28}
 .glyph{fill:none;stroke:#1f2328;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .wire{fill:none;stroke:#d1d9e0;stroke-width:2;stroke-linecap:round}
@@ -14,7 +13,8 @@
 .dash{stroke-dasharray:6 7}
 .flow{stroke-dasharray:10 8;animation:flow 2.4s linear infinite}
 @keyframes flow{to{stroke-dashoffset:-18}}
-a{text-decoration:none}
+a{text-decoration:none;cursor:pointer}
+a:hover text,a:focus-visible text,text a:hover tspan,text a:focus-visible tspan{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
 .eyebrow{font:600 12px ui-monospace,'SFMono-Regular','Cascadia Mono',Menlo,Consolas,'Liberation Mono',monospace;letter-spacing:1.8px}
 .headline{font:700 46px -apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif;letter-spacing:-1.5px}
 .subhead{font:500 18px -apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif}
@@ -24,8 +24,8 @@ a{text-decoration:none}
 .tiny{font:500 11px -apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif}
 .ref{font:500 10.5px ui-monospace,'SFMono-Regular','Cascadia Mono',Menlo,Consolas,'Liberation Mono',monospace;letter-spacing:.2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}</style>
-<rect width="1320" height="760" fill="#ffffff"/>
-<path class="grid" d="M44 0V760"/><path class="grid" d="M88 0V760"/><path class="grid" d="M132 0V760"/><path class="grid" d="M176 0V760"/><path class="grid" d="M220 0V760"/><path class="grid" d="M264 0V760"/><path class="grid" d="M308 0V760"/><path class="grid" d="M352 0V760"/><path class="grid" d="M396 0V760"/><path class="grid" d="M440 0V760"/><path class="grid" d="M484 0V760"/><path class="grid" d="M528 0V760"/><path class="grid" d="M572 0V760"/><path class="grid" d="M616 0V760"/><path class="grid" d="M660 0V760"/><path class="grid" d="M704 0V760"/><path class="grid" d="M748 0V760"/><path class="grid" d="M792 0V760"/><path class="grid" d="M836 0V760"/><path class="grid" d="M880 0V760"/><path class="grid" d="M924 0V760"/><path class="grid" d="M968 0V760"/><path class="grid" d="M1012 0V760"/><path class="grid" d="M1056 0V760"/><path class="grid" d="M1100 0V760"/><path class="grid" d="M1144 0V760"/><path class="grid" d="M1188 0V760"/><path class="grid" d="M1232 0V760"/><path class="grid" d="M1276 0V760"/><path class="grid" d="M0 44H1320"/><path class="grid" d="M0 88H1320"/><path class="grid" d="M0 132H1320"/><path class="grid" d="M0 176H1320"/><path class="grid" d="M0 220H1320"/><path class="grid" d="M0 264H1320"/><path class="grid" d="M0 308H1320"/><path class="grid" d="M0 352H1320"/><path class="grid" d="M0 396H1320"/><path class="grid" d="M0 440H1320"/><path class="grid" d="M0 484H1320"/><path class="grid" d="M0 528H1320"/><path class="grid" d="M0 572H1320"/><path class="grid" d="M0 616H1320"/><path class="grid" d="M0 660H1320"/><path class="grid" d="M0 704H1320"/><path class="grid" d="M0 748H1320"/>
+<rect width="1320" height="670" fill="#ffffff"/>
+<path class="grid" d="M44 0V670"/><path class="grid" d="M88 0V670"/><path class="grid" d="M132 0V670"/><path class="grid" d="M176 0V670"/><path class="grid" d="M220 0V670"/><path class="grid" d="M264 0V670"/><path class="grid" d="M308 0V670"/><path class="grid" d="M352 0V670"/><path class="grid" d="M396 0V670"/><path class="grid" d="M440 0V670"/><path class="grid" d="M484 0V670"/><path class="grid" d="M528 0V670"/><path class="grid" d="M572 0V670"/><path class="grid" d="M616 0V670"/><path class="grid" d="M660 0V670"/><path class="grid" d="M704 0V670"/><path class="grid" d="M748 0V670"/><path class="grid" d="M792 0V670"/><path class="grid" d="M836 0V670"/><path class="grid" d="M880 0V670"/><path class="grid" d="M924 0V670"/><path class="grid" d="M968 0V670"/><path class="grid" d="M1012 0V670"/><path class="grid" d="M1056 0V670"/><path class="grid" d="M1100 0V670"/><path class="grid" d="M1144 0V670"/><path class="grid" d="M1188 0V670"/><path class="grid" d="M1232 0V670"/><path class="grid" d="M1276 0V670"/><path class="grid" d="M0 44H1320"/><path class="grid" d="M0 88H1320"/><path class="grid" d="M0 132H1320"/><path class="grid" d="M0 176H1320"/><path class="grid" d="M0 220H1320"/><path class="grid" d="M0 264H1320"/><path class="grid" d="M0 308H1320"/><path class="grid" d="M0 352H1320"/><path class="grid" d="M0 396H1320"/><path class="grid" d="M0 440H1320"/><path class="grid" d="M0 484H1320"/><path class="grid" d="M0 528H1320"/><path class="grid" d="M0 572H1320"/><path class="grid" d="M0 616H1320"/><path class="grid" d="M0 660H1320"/>
 <defs>
 <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#d1d9e0"/></marker>
 <marker id="warnarrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#bc4c00"/></marker>
@@ -34,87 +34,89 @@ a{text-decoration:none}
 <text class="eyebrow mute" x="24" y="34">HARNESS FIRMWARE</text>
 <text class="headline" x="24" y="66" style="font-size:28px;letter-spacing:-.5px">The audited round loop</text>
 <text class="label mute" x="24" y="92">INPUTS</text>
-<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/CLAUDE.md"><g transform="translate(24 100)">
+<g transform="translate(24 100)">
+<rect class="panel" width="272" height="180" rx="8"/>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/CLAUDE.md" target="_blank" rel="noopener noreferrer" aria-label="Kernel"><g transform="translate(24 30)"><path class="glyph" d="M-8-10H5A3 3 0 0 1 8-7V10H-5A3 3 0 0 1-8 7Z"/><path class="glyph" d="M-5 10A3 3 0 0 1-5 4H8"/></g>
+<text class="subhead ink" x="52" y="36" font-weight="600">Kernel</text></a>
+<text class="copy mute" x="16" y="64">CLAUDE.md rules always loaded;</text><text class="copy mute" x="16" y="82">6 reference files on demand</text>
+<text class="ref accent" x="16" y="102"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/CLAUDE.md" target="_blank" rel="noopener noreferrer" aria-label="CLAUDE.md"><tspan>CLAUDE.md</tspan></a><tspan> · </tspan><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/reference" target="_blank" rel="noopener noreferrer" aria-label=".claude/reference/"><tspan>.claude/reference/</tspan></a></text>
+<path class="panel" d="M16 116H256"/>
+<text class="label mute" x="16" y="137">TOKEN EFFICIENCY</text>
+<text class="ref accent" x="16" y="160"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/caveman/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="caveman"><tspan>caveman</tspan></a><tspan> · </tspan><a href="https://github.com/rtk-ai/rtk" target="_blank" rel="noopener noreferrer" aria-label="RTK"><tspan>RTK</tspan></a><tspan> · </tspan><a href="https://github.com/ryanportfolio/STK" target="_blank" rel="noopener noreferrer" aria-label="STK"><tspan>STK</tspan></a></text>
+</g><g transform="translate(24 300)">
 <rect class="panel" width="272" height="150" rx="8"/>
-<g transform="translate(24 30)"><path class="glyph" d="M-8-10H5A3 3 0 0 1 8-7V10H-5A3 3 0 0 1-8 7Z"/><path class="glyph" d="M-5 10A3 3 0 0 1-5 4H8"/></g>
-<text class="subhead ink" x="52" y="36" font-weight="600">Kernel + reference</text>
-<text class="copy mute" x="16" y="72">CLAUDE.md rules always loaded;</text><text class="copy mute" x="16" y="92">6 reference files on demand</text>
-<text class="ref accent" x="16" y="132">CLAUDE.md · .claude/reference/</text>
-</g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills"><g transform="translate(24 270)">
-<rect class="panel" width="272" height="150" rx="8"/>
-<g transform="translate(24 30)"><rect class="glyph" x="-9" y="-9" width="8" height="8" rx="1"/><rect class="glyph" x="1" y="-9" width="8" height="8" rx="1"/><rect class="glyph" x="-9" y="1" width="8" height="8" rx="1"/><rect class="glyph" x="1" y="1" width="8" height="8" rx="1"/></g>
-<text class="subhead ink" x="52" y="36" font-weight="600">Skill library</text>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills" target="_blank" rel="noopener noreferrer" aria-label="Skill library"><g transform="translate(24 30)"><rect class="glyph" x="-9" y="-9" width="8" height="8" rx="1"/><rect class="glyph" x="1" y="-9" width="8" height="8" rx="1"/><rect class="glyph" x="-9" y="1" width="8" height="8" rx="1"/><rect class="glyph" x="1" y="1" width="8" height="8" rx="1"/></g>
+<text class="subhead ink" x="52" y="36" font-weight="600">Skill library</text></a>
 <text class="copy mute" x="16" y="72">30 playbooks routed by description,</text><text class="copy mute" x="16" y="92">loaded only when called</text>
-<text class="ref accent" x="16" y="132">.claude/skills/ · .agents/skills/</text>
-</g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.github/workflows"><g transform="translate(24 440)">
+<text class="ref accent" x="16" y="132"><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills" target="_blank" rel="noopener noreferrer" aria-label=".claude/skills/"><tspan>.claude/skills/</tspan></a><tspan> · </tspan><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.agents/skills" target="_blank" rel="noopener noreferrer" aria-label=".agents/skills/"><tspan>.agents/skills/</tspan></a></text>
+
+</g><g transform="translate(24 470)">
 <rect class="panel" width="272" height="150" rx="8"/>
-<g transform="translate(24 30)"><path class="glyph" d="M-9 4A9 9 0 0 1 9 4"/><path class="glyph" d="M0 4L5-3"/><path class="glyph" d="M-11 8H11"/></g>
-<text class="subhead ink" x="52" y="36" font-weight="600">Evaluators</text>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.github/workflows" target="_blank" rel="noopener noreferrer" aria-label="Evaluators"><g transform="translate(24 30)"><path class="glyph" d="M-9 4A9 9 0 0 1 9 4"/><path class="glyph" d="M0 4L5-3"/><path class="glyph" d="M-11 8H11"/></g>
+<text class="subhead ink" x="52" y="36" font-weight="600">Evaluators</text></a>
 <text class="copy mute" x="16" y="72">CI, tests, audited evidence:</text><text class="copy mute" x="16" y="92">evidence beats claims</text>
-<text class="ref accent" x="16" y="132">.github/workflows/ · /verify-this</text>
-</g></a>
-<path class="wire" marker-end="url(#arrow)" d="M296 175H316"/><path class="wire" marker-end="url(#arrow)" d="M296 345H316"/><path class="wire" marker-end="url(#arrow)" d="M296 515H316"/>
-<rect class="panel" x="320" y="90" width="500" height="560" rx="10"/>
-<a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/long-horizon"><text class="label mute" x="570" y="118" text-anchor="middle">AGENTIC ROUND LOOP · LONG-HORIZON + FABLE-MODE</text></a>
+<text class="ref accent" x="16" y="132"><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.github/workflows" target="_blank" rel="noopener noreferrer" aria-label=".github/workflows/"><tspan>.github/workflows/</tspan></a><tspan> · </tspan><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/verify-this/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="/verify-this"><tspan>/verify-this</tspan></a></text>
+
+</g>
+<path class="wire" marker-end="url(#arrow)" d="M296 190H316"/><path class="wire" marker-end="url(#arrow)" d="M296 375H316"/><path class="wire" marker-end="url(#arrow)" d="M296 545H316"/>
+<rect class="panel" x="310" y="90" width="520" height="560" rx="10"/>
 <path class="wire flow" marker-end="url(#arrow)" d="M617.9 176.3A185 185 0 0 1 725.2 254.2"/><path class="wire flow" marker-end="url(#arrow)" d="M754.7 345.3A185 185 0 0 1 713.8 471.4"/><path class="wire flow" marker-end="url(#arrow)" d="M636.3 527.7A185 185 0 0 1 503.7 527.7"/><path class="wire flow" marker-end="url(#arrow)" d="M426.2 471.4A185 185 0 0 1 385.3 345.3"/><path class="wire flow" marker-end="url(#arrow)" d="M414.8 254.2A185 185 0 0 1 522.1 176.3"/>
-<a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/recall"><g transform="translate(570 170)">
+<g transform="translate(570 170)">
 <circle r="34" class="node"/>
 <g><circle cx="-3" cy="-3" r="7" class="glyph"/><path class="glyph" d="M2 2L10 10"/></g>
 <g transform="translate(0 52)"><rect x="-98.6" y="-14" width="197.2" height="56" rx="6" class="tagbox"/>
-<text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">1  Recall</tspan></text>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/recall/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="Recall skill"><text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">Recall</tspan></text></a>
 <text class="tiny mute" text-anchor="middle" y="18">kernel, reference, dead ends</text>
-<text class="ref accent" text-anchor="middle" y="34">/recall · .claude/reference/</text></g>
-</g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/long-horizon"><g transform="translate(745.9 297.8)">
+<text class="ref accent" text-anchor="middle" y="34"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/recall/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="/recall"><tspan>/recall</tspan></a><tspan> · </tspan><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/reference" target="_blank" rel="noopener noreferrer" aria-label=".claude/reference/"><tspan>.claude/reference/</tspan></a></text></g>
+</g><g transform="translate(745.9 297.8)">
 <circle r="34" class="node"/>
 <g><rect x="-8" y="-11" width="16" height="22" rx="2" class="glyph"/><path class="glyph" d="M-4-4H4M-4 1H4M-4 6H1"/></g>
-<g transform="translate(0 52)"><rect x="-96" y="-14" width="192" height="56" rx="6" class="tagbox"/>
-<text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">2  Plan</tspan></text>
+<g transform="translate(0 52)"><rect x="-80" y="-14" width="160" height="84" rx="6" class="tagbox"/>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/long-horizon/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="Plan skill"><text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">Plan</tspan></text></a>
 <text class="tiny mute" text-anchor="middle" y="18">one step, one brief</text>
-<text class="ref accent" text-anchor="middle" y="34">long-horizon · state.md</text></g>
-</g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/fable-mode"><g transform="translate(678.7 504.7)">
+<text class="ref accent" text-anchor="middle" y="34"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/long-horizon/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="long-horizon"><tspan>long-horizon</tspan></a></text><text class="ref accent" text-anchor="middle" y="48"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/brainstorming/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="brainstorming"><tspan>brainstorming</tspan></a></text><text class="ref accent" text-anchor="middle" y="62"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/why/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="why"><tspan>why</tspan></a></text></g>
+</g><g transform="translate(678.7 504.7)">
 <circle r="34" class="node"/>
 <g><rect x="-11" y="-9" width="22" height="18" rx="2" class="glyph"/><path class="glyph" d="M-6-3L-2 0L-6 3M0 4H6"/></g>
 <g transform="translate(0 52)"><rect x="-96" y="-14" width="192" height="56" rx="6" class="tagbox"/>
-<text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">3  Execute</tspan></text>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/fable-mode/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="Execute skill"><text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">Execute</tspan></text></a>
 <text class="tiny mute" text-anchor="middle" y="18">fresh executor subagent</text>
-<text class="ref accent" text-anchor="middle" y="34">fable-mode discipline</text></g>
-</g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/codex-review"><g transform="translate(461.3 504.7)">
+<text class="ref accent" text-anchor="middle" y="34"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/fable-mode/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="fable-mode"><tspan>fable-mode</tspan></a><tspan> discipline</tspan></text></g>
+</g><g transform="translate(461.3 504.7)">
 <circle r="34" class="node"/>
 <g><circle cx="0" cy="0" r="10" class="glyph"/><path class="glyph" d="M-4 0L-1 3L5-3"/></g>
-<g transform="translate(0 52)"><rect x="-140.2" y="-14" width="280.4" height="56" rx="6" class="tagbox"/>
-<text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">4  Audit</tspan></text>
+<g transform="translate(0 52)"><rect x="-96" y="-14" width="192" height="98" rx="6" class="tagbox"/>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/codex-review/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="Audit skill"><text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">Audit</tspan></text></a>
 <text class="tiny mute" text-anchor="middle" y="18">fresh auditor or cross-vendor</text>
-<text class="ref accent" text-anchor="middle" y="34">long-horizon · verify-this · codex-review</text></g>
-</g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/long-horizon"><g transform="translate(394.1 297.8)">
+<text class="ref accent" text-anchor="middle" y="34"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/long-horizon/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="long-horizon"><tspan>long-horizon</tspan></a><tspan> · </tspan><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/verify-this/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="verify-this"><tspan>verify-this</tspan></a></text><text class="ref accent" text-anchor="middle" y="48"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/advocate/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="advocate"><tspan>advocate</tspan></a><tspan> · </tspan><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/codex-review/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="codex-review"><tspan>codex-review</tspan></a></text><text class="ref accent" text-anchor="middle" y="62"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/arena/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="arena"><tspan>arena</tspan></a><tspan> · </tspan><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/wow-loop/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="wow-loop"><tspan>wow-loop</tspan></a></text><text class="ref accent" text-anchor="middle" y="76"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/impartial-review/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="impartial-review"><tspan>impartial-review</tspan></a></text></g>
+</g><g transform="translate(394.1 297.8)">
 <circle r="34" class="node"/>
 <g><circle cx="-6" cy="-7" r="3.5" class="glyph"/><circle cx="-6" cy="7" r="3.5" class="glyph"/><circle cx="7" cy="0" r="3.5" class="glyph"/><path class="glyph" d="M-6-3.5V3.5M-2.7 7C1 7 3.5 4 3.5 0"/></g>
-<g transform="translate(0 52)"><rect x="-96" y="-14" width="192" height="56" rx="6" class="tagbox"/>
-<text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">5  Integrate</tspan></text>
+<g transform="translate(0 52)"><rect x="-80" y="-14" width="160" height="70" rx="6" class="tagbox"/>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/long-horizon/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="Integrate skill"><text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">Integrate</tspan></text></a>
 <text class="tiny mute" text-anchor="middle" y="18">verified progress or dead end</text>
-<text class="ref accent" text-anchor="middle" y="34">state.md lineage</text></g>
-</g></a>
-<circle cx="570" cy="378" r="94" class="panel dash"/>
+<text class="ref accent" text-anchor="middle" y="34"><tspan>record verified result</tspan></text><text class="ref accent" text-anchor="middle" y="48"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/refine/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="refine"><tspan>refine</tspan></a></text></g>
+</g>
+<circle cx="570" cy="378" r="90" class="panel dash"/>
 <text class="subhead ink" x="570" y="352" text-anchor="middle" font-weight="600">Manager session</text>
 <text class="tiny mute" x="570" y="372" text-anchor="middle">one context holds the goal</text>
-<text class="small mute" x="570" y="396" text-anchor="middle">state file · subagents · tools</text>
-<text class="tiny mute" x="570" y="414" text-anchor="middle">contract · verified · remaining · dead ends</text>
-<a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/long-horizon"><g transform="translate(860 90)">
+<g transform="translate(860 90)">
 <rect class="panel" width="436" height="150" rx="8"/>
-<text class="label mute" x="16" y="28">SUPERVISOR · STAGNATION WATCH</text>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/long-horizon/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="Long-horizon stagnation supervisor"><text class="label mute" x="16" y="28">SUPERVISOR · STAGNATION WATCH</text></a>
 <text class="copy ink" x="16" y="54">2 audit fails on one step → change approach</text>
 <text class="copy ink" x="16" y="76">3 rounds, no new verified progress → rewrite plan</text>
 <text class="copy ink" x="16" y="98">cross-vendor consult, checked against the contract</text>
-<text class="ref accent" x="16" y="126">long-horizon (Stagnation) · codex-review (gpt-5.6-sol)</text>
-</g></a>
+<text class="ref accent" x="16" y="126"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/long-horizon/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="long-horizon (Stagnation)"><tspan>long-horizon (Stagnation)</tspan></a><tspan> · </tspan><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/codex-review/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="codex-review (gpt-5.6-sol)"><tspan>codex-review (gpt-5.6-sol)</tspan></a></text>
+</g>
 <path class="warnwire dash" marker-end="url(#warnarrow)" d="M880 240C830 262 800 278 786 290"/>
 <text class="tiny" fill="#bc4c00" x="872" y="262">conditional intervention</text>
-<a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/merge"><g transform="translate(860 350)">
+<g transform="translate(860 350)">
 <rect class="panel" width="170" height="120" rx="8"/>
-<text class="subhead ink" x="16" y="32" font-weight="600">Candidate</text>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/merge/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="Merge skill"><text class="subhead ink" x="16" y="32" font-weight="600">Candidate</text></a>
 <text class="copy mute" x="16" y="58">branch + PR,</text>
 <text class="copy mute" x="16" y="78">evidence attached</text>
-<text class="ref accent" x="16" y="102">/merge cycle · gh pr</text>
-</g></a>
+<text class="ref accent" x="16" y="102"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/merge/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="/merge cycle"><tspan>/merge cycle</tspan></a><tspan> · </tspan><a href="https://cli.github.com/manual/gh_pr" target="_blank" rel="noopener noreferrer" aria-label="gh pr"><tspan>gh pr</tspan></a></text>
+</g>
 <path class="wire" marker-end="url(#arrow)" d="M820 410H856"/>
 <path class="wire" marker-end="url(#arrow)" d="M1030 410H1041"/>
 <g transform="translate(1085 410)">
@@ -124,19 +126,16 @@ a{text-decoration:none}
 </g>
 <path class="wire active" marker-end="url(#accentarrow)" d="M1129 410H1134"/>
 <text class="tiny accent" x="1116" y="378" text-anchor="middle">merge</text>
-<a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/refine"><g transform="translate(1138 340)">
+<g transform="translate(1138 340)">
 <rect width="158" height="140" rx="8" fill="none" stroke="#1a7f37" stroke-width="1.5"/>
-<text class="subhead ink" x="12" y="30" font-weight="600">Updated lineage</text>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/refine/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="Refine skill"><text class="subhead ink" x="12" y="30" font-weight="600">Updated lineage</text></a>
 <text class="copy mute" x="12" y="58">squash-merge → main</text>
 <text class="copy mute" x="12" y="78">checkout pulled</text>
 <text class="copy mute" x="12" y="98">lessons → /refine</text>
-<text class="ref accent" x="12" y="122">refine · recall save</text>
-</g></a>
+<text class="ref accent" x="12" y="122"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/refine/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="refine"><tspan>refine</tspan></a><tspan> · </tspan><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/recall/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="recall save"><tspan>recall save</tspan></a></text>
+</g>
 <path class="warnwire dash" marker-end="url(#warnarrow)" d="M1085 450V600H835"/>
-<a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/babysit-ci"><text class="tiny" fill="#bc4c00" x="960" y="590" text-anchor="middle">repair and retry · babysit-ci</text></a>
+<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/babysit-ci/SKILL.md" target="_blank" rel="noopener noreferrer"><text class="tiny" fill="#bc4c00" x="960" y="590" text-anchor="middle">repair and retry · babysit-ci</text></a>
 <path class="accentwire dash" marker-end="url(#accentarrow)" d="M1230 336C1310 260 1312 96 1160 74C900 44 400 38 168 92"/>
 <text class="tiny accent" x="560" y="68">lessons merge back into the firmware: kernel, skills, reference</text>
-<text class="label mute" x="24" y="678">ALSO IN THE FIRMWARE</text>
-<a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/arena"><g transform="translate(24 690)"><rect class="cell" width="211.8" height="34" rx="17"/><text class="small mute" x="105.9" y="21" text-anchor="middle">arena · parallel candidates</text></g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/wow-loop"><g transform="translate(249.8 690)"><rect class="cell" width="241.4" height="34" rx="17"/><text class="small mute" x="120.7" y="21" text-anchor="middle">wow-loop · adversarial critique</text></g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/impartial-review"><g transform="translate(505.2 690)"><rect class="cell" width="189.6" height="34" rx="17"/><text class="small mute" x="94.8" y="21" text-anchor="middle">impartial + Codex review</text></g></a><g transform="translate(708.8 690)"><rect class="cell" width="145.2" height="34" rx="17"/><text class="small mute" x="72.6" y="21" text-anchor="middle">RTK/STK token diet</text></g><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/unslop"><g transform="translate(868 690)"><rect class="cell" width="219.2" height="34" rx="17"/><text class="small mute" x="109.6" y="21" text-anchor="middle">unslop + caveman prose gates</text></g></a><a href="https://github.com/ryanportfolio/Harness-Firmware/tree/main/.claude/skills/sync-starter"><g transform="translate(1101.2 690)"><rect class="cell" width="197" height="34" rx="17"/><text class="small mute" x="98.5" y="21" text-anchor="middle">sync-starter · every repo</text></g></a>
-<text class="small mute" x="1296" y="745" text-anchor="end">same loop shape AVO uses to reach 100 RHAE on ARC-AGI-3 · the harness, not the model, carries it</text>
 </svg>
