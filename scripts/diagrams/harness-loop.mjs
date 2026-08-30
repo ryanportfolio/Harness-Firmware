@@ -1,5 +1,5 @@
 // Generates assets/diagrams/harness-loop-{light,dark}.svg — the harness-firmware
-// counterpart of NVIDIA's AVO architecture diagram: inputs, the audited round loop,
+// counterpart of NVIDIA's AVO architecture diagram: inputs, a five-stage feedback loop,
 // the stagnation supervisor, the CI gate, and the lineage that feeds back into the
 // firmware itself. Every element names its real skill or file and links to it
 // (links are clickable when the SVG is opened directly; GitHub's <img> embed strips
@@ -142,8 +142,8 @@ function build(themeName) {
       extra: tokenEfficiency,
     }),
     inputBox(300, "Skill library", [
-      "30 playbooks routed by description,",
-      "loaded only when called",
+      "Repeated failures become rules for",
+      "planning, audits, shipping, recovery",
     ], [part(".claude/skills/", `${TREE}/.claude/skills`), part(" · "), part(".agents/skills/", `${TREE}/.agents/skills`)], `${TREE}/.claude/skills`,
     `<rect class="glyph" x="-9" y="-9" width="8" height="8" rx="1"/><rect class="glyph" x="1" y="-9" width="8" height="8" rx="1"/><rect class="glyph" x="-9" y="1" width="8" height="8" rx="1"/><rect class="glyph" x="1" y="1" width="8" height="8" rx="1"/>`),
     inputBox(470, "Evaluators", [
@@ -158,15 +158,14 @@ function build(themeName) {
     .join("");
 
   const supervisor = `<g transform="translate(860 90)">
-<rect class="panel" width="436" height="150" rx="8"/>
+<rect class="panel" width="436" height="128" rx="8"/>
 <a href="${SKILL("long-horizon")}" target="_blank" rel="noopener noreferrer" aria-label="Long-horizon stagnation supervisor"><text class="label mute" x="16" y="28">SUPERVISOR · STAGNATION WATCH</text></a>
 <text class="copy ink" x="16" y="54">2 audit fails on one step → change approach</text>
 <text class="copy ink" x="16" y="76">3 rounds, no new verified progress → rewrite plan</text>
-<text class="copy ink" x="16" y="98">cross-vendor consult, checked against the contract</text>
-<text class="ref accent" x="16" y="126">${linkedText([part("long-horizon (Stagnation)", SKILL("long-horizon")), part(" · "), part("codex-review (gpt-5.6-sol)", SKILL("codex-review"))])}</text>
+<text class="ref accent" x="16" y="104">${linkedText([part("long-horizon (Stagnation)", SKILL("long-horizon")), part(" · "), part("codex-review (gpt-5.6-sol)", SKILL("codex-review"))])}</text>
 </g>
-<path class="warnwire dash" marker-end="url(#warnarrow)" d="M880 240C830 262 800 278 786 290"/>
-<text class="tiny" fill="${warn}" x="872" y="262">conditional intervention</text>`;
+<path class="warnwire dash" marker-end="url(#warnarrow)" d="M880 218C830 240 800 266 786 290"/>
+<text class="tiny" fill="${warn}" x="872" y="240">conditional intervention</text>`;
 
   const candidate = `<g transform="translate(860 350)">
 <rect class="panel" width="170" height="120" rx="8"/>
@@ -205,8 +204,7 @@ function build(themeName) {
 <marker id="accentarrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8Z" fill="${theme.accent}"/></marker>
 </defs>
 <text class="eyebrow mute" x="24" y="34">HARNESS FIRMWARE</text>
-<text class="headline" x="24" y="66" style="font-size:28px;letter-spacing:-.5px">The audited round loop</text>
-<text class="label mute" x="24" y="92">INPUTS</text>
+<text class="label mute" x="24" y="66">INPUTS</text>
 ${inputs.join("")}
 ${inputArrows}
 <rect class="panel" x="310" y="90" width="520" height="560" rx="10"/>
@@ -244,8 +242,8 @@ a:hover text,a:focus-visible text,text a:hover tspan,text a:focus-visible tspan{
 .ref{font:500 10.5px ${MONO};letter-spacing:.2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}`;
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="group" aria-label="Harness firmware architecture with links: inputs feed an audited round loop, a stagnation supervisor intervenes conditionally, candidates pass a CI gate into an updated lineage that feeds lessons back into the firmware.">
-<title>Harness firmware · the audited round loop</title>
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="group" aria-label="Harness firmware architecture with links: inputs feed a five-stage feedback loop, a stagnation supervisor intervenes conditionally, candidates pass a CI gate into an updated lineage that feeds lessons back into the firmware.">
+<title>Harness firmware architecture</title>
 <style>${css}</style>
 <rect width="${W}" height="${H}" fill="${themeName === "light" ? "#ffffff" : "#0d1117"}"/>
 ${body}
