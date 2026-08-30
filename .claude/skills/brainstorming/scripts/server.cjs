@@ -138,7 +138,12 @@ function requestToken(req) {
   const match = (req.headers.cookie || '').match(
     new RegExp('(?:^|;\\s*)' + TOKEN_COOKIE + '=([^;]*)')
   );
-  return match ? decodeURIComponent(match[1]) : null;
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch (e) {
+    return null; // malformed percent-encoding: treat as no token, not a crash
+  }
 }
 
 function getNewestScreen() {
@@ -176,7 +181,7 @@ function handleRequest(req, res) {
 
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
-      'Set-Cookie': TOKEN_COOKIE + '=' + TOKEN + '; HttpOnly; SameSite=Strict; Path=/'
+      'Set-Cookie': TOKEN_COOKIE + '=' + encodeURIComponent(TOKEN) + '; HttpOnly; SameSite=Strict; Path=/'
     });
     res.end(html);
   } else if (req.method === 'GET' && pathname.startsWith('/files/')) {
@@ -380,7 +385,7 @@ function startServer() {
   server.listen(PORT, HOST, () => {
     const info = JSON.stringify({
       type: 'server-started', port: Number(PORT), host: HOST,
-      url_host: URL_HOST, url: 'http://' + URL_HOST + ':' + PORT + '/?token=' + TOKEN,
+      url_host: URL_HOST, url: 'http://' + URL_HOST + ':' + PORT + '/?token=' + encodeURIComponent(TOKEN),
       token: TOKEN, screen_dir: CONTENT_DIR, state_dir: STATE_DIR
     });
     console.log(info);
