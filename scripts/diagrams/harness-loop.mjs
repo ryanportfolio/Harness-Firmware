@@ -31,20 +31,20 @@ const pos = (deg) => [CX + R * Math.sin(rad(deg)), CY - R * Math.cos(rad(deg))];
 const fmt = (n) => Number(n.toFixed(1));
 
 const NODES = [
-  { deg: 0, name: "Recall", sub: "kernel, reference, dead ends", refs: [part("/recall", SKILL("recall")), part(" · "), part(".claude/reference/", `${TREE}/.claude/reference`)], href: SKILL("recall") },
-  { deg: 72, name: "Plan", sub: "one step, one brief", minBoxW: 160, refRows: [
+  { deg: 0, name: "Recall", refs: [part("/recall", SKILL("recall")), part(" · "), part(".claude/reference/", `${TREE}/.claude/reference`)], href: SKILL("recall") },
+  { deg: 72, name: "Plan", minBoxW: 160, refRows: [
     [part("long-horizon", SKILL("long-horizon"))],
     [part("brainstorming", SKILL("brainstorming"))],
     [part("why", SKILL("why"))],
   ], href: SKILL("long-horizon") },
-  { deg: 144, name: "Execute", sub: "fresh executor subagent", refs: [part("fable-mode", SKILL("fable-mode")), part(" discipline")], href: SKILL("fable-mode") },
-  { deg: 216, name: "Audit", sub: "fresh auditor or cross-vendor", refRows: [
+  { deg: 144, name: "Execute", refs: [part("fable-mode", SKILL("fable-mode")), part(" discipline")], href: SKILL("fable-mode") },
+  { deg: 216, name: "Audit", refRows: [
     [part("long-horizon", SKILL("long-horizon")), part(" · "), part("verify-this", SKILL("verify-this"))],
     [part("advocate", SKILL("advocate")), part(" · "), part("codex-review", SKILL("codex-review"))],
     [part("arena", SKILL("arena")), part(" · "), part("wow-loop", SKILL("wow-loop"))],
     [part("impartial-review", SKILL("impartial-review"))],
   ], href: SKILL("codex-review") },
-  { deg: 288, name: "Integrate", sub: "verified progress or dead end", minBoxW: 160, refRows: [
+  { deg: 288, name: "Integrate", minBoxW: 160, refRows: [
     [part("record verified result")],
     [part("refine", SKILL("refine"))],
   ], href: SKILL("long-horizon") },
@@ -81,14 +81,13 @@ function loopNodes() {
     const [x, y] = pos(node.deg).map(fmt);
     const refRows = node.refRows ?? [node.refs];
     const boxW = Math.max(node.minBoxW ?? 192, ...refRows.map((parts) => partsText(parts).length * 6.4 + 18));
-    const boxH = 56 + (refRows.length - 1) * 14;
-    const refLines = refRows.map((parts, index) => `<text class="ref accent" text-anchor="middle" y="${34 + index * 14}">${linkedText(parts)}</text>`).join("");
+    const boxH = 52 + (refRows.length - 1) * 16;
+    const refLines = refRows.map((parts, index) => `<text class="ref accent" text-anchor="middle" y="${28 + index * 16}">${linkedText(parts)}</text>`).join("");
     return `<g transform="translate(${x} ${y})">
 <circle r="34" class="node"/>
 <g>${nodeIcon(node.name)}</g>
-<g transform="translate(0 52)"><rect x="${fmt(-boxW / 2)}" y="-14" width="${fmt(boxW)}" height="${boxH}" rx="6" class="tagbox"/>
-<a href="${node.href}" target="_blank" rel="noopener noreferrer" aria-label="${esc(node.name)} skill"><text class="small ink" text-anchor="middle" y="2"><tspan font-weight="700">${esc(node.name)}</tspan></text></a>
-<text class="tiny mute" text-anchor="middle" y="18">${esc(node.sub)}</text>
+<g transform="translate(0 52)"><rect x="${fmt(-boxW / 2)}" y="-18" width="${fmt(boxW)}" height="${boxH}" rx="6" class="tagbox"/>
+<a href="${node.href}" target="_blank" rel="noopener noreferrer" aria-label="${esc(node.name)} skill"><text class="node-title ink" text-anchor="middle" y="4">${esc(node.name)}</text></a>
 ${refLines}</g>
 </g>`;
   }).join("");
@@ -240,7 +239,7 @@ a:hover text,a:focus-visible text,text a:hover tspan,text a:focus-visible tspan{
 .subhead{font:500 18px ${SANS}}
 .label{font:700 13px ${MONO};letter-spacing:.7px}
 .copy{font:400 14px ${SANS}}
-.small{font:500 12px ${MONO};letter-spacing:.25px}
+.node-title{font:700 16px ${SANS};letter-spacing:.1px}
 .tiny{font:500 11px ${SANS}}
 .ref{font:500 10.5px ${MONO};letter-spacing:.2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}`;
