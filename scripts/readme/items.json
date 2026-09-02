@@ -135,13 +135,8 @@
       "group": "specialist"
     },
     {
-      "name": "humanizer",
-      "label": "Humanizer",
-      "group": "specialist"
-    },
-    {
-      "name": "purposeful-writing",
-      "label": "Purposeful writing",
+      "name": "writing",
+      "label": "Writing",
       "group": "specialist"
     },
     {
@@ -157,11 +152,6 @@
     {
       "name": "bro",
       "label": "Plain English",
-      "group": "specialist"
-    },
-    {
-      "name": "unslop",
-      "label": "Unslop",
       "group": "specialist"
     },
     {

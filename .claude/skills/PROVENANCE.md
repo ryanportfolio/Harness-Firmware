@@ -15,7 +15,7 @@ LICENSE/NOTICE files in the skill folder.
 | `writing-plans` | obra/superpowers | MIT (in folder) | Stock |
 | `writing-skills` | obra/superpowers | MIT (in folder) | Stock |
 | `caveman` | Community token-compression pattern (viral skill, author attribution unclear) | Reimplemented here | Intensity tiers (lite/full/ultra), output budget, auto-clarity carve-outs, persistence rules |
-| `humanizer` | Community "humanizer" de-AI-writing pattern | Reimplemented here | patterns.md tell catalog; voice-matching; review-only mode |
+| `writing` | Wikipedia "Signs of AI writing" tell catalog; `unslop` in [cursor/plugins pstack](https://github.com/cursor/plugins/tree/main/pstack) (poteto, MIT); Hermes Agent `purposeful-writing` (MIT); [petergyang/no-ai-slop](https://github.com/petergyang/no-ai-slop) (MIT) | Reimplemented here, MIT | One skill replacing `humanizer`, `purposeful-writing`, `unslop`, and the bootstrap `writing` copy; scoped to text that leaves the session; patterns 35-45 and edit-mode restraint from no-ai-slop; the always-on digest stays in CLAUDE.md and `caveman` |
 | `refine` | Concept from [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) Continual Harness `/refine` (MIT); no code or text vendored | Reimplemented here | Trajectory friction classes; delegates edits to recall/writing-skills; commit-per-edit as rollback snapshot |
 | `long-horizon` | Concept from [AMAP-ML/LongHorizon-Harness](https://github.com/AMAP-ML/LongHorizon-Harness) (MIT); no code or text vendored | Reimplemented here | Manager/Executor/Auditor loop mapped to subagents; state file in `.tmp/`; frozen contract + verdict triple (status/integrity/contract); round cap + ask gate; stacks with fable-mode; kernel no-Haiku floor |
 

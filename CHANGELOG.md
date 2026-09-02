@@ -22,12 +22,27 @@ condensed.
 - `long-horizon` skill: Manager/Executor/Auditor rounds with audit-gated
   durable state for tasks bigger than one context window (concept port of
   AMAP-ML's LongHorizon-Harness).
+- `writing` skill: one skill for text that leaves the session (docs,
+  READMEs, site and UI copy, emails) and for editing or auditing a draft
+  for AI tells. Adds the rhetoric patterns from petergyang/no-ai-slop
+  (throat-clearing openers, faux-insight setups, colon reveals, kickers)
+  and its edit-mode restraint (minimum effective edit, keep real hedges).
 
 ### Changed
 
 - `README.md`: the safety model section became "what's different here", the
   template's differentiators; the safety rules moved to `CONTRIBUTING.md`
   beside the PR checklist that enforces them.
+- `CLAUDE.md`, `caveman`, `session-start.sh`: the always-on core-tells
+  digest now points at `writing/patterns.md` instead of the removed
+  `unslop` skill.
+
+### Removed
+
+- `humanizer`, `purposeful-writing`, `unslop` skills and the
+  `bootstrap/machine/home-claude/skills/writing` copy, folded into
+  `writing`. The always-on digest in `CLAUDE.md` and `caveman` is
+  unchanged.
 
 ## [1.2.0] - 2026-07-25
 

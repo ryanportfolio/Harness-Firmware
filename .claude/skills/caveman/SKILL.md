@@ -33,7 +33,7 @@ Tells banned at write time:
 - Say what it does, not how it feels: name the mechanism or number, else cut. A sentence that fits any project's docs says nothing about this one; cut it.
 - Active voice; adverbs become the measurement; sentence-case headings; no decorative emojis; straight quotes.
 
-This list is a verbatim copy of the "Core tells, banned at write time" digest in CLAUDE.md. Editing one means editing both. The full 30-pattern list and the code-diff mode live in `.claude/skills/unslop/SKILL.md`, loaded for `/unslop` passes.
+This list is a verbatim copy of the "Core tells, banned at write time" digest in CLAUDE.md. Editing one means editing both. The full tell catalog lives in `.claude/skills/writing/patterns.md`; the `writing` skill covers text that leaves the session.
 
 ## Rules
 
