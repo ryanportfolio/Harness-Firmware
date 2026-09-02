@@ -36,7 +36,7 @@ Form follows the job. Application answer: answer, one example, what it reveals. 
 
 ## Tells
 
-Catalog with before/after examples in `patterns.md`; open it when a tell is ambiguous.
+Mannered prose substitutes metaphor and flourish for direct statement: "a dial worth turning" for "a parameter worth varying". The phrases display the writer instead of conveying the idea, and readers can tell. Say what you mean; when a literal phrase exists, use it. The lists below name the recurring forms. Catalog with before/after examples in `patterns.md`; open it when a tell is ambiguous.
 
 - **Puffery and AI vocabulary.** pivotal, testament, landscape, groundbreaking, delve, crucial, showcase, robust, seamless, transformative, empower, streamline; leverage and utilize (use), facilitate (help). Full list: patterns 1, 4, 7.
 - **Superficial -ing tails** ("highlighting the team's commitment"), **vague attribution** (experts agree), **copula dodges and inanimate actors** (serves as, "the decision emerged"), **fake structure** (rule of three, false ranges, synonym cycling).
