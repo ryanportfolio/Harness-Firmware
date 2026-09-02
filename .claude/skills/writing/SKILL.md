@@ -44,6 +44,7 @@ Mannered prose substitutes metaphor and flourish for direct statement: "a dial w
 - **Rhetorical setups.** Throat-clearing ("Here's the thing", "Let me be clear"); faux-insight ("what nobody tells you"); colon reveals ("The best part: it learns."); dramatic fragmentation ("That's it. That's the whole thing."); self-answered questions, "Plot twist:"; metadiscourse ("this distinction matters", "as you can see"). State the point. Patterns 35-42.
 - **Kicker endings and recaps.** A final aphorism or mic-drop line, "In conclusion". Delete; never rewrite into a better metaphor. End on the last concrete sentence or a plain next action.
 - **Style tics.** Colon as mid-sentence hinge; bold on every noun; inline-header bullets that restate their label; Title Case headings; decorative emojis; curly quotes; uniform hyphenated compounds; bullets where prose reads better; a header over two sentences.
+- **Marketing shapes.** "whether you're X or Y", "that's where X comes in", "say goodbye to", "imagine a", hedged benefits ("helps you to"), boilerplate CTAs, process bleed. Patterns 46-54.
 - **Chatbot artifacts** (Great question, I hope this helps) and **abstract metaphor nouns** (substrate, wedge, paradigm, north star, flywheel). Pick the concrete word.
 
 Words naming a real thing in the repo ("harness") are terms, not tells.

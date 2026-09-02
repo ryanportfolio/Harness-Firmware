@@ -2,7 +2,7 @@
 
 Before/after examples for each tell. Read this file only when a pattern named in SKILL.md is ambiguous in the text at hand.
 
-Patterns 1-27 derive from Wikipedia's [Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) guide (WikiProject AI Cleanup). 28-34 are plain-speech extensions. 35-45 are the rhetoric patterns from petergyang/no-ai-slop (MIT), with examples written here.
+Patterns 1-27 derive from Wikipedia's [Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) guide (WikiProject AI Cleanup). 28-34 are plain-speech extensions. 35-45 are the rhetoric patterns from petergyang/no-ai-slop (MIT), with examples written here. 46-54 are the marketing-copy patterns from ItsssssJack/SlopMonster (MIT), with examples written here.
 
 ---
 
@@ -76,7 +76,7 @@ If the writer has no source, ask for one or flag the claim. Never invent a sourc
 
 ### 7. AI vocabulary
 
-**Watch:** additionally, crucial, delve, enduring, enhance, fostering, garner, interplay, intricate, landscape (abstract), pivotal, showcase, tapestry, testament, underscore, vibrant, robust, seamless, transformative, elevate, empower, streamline, multifaceted, meticulous, paramount, ever-evolving, game changer, cutting-edge, realm, beacon, embark, supercharge
+**Watch:** additionally, crucial, delve, enduring, enhance, fostering, garner, interplay, intricate, landscape (abstract), pivotal, showcase, tapestry, testament, underscore, vibrant, robust, seamless, transformative, elevate, empower, streamline, multifaceted, meticulous, paramount, ever-evolving, game changer, cutting-edge, realm, beacon, embark, supercharge, unlock, unleash, boost, journey, solution, effortless, intuitive, world-class, best-in-class, curated, compelling, holistic, synergy, plethora
 
 **Before:**
 > Additionally, a distinctive feature of Somali cuisine is the incorporation of camel meat. An enduring testament to Italian colonial influence is the widespread adoption of pasta in the local culinary landscape, showcasing how these dishes have integrated into the traditional diet.
@@ -486,3 +486,99 @@ Trailing clauses that pretend to explain meaning: highlighting, underscoring, re
 
 **After:**
 > The launch adds file search, so users can find old drafts without leaving the editor.
+
+---
+
+## Marketing copy
+
+The landing-page register. Every competitor shipped the same sentence; the reader has read it a thousand times.
+
+### 46. "Whether you're X or Y"
+
+Name the one reader you mean.
+
+**Before:**
+> Whether you're a solo founder or a Fortune 500 team, Acme scales with you.
+
+**After:**
+> Built for teams of two to twenty who outgrew a shared spreadsheet.
+
+### 47. "That's where X comes in"
+
+State what X does.
+
+**Before:**
+> Managing invoices by hand gets messy fast. That's where Acme comes in.
+
+**After:**
+> Acme reads the PDF, fills the ledger row, and flags any total that does not match the PO.
+
+### 48. "Say goodbye to"
+
+Name what replaces it.
+
+**Before:**
+> Say goodbye to guesswork.
+
+**After:**
+> Every estimate shows the three line items it came from.
+
+### 49. "Imagine a..." opener
+
+Show it instead.
+
+**Before:**
+> Imagine a world where deploys never wake you up.
+
+**After:**
+> The last on-call page from a deploy was in March.
+
+### 50. "More than just"
+
+Same fix as the negation pivot: cut the first clause, keep the claim.
+
+**Before:**
+> More than just a task list.
+
+**After:**
+> A task list that assigns owners from the commit history.
+
+### 51. Hedged benefit
+
+"Helps you to", "can help you", "is designed to". One committed verb.
+
+**Before:**
+> Acme can help you to reduce churn.
+
+**After:**
+> Acme emails the accounts that stopped logging in, before they cancel.
+
+### 52. Boilerplate CTA
+
+"Ready to get started?", "Get started", "Learn more". The button says what it does.
+
+**Before:**
+> Ready to get started? Learn more.
+
+**After:**
+> Book a 20-minute inspection.
+
+### 53. Process bleed
+
+The model's working notes leak into the deliverable.
+
+**Before:**
+> I've analysed your requirements and structured the following sections for maximum clarity.
+
+**After:**
+> (delete; start at the first real sentence)
+
+### 54. Semicolons in web copy
+
+Wrong register for a landing page or product page. Two sentences.
+
+**Before:**
+> Deploys take four minutes; rollbacks take one.
+
+**After:**
+> Deploys take four minutes. Rollbacks take one.
