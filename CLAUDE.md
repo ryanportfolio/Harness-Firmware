@@ -21,7 +21,7 @@ Invoke the `caveman` skill at **ultra** at session start. Applies to all prose r
 
 ## Always-on unslop
 
-Everything written for humans passes this check at write time: chat prose, commit messages, PR bodies, docs, READMEs, UI text. Write clean first; never generate the tell and fix it after. Never drop a fact, caveat, or qualifier to remove a tell. Caveman compresses, unslop strips tells; both apply. Full pattern list + code-diff mode: `.claude/skills/unslop/SKILL.md` (load for `/unslop` passes).
+Everything written for humans passes this check at write time: chat prose, commit messages, PR bodies, docs, READMEs, UI text. Write clean first; never generate the tell and fix it after. Never drop a fact, caveat, or qualifier to remove a tell. Caveman compresses, unslop strips tells; both apply. Text that leaves the session (docs, READMEs, site and UI copy, emails) goes through the `writing` skill; its `patterns.md` holds the full tell catalog.
 
 Core tells, banned at write time:
 

@@ -7,7 +7,7 @@ description: "Use for \"automate me\", \"/automate-me\", \"create/update my -mod
 
 A guided flow for turning the user's working conventions into a skill agents will follow. The output is one `-mode` skill tailored to them (e.g. `ryan-mode`).
 
-This skill orchestrates others: an inline mining pass (step 1), writing-skills plus addskill (authoring and repo install), and unslop (prose discipline). It sequences them; it doesn't replace them.
+This skill orchestrates others: an inline mining pass (step 1), writing-skills plus addskill (authoring and repo install), and the CLAUDE.md core-tells digest (prose discipline). It sequences them; it doesn't replace them.
 
 ## Flow
 
@@ -73,7 +73,7 @@ Author via writing-skills; install via addskill (repo commit, Codex adapter, com
 
 ### 5. Iterate on prose
 
-Apply unslop and writing-skills' guidelines to every line. Show the draft to the user and take feedback; expect multiple iterations. Cut ruthlessly: a mode skill is not a manual.
+Apply the CLAUDE.md core-tells digest and writing-skills' guidelines to every line. Show the draft to the user and take feedback; expect multiple iterations. Cut ruthlessly: a mode skill is not a manual.
 
 ### 6. Land it
 

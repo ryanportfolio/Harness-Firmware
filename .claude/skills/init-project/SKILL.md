@@ -82,12 +82,12 @@ Verify: `grep -rn "caveman" CLAUDE.md .claude/hooks/session-start.sh` returns ei
 | data / notebooks | `forge-repo-ui-skill`, `lab` |
 | writing / docs | `forge-repo-ui-skill`, `lab` |
 
-The table is a floor, not a ceiling — offer obvious extras ("no frontend planned, also drop `humanizer`? it's for prose deliverables"). Each `off` saves its description from every turn (`bash .claude/scripts/context-weight.sh` shows per-skill weight); takes effect next session.
+The table is a floor, not a ceiling — offer obvious extras ("no frontend planned, also drop `lab`? it's for visual prototyping"). Each `off` saves its description from every turn (`bash .claude/scripts/context-weight.sh` shows per-skill weight); takes effect next session.
 
 **Skill preset.** The Step 2 answer decides how much survives the profile pruning:
 
 - **full**: keep everything the profile table left; nothing further to do.
-- **minimal**: delete the situational extras from `.claude/skills/` and keep the core-loop and discipline tiers. The extras are `advocate`, `enhance-prompt`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `humanizer`, `lab`, `purposeful-writing`, `why`, plus `caveman` unless Step 2 chose a caveman prose mode (delete it otherwise). These are the same three tiers `README.md` lists; keep the wording in both places agreeing.
+- **minimal**: delete the situational extras from `.claude/skills/` and keep the core-loop and discipline tiers. The extras are `advocate`, `enhance-prompt`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `lab`, `why`, plus `caveman` unless Step 2 chose a caveman prose mode (delete it otherwise). These are the same three tiers `README.md` lists; keep the wording in both places agreeing.
 
 Do not delete past the extras. The core-loop and discipline skills are named by the always-loaded layer, so cutting into them reproduces the bug Step 3b exists to prevent.
 

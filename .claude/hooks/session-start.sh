@@ -79,8 +79,8 @@ print_unslop_directive() {
 this session passes the unslop pattern check at write time: chat prose, commit
 messages, PR bodies, docs, READMEs, UI text. Write clean first; never generate
 the tell and fix it after. The core-tells digest is inline in CLAUDE.md
-("Always-on unslop" section) -- already loaded, no read step needed. Full list:
-.claude/skills/unslop/SKILL.md, for /unslop passes.
+("Always-on unslop" section) -- already loaded, no read step needed. Text that
+leaves the session (docs, READMEs, site copy, emails) loads the writing skill.
 UNSLOP
 }
 

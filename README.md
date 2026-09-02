@@ -4,7 +4,7 @@
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/boot-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/boot-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/boot-dark.svg">
-<img alt="Harness Firmware boots with 33 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
+<img alt="Harness Firmware boots with 31 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
 </picture>
 
 Harness Firmware stores agent instructions, project notes, reusable skills, and verification rules in the repository for Claude Code and Codex.
@@ -57,7 +57,7 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="33 canonical playbooks serve Claude Code directly and Codex through 33 generated adapters, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="31 canonical playbooks serve Claude Code directly and Codex through 31 generated adapters, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
@@ -65,9 +65,9 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 
 Both runtimes read the committed project topics under `.claude/reference/`. Workflow bodies stay canonical under `.claude/skills/`.
 
-## 33 workflows, loaded when called
+## 31 workflows, loaded when called
 
-**9 core · 9 discipline · 15 specialist**
+**9 core · 9 discipline · 13 specialist**
 
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
@@ -78,13 +78,13 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/skills-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/skills-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/skills-dark.svg">
-<img alt="A memory map of 33 on-demand workflows grouped into 9 core, 9 discipline, and 15 specialist skills." src="assets/readme/skills-light.svg" width="100%">
+<img alt="A memory map of 31 on-demand workflows grouped into 9 core, 9 discipline, and 13 specialist skills." src="assets/readme/skills-light.svg" width="100%">
 </picture>
 
 </details>
 
 <details>
-<summary><strong>Click to browse all 33 skills</strong></summary>
+<summary><strong>Click to browse all 31 skills</strong></summary>
 
 <!-- skill-list:start -->
 ### core workflows · 9
@@ -111,7 +111,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`verify-this`](.claude/skills/verify-this/SKILL.md) · Verify a claim with fresh local evidence: restate it falsifiably, capture baseline and treatment, compare, return VERIFIED, NOT VERIFIED, or INCONCLUSIVE. Use for /verify-this, "prove it works", "did this fix it", "show me the evidence".
 - [`dare`](.claude/skills/dare/SKILL.md) · First-principles chain: decompose, audit assumptions, recombine surviving blocks, test against reality; each step a fresh subagent fed only the prior artifact. Use on /dare, 'first principles', or 'are we solving the right problem'.
 
-### specialist tools · 15
+### specialist tools · 13
 
 - [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Use proactively for hard layered work with dependent steps, load-bearing unknowns, repeated failures, or verification-sensitive handoff; also when the user asks for Fable mode.
 - [`wow-loop`](.claude/skills/wow-loop/SKILL.md) · Multi-agent perfection loop for any deliverable. Recon, one spec, one implementer, adversarial screenshot-verified critique until an evidence gate passes. Use when the user says /wow-loop, asks for "wow factor" or "dial it to 11".
@@ -121,12 +121,10 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`why`](.claude/skills/why/SKILL.md) · Use only when the user explicitly invokes /why to challenge the assistant's immediately prior recommendation; never trigger from ordinary why questions or paraphrases.
 - [`enhance-prompt`](.claude/skills/enhance-prompt/SKILL.md) · Use when the user asks to rewrite a rough request into a polished, copy/paste-ready prompt for another agent or a fresh session.
 - [`handoff-audit`](.claude/skills/handoff-audit/SKILL.md) · Use when the user asks for a self-contained audit prompt to paste into a separate fresh session for independent verification.
-- [`humanizer`](.claude/skills/humanizer/SKILL.md) · Use when the user asks to humanize, de-AI, de-slop, voice-match, or review prose for AI tells before publishing.
-- [`purposeful-writing`](.claude/skills/purposeful-writing/SKILL.md) · Use when drafting or revising prose for a reader: application answers, emails, essays, bios, cover letters, proposals, memos, reports, product copy, speeches, or when a draft reads as machine-made or must match a writer's own voice.
+- [`writing`](.claude/skills/writing/SKILL.md) · Use for text that leaves the session (READMEs, docs, site and UI copy, emails, release notes, application answers) or to unslop, humanize, voice-match, or audit a draft for AI tells. Chat, commits, and PRs stay with caveman.
 - [`forge-repo-ui-skill`](.claude/skills/forge-repo-ui-skill/SKILL.md) · Use when the user wants a repository-specific UI or design skill synthesized from current agent skills; not for ordinary UI implementation or backend-only work.
 - [`caveman`](.claude/skills/caveman/SKILL.md) · Ultra-compressed communication mode. Cuts token usage ~75% by speaking like caveman while keeping full technical accuracy.
 - [`bro`](.claude/skills/bro/SKILL.md) · Restate the assistant's last message in plain human language, no jargon. Use when the user says /bro, "in plain english", "dumb it down", or "what does that actually mean".
-- [`unslop`](.claude/skills/unslop/SKILL.md) · Always-on AI-tell stripper: apply its pattern check to everything written for humans (chat prose, commits, PR bodies, docs, UI text). Also use when the user says /unslop, "unslop this", or points at text or a file to clean.
 - [`session-hub`](.claude/skills/session-hub/SKILL.md) · Coordinate parallel Claude Code sessions via a shared append-only Desktop HTML hub. Use on /session-hub, 'run parallel sessions on this', joining a hub, or proactively when edits or commits this session did not make appear in the checkout.
 <!-- skill-list:end -->
 

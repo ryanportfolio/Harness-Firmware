@@ -10,12 +10,12 @@ const variants = ["light", "dark", "narrow-light", "narrow-dark"];
 const requiredLinks = ["GUIDE.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "actions/workflows/validate-template.yml"];
 
 test("README facts match the canonical repository inventory", () => {
-  assert.equal(facts.skillCount, 33);
-  assert.equal(facts.adapterCount, 33);
+  assert.equal(facts.skillCount, 31);
+  assert.equal(facts.adapterCount, 31);
   assert.equal(facts.referenceFileCount, 6);
   assert.deepEqual(facts.runtimeNames, ["Claude Code", "Codex"]);
   assert.equal(facts.runtimeCount, facts.runtimeNames.length);
-  assert.deepEqual(facts.tierCounts, { core: 9, discipline: 9, specialist: 15 });
+  assert.deepEqual(facts.tierCounts, { core: 9, discipline: 9, specialist: 13 });
   assert.deepEqual(facts.inventoryNames, facts.canonicalNames);
   assert.ok(facts.onDemandBytes > facts.residentBytes);
 });
@@ -89,7 +89,7 @@ test("skill memory map draws every skill within its narrow canvas", () => {
       assert.equal((source.match(new RegExp(`data-skill="${skill}"`, "g")) ?? []).length, 1, `${variant}: ${skill}`);
     }
     assert.match(source, /data-group-count="9"/);
-    assert.match(source, /data-group-count="15"/);
+    assert.match(source, /data-group-count="13"/);
     if (variant.startsWith("narrow")) {
       const height = Number(source.match(/viewBox="0 0 390 (\d+)"/)?.[1]);
       const bottoms = [...source.matchAll(/data-bottom="(\d+)"/g)].map((match) => Number(match[1]));
