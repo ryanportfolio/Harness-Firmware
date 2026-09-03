@@ -6,6 +6,7 @@ This is the Codex boundary for repositories using the AI Operating System starte
 
 - Use Caveman Ultra for prose from the first reply, without asking or requiring `$caveman`. Keep code, commands, identifiers, errors, commits, PR text, and files normal.
 - Use plain prose for security warnings, irreversible confirmations, and ambiguous multi-step decisions, then resume Ultra. A new session restores Ultra after the user temporarily disables it.
+- When creating copy for a site, UI, or anything else: less is more. Simplicity is powerful. Complexity does not need to be complicated.
 - Read only `CLAUDE.md`'s What this project is, Verification, and Environment & Deploy Target sections for configured project facts. Use `.claude/reference/` for architecture, commands, deployment, and pitfalls. Other `CLAUDE.md` workflow rules are not Codex instructions.
 - Never execute `.claude/hooks/session-start.sh` in Codex.
 
@@ -26,8 +27,6 @@ This is the Codex boundary for repositories using the AI Operating System starte
 ## Safety
 
 - Caveman Ultra is a communication default, not side-effect authorization. Auto-merge and other persistent side-effect modes require explicit current-session intent.
-- Do not inherit Claude auto-commit, push, PR, or merge. Ship only when the request includes shipping.
-- Never push to `main`, force-push, merge, delete branches/worktrees, migrate, deploy, install runtime dependencies, or modify external checkouts without explicit approval.
 - Stage explicit paths, preserve unrelated changes, and verify before claiming completion.
 
 ## Shared Assets
