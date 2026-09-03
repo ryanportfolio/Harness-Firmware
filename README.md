@@ -4,7 +4,7 @@
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/boot-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/boot-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/boot-dark.svg">
-<img alt="Harness Firmware boots with 31 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
+<img alt="Harness Firmware boots with 32 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
 </picture>
 
 Harness Firmware stores agent instructions, project notes, reusable skills, and verification rules in the repository for Claude Code and Codex.
@@ -57,7 +57,7 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="31 canonical playbooks serve Claude Code directly and Codex through 31 generated adapters, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="32 canonical playbooks serve Claude Code directly and Codex through 32 generated adapters, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
@@ -65,9 +65,9 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 
 Both runtimes read the committed project topics under `.claude/reference/`. Workflow bodies stay canonical under `.claude/skills/`.
 
-## 31 workflows, loaded when called
+## 32 workflows, loaded when called
 
-**9 core · 9 discipline · 13 specialist**
+**9 core · 10 discipline · 13 specialist**
 
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
@@ -78,13 +78,13 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/skills-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/skills-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/skills-dark.svg">
-<img alt="A memory map of 31 on-demand workflows grouped into 9 core, 9 discipline, and 13 specialist skills." src="assets/readme/skills-light.svg" width="100%">
+<img alt="A memory map of 32 on-demand workflows grouped into 9 core, 10 discipline, and 13 specialist skills." src="assets/readme/skills-light.svg" width="100%">
 </picture>
 
 </details>
 
 <details>
-<summary><strong>Click to browse all 31 skills</strong></summary>
+<summary><strong>Click to browse all 32 skills</strong></summary>
 
 <!-- skill-list:start -->
 ### core workflows · 9
@@ -99,7 +99,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`automate-me`](.claude/skills/automate-me/SKILL.md) · Use for "automate me", "/automate-me", "create/update my -mode skill", or "turn my preferences / working style into a skill". Mines the current project's transcripts plus direct questions, then drafts a personal <handle>-mode skill.
 - [`adopt-repo`](.claude/skills/adopt-repo/SKILL.md) · Mirror an existing external repo privately under the user's account and overlay the firmware: clone upstream, strip template-only files, privacy-sweep, run init-project. Use on /adopt-repo <url> or 'pull this repo into our firmware'.
 
-### quality disciplines · 9
+### quality disciplines · 10
 
 - [`brainstorming`](.claude/skills/brainstorming/SKILL.md) · Use when brainstorming or designing a product, interface, workflow, architecture, or behavior change with unresolved goals or material tradeoffs; not for routine or fully specified work.
 - [`writing-plans`](.claude/skills/writing-plans/SKILL.md) · Use when you have a spec or requirements for a multi-step task, before touching code
@@ -108,6 +108,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`long-horizon`](.claude/skills/long-horizon/SKILL.md) · Use for work too big for one context window: long multi-step tasks, progress lost to compaction or failed retries, work spanning hours or sessions, or when the user says /long-horizon or asks to run a task in verified rounds.
 - [`babysit-ci`](.claude/skills/babysit-ci/SKILL.md) · Watch a PR's checks and iterate on failures until green. Use for /babysit-ci, "watch CI", "fix CI", "get the checks green", or when a PR is waiting on failing or pending checks.
 - [`codex-review`](.claude/skills/codex-review/SKILL.md) · Cross-vendor second-opinion review. Drives OpenAI Codex CLI (codex exec review, gpt-5.6-sol, high reasoning) over a PR, branch, commit, or uncommitted diff, then verifies each finding. Trigger: /codex-review, "have Codex/Sol review this".
+- [`claude-review`](.claude/skills/claude-review/SKILL.md) · Use when the user says /claude-review, asks Claude or Fable to review code written in Codex, or requests a cross-vendor review through Claude CLI.
 - [`verify-this`](.claude/skills/verify-this/SKILL.md) · Verify a claim with fresh local evidence: restate it falsifiably, capture baseline and treatment, compare, return VERIFIED, NOT VERIFIED, or INCONCLUSIVE. Use for /verify-this, "prove it works", "did this fix it", "show me the evidence".
 - [`dare`](.claude/skills/dare/SKILL.md) · First-principles chain: decompose, audit assumptions, recombine surviving blocks, test against reality; each step a fresh subagent fed only the prior artifact. Use on /dare, 'first principles', or 'are we solving the right problem'.
 
