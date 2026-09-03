@@ -90,6 +90,11 @@
       "group": "discipline"
     },
     {
+      "name": "claude-review",
+      "label": "Claude review",
+      "group": "discipline"
+    },
+    {
       "name": "verify-this",
       "label": "Verify this",
       "group": "discipline"
