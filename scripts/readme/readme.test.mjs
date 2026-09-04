@@ -11,7 +11,7 @@ const requiredLinks = ["GUIDE.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE",
 
 test("README facts match the canonical repository inventory", () => {
   assert.equal(facts.skillCount, 33);
-  assert.equal(facts.adapterCount, 33);
+  assert.equal(facts.codexSkillCount, 33);
   assert.equal(facts.referenceFileCount, 6);
   assert.deepEqual(facts.runtimeNames, ["Claude Code", "Codex"]);
   assert.equal(facts.runtimeCount, facts.runtimeNames.length);
@@ -108,7 +108,7 @@ test("boot and runtime panels use measured counts", () => {
     assert.match(boot, new RegExp(`${facts.referenceFileCount} files mounted`));
     assert.match(boot, new RegExp(`${facts.runtimeCount} targets declared`));
     assert.match(runtime, new RegExp(`${facts.skillCount} canonical workflows`));
-    assert.match(runtime, new RegExp(`${facts.adapterCount} (?:ADAPTERS VERIFIED|adapters)`, "i"));
+    assert.match(runtime, new RegExp(`${facts.codexSkillCount} (?:CODEX SKILLS VERIFIED|skills)`, "i"));
   }
 });
 

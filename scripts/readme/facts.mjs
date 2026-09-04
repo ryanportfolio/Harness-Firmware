@@ -27,10 +27,10 @@ export function collectFacts() {
   sameMembers([...groupIds].sort(), ["core", "discipline", "specialist"], "skill groups");
 
   const canonicalNames = directories(".claude/skills");
-  const adapterNames = directories(".agents/skills");
+  const codexNames = directories(".agents/skills");
   const inventoryNames = inventory.skills.map((skill) => skill.name).sort();
   sameMembers(inventoryNames, canonicalNames, "README skill inventory");
-  sameMembers(adapterNames, canonicalNames, "Codex adapter inventory");
+  sameMembers(codexNames, canonicalNames, "Codex skill inventory");
 
   const tierCounts = Object.fromEntries(groupIds.map((group) => [group, 0]));
   const skills = inventory.skills.map((item) => {
@@ -68,7 +68,7 @@ export function collectFacts() {
 
   return {
     skillCount: canonicalNames.length,
-    adapterCount: adapterNames.length,
+    codexSkillCount: codexNames.length,
     runtimeNames,
     runtimeCount: runtimeNames.length,
     referenceFileCount,

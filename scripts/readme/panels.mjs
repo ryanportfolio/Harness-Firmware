@@ -127,7 +127,7 @@ function boot(themeName, narrow) {
     : `<text class="eyebrow mute" x="40" y="46">REPOSITORY FIRMWARE</text><text class="headline" x="40" y="100">Harness Firmware</text><text class="subhead mute" x="40" y="132">Instructions, project memory, and verification for Claude Code and Codex.</text>`;
   const ready = narrow
     ? `<g class="boot-ready"><rect class="tag" x="24" y="548" width="342" height="30" rx="6"/><text class="label accent" x="195" y="569" text-anchor="middle">READY · ${facts.skillCount}/${facts.skillCount}</text></g>`
-    : `<g class="boot-ready"><rect class="tag" x="660" y="58" width="180" height="174" rx="8"/><text class="small mute" x="680" y="88">BOOT STATUS</text><text class="count accent" x="680" y="136">READY</text><text class="small" x="680" y="170">${facts.skillCount}/${facts.skillCount} skills indexed</text><text class="small" x="680" y="196">${facts.adapterCount}/${facts.adapterCount} adapters current</text></g>`;
+    : `<g class="boot-ready"><rect class="tag" x="660" y="58" width="180" height="174" rx="8"/><text class="small mute" x="680" y="88">BOOT STATUS</text><text class="count accent" x="680" y="136">READY</text><text class="small" x="680" y="170">${facts.skillCount}/${facts.skillCount} skills indexed</text><text class="small" x="680" y="196">${facts.codexSkillCount}/${facts.codexSkillCount} skills current</text></g>`;
   return svg({
     width, height, title: "Harness Firmware boot trace",
     label: `Harness Firmware boots with ${facts.skillCount} skills, ${facts.referenceFileCount} project-memory files, and ${facts.runtimeCount} runtime boundaries ready.`,
@@ -147,21 +147,21 @@ function runtime(themeName, narrow) {
     body = `${grid(width, height)}${arrowDefs(theme)}<text class="eyebrow mute" x="24" y="36">ONE SOURCE · TWO BOUNDARIES</text><text class="subhead" x="24" y="70">Canonical playbooks stay together.</text>
 ${node(40, 108, 310, 92, "SOURCE OF TRUTH", ".claude/skills/", `${facts.skillCount} canonical workflows`)}
 <path class="wire" marker-end="url(#arrow)" d="M195 200V240H108V264"/><path class="wire dash" marker-end="url(#arrow)" d="M195 240H282V264"/>
-${node(24, 274, 168, 104, "DIRECT", "CLAUDE CODE", "kernel + hooks")}${node(198, 274, 168, 104, "GENERATED", "CODEX", "AGENTS.md boundary")}
+${node(24, 274, 168, 104, "DIRECT", "CLAUDE CODE", "kernel + hooks")}${node(198, 274, 168, 104, "DISCOVERED", "CODEX", "AGENTS.md boundary")}
 <path class="wire" marker-end="url(#arrow)" d="M108 378V428H184"/><path class="wire" marker-end="url(#arrow)" d="M282 378V428H206"/>
 ${node(40, 438, 310, 96, "SHARED PROJECT MEMORY", ".claude/reference/", `${facts.referenceFileCount} committed topics`, true)}
-<rect class="tag" x="40" y="570" width="310" height="48" rx="6"/><text class="label accent" x="195" y="600" text-anchor="middle">${facts.adapterCount} ADAPTERS VERIFIED</text><circle class="signal runtime-packet" cx="195" cy="240" r="6"/>`;
+<rect class="tag" x="40" y="570" width="310" height="48" rx="6"/><text class="label accent" x="195" y="600" text-anchor="middle">${facts.codexSkillCount} CODEX SKILLS VERIFIED</text><circle class="signal runtime-packet" cx="195" cy="240" r="6"/>`;
   } else {
     body = `${grid(width, height)}${arrowDefs(theme)}<text class="eyebrow mute" x="40" y="42">ONE SOURCE · TWO RUNTIME BOUNDARIES</text><text class="headline" x="40" y="92" style="font-size:38px">Playbooks stay canonical.</text><text class="subhead mute" x="40" y="122">Adapters translate discovery and safety rules without copying workflow bodies.</text>
 ${node(40, 170, 234, 106, "SOURCE OF TRUTH", ".claude/skills/", `${facts.skillCount} canonical workflows`)}
 <path class="wire" marker-end="url(#arrow)" d="M274 218H348"/><path class="wire dash" marker-end="url(#arrow)" d="M274 250H330V326H590"/>
-${node(358, 170, 212, 106, "DIRECT", "CLAUDE CODE", "kernel · hooks · skills")}${node(600, 170, 240, 106, "GENERATED", "CODEX", `${facts.adapterCount} adapters · AGENTS.md`)}
+${node(358, 170, 212, 106, "DIRECT", "CLAUDE CODE", "kernel · hooks · skills")}${node(600, 170, 240, 106, "DISCOVERED", "CODEX", `${facts.codexSkillCount} skills · AGENTS.md`)}
 <path class="wire" marker-end="url(#arrow)" d="M464 276V314H444"/><path class="wire" marker-end="url(#arrow)" d="M720 276V314H610"/>
 ${node(252, 326, 368, 76, "SHARED PROJECT MEMORY", ".claude/reference/", `${facts.referenceFileCount} committed topics`, true)}<circle class="signal runtime-packet" cx="310" cy="218" r="6"/>`;
   }
   return svg({
     width, height, title: "Harness Firmware runtime bus",
-    label: `${facts.skillCount} canonical playbooks serve Claude Code directly and Codex through ${facts.adapterCount} generated adapters, with shared project memory.`,
+    label: `${facts.skillCount} canonical playbooks serve Claude Code directly and Codex through ${facts.codexSkillCount} skills, with shared project memory.`,
     themeName,
     extraCss: "@keyframes runtimePacket{0%,8%{opacity:0;transform:translateX(0)}12%{opacity:1}82%{opacity:1;transform:translateX(280px)}88%,100%{opacity:0;transform:translateX(280px)}}.runtime-packet{animation:runtimePacket 12s linear infinite}",
     body,
