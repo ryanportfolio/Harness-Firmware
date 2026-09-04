@@ -57,11 +57,11 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="33 canonical playbooks serve Claude Code directly and Codex through 33 generated adapters, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="33 canonical playbooks serve Claude Code directly and Codex through 33 skills, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
-- **Codex:** reads `AGENTS.md` and `.agents/skills/` for generated discovery adapters with explicit capability and safety boundaries.
+- **Codex:** reads `AGENTS.md` and `.agents/skills/` for skills with explicit capability and safety boundaries. Most are generated adapters; [long-horizon](.agents/skills/long-horizon/SKILL.md) is maintained directly for Codex.
 
 Both runtimes read the committed project topics under `.claude/reference/`. Workflow bodies stay canonical under `.claude/skills/`.
 

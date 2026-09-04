@@ -2,6 +2,10 @@
 
 `.claude/skills/` remains Claude's source. An adapter exposes a workflow; it does not prove every runtime capability exists.
 
+`long-horizon` is a standalone Codex skill maintained in `.agents/skills/long-horizon/SKILL.md`.
+It does not load Claude's workflow. The synchronizer explicitly preserves it; edit it directly.
+Its capability-gated classification still requires fresh independent agents.
+
 - **Native**: direct mapping.
 - **Adapted**: Codex paths, approvals, or UI substitutions.
 - **Capability-gated**: requires a currently exposed tool.

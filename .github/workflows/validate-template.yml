@@ -59,6 +59,9 @@ jobs:
       - name: Codex starter contract is valid
         run: node .claude/scripts/test-codex-contract.mjs
 
+      - name: Codex skill sync preserves standalone workflows
+        run: node --test .claude/scripts/test-sync-codex-skills.mjs
+
       - name: README facts and generated assets are valid
         run: node --test scripts/readme/readme.test.mjs
 
