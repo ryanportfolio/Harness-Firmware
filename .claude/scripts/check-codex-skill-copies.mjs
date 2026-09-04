@@ -20,10 +20,21 @@ export function compareCopies(sourceRoot, targetRoot, names) {
   for (const name of names) {
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) throw new Error("Invalid skill name");
     const target = path.join(targetRoot, name);
-    if (!fs.existsSync(target)) continue;
-    if (fs.lstatSync(target).isSymbolicLink()) throw new Error(`${target}: inspect linked skills separately`);
-    const sourceFiles = inventory(path.join(sourceRoot, name));
-    const targetFiles = inventory(target);
+    let sourceFiles, targetFiles;
+    try {
+      let targetEntry;
+      try { targetEntry = fs.lstatSync(target); }
+      catch (error) {
+        if (error.code === "ENOENT") continue;
+        throw error;
+      }
+      if (targetEntry.isSymbolicLink()) throw new Error("inspect linked skills separately");
+      sourceFiles = inventory(path.join(sourceRoot, name));
+      targetFiles = inventory(target);
+    } catch (error) {
+      results.push({ name, target, differences: [], unverified: error.message });
+      continue;
+    }
     const differences = [];
     for (const [file, bytes] of sourceFiles) {
       if (!targetFiles.has(file)) differences.push(`missing: ${file}`);
@@ -44,14 +55,19 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     process.exitCode = 2;
   } else {
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-    const names = JSON.parse(fs.readFileSync(path.join(root, ".agents/skill-sources.json"), "utf8")).standalone;
+    const modes = JSON.parse(fs.readFileSync(path.join(root, ".agents/skill-modes.json"), "utf8")).skills;
+    const overrides = JSON.parse(fs.readFileSync(path.join(root, ".claude/settings.json"), "utf8")).skillOverrides ?? {};
+    const names = Object.entries(modes)
+      .filter(([name, mode]) => mode === "native" && overrides[name] !== "off")
+      .map(([name]) => name);
     let checked = 0;
     for (const target of targets) {
       for (const result of compareCopies(path.join(root, ".agents/skills"), path.resolve(target), names)) {
         checked++;
-        console.log(`${result.differences.length ? "DIFF" : "MATCH"}: ${result.target}`);
+        console.log(`${result.unverified ? "UNVERIFIED" : result.differences.length ? "DIFF" : "MATCH"}: ${result.target}`);
+        if (result.unverified) console.log(`  ${result.unverified}`);
         for (const difference of result.differences) console.log(`  ${difference}`);
-        if (result.differences.length) process.exitCode = 1;
+        if (result.unverified || result.differences.length) process.exitCode = 1;
       }
     }
     console.log(`Compared ${checked} existing copies. No files changed.`);

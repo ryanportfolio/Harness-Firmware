@@ -12,7 +12,8 @@ it. Preserve unrelated files and user customizations.
 For this repository:
 
 1. A standalone Codex workflow lives in `.agents/skills/<name>/SKILL.md`. Register its name
-   in `.agents/skill-sources.json` under `standalone`; that file is its source-ownership list.
+   as `native` in `.agents/skill-modes.json`. Preserve explicit disabled choices and legacy
+   overrides. Use built-in `skill-creator` for authoring; this skill handles installation.
 2. A shared Claude workflow keeps its source in `.claude/skills/<name>/SKILL.md` and uses a
    generated Codex adapter. Edit that source only when changing Claude behavior is authorized.
 3. Classify every active Codex skill once in `.agents/CODEX-SKILL-COMPATIBILITY.md`. Native

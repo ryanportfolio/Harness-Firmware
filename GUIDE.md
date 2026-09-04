@@ -31,7 +31,7 @@ Git writes still follow the active runtime's safety rules and the user's authori
 4. Let Codex discover standalone workflows and generated adapters under `.agents/skills/`.
 5. Do not run Claude hooks or inherit Claude automatic Git behavior unless the user explicitly asks in the current Codex session.
 
-For a new project, ask Codex to initialize the starter or select the `init-project` skill. Its adapter delegates to the same canonical workflow used by Claude Code.
+For a new project, ask Codex to initialize the starter or select its native `init-project` skill. It uses the Codex instruction boundary and shared project facts.
 
 ## prose mode
 
@@ -97,7 +97,7 @@ The repository carries the loop:
 | Claude Code | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/`, `.claude/skills/` | Kernel rules, slash skills, project memory, session hook, plugin path, and Claude-specific workflow rules. |
 | Codex | `AGENTS.md`, `.agents/skills/` | Explicit safety boundary, standalone workflows, and generated adapters to shared playbooks. |
 
-Generated Codex adapters delegate to `.claude/skills/`. Standalone names in `.agents/skill-sources.json` are maintained directly under `.agents/skills/` and preserved by sync. See [skill maintenance](docs/codex-skills.md) for ownership and personal-copy reconciliation. `AGENTS.md` defines the Codex safety boundary. Codex does not run Claude SessionStart hooks. Workflows that need unavailable tools remain capability-gated.
+Generated Codex adapters delegate to `.claude/skills/`. Native entries in `.agents/skill-modes.json` are maintained directly under `.agents/skills/` and preserved by sync. See [skill maintenance](docs/codex-skills.md) for ownership and personal-copy reconciliation. `AGENTS.md` defines the Codex safety boundary. Codex does not run Claude SessionStart hooks. Workflows that need unavailable tools remain capability-gated.
 
 ## repository map
 

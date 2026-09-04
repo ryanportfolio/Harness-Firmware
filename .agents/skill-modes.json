@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "addskill": "native",
+    "brainstorming": "native",
+    "bro": "native",
+    "caveman": "native",
+    "enhance-prompt": "native",
+    "fable-mode": "native",
+    "handoff-audit": "native",
+    "impartial-review": "native",
+    "init-project": "native",
+    "long-horizon": "native",
+    "merge": "native",
+    "recall": "native",
+    "refine": "native",
+    "unslop": "native",
+    "why": "native",
+    "writing": "native",
+    "writing-plans": "native",
+    "writing-skills": "disabled"
+  }
+}

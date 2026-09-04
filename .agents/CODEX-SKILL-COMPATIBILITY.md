@@ -2,10 +2,13 @@
 
 `.claude/skills/` remains Claude's source. An adapter exposes a workflow; it does not prove every runtime capability exists.
 
-Standalone Codex ownership is declared in `.agents/skill-sources.json`. Maintain those
-skills directly in `.agents/skills/<name>/`; they do not load Claude's workflow. Sync
-preserves them independently of Claude's source and settings. Other skills remain generated
-adapters. Ownership is separate from the capability classifications below.
+`.agents/skill-modes.json` declares `native`, `adapter`, or `disabled`; omitted names
+retain adapter behavior. Maintain native skills directly in `.agents/skills/<name>/`;
+they do not load Claude workflow bodies. Sync preserves native content and validates
+metadata and local references. Legacy `skillOverrides: off` remains disabled. Move a
+maintained skill outside discovery explicitly before disabling it. Ownership is separate
+from the capability classifications below. Use built-in `skill-creator` for Codex authoring;
+`writing-skills` remains disabled for Codex.
 
 Personal installations are explicit copies of these sources. See `docs/codex-skills.md`
 for comparison, backup, reconciliation, and discovery checks.
@@ -18,8 +21,8 @@ for comparison, backup, reconciliation, and discovery checks.
 
 | Status | Skills |
 |---|---|
-| Native | `addskill`, `babysit-ci`, `brainstorming`, `bro`, `caveman`, `enhance-prompt`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `recall`, `refine`, `session-hub`, `verify-this`, `writing`, `writing-plans`, `writing-skills` |
-| Adapted | `astra-review`, `automate-me`, `claude-review`, `codex-review`, `init-project`, `lab`, `optimize-context`, `sync-starter` |
+| Native | `addskill`, `babysit-ci`, `brainstorming`, `bro`, `caveman`, `enhance-prompt`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `recall`, `refine`, `session-hub`, `unslop`, `verify-this`, `writing`, `writing-plans` |
+| Adapted | `astra-review`, `automate-me`, `claude-review`, `codex-review`, `init-project`, `lab`, `optimize-context`, `sync-starter`, `writing-skills` |
 | Capability-gated | `advocate`, `arena`, `dare`, `impartial-review`, `long-horizon`, `why`, `wow-loop` |
 | Dangerous | `adopt-repo`, `merge` |
 | Claude-only | None in the starter source set. |

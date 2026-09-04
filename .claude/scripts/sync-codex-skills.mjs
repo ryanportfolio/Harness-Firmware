@@ -11,12 +11,7 @@ const root = path.resolve(scriptDir, "..", "..");
 const sourceRoot = path.join(root, ".claude", "skills");
 const targetRoot = path.join(root, ".agents", "skills");
 const settingsPath = path.join(root, ".claude", "settings.json");
-const registryPath = path.join(root, ".agents", "skill-sources.json");
-const registered = JSON.parse(fs.readFileSync(registryPath, "utf8")).standalone;
-if (!Array.isArray(registered) || registered.some((name) => typeof name !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) || new Set(registered).size !== registered.length) {
-  throw new Error(`${registryPath}: standalone must contain unique skill directory names`);
-}
-const standaloneSkills = new Set(registered);
+const modesPath = path.join(root, ".agents", "skill-modes.json");
 const mode = process.argv[2] ?? "--check";
 
 if (!new Set(["--check", "--write"]).has(mode)) {
@@ -58,20 +53,18 @@ function readMetadata(skillDir, skillPath) {
 
   const lines = match[1].split(/\r?\n/);
   let name = skillDir;
+  let declaredName = false;
   let description = "";
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     const nameMatch = line.match(/^name:\s*(.+)$/);
-    if (nameMatch) name = parseScalar(nameMatch[1]);
+    if (nameMatch) { name = parseScalar(nameMatch[1]); declaredName = true; }
 
     const descriptionMatch = line.match(/^description:\s*(.*)$/);
     if (!descriptionMatch) continue;
 
     const value = descriptionMatch[1].trim();
-    // Block scalars carry an optional chomping indicator: >, >-, >+, |, |-, |+.
-    // Matching only the bare forms reads the indicator itself as the
-    // description, which shipped `description: ">-"` adapters to Codex.
     if (/^[>|][-+]?$/.test(value)) {
       const block = [];
       for (index += 1; index < lines.length; index += 1) {
@@ -88,7 +81,33 @@ function readMetadata(skillDir, skillPath) {
   }
 
   if (!description) throw new Error(`${skillPath}: missing description`);
-  return { name, description };
+  return { name, description, declaredName };
+}
+
+function localReferences(text) {
+  const links = [];
+  // Code examples are not live Markdown links.
+  const markdown = text.replace(/^```[^\n]*\n[\s\S]*?^```\s*$/gm, "").replace(/`[^`\n]*`/g, "");
+  const starts = [...markdown.matchAll(/\]\(\s*|^ {0,3}\[[^\]\n]+\]:\s*/gm)];
+  for (const start of starts) {
+    let index = start.index + start[0].length;
+    if (markdown[index] === "<") {
+      const end = markdown.indexOf(">", index + 1);
+      if (end !== -1) links.push(markdown.slice(index + 1, end));
+      continue;
+    }
+    let link = "", depth = 0;
+    for (; index < markdown.length; index++) {
+      const ch = markdown[index];
+      if (ch === "\\" && index + 1 < markdown.length) { link += markdown[++index]; continue; }
+      if (/\s/.test(ch) || (ch === ")" && depth === 0)) break;
+      if (ch === "(") depth++;
+      if (ch === ")") depth--;
+      link += ch;
+    }
+    if (link) links.push(link);
+  }
+  return links;
 }
 
 function disabledSkills() {
@@ -118,25 +137,44 @@ function generatedAdapter(filePath) {
 }
 
 const disabled = disabledSkills();
+const modes = fs.existsSync(modesPath) ? JSON.parse(fs.readFileSync(modesPath, "utf8")) : { version: 1, skills: {} };
+if (modes.version !== 1 || !modes.skills || typeof modes.skills !== "object" || Array.isArray(modes.skills)) {
+  throw new Error(`${modesPath}: expected version 1 and a skills object`);
+}
+for (const [name, ownership] of Object.entries(modes.skills)) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || !["native", "adapter", "disabled"].includes(ownership)) {
+    throw new Error(`${modesPath}: invalid skill name or mode: ${name}`);
+  }
+  if (ownership === "disabled") disabled.add(name);
+}
 const desired = new Map();
+const native = new Set();
 
-// Native ownership is independent of Claude source files and enablement settings.
-for (const name of standaloneSkills) {
-  const nativePath = path.join(targetRoot, name, "SKILL.md");
-  if (!fs.existsSync(nativePath) || generatedAdapter(nativePath)) {
-    throw new Error(`${nativePath}: expected a hand-authored standalone Codex skill; restore it from Git`);
+// Native skills are maintained directly. Sync validates, but never writes them.
+for (const [name, ownership] of Object.entries(modes.skills)) {
+  if (ownership !== "native" || disabled.has(name)) continue;
+  const skillPath = path.join(targetRoot, name, "SKILL.md");
+  if (!fs.existsSync(skillPath) || generatedAdapter(skillPath)) {
+    throw new Error(`${skillPath}: native mode requires a maintained SKILL.md without the generated marker`);
   }
-  const text = fs.readFileSync(nativePath, "utf8");
-  const metadata = readMetadata(name, nativePath);
-  if (!/^name:\s*\S/m.test(text) || metadata.name !== name) {
-    throw new Error(`${nativePath}: name must match ${name}`);
+  const text = fs.readFileSync(skillPath, "utf8");
+  const metadata = readMetadata(name, skillPath);
+  if (!metadata.declaredName || metadata.name !== name || typeof metadata.description !== "string") {
+    throw new Error(`${skillPath}: native metadata must declare the directory name and a description`);
   }
-  desired.set(name, null);
+  // Resolve linked references from the real skill directory, including user symlinks.
+  for (const target of localReferences(text)) {
+    const link = target.split("#")[0];
+    if (!link || /^[a-z][a-z0-9+.-]*:/i.test(link) || path.isAbsolute(link)) continue;
+    const referenced = path.resolve(path.dirname(fs.realpathSync(skillPath)), decodeURIComponent(link));
+    if (!fs.existsSync(referenced)) throw new Error(`${skillPath}: missing reference ${link}`);
+  }
+  native.add(name);
 }
 
 if (fs.existsSync(sourceRoot)) {
   for (const entry of fs.readdirSync(sourceRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory() || disabled.has(entry.name) || standaloneSkills.has(entry.name)) continue;
+    if (!entry.isDirectory() || disabled.has(entry.name) || native.has(entry.name)) continue;
     const skillPath = path.join(sourceRoot, entry.name, "SKILL.md");
     if (!fs.existsSync(skillPath)) continue;
     const metadata = readMetadata(entry.name, skillPath);
@@ -147,7 +185,6 @@ if (fs.existsSync(sourceRoot)) {
 
 const actions = [];
 for (const [skillDir, expected] of desired) {
-  if (expected === null) continue;
   const adapterPath = path.join(targetRoot, skillDir, "SKILL.md");
   if (!fs.existsSync(adapterPath)) {
     actions.push({ type: "create", skillDir, adapterPath, expected });
@@ -163,11 +200,24 @@ for (const [skillDir, expected] of desired) {
 
 if (fs.existsSync(targetRoot)) {
   for (const entry of fs.readdirSync(targetRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory() || desired.has(entry.name)) continue;
+    if ((!entry.isDirectory() && !entry.isSymbolicLink()) || desired.has(entry.name) || native.has(entry.name)) continue;
     const adapterPath = path.join(targetRoot, entry.name, "SKILL.md");
+    if (disabled.has(entry.name) && fs.existsSync(adapterPath) && !generatedAdapter(adapterPath)) {
+      throw new Error(`${adapterPath}: disabled native skill remains discoverable; move it outside .agents/skills explicitly`);
+    }
     if (generatedAdapter(adapterPath)) {
       actions.push({ type: "remove", skillDir: entry.name, adapterPath });
     }
+  }
+}
+
+// A generated target must not point outside this checkout through a directory link.
+for (const action of actions) {
+  let ancestor = action.adapterPath;
+  while (!fs.existsSync(ancestor)) ancestor = path.dirname(ancestor);
+  const relative = path.relative(fs.realpathSync(root), fs.realpathSync(ancestor));
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(`${action.adapterPath}: generated target resolves outside this repository`);
   }
 }
 
@@ -177,7 +227,7 @@ if (mode === "--check") {
     console.error("Run: node .claude/scripts/sync-codex-skills.mjs --write");
     process.exit(1);
   }
-  console.log(`Codex skill adapters are current (${desired.size}).`);
+  console.log(`Codex skills current (${native.size} native, ${desired.size} adapters).`);
   process.exit(0);
 }
 
@@ -193,4 +243,4 @@ for (const action of actions) {
   console.log(`${action.type}: ${action.skillDir}`);
 }
 
-console.log(`Codex skill adapters synchronized (${desired.size}).`);
+console.log(`Codex skills synchronized (${native.size} native, ${desired.size} adapters).`);

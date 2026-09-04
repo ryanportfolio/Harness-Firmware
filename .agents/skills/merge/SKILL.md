@@ -38,9 +38,9 @@ merge does not grant publication authority. Reading or editing this skill does n
    supported. If no atomic head guard exists, disclose that limitation and use a supported
    guarded API or defer; do not silently merge unverified new commits.
 6. Verify the PR is merged and fetch the target ref to confirm the merge commit. Report
-   the PR and observed result. Keep the branch unless cleanup was requested. Before reusing
-   a branch after squash, merge the updated target into it or create a new task branch so
-   a later PR does not replay already-landed changes. Never reset unrelated work.
+   the PR and observed result. Keep the branch unless cleanup was requested. After squash, start the next change on a new
+   task branch from the updated target while preserving uncommitted work. Never reset
+   unrelated work, force-push, or push directly to the target branch.
 
 Use current tool help for unavailable options. On interruption, inspect actual Git and PR
 state before retrying; a lost command response does not mean the write failed. Pause only

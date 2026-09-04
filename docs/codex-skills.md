@@ -1,13 +1,14 @@
 # Maintaining Codex skills
 
-The `standalone` list in `.agents/skill-sources.json` declares workflows maintained directly
-in `.agents/skills/<name>/`. These own their Codex instructions. Other skills are generated
-adapters to shared workflows in `.claude/skills/`. A skill's source ownership is separate
-from whether it requires agents or explicit authorization.
+The `native` entries in `.agents/skill-modes.json` declare workflows maintained directly
+in `.agents/skills/<name>/`. These own their Codex instructions. The registry also supports
+`adapter` and `disabled`; omitted names retain generated adapter behavior. A skill's source
+ownership is separate from whether it requires agents or explicit authorization.
 
-Standalone entries do not depend on a Claude counterpart or Claude enablement setting.
-Use the target Codex client's supported skill configuration to disable a personal or repo
-skill; changing Claude settings does not disable a standalone Codex skill.
+Native entries do not require a Claude counterpart. Existing `skillOverrides: off` settings
+remain respected for compatibility. Move a maintained skill outside discovery explicitly
+before disabling it. Codex uses built-in `skill-creator` for authoring; `writing-skills`
+remains disabled. Use `addskill` for this repository's registration and installation rules.
 
 ## Repository changes
 
@@ -22,7 +23,7 @@ Run:
 node .claude/scripts/sync-codex-skills.mjs --write
 node .claude/scripts/sync-codex-skills.mjs --check
 node .claude/scripts/test-codex-contract.mjs
-node --test .claude/scripts/test-sync-codex-skills.mjs .claude/scripts/test-codex-skill-copies.mjs
+node --test .claude/scripts/test-sync-codex-skills.mjs .claude/scripts/test-codex-skill-sync.mjs .claude/scripts/test-codex-skill-copies.mjs
 ```
 
 Sync refuses missing or still-generated standalone entry points. It preserves handwritten
@@ -52,8 +53,10 @@ node .claude/scripts/check-codex-skill-copies.mjs <personal-skills-root>
 ```
 
 It compares existing copies of registered standalone skills and required source resources;
-it installs nothing and treats extra destination files as possible customizations. It does
-not scan chats, change settings, or automatically publish updates. A restore uses the
+it installs nothing and treats extra destination files as possible customizations. Comparisons
+use exact bytes, including line endings. Links and unreadable resources are reported as
+unverified while other copies are still checked. It does not scan chats, change settings,
+or automatically publish updates. A restore uses the
 recorded backup after verifying the exact destination and intervening changes.
 
 Repository edits, personal installation, and Git publication are separate scopes. An

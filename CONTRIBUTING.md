@@ -6,7 +6,7 @@ judged on what they cost to keep loaded, not just on whether they work.
 ## dev loop
 
 Shared workflows are authored in `.claude/skills/` and exposed through generated Codex
-adapters. Standalone names in `.agents/skill-sources.json` are authored directly in
+adapters. Native entries in `.agents/skill-modes.json` are authored directly in
 `.agents/skills/`; sync preserves them. See [Codex skill maintenance](docs/codex-skills.md).
 
 ```sh
@@ -36,8 +36,8 @@ and say what it buys.
 - Shipped files are ASCII-only. Validation fails on anything else.
 - No secrets, tokens, private checkout paths, or maintainer-only assumptions in
   shipped files. See the safety rules below.
-- Skills follow the `writing-skills` skill: trigger-first descriptions, no
-  filler, and a stated way to tell the skill worked.
+- Claude skill authoring uses `writing-skills`; Codex uses built-in `skill-creator`.
+  Keep descriptions precise, omit filler, and state how to verify useful behavior.
 - Update `CHANGELOG.md` under an unreleased or upcoming version heading when
   the change is user-visible.
 

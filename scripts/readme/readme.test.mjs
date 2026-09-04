@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { collectFacts } from "./facts.mjs";
+import { collectFacts, expectedCodexNames } from "./facts.mjs";
 import { absolute, read } from "./lib.mjs";
 
 const facts = collectFacts();
@@ -150,4 +150,10 @@ test("human-facing README files follow the writing contract", () => {
     assert.doesNotMatch(source, /^#{1,6} .+\.$/mu, `${relativePath} has a heading with a trailing period`);
   }
   assert.doesNotMatch(read("README.md"), /repo-resident operating layer|The repository learns|hot path/i);
+});
+
+test("Codex inventory honors native additions and both disabled sources", () => {
+  const names = ['adapter', 'native', 'disabled', 'legacy'];
+  assert.deepEqual(expectedCodexNames(names, {native: 'native', extra: 'native', disabled: 'disabled', legacy: 'native'}, {legacy: 'off'}), ['adapter', 'extra', 'native']);
+  assert.deepEqual(expectedCodexNames(['old', 'ordinary']), ['old', 'ordinary']);
 });

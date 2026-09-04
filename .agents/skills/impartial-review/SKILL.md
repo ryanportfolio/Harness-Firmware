@@ -24,7 +24,7 @@ For a small, low-risk change, use one independent reviewer. For broader work, co
 five areas, assigning reviewers or bounded batches according to actual available capacity:
 correctness/types; data flow/compatibility/failures; performance/security/observability;
 missing integration/cleanup; project-specific rules. Count Manager and other active agents
-against capacity. Wait and release completed agents when supported before starting a new
+against capacity; state worker and retry bounds. Wait and release completed agents when supported before starting a new
 batch. Preserve independent context even when execution is sequential.
 
 Inherit the session model when suitable. Respect an explicitly required model or quality
