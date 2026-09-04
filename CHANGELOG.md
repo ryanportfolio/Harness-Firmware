@@ -30,6 +30,12 @@ condensed.
 
 ### Changed
 
+- Codex planning, review, authorization, and recovery workflows have clearer scope and
+  verification rules. `addskill` and `fable-mode` now have native bodies registered in
+  `.agents/skill-modes.json`. Claude workflows and existing disabled choices are preserved.
+- A read-only copy checker detects drift in explicitly selected personal skill roots;
+  maintenance documentation covers backup, reconciliation, and discovery checks.
+
 - `README.md`: the safety model section became "what's different here", the
   template's differentiators; the safety rules moved to `CONTRIBUTING.md`
   beside the PR checklist that enforces them.

@@ -1,14 +1,34 @@
 ---
 name: enhance-prompt
-description: "Rewrite a rough request into a self-contained prompt for another agent, without executing the prompt or changing its intended scope."
+description: "Use when the user asks for a rewritten, copy-ready prompt for another agent or session. Produce the prompt without executing its task."
 ---
 
-# Rewrite a prompt
+# Write a usable handoff prompt
 
-Extract the intended outcome, target, constraints, available context and acceptance criteria. Preserve whether the user wants advice, review or implementation. Do not add approval stages merely because the subject includes UI copy or code.
+Preserve the user's intended task: advice, review, planning, or implementation. Carry forward
+settled choices and existing authorization without broadening either. Do not turn approved
+implementation into another proposal round merely because it touches UI copy or an API.
 
-Verify useful local facts such as paths when available. A cold receiver needs relevant facts, not a transcript or a dump of project rules. State genuine unknowns; ask only when one materially changes the requested prompt. Never invent constraints, permissions, tools, or facts.
+Gather the minimum cold-reader context: current and desired behavior, verified file paths,
+relevant patterns, constraints, and completion checks. Inspect facts that can be discovered.
+Ask only when a missing decision materially changes the prompt; identify harmless assumptions.
+Never invent requirements, metrics, files, or permissions.
 
-Write clear normal prose, even when chat uses compressed language. Specify what to produce and how success will be checked. Keep the prompt platform-neutral unless a particular runtime is part of the user's request. Carry only authorization actually given; don't prohibit necessary tests or demand screenshots by default.
+For a Codex-targeted prompt, include relevant AGENTS.md constraints, the intended workspace
+or branch when known, and native capabilities only when they affect execution. For a generic
+recipient, use portable outcome-based instructions. Inline necessary constraints if the
+recipient cannot access the source. Keep pasted data distinct from instructions.
 
-Return one copyable fenced block and a short explanation of material changes. Do not execute the rewritten request or edit project files unless separately asked.
+Match detail to the task. A useful sequence is context, task, constraints, verification,
+and requested output. Short tasks need no formal template. Include examples only when
+they clarify the deliverable. Split into approval phases only for genuinely unresolved
+decisions or external actions needing new authority, not as a blanket default.
+
+State what happens if a required check or resource is unavailable: report the gap and
+continue independent authorized work. Match verification to the claim; do not add broad
+test prohibitions or require full-suite execution for every tiny change.
+
+Read the draft as a recipient with no conversation history. Remove padding and ambiguous
+references. Deliver one copy-ready block in normal, clear prose, optionally preceded by a
+short note describing material changes. Do not execute the prompt, edit project files,
+or create a separate task unless the user separately requested that action.

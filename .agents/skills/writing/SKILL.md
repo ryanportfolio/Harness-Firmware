@@ -5,7 +5,7 @@ description: "Use for user-facing deliverables: website copy, product UI, onboar
 
 # Writing
 
-Editorial rules distilled from a real editor's rulings. Every rule below exists because a shipped draft failed without it. The bar: a smart reader outside the domain gets it on first read, and nothing reads as AI-made.
+Editorial rules distilled from a real editor's rulings. Every rule below exists because a shipped draft failed without it. The bar: a smart reader outside the domain gets it on first read.
 
 Use this skill for user-facing deliverables, including text embedded in code or produced inside a chat answer for later publication. Keep the deliverable in its intended audience’s voice. Ordinary conversation, progress updates and explanations to the session user follow Caveman with built-in Unslop; do not apply this editorial workflow to them.
 
@@ -19,7 +19,7 @@ Before drafting for a repo, check for `.claude/reference/voice.md` (or whatever 
 
 Settle these silently first, do not narrate them: who reads this; what they should understand, decide, or do; what the prompt is really asking (a question about a challenge may want judgment or fit, not the chronology); the hard constraints (length, format, required points); and which facts or examples carry the answer. Lead with that best material.
 
-## Hard bans
+## Style defaults
 
 - **Em dashes (U+2014), anywhere.** No en-dash or double-hyphen stand-ins. Use a period, comma, colon, or parentheses; a middle dot (U+00B7) for label-style separators. Reads as an AI tell.
 - **Trailing periods on headings** (h1-h6, section titles, kickers, figure titles). Periods never appear in large display text at all.
@@ -31,6 +31,8 @@ Settle these silently first, do not narrate them: who reads this; what they shou
 - **AI tells:** delve, robust, seamless, crucial, pivotal, testament, showcase, foster, leverage, utilize, vibrant, tapestry, landscape (abstract); "serves as" / "stands as" copula dodges; rule-of-three lists; "from X to Y" fake ranges; Title Case Headings; trailing summaries; "experts say" vague attribution; sycophantic openers and "hope this helps" closers.
 
 ## Rules
+
+These are defaults subordinate to the user's explicit choices and project voice.
 
 - **Lead with the point.** If a paragraph's payoff sentence could open it, move it up and cut the wind-up. Answer early; background only when truly needed.
 - **Titles are plain and specific.** A reader who has not opened the piece can say what it is about from the title alone. Evocative only on top of specific ("Thinking on a budget" works; "The firmament moved" decodes to nothing). Descriptions are concrete promises, not atmosphere.
@@ -50,7 +52,7 @@ Settle these silently first, do not narrate them: who reads this; what they shou
 
 ## Review pass
 
-On the finished draft, in order:
+On the finished draft, apply only defaults that the user or project voice has not overridden. Preserve requested stylistic choices, attributed quotes, code, and error strings throughout. Check in this order:
 
 1. Search for em dashes and double-hyphen stand-ins; replace every one.
 2. Strip trailing periods from headings.
@@ -66,15 +68,15 @@ On the finished draft, in order:
 
 For an explicitly requested prose review, close with a verdict. Ordinary drafting and code reviews do not require an editorial verdict:
 
-- **PASS**: nothing in Hard bans or Rules is still violated.
-- **FAIL**: at least one violation remains. Name each one and the rule it breaks.
+- **PASS**: no applicable, unoverridden style rule is violated.
+- **FAIL**: at least one applicable violation remains. Name it and the rule it breaks; an explicitly requested style is not a violation.
 
 Then label every remaining note:
 
-- **Requirement**: fixes a Hard bans or Rules violation. The draft does not ship until applied. Any open requirement means the verdict is FAIL.
+- **Requirement**: fixes an applicable, unoverridden style-rule violation. The draft does not ship until applied. Any open requirement means the verdict is FAIL.
 - **Suggestion**: optional improvement (tighter phrasing, alternative title, tone tweak). The draft can ship without it.
 
-Never leave a note unlabeled, and never end the review without the PASS/FAIL line.
+For explicit editorial reviews, label notes and include the verdict. Ordinary drafting needs no verdict.
 
 ## Anti-patterns
 

@@ -176,7 +176,7 @@ function checkCodexSync() {
     return;
   }
   if (result.status === 0) {
-    record("codex-sync", "PASS", ".agents/skills/ adapters are in sync with .claude/skills/");
+    record("codex-sync", "PASS", "Codex adapters are current and registered standalone skills are present");
     return;
   }
   const drift = `${result.stderr ?? ""}${result.stdout ?? ""}`

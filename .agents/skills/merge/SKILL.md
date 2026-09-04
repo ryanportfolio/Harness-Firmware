@@ -1,26 +1,47 @@
 ---
 name: merge
-description: "Commit, push, and merge completed work when requested. Session-wide auto-merge requires an explicit request for that persistent mode."
+description: "Use when the user explicitly requests a merge or enables session-wide automatic commit, push, PR, and merge. A one-shot request does not enable persistent publication."
 ---
 
 # Merge verified work
 
-Determine whether authorization covers this change only or every completed task in this session. A one-time "merge when ready" does not enable a persistent mode. Announce session mode plainly when explicitly enabled; "stop merge" disables it. Preserve existing authorization without asking again.
+Determine authorization first. A plain merge request applies to the current work only.
+Enable persistent auto-merge only when explicitly requested as a session-wide mode; announce
+that scope in plain prose. Stop it when the user asks or the session ends. A skill mentioning
+merge does not grant publication authority. Reading or editing this skill does not activate it.
 
-## Prepare the exact change
+## Integration
 
-Inspect working changes, branch, HEAD, remote and applicable verification. Preserve unrelated files. Resolve the remote default branch rather than assuming its name. Refresh the remote base before integration.
+1. Inspect repository, remote, branch, working changes, and existing PR. Confirm the target
+   branch from the task or repository default. Preserve unrelated work. For detached HEAD
+   or work on the target branch, create a task branch before committing; respect any branch
+   explicitly chosen by the user. Do not modify another checkout without authorization.
+2. Complete relevant local checks. Stage explicit paths, inspect the staged diff, commit,
+   and push. Never bypass hooks. Reuse the branch's open PR; create one if needed with a
+   description of final behavior and validation. Pass multiline bodies through a file or
+   structured argument. Verify PR base, head, and remote before continuing.
+3. Fetch the target branch and inspect mergeability. Resolve unambiguous conflicts while
+   preserving both changes' intent. Investigate semantic conflicts; ask only when resolution
+   needs a missing user decision. Reverify affected behavior and push before checking CI.
+4. Inspect **all PR checks** with `gh pr checks --json name,bucket,state,workflow,link` or
+   the current equivalent. Wait for pending checks with bounded monitoring. Diagnose failed
+   checks and fix in scope; do not rely only on branch protection or MERGEABLE. Verify the
+   expected workflows actually ran. Explain absent, skipped, or unavailable required checks;
+   they do not count as passing.
+   Defer merging while a required check is absent, skipped, or unavailable unless the
+   established verification contract explicitly permits that outcome.
+   A repository with no CI can use its established local verification contract, with that
+   limit reported. Never bypass checks with admin options.
+5. Re-read the PR head after checks. If it changed, verify the new content and checks again.
+   Squash is this repository's default unless the user or target repository specifies
+   otherwise. Use `gh pr merge <number> --squash --match-head-commit <verified-head>` when
+   supported. If no atomic head guard exists, disclose that limitation and use a supported
+   guarded API or defer; do not silently merge unverified new commits.
+6. Verify the PR is merged and fetch the target ref to confirm the merge commit. Report
+   the PR and observed result. Keep the branch unless cleanup was requested. After squash, start the next change on a new
+   task branch from the updated target while preserving uncommitted work. Never reset
+   unrelated work, force-push, or push directly to the target branch.
 
-From detached HEAD or the default branch, create a feature branch using the repository's prefix. After a previous squash merge, keep that old branch and start the next change from the updated remote base; do not merge main back into stale squash history. Preserve uncommitted work while changing bases. If moving it would overwrite user changes, stop and explain the concrete conflict.
-
-Run the checks relevant to the actual changes and project requirements. If the base moves or conflict resolution changes the result, rerun affected checks. Resolve clear mechanical conflicts; ask about genuinely ambiguous competing behavior. Do not claim a check ran from a reviewer's summary alone.
-
-Stage exact paths and inspect the staged diff before committing. Verify destination identity and access before pushing. Use the configured repository and existing credentials; never change remotes or access controls to bypass a denial. Write multiline PR text to a file and pass --body-file. The PR describes final behavior, validation, and material limits.
-
-## Close the merge gate
-
-Record the candidate head SHA. Inspect the PR's base, head, review requirements, mergeability and checks. MERGEABLE establishes absence of merge conflicts, not CI success. Wait for applicable checks to finish and require their successful outcomes. Missing or pending required evidence keeps this gate open. Fix scoped failures when authorized; report external or permission blockers. Do not bypass protections with --admin.
-
-Use a squash merge unless the user or project specifies otherwise, binding it to the verified head with gh pr merge NUMBER --squash --match-head-commit SHA. Recheck a changed head before retrying. Do not force-push, push directly to the default branch, or delete branches/worktrees as part of merging.
-
-After success, query the PR's merged state and merge commit, fetch the remote base and verify the intended files landed. Report the PR link and actual checks. A frontend build does not imply a packaged release or deployment. No automatic release follows a merge.
+Use current tool help for unavailable options. On interruption, inspect actual Git and PR
+state before retrying; a lost command response does not mean the write failed. Pause only
+the blocked action, finish independent authorized work, and report the exact blocker.

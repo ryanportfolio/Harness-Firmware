@@ -1,16 +1,58 @@
 ---
 name: impartial-review
-description: "Review scoped code with fresh independent reviewers when the user requests independent or multi-agent review."
+description: "Use when the user requests independent review of code, a diff, or recent changes. Requires fresh reviewer context through exposed agents or an authenticated Codex CLI."
 ---
 
-# Independent code review
+# Independent Codex review
 
-Pin the requested scope: uncommitted work including relevant untracked files, a commit and parent, or exact PR/base/head. Inspect exposed collaboration tools and free slots before promising concurrency. If independence cannot be provided, report the gap rather than presenting self-review as the requested result.
+Manager fixes the review scope, dispatches independent reviewers, verifies their findings,
+and reports actionable results. Review requests do not authorize implementation or publication.
 
-Choose reviewer coverage proportional to the diff. Use one fresh reviewer for a narrow change; for a broader change cover correctness, state/error paths, performance/security and project constraints. Buckets need not be separate simultaneous agents. Fit waves to available slots, counting the manager, and disclose total worker/retry bounds.
+Resolve the requested files, commit, or PR. Otherwise inspect uncommitted changes first,
+then the latest commit and any relevant open PR. Record exact base/head revisions and
+dirty/untracked content. Capture enough baseline to distinguish existing work. State scope.
+Review evidence applies to that content; relevant later edits require renewed review.
 
-Use collaboration.spawn_agent with fork_turns: "none" and a standalone scope, raw paths, relevant constraints and finding format. Inherit configured model/effort unless a supported override was requested. Reviewers are read-only leaves: no edits, nested agents or review processes. Do not pass the author conversation or prior verdicts.
+## Dispatch
 
-Require each finding to include path:line, actual trigger, impact, evidence, certainty and proposed fix. Allow a clean result; never require a defect quota. Wait for each reviewer through the appropriate collaboration wait tool. Fresh Codex reviewers are not a different vendor.
+Use currently exposed native agents first. Spawn with `fork_turns: "none"` or the runtime's
+actual fresh-context equivalent. Do not pass Manager reasoning or an author's proposed
+verdict. Give each reviewer scope, raw artifacts, relevant constraints, and these rules.
+Each is a leaf reviewer: no agents or review subprocesses of its own, no fixes or Git writes.
 
-Verify every candidate against current code and a reproduction where useful. Deduplicate root causes; classify confirmed, refuted or unverified, with reasons. A review-only request ends with findings and a merge recommendation, not repairs or publication. Apply fixes only if authorized; run affected checks and invalidate stale review evidence when source changes.
+For a small, low-risk change, use one independent reviewer. For broader work, cover all
+five areas, assigning reviewers or bounded batches according to actual available capacity:
+correctness/types; data flow/compatibility/failures; performance/security/observability;
+missing integration/cleanup; project-specific rules. Count Manager and other active agents
+against capacity; state worker and retry bounds. Wait and release completed agents when supported before starting a new
+batch. Preserve independent context even when execution is sequential.
+
+Inherit the session model when suitable. Respect an explicitly required model or quality
+floor; do not silently downgrade. Native Codex reviewers provide independent context, not
+vendor independence.
+
+If native agents are unavailable, check authenticated Codex CLI and its current help.
+Run separate read-only `codex exec` processes with standalone prompts on stdin, unique
+output/log files, and bounded concurrency. Pass exact scope and forbid nested review.
+Track processes and wait for completion; stale files are not new results. Use supported
+options and authorized model settings. If neither route can supply independent context,
+report the gap; do not call Manager self-review an impartial review.
+
+## Reviewer evidence
+
+Read code and relevant callers before reporting. Exercise an affordable reproduction when
+it resolves uncertainty. Match project rules to what they govern: AGENTS.md governs Codex;
+shared product constraints remain relevant regardless of author. Do not import Claude-only
+session policies as Codex obligations.
+
+For each finding include location, concrete trigger, consequence, evidence, proposed fix,
+severity, and confidence. Keep severity separate from confidence. Missing access means a
+check was unavailable, not that code passed. Report credible uncertain findings with their
+uncertainty; do not invent issues or promote style preferences into correctness blockers.
+Finding nothing is valid.
+
+Manager deduplicates and tries to refute findings against the actual source. Confirm,
+dismiss with evidence, or retain explicit uncertainty. Rank globally by impact. Report
+actionable findings, material unavailable checks, reviewed scope, and recommendation.
+Keep speculative concerns separate from verified defects. Fix only when requested or
+already authorized, then independently recheck affected claims.

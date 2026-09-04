@@ -1,16 +1,36 @@
 ---
 name: brainstorming
-description: "Clarify meaningful design uncertainty and plan a feature or change. For clear implementation requests, make a proportionate plan and continue."
+description: "Use when product, interface, workflow, or architecture goals have unresolved material tradeoffs. Skip routine work and implementation of an approved design."
 ---
 
-# Design and plan
+# Resolve the design decisions
 
-Read relevant project facts and existing patterns. Determine whether the user wants ideas, a plan, a review, or implementation. Keep that requested outcome; approval already given still applies.
+Match discovery to uncertainty. Clear or routine work needs no brainstorming detour.
+For one or two small choices, inspect context, recommend a direction, resolve the missing
+decision, and continue. Use a fuller design when competing approaches materially affect
+the result or when failure would be costly.
 
-For a clear bounded implementation, state the approach briefly and proceed. For an unresolved decision that materially changes the result, explain the tradeoff and ask one concise question, using the available input tool when appropriate. Continue independent work while waiting. Do not require a new design approval for every edit or section.
+Read the smallest useful set of project facts, existing patterns, representative code,
+and constraints. Separate observable facts from user-owned preferences. Investigate facts
+instead of asking the user to retrieve them. Preserve already-approved direction.
 
-For substantial work, compare viable approaches only where the choice matters. Record the selected approach, affected files, dependencies, acceptance checks and genuine unknowns in a compact plan. Use the user's chosen location or .tmp/plans/TASK.md. Plan around behavior and evidence; do not prewrite every implementation line or force a test/commit ceremony for trivial changes.
+Ask concise, related questions only for decisions that change scope, behavior, architecture,
+or another important outcome. Use the current input tool when available and appropriate;
+otherwise ask directly. Continue useful work that does not depend on the answer. Time spent
+waiting is not an answer to a required question.
 
-Use exposed browser or visualization capabilities when they help and project rules permit. Do not offer a separate visual-companion consent workflow. Never assume a particular browser, task planner, subagent, or execution skill exists.
+When several approaches are viable, explain their decisive tradeoffs and recommend one.
+Do not manufacture alternatives to meet a quota. Present a coherent design covering only
+relevant behavior, boundaries, failures, data, accessibility, verification, and rollout.
+Use one decision gate for unresolved material direction; do not ask to approve each section
+or reconfirm ordinary implementation details within accepted scope.
 
-If the user asked for implementation, continue within the authorized scope after planning. If they asked only for a plan or brainstorming, deliver that artifact without implementing it. Do not commit a spec, create a new task, publish, or enable session modes unless requested.
+Use a native visualization or available browser workflow when seeing the design materially
+helps. Reuse supported tools and current authorization instead of assuming a Claude-specific
+visual helper is required. New installation, publication, or external access follows its
+own permissions. Text remains sufficient when visuals are unnecessary or unavailable.
+
+Save a design artifact when requested or needed for a substantial handoff, using project
+conventions. Check it for contradictions, unsupported assumptions, and missing acceptance
+criteria. Continue implementation when that was requested and the material decisions are
+resolved; stop at design when design was the request. No automatic commit or publication.
