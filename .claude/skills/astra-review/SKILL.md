@@ -21,7 +21,13 @@ mkdir -p .tmp
 codex exec review --base origin/main -m gpt-6-astra -c model_reasoning_effort=medium -o .tmp/astra-review.md < /dev/null > .tmp/astra-run.log 2>&1
 ```
 
-`< /dev/null` keeps `codex exec` from parking on an open stdin pipe when backgrounded. Use the `astra-` file names so a leftover `codex-review.md` from an earlier `codex-review` run cannot be read back as this run's report.
+`< /dev/null` keeps `codex exec` from parking on an open stdin pipe when backgrounded. PowerShell rejects `<` at parse time (`The '<' operator is reserved for future use`), so from a PowerShell shell run the same command through cmd:
+
+```powershell
+cmd /c "codex exec review --base origin/main -m gpt-6-astra -c model_reasoning_effort=medium -o .tmp/astra-review.md < NUL > .tmp/astra-run.log 2>&1"
+```
+
+Use the `astra-` file names so a leftover `codex-review.md` from an earlier `codex-review` run cannot be read back as this run's report.
 
 `$ARGUMENTS` carries the scope the same way it does for `codex-review`.
 
