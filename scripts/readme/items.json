@@ -90,6 +90,11 @@
       "group": "discipline"
     },
     {
+      "name": "astra-review",
+      "label": "Astra review",
+      "group": "discipline"
+    },
+    {
       "name": "claude-review",
       "label": "Claude review",
       "group": "discipline"
