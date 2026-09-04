@@ -21,6 +21,13 @@ function normalizedBytes(text) {
   return Buffer.byteLength(text.replaceAll("\r\n", "\n"));
 }
 
+export function expectedCodexNames(canonicalNames, modes = {}, overrides = {}) {
+  const enabled = name => modes[name] !== "disabled" && overrides[name] !== "off";
+  const names = new Set(canonicalNames.filter(enabled));
+  for (const [name, mode] of Object.entries(modes)) if (mode === "native" && enabled(name)) names.add(name);
+  return [...names].sort();
+}
+
 export function collectFacts() {
   const inventory = readJson("scripts/readme/items.json");
   const groupIds = inventory.groups.map((group) => group.id);
@@ -30,7 +37,9 @@ export function collectFacts() {
   const codexNames = directories(".agents/skills");
   const inventoryNames = inventory.skills.map((skill) => skill.name).sort();
   sameMembers(inventoryNames, canonicalNames, "README skill inventory");
-  sameMembers(codexNames, canonicalNames, "Codex skill inventory");
+  const modes = fs.existsSync(absolute(".agents/skill-modes.json")) ? readJson(".agents/skill-modes.json").skills : {};
+  const overrides = readJson(".claude/settings.json").skillOverrides ?? {};
+  sameMembers(codexNames, expectedCodexNames(canonicalNames, modes, overrides), "Codex skill inventory");
 
   const tierCounts = Object.fromEntries(groupIds.map((group) => [group, 0]));
   const skills = inventory.skills.map((item) => {

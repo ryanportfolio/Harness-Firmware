@@ -59,13 +59,20 @@ const disabled = new Set(
     .map(([name]) => name),
 );
 
+const modes = exists(".agents/skill-modes.json") ? JSON.parse(read(".agents/skill-modes.json")) : { skills: {} };
+for (const [name, mode] of Object.entries(modes.skills)) if (mode === "disabled") disabled.add(name);
+for (const name of disabled) if (exists(`.agents/skills/${name}/SKILL.md`)) failures.push(`${name}: disabled skill remains discoverable`);
 const skillsRoot = path.join(root, ".claude", "skills");
-const skills = fs.readdirSync(skillsRoot, { withFileTypes: true })
+const canonicalEntries = fs.readdirSync(skillsRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && !disabled.has(entry.name))
   .filter((entry) => fs.existsSync(path.join(skillsRoot, entry.name, "SKILL.md")))
+  .map((entry) => ({name: entry.name}));
+const activeNames = new Set(canonicalEntries.map(entry => entry.name));
+for (const [name, mode] of Object.entries(modes.skills)) if (mode === "native" && !disabled.has(name)) activeNames.add(name);
+const skills = [...activeNames].map(name => ({name}))
   .map((entry) => {
     const canonicalPath = `.claude/skills/${entry.name}/SKILL.md`;
-    const canonicalMetadata = frontmatter(canonicalPath);
+    const canonicalMetadata = exists(canonicalPath) ? frontmatter(canonicalPath) : {};
     if (canonicalMetadata.name && canonicalMetadata.name !== entry.name) {
       failures.push(`${canonicalPath}: declared name ${canonicalMetadata.name} does not match directory ${entry.name}`);
     }
@@ -120,8 +127,8 @@ for (const skill of skills) {
   }
 }
 for (const skill of classifications.keys()) {
-  if (!skills.some((entry) => entry.directory === skill)) {
-    failures.push(`${skill}: compatibility classification has no active canonical skill`);
+  if (!disabled.has(skill) && !skills.some((entry) => entry.directory === skill)) {
+    failures.push(`${skill}: compatibility classification has no active Codex skill`);
   }
 }
 
