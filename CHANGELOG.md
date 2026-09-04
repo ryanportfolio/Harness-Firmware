@@ -30,6 +30,12 @@ condensed.
 
 ### Changed
 
+- Thirteen Codex skills are maintained as standalone workflows, with native planning,
+  review, authorization, and recovery rules. Claude workflows remain unchanged.
+- `.agents/skill-sources.json` declares standalone ownership independently of Claude
+  settings. Sync preserves authored content; a read-only copy checker detects drift
+  in explicitly selected personal skill roots.
+
 - `README.md`: the safety model section became "what's different here", the
   template's differentiators; the safety rules moved to `CONTRIBUTING.md`
   beside the PR checklist that enforces them.

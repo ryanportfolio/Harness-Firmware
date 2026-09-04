@@ -1,0 +1,17 @@
+{
+  "standalone": [
+    "addskill",
+    "brainstorming",
+    "caveman",
+    "enhance-prompt",
+    "fable-mode",
+    "impartial-review",
+    "long-horizon",
+    "merge",
+    "recall",
+    "refine",
+    "writing",
+    "writing-plans",
+    "writing-skills"
+  ]
+}

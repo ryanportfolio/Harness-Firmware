@@ -31,7 +31,7 @@ This is the Codex boundary for repositories using the AI Operating System starte
 
 ## Shared Assets
 
-- `.claude/skills/` is canonical for generated Codex adapters. `long-horizon` is maintained directly in `.agents/skills/long-horizon/SKILL.md`; sync preserves it. Treat `$ARGUMENTS` as invocation input.
+- `.agents/skill-sources.json` lists standalone Codex skills maintained directly in `.agents/skills/`. Other adapters use `.claude/skills/` as their source. Sync preserves standalone content. Treat `$ARGUMENTS` as invocation input.
 - Read relevant `.claude/reference/` material before unfamiliar work and `.agents/CODEX-SKILL-COMPATIBILITY.md` before adapted, gated, or dangerous skills.
 - After canonical skill changes run `node .claude/scripts/sync-codex-skills.mjs --write`.
 - Tool mapping: `.agents/codex-tools.md`.

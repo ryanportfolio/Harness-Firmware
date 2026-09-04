@@ -61,9 +61,9 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 </picture>
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
-- **Codex:** reads `AGENTS.md` and `.agents/skills/` for skills with explicit capability and safety boundaries. Most are generated adapters; [long-horizon](.agents/skills/long-horizon/SKILL.md) is maintained directly for Codex.
+- **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows and generated adapters with explicit capability and safety boundaries. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
-Both runtimes read the committed project topics under `.claude/reference/`. Workflow bodies stay canonical under `.claude/skills/`.
+Both runtimes read the committed project topics under `.claude/reference/`. Shared workflows live under `.claude/skills/`; standalone Codex workflows live under `.agents/skills/`.
 
 ## 33 workflows, loaded when called
 

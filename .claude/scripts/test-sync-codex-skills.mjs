@@ -19,6 +19,7 @@ function fixture(t) {
     fs.writeFileSync(target, content);
   };
   write(".claude/scripts/sync-codex-skills.mjs", fs.readFileSync(script));
+  write(".agents/skill-sources.json", JSON.stringify({ standalone: ["long-horizon"] }));
   for (const name of ["long-horizon", "ordinary"]) {
     write(`.claude/skills/${name}/SKILL.md`, `---\nname: ${name}\ndescription: Use when /${name} is requested.\n---\nClaude workflow.\n`);
   }
@@ -68,3 +69,31 @@ test("unregistered hand-authored adapters remain protected", (t) => {
   assert.match(result.stderr, /refusing to overwrite a hand-authored Codex skill/);
   assert.equal(f.read(".agents/skills/ordinary/SKILL.md"), "Personal content\n");
 });
+
+test("standalone inventory survives absent Claude source and requires its own file", (t) => {
+  const f = fixture(t);
+  fs.unlinkSync(path.join(f.root, ".claude/skills/long-horizon/SKILL.md"));
+  assert.equal(f.run("--write").status, 0);
+  assert.equal(f.read(".agents/skills/long-horizon/SKILL.md"), native);
+  fs.unlinkSync(path.join(f.root, ".agents/skills/long-horizon/SKILL.md"));
+  const result = f.run("--write");
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /long-horizon/);
+});
+
+test("Claude disabling does not disable a standalone Codex skill", (t) => {
+  const f = fixture(t);
+  f.write(".claude/settings.json", JSON.stringify({skillOverrides:{"long-horizon":"off"}}));
+  assert.equal(f.run("--write").status, 0);
+  fs.unlinkSync(path.join(f.root, ".agents/skills/long-horizon/SKILL.md"));
+  assert.notEqual(f.run("--check").status, 0);
+});
+
+for (const standalone of [["../outside"], ["long-horizon", "long-horizon"], "long-horizon"]) {
+  test(`invalid standalone registry rejected: ${JSON.stringify(standalone)}`, (t) => {
+    const f = fixture(t);
+    f.write(".agents/skill-sources.json", JSON.stringify({standalone}));
+    assert.notEqual(f.run("--write").status, 0);
+    assert.equal(fs.existsSync(path.join(f.root, ".agents/skills/ordinary/SKILL.md")), false);
+  });
+}

@@ -62,7 +62,9 @@ publication, deployments, migrations, installation, or external messages.
    commands/results, and blockers. It cannot edit Manager state or dispatch more agents.
 3. **Audit after execution stops.** Spawn a separate fresh agent. Give it the contract and
    amendments, authorized step scope, local checks, baseline, and workspace paths. Exclude
-   executor reports, turns, and verdicts. Auditor inspects actual changes and runs relevant
+   executor reports, turns, and verdicts. If a report is itself the requested deliverable,
+   the auditor must inspect it as an artifact, without receiving the executor's assessment.
+   Auditor inspects actual changes and runs relevant
    checks itself. It does not fix implementation or write Manager state. Keep other writers
    off the audited files until the verdict is integrated.
 4. **Integrate.** Accept only `complete + clean + aligned` backed by evidence. Otherwise
@@ -108,6 +110,11 @@ to the inspected workspace; later relevant edits require revalidation.
 - At `max(5, 2 * initial step count)` rounds, reassess scope and remaining work. Record a
   changed strategy before continuing; a numeric cap alone is not completion or a reason to
   abandon feasible authorized work. Honor explicit user limits and runtime stop rules.
+
+Track executor attempts and auditor invocations, including retries. A user-stated budget
+or a bound agreed with the user is binding; checkpoint before exceeding it. Distinguish
+that limit from the default strategy reassessment threshold. Preserve evidence and report
+remaining work when a binding limit is reached; it does not establish completion.
 
 For an unresolved plateau, optionally consult a different vendor once per trigger. From
 Codex, use an available Claude review workflow with its authentication and permission

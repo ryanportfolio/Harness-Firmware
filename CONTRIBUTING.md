@@ -5,11 +5,13 @@ judged on what they cost to keep loaded, not just on whether they work.
 
 ## dev loop
 
-Skills are authored once and generated twice. `.claude/skills/` is canonical.
-`.agents/skills/` holds generated Codex adapters and is never hand-edited.
+Shared workflows are authored in `.claude/skills/` and exposed through generated Codex
+adapters. Standalone names in `.agents/skill-sources.json` are authored directly in
+`.agents/skills/`; sync preserves them. See [Codex skill maintenance](docs/codex-skills.md).
 
 ```sh
-# 1. edit the canonical skill
+# 1. edit the source for the intended runtime
+# Use .agents/skills/<skill>/SKILL.md for a registered standalone Codex skill.
 $EDITOR .claude/skills/<skill>/SKILL.md
 
 # 2. regenerate the Codex adapters
@@ -59,14 +61,14 @@ person's machine.
 
 A good skill PR contains:
 
-- `SKILL.md` under `.claude/skills/<name>/`, with a description that names the
+- `SKILL.md` under the intended runtime's source directory, with a description that names the
   trigger conditions, not the topic. If an agent cannot tell from the
   description when to load it, the skill will not fire.
 - A row in `.claude/skills/PROVENANCE.md` if the skill is forked or adapted
   from a third party, plus that upstream's LICENSE or NOTICE file kept inside
   the skill folder. Record what you changed.
-- Regenerated `.agents/skills/` adapters from the sync script, committed
-  alongside the source.
+- Regenerated adapters alongside shared sources, or a registered standalone Codex entry
+  with its capability classification. Include sync and contract verification.
 - The context-weight number before and after, when the skill is large.
 
 Skills earn their place. Prefer improving an existing one over adding a

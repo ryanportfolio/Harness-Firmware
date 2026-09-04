@@ -28,7 +28,7 @@ Git writes still follow the active runtime's safety rules and the user's authori
 1. Open the repository in Codex.
 2. Let Codex read `AGENTS.md` as its instruction boundary.
 3. Use `.claude/reference/` for shared project knowledge.
-4. Let Codex discover generated adapters under `.agents/skills/`.
+4. Let Codex discover standalone workflows and generated adapters under `.agents/skills/`.
 5. Do not run Claude hooks or inherit Claude automatic Git behavior unless the user explicitly asks in the current Codex session.
 
 For a new project, ask Codex to initialize the starter or select the `init-project` skill. Its adapter delegates to the same canonical workflow used by Claude Code.
@@ -95,9 +95,9 @@ The repository carries the loop:
 | Runtime | Entry point | Responsibility |
 |---|---|---|
 | Claude Code | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/`, `.claude/skills/` | Kernel rules, slash skills, project memory, session hook, plugin path, and Claude-specific workflow rules. |
-| Codex | `AGENTS.md`, `.agents/skills/` | Explicit safety boundary and generated skill discovery adapters backed by canonical playbooks. |
+| Codex | `AGENTS.md`, `.agents/skills/` | Explicit safety boundary, standalone workflows, and generated adapters to shared playbooks. |
 
-Codex adapters delegate to `.claude/skills/`, so maintainers update one source. `AGENTS.md` defines the Codex safety boundary. Codex does not run Claude SessionStart hooks. Workflows that need unavailable tools remain capability-gated.
+Generated Codex adapters delegate to `.claude/skills/`. Standalone names in `.agents/skill-sources.json` are maintained directly under `.agents/skills/` and preserved by sync. See [skill maintenance](docs/codex-skills.md) for ownership and personal-copy reconciliation. `AGENTS.md` defines the Codex safety boundary. Codex does not run Claude SessionStart hooks. Workflows that need unavailable tools remain capability-gated.
 
 ## repository map
 
@@ -106,7 +106,7 @@ Codex adapters delegate to `.claude/skills/`, so maintainers update one source. 
 | `CLAUDE.md` | Claude Code kernel loaded every turn. Spawned projects fill its verification and deployment sections. |
 | `AGENTS.md` | Codex instruction and safety boundary. |
 | `.claude/skills/` | Canonical workflow playbooks. |
-| `.agents/skills/` | Generated Codex discovery adapters. |
+| `.agents/skills/` | Standalone Codex workflows and generated discovery adapters. |
 | `.claude/reference/` | Committed project memory for architecture, commands, deployment, pitfalls, secrets, and technology choices. |
 | `.claude/hooks/session-start.sh` | Claude Code startup checks and reminders. |
 | `.claude/scripts/context-weight.sh` | Always-loaded source weight measurement. |
