@@ -22,6 +22,7 @@ function fixture(t) {
   for (const name of ["long-horizon", "ordinary"]) {
     write(`.claude/skills/${name}/SKILL.md`, `---\nname: ${name}\ndescription: Use when /${name} is requested.\n---\nClaude workflow.\n`);
   }
+  write(".agents/skill-modes.json", JSON.stringify({version: 1, skills: {"long-horizon": "native"}}));
   write(".agents/skills/long-horizon/SKILL.md", native);
   return {
     root, write,
