@@ -11,7 +11,7 @@ const requiredLinks = ["GUIDE.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE",
 
 test("README facts match the canonical repository inventory", () => {
   assert.equal(facts.skillCount, 33);
-  assert.equal(facts.codexSkillCount, 33);
+  assert.equal(facts.codexSkillCount, 34);
   assert.equal(facts.referenceFileCount, 6);
   assert.deepEqual(facts.runtimeNames, ["Claude Code", "Codex"]);
   assert.equal(facts.runtimeCount, facts.runtimeNames.length);
