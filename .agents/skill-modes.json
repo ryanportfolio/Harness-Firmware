@@ -12,6 +12,7 @@
     "init-project": "native",
     "long-horizon": "native",
     "merge": "native",
+    "perf-loop": "native",
     "recall": "native",
     "refine": "native",
     "unslop": "native",
