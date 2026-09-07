@@ -345,6 +345,7 @@ Test for any word: would a smart reader outside the domain pause on it? If a pla
 
 | Fancy | Plain |
 |---|---|
+| ancillary | supporting, or name the thing ("tooling", "works in progress") |
 | prohibition | ban |
 | verbatim | word-for-word |
 | corroborated | backed up |
@@ -360,6 +361,8 @@ Test for any word: would a smart reader outside the domain pause on it? If a pla
 | myriad, plethora | many |
 | happy case | when things go right |
 | connectives | connecting words |
+| first-party | your own |
+| data governance | who controls your data |
 
 Some words have no fixed swap because the plain phrase depends on what was meant: "disarmingly", "load-bearing" as a metaphor, "synchronous" in prose. Say the specific thing the sentence observes ("the assumption everything else rests on", "a back-and-forth call"); do not pick a near-synonym that shifts the meaning.
 
