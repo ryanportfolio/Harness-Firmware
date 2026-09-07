@@ -356,13 +356,12 @@ Test for any word: would a smart reader outside the domain pause on it? If a pla
 | elicitation | nudge (or say the instruction) |
 | convergence | shared conclusion |
 | imperatively | as a command |
-| disarmingly | surprisingly |
 | salient | main |
 | myriad, plethora | many |
-| load-bearing (figurative) | most important |
 | happy case | when things go right |
-| synchronous (in prose) | back-and-forth |
 | connectives | connecting words |
+
+Some words have no fixed swap because the plain phrase depends on what was meant: "disarmingly", "load-bearing" as a metaphor, "synchronous" in prose. Say the specific thing the sentence observes ("the assumption everything else rests on", "a back-and-forth call"); do not pick a near-synonym that shifts the meaning.
 
 The list is examples, not the boundary. What never changes: a technical term that is the accurate name of the thing (token, commit, retrieval, deterministic when precision matters, product and model names); code, identifiers, URLs, paths; quoted artifacts; a fancy word with no equally accurate plain substitute, glossed at first use. A sidegrade synonym is not a fix.
 
