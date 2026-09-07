@@ -55,7 +55,7 @@ Patterns 1-27 derive from Wikipedia's [Signs of AI writing](https://en.wikipedia
 **Before:**
 > Due to its unique characteristics, the Haolai River is of interest to researchers and conservationists. Experts believe it plays a crucial role in the regional ecosystem.
 
-**After:**
+**After** (the writer had the survey on hand; the example does not license adding one):
 > The Haolai River supports several endemic fish species, according to a 2019 survey by the Chinese Academy of Sciences.
 
 If the writer has no source, ask for one or flag the claim. Never invent a source.
@@ -335,11 +335,36 @@ Ask what the sentence tells the reader to do or know. If it cannot be restated a
 **After:**
 > If a sentence needs a second read, split it. One idea per sentence.
 
-### 31. Weak adverbs and fancy synonyms
+### 31. Weak adverbs, fancy synonyms, and Latinate dress-ups
 
 - "runs quickly" → "is fast" or the measured number
 - "significantly improves" → the measured delta
 - utilize → use, leverage → use, facilitate → help, numerous → many, in the event that → if, subsequent → next, commence → start
+
+Test for any word: would a smart reader outside the domain pause on it? If a plain phrase says the same thing, the plain phrase ships. Swaps a real editor made on shipped copy; the same word appearing again is a defect:
+
+| Fancy | Plain |
+|---|---|
+| prohibition | ban |
+| verbatim | word-for-word |
+| corroborated | backed up |
+| subsequent | later, after |
+| interventions | fixes |
+| amend | fix, update |
+| disambiguation | separation |
+| exfiltration | data theft |
+| elicitation | nudge (or say the instruction) |
+| convergence | shared conclusion |
+| imperatively | as a command |
+| disarmingly | surprisingly |
+| salient | main |
+| myriad, plethora | many |
+| load-bearing (figurative) | most important |
+| happy case | when things go right |
+| synchronous (in prose) | back-and-forth |
+| connectives | connecting words |
+
+The list is examples, not the boundary. What never changes: a technical term that is the accurate name of the thing (token, commit, retrieval, deterministic when precision matters, product and model names); code, identifiers, URLs, paths; quoted artifacts; a fancy word with no equally accurate plain substitute, glossed at first use. A sidegrade synonym is not a fix.
 
 ### 32. Generic conclusions
 
