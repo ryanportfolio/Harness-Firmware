@@ -11,6 +11,15 @@ condensed.
 
 ## [Unreleased]
 
+### Changed
+
+- `writing` skill: pattern 31 carries the Latinate-dress-up trap table
+  from Corewise.Academy `plain-words` (prohibition → ban, verbatim →
+  word-for-word, and so on) plus the what-never-changes list; the
+  plain-words rule in SKILL.md names the swaps. Pattern 5 labels its
+  After text as citing a source the writer already had, so the example
+  no longer reads as permission to invent one.
+
 ### Added
 
 - `scripts/lib/launch-chrome.mjs`: headed Chrome launcher that puts the
