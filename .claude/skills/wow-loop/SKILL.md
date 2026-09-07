@@ -40,7 +40,7 @@ One director writes `spec.md` (exact values: dimensions, tokens, timing tables, 
 
 `bar.md` is torn down from one named reference the user, the conversation, or the director supplies: a specific model, page, video, or document. Record the reference identity and store its captures or excerpts under `captures/reference/`. Mechanisms, not adjectives. "Feels premium" is useless; "headline is 5x body size, three type sizes total", "engine glow occupies 12-15% of the rear-view frame", "nothing animates for under 400 ms" are checkable from a capture. If no reference exists, derive checks from the user's goal and say so in `bar.md`.
 
-Each check gets a stable ID and records: requirement; gating or advisory; module or whole; reference or rationale; state, view, or interaction to inspect; method; pass condition with tolerance; dependencies. Method is `scripted` (dimensions, page count, text present, colors, console errors, frame time, triangle count: anything a script can measure) or `judged` (composition, fidelity, motion, taste). Scripted checks go into `check.sh` (or the project's test runner) and run after every edit at zero model cost; critics are dispatched only once every scripted check passes and see only the judged list. Five to twelve checks per module is the working range. Separate reference fidelity, comparative appeal, functional correctness, and performance; a pass in one says nothing about another. Freeze the contract before implementation. Amendments append a version and named checks.
+Each check gets a stable ID and records: requirement; gating or advisory; module or whole; reference or rationale; state, view, or interaction to inspect; method; pass condition with tolerance; dependencies. Method is `scripted` (dimensions, page count, text present, colors, console errors, frame time, triangle count: anything a script can measure) or `judged` (composition, fidelity, motion, taste). Scripted checks go into `check.sh` (or the project's test runner) and run after every edit at zero model cost; critics are dispatched only once every gating scripted check passes (advisory scripted failures are recorded, not blocking) and see only the judged list. Five to twelve checks per module is the working range. Separate reference fidelity, comparative appeal, functional correctness, and performance; a pass in one says nothing about another. Freeze the contract before implementation. Amendments append a version and named checks.
 
 **Modules.** Split when parts can be built and reviewed on their own; a compact artifact stays one module. Each module lists its artifact paths (disjoint from other modules), dependencies, and local checks. Always define whole-deliverable checks: composition, integration, transitions, full playback, complete user journey. Passing parts do not establish a coherent whole.
 
@@ -75,12 +75,12 @@ Detailed evidence stays in `reports/` and `captures/`; the JSON holds paths and 
 **Fingerprint.** Content plus path, over the module's tracked and untracked files and its ignored generated dirs. `git diff` misses staged and untracked; `git ls-files --ignored` filters to ignored-only. Use:
 
 ```bash
-{ git ls-files -z --cached --others --exclude-standard -- <module paths>; find <gen_dirs> -type f -print0 2>/dev/null; } \
+{ git ls-files -z --cached --others --exclude-standard -- <module paths>; [ -n "<gen_dirs>" ] && find <gen_dirs> -type f -print0 2>/dev/null; } \
 | sort -zu | while IFS= read -r -d '' f; do [ -f "$f" ] && printf '%s %s\n' "$f" "$(git hash-object "$f")"; done \
 | git hash-object --stdin | cut -c1-12
 ```
 
-Whole-deliverable fingerprint is the hash of the module fingerprints in ID order.
+A bare `find` with no path scans the whole worktree, including this state dir, and would churn every fingerprint; the guard above skips it when `gen_dirs` is empty. Whole-deliverable fingerprint is the hash of the module fingerprints in ID order.
 
 ## 4. Build
 
@@ -95,7 +95,7 @@ Two fresh critics per round, distinct lenses, each briefed to disprove the work.
 - Experience critic: takes its own captures at every named state, view, and zoom the checks require, plus at least two the contract did not list (another viewport, a later page, an off-axis angle, a mid-transition frame) since defects hide where nobody planned to look, plus a natural run. It passes or fails each judged check from what it sees, comparing against the stored reference captures in the same session.
 - Engineering critic: reruns `check.sh`, tests, typecheck, build, console and resource checks, performance measurement under recorded conditions, full diff read for regressions, scope violations, nondeterminism, accessibility damage, leaked processes. Adapt the lens to the medium (export integrity and link checks for a document).
 
-Report is JSON, parsed by the orchestrator, so no finding is lost to vocabulary drift: `fingerprint`, `contract_version`, `checks: {id: {status: passed|failed|unavailable, evidence: []}}`, `findings: [{id, check, module, severity: blocker|major|minor, gating: bool, evidence: [], reproduction, repair}]`, `gaps: []`. A gating finding without an evidence path is returned to the critic, not accepted. Measure when a finding could be argued (pixel stats, bounding boxes, timings). Read every capture cited.
+Report is JSON, parsed by the orchestrator, so no finding is lost to vocabulary drift: `fingerprint`, `contract_version`, `checks: {id: {status: passed|failed|unavailable, evidence: []}}`, `findings: [{id, check, module, severity: blocker|major|minor, gating: bool, evidence: [], reproduction, repair}]`, `resolutions: {prior_id: fixed|open|refuted, with evidence}` for every open finding handed over in the second message, `gaps: []`. A gating finding without an evidence path is returned to the critic, not accepted; so is a report that omits a resolution for any handed-over finding. Measure when a finding could be argued (pixel stats, bounding boxes, timings). Read every capture cited.
 
 Browser discipline for any agent touching a live page: one structural action per step with a capture before and after; fresh screenshot before any coordinate click; refresh element refs after navigation or DOM change; select the page by a stable app marker (`data-*` root), never tab order; Electron and Chromium apps attach via `--remote-debugging-port`.
 
