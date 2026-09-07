@@ -125,10 +125,12 @@ The Manager compacts too. After any context compaction or session restart, the f
 to re-read the state file and treat it as the whole truth: a step you remember planning but
 that is not in the file did not happen, and a step in Verified progress you do not remember
 did. Never reconstruct progress from memory of the conversation. Then reconcile Phase before
-touching anything: `planned` → the executor may never have started, check the manifest diff
-is empty and re-spawn; `executing` or `awaiting-audit` → the executor's work may be on disk,
-so audit it against the existing Baseline; never re-Plan over a populated block, that would
-replace the Baseline the audit needs; `audited` → finish Integrate.
+touching anything: `planned` → the executor may never have started; if the Baseline manifest
+or ref is missing or partial, the crash hit between the phase write and the snapshot, so redo
+Plan for the same step from scratch; otherwise check the manifest diff is empty and re-spawn;
+`executing` or `awaiting-audit` → the executor's work may be on disk, so audit it against the
+existing Baseline; never re-Plan over a populated block, that would replace the Baseline the
+audit needs; `audited` → finish Integrate.
 
 ## Stagnation
 
