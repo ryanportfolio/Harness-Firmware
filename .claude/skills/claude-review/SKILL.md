@@ -5,13 +5,13 @@ description: Use when the user says /claude-review, asks Claude or Fable to revi
 
 # Claude review
 
-Run one fresh Claude CLI reviewer, then verify its findings in the current session. Default to the pinned `claude-fable-5-1` model at high effort under the user's Claude subscription. From Codex this is cross-vendor review; from Claude it provides fresh context only. State which applies.
+Run one fresh Claude CLI reviewer, then verify its findings in the current session. Default to the `fable` model alias (always the latest Fable model) at high effort under the user's Claude subscription. From Codex this is cross-vendor review; from Claude it provides fresh context only. State which applies.
 
 ## 1. Fail-closed preflight
 
 Run `claude --version` and `claude auth status`. Require:
 
-- Claude CLI 2.1.257 or newer, with Fable 5.1 support.
+- Claude CLI 2.1.257 or newer, with the `fable` model alias (`claude --help` lists it under `--model`).
 - `loggedIn: true`, `authMethod: claude.ai`, `apiProvider: firstParty`, and `subscriptionType: max`.
 - No `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_PROFILE`, `ANTHROPIC_DEFAULT_FABLE_MODEL`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, `CLAUDE_CODE_USE_FOUNDRY`, or `CLAUDE_CODE_USE_ANTHROPIC_AWS` in the child process environment. Check presence only; never print values.
 
@@ -38,7 +38,7 @@ Create a unique `.tmp/claude-review-*` directory and exclude it from review scop
 Run from the repository root, adapting quoting to the active shell:
 
 ```bash
-claude -p --model claude-fable-5-1 --effort high \
+claude -p --model fable --effort high \
   --permission-mode plan --permission-prompts none --restricted \
   --tools "Read,Glob,Grep,Bash" --disable-slash-commands --strict-mcp-config \
   --no-session-persistence --no-chrome --output-format text \
@@ -59,18 +59,18 @@ Treat Claude's report as candidates, not conclusions. Check every finding agains
 - **Refuted:** evidence disproves it; list it under `Dismissed` with the reason.
 - **Kept with caveat:** evidence is incomplete; state the missing check.
 
-Order confirmed findings as BLOCKING, SHOULD-FIX, then NITPICK. Include `path:line`, impact, and fix. End with checked-and-fine items, dismissed findings, and a concrete merge recommendation. Attribute the run: `Claude Fable 5.1, high effort reviewed <scope>; N of M findings survived verification.`
+Order confirmed findings as BLOCKING, SHOULD-FIX, then NITPICK. Include `path:line`, impact, and fix. End with checked-and-fine items, dismissed findings, and a concrete merge recommendation. Attribute the run: `Claude Fable (latest, fable alias), high effort reviewed <scope>; N of M findings survived verification.`
 
 ## Optional ultrareview
 
-Use `claude ultrareview` only when the user explicitly requests `ultra` and separately confirms after hearing that it uploads repository state, uses Anthropic's managed model fleet rather than the Fable 5.1 pin, and may consume a free run or paid usage credits. `claude-review` alone is not that consent. Use `--no-post`; posting remains a separate explicit action. Never substitute ultrareview after a local-review failure.
+Use `claude ultrareview` only when the user explicitly requests `ultra` and separately confirms after hearing that it uploads repository state, uses Anthropic's managed model fleet rather than the local `fable` alias, and may consume a free run or paid usage credits. `claude-review` alone is not that consent. Use `--no-post`; posting remains a separate explicit action. Never substitute ultrareview after a local-review failure.
 
 ## Common mistakes
 
 | Mistake | Required response |
 |---|---|
 | API/provider variable present | Stop before inference |
-| Old CLI or rejected Fable 5.1 model | Stop; do not probe or substitute |
+| Old CLI or rejected `fable` model alias | Stop; do not probe or substitute |
 | Failed or stalled run | Report once; ask before retrying |
 | Claude finding sounds plausible | Verify it locally before surfacing |
 | Claude runtime invokes this skill | Describe it as fresh-context, not cross-vendor |
