@@ -1,66 +1,136 @@
 ---
-description: Multi-agent perfection loop for any deliverable. Recon, one spec, one implementer, adversarial screenshot-verified critique until an evidence gate passes. Use when the user says /wow-loop, asks for "wow factor" or "dial it to 11".
+name: wow-loop
+description: "Evidence-gated review and repair loop for one deliverable. Use on /wow-loop, requests for wow factor or dial it to 11, or substantial visual work (3D, animation, UI, rendered documents) that needs reference fidelity or repeated visual correction. Skip routine cosmetic edits and discussion of the skill itself."
 ---
 
-# Wow loop — evidence-gated pursuit of utterly perfect
+# Wow loop
 
-Produces a deliverable that survives adversarial review, not one that merely looks done. The loop ends when verifiers armed with screenshots and measurements fail to break it, never when the work "seems finished". Subject-agnostic: the same shape works for a WebGL intro, a landing page, a slide deck, or a PDF.
+Improve one deliverable until independent critics, working from their own captures and measurements, establish that it meets a written quality contract. State and evidence persist on disk so a later invocation resumes from the weakest module instead of starting over.
 
-`$ARGUMENTS` names the target when invoked as a slash command; otherwise take the deliverable from conversation context.
+Target comes from `$ARGUMENTS` or the conversation. Explicit invocation runs the loop even for a small deliverable; scale agent count to the task. Use `arena` when the solution shape is open, `lab` when the user wants to hand-tune values. Neither is a prerequisite.
 
-## Step 0: Isolation and determinism first
+## Invariants (hold every round)
 
-Before any agent runs, establish the substrate that makes verification trustworthy:
+- Self-review never establishes acceptance. Reading code never establishes a visual. Every visual verdict comes from a capture the verdict-giver read.
+- One writer per file set at a time. Parallel implementers only on modules with disjoint artifact paths and separate build dirs and ports.
+- Critics and judges write captures and reports, never the deliverable.
+- Verdicts are binary per check and per finding. No numeric quality scores; they drift upward every round.
+- Never weaken a check to obtain a pass. User feedback amends the contract as a versioned, named check.
+- Every subagent brief carries the browser rule: headed Chrome on the real GPU via `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`) for anything WebGL or animated; never headless, never minimized. Static media (PDF pages, deck exports, plain pages) may render without the GPU path. Parallel critics use `playwright-iso` or their own Chrome, never the shared plugin browser (it deadlocked a critic and the main session for 10 minutes on 2026-08-29).
+- Subagents receive the prompt plus CLAUDE.md, never this skill or the conversation. Every rule a role needs travels in its brief.
+- Save state before each dispatch, after each report, and before yielding.
 
-- Fresh worktree off freshly fetched main. Each concurrent workstream gets its own ports AND its own build output dir (e.g. `NEXT_DIST_DIR=.next-dev2`); two processes sharing one build dir silently corrupt each other.
-- Seeded randomness only in the deliverable. Any animation or generated content must be reproducible.
-- Build a capture hook into the work itself: a way to freeze the deliverable at any named state (`hold(percent)`, `beat(name)`) so a screenshot taken twice is byte-identical. If frames are not reproducible, every later verdict is a guess.
-- Every agent that starts a server kills it before returning and proves the port is free.
-- Preflight the capture path for THIS deliverable type before any round runs: take one real screenshot/render (site screenshot, PDF page render, video filmstrip) and read it back. If a capability is missing (no renderer, no capture tool), name which verifier lens goes blind and declare the degradation to the user up front; never proceed silently with a verifier that cannot see.
+## 1. Start or resume
 
-## Step 1: Recon (ground truth, no opinions)
+Slug: kebab-case from the target name. If `.tmp/wow-loop/<slug>/state.json` exists, resume; if its `task` differs from the current request, ask the user or pick a new slug.
 
-One read-only agent gathers what every later agent will rely on: exact code excerpts with line refs, live measurements (rendered positions, computed styles, timings), existing test pins, reusable pieces. Designers and implementers never work from memory or assumption; stale recon is how confident agents build the wrong thing. If a claim can be measured live, measure it rather than derive it.
+**First run.** Fresh worktree off freshly fetched `origin/main` unless already in a task worktree or mid-task on the user's branch. Concurrent workstreams get their own ports and build output dirs (`NEXT_DIST_DIR=.next-dev2`); two processes on one build dir corrupt each other. Preflight the capture path: take one real capture of the current artifact and read it. A missing capability (no renderer, no GPU, no capture tool) is recorded as `unavailable` on the checks it blinds and declared to the user now, not discovered in round three.
 
-## Step 2: Spec (one director, nothing left to taste)
+**Resume.** Recompute every module fingerprint (section 3). Mismatch marks that module's checks, its dependents' checks, and the whole-deliverable checks `stale`; unrelated passes stay. Verify evidence paths still exist; a report whose captures are gone is `stale`. Reconcile with the latest user instructions. Recover partial work before repeating it. Enter at `next_action`, targeting the module with the most acceptance blockers, then highest severity, then dependency order. Do not restart all modules.
 
-Competing concepts from 2 independent designers are worth it for wide solution spaces; otherwise go straight to one director. Either way the output is ONE spec with exact values: dimensions, colors from the project's token vocabulary, timing tables, band/beat names, file layout, test plan, and a risk list. The spec is the single source of truth; if the implementer has to make a taste decision, the spec failed.
+`/loop /wow-loop <slug>` re-fires only while this session stays open. Across sessions the state file is the continuity; the user re-invokes with the slug.
 
-The spec also fixes the bar. Name one concrete reference that already does this brilliantly (a specific page, video, or doc — from the user, the conversation, or the director's pick) and tear it down into 5-7 checkable mechanisms written as `bar.md`: mechanisms, not adjectives. "Feels premium" is useless; "headline is 5x body size, three type sizes total" or "nothing animates for under 400ms" is checkable by looking. Every line must be verifiable from a screenshot or measurement. If no reference exists, derive the mechanisms from the spec's own values. A vague bar is the number one way perfection loops fail: the verifier invents a comparison and approves everything on round one.
+Track every process the task starts. Keep review servers alive while critics need them; stop owned processes before yielding and prove the port is free. Never stop processes the task did not start.
 
-## Step 3: Implement (sole owner of hot files)
+## 2. Contract
 
-Exactly one implementer edits the deliverable per round. Parallel editors on shared files collide and silently clobber each other. The implementer self-verifies with the capture hook before returning: held-state screenshots at the spec's named beats, one natural uncontrolled run, accessibility variants (reduced motion, no-JS, keyboard). The implementer must READ its own screenshots before claiming them.
+Recon first: one read-only agent (or the orchestrator, for a small target) gathers exact code excerpts with line refs, live measurements, existing pins, reusable pieces, and the reference material. Nobody downstream works from memory.
 
-## Step 4: Adversarial verify (try to break it, on evidence)
+One director writes `spec.md` (exact values: dimensions, tokens, timing tables, file layout, module list, risks) and `bar.md`. Two competing directors only when the direction is materially unresolved.
 
-Two or more verifiers with distinct lenses, each prompted to DISPROVE the work:
+`bar.md` is torn down from one named reference the user, the conversation, or the director supplies: a specific model, page, video, or document. Record the reference identity and store its captures or excerpts under `captures/reference/`. Mechanisms, not adjectives. "Feels premium" is useless; "headline is 5x body size, three type sizes total", "engine glow occupies 12-15% of the rear-view frame", "nothing animates for under 400 ms" are checkable from a capture. If no reference exists, derive checks from the user's goal and say so in `bar.md`.
 
-- An experience lens: does each beat land as intended for a human, judged from fresh screenshots at held states plus a natural run, compared against the reference or baseline in the same session. Check every `bar.md` mechanism explicitly, pass or fail each. When comparing ours against the reference, present the two captures side by side with labels stripped and call which is better blind; a verifier that knows which one is ours goes soft on it.
-- An engineering lens: independent test/typecheck/build runs, full diff read hunting regressions, scope violations, nondeterminism, accessibility damage, leaked processes.
+Each check gets a stable ID and records: requirement; gating or advisory; module or whole; reference or rationale; state, view, or interaction to inspect; method; pass condition with tolerance; dependencies. Method is `scripted` (dimensions, page count, text present, colors, console errors, frame time, triangle count: anything a script can measure) or `judged` (composition, fidelity, motion, taste). Scripted checks go into `check.sh` (or the project's test runner) and run after every edit at zero model cost; critics are dispatched only once every scripted check passes and see only the judged list. Five to twelve checks per module is the working range. Separate reference fidelity, comparative appeal, functional correctness, and performance; a pass in one says nothing about another. Freeze the contract before implementation. Amendments append a version and named checks.
 
-Non-negotiables for verifiers: treat implementer claims as untrusted; read every screenshot cited; measure instead of eyeballing (pixel stats, bounding boxes, timings) whenever a finding could be argued; name exact evidence paths; label each finding confirmed or refuted with severity.
+**Modules.** Split when parts can be built and reviewed on their own; a compact artifact stays one module. Each module lists its artifact paths (disjoint from other modules), dependencies, and local checks. Always define whole-deliverable checks: composition, integration, transitions, full playback, complete user journey. Passing parts do not establish a coherent whole.
 
-Browser-driving rules for anyone (implementer or verifier) touching a live page: perform exactly one structural action per step (click, type, scroll, navigate, resize) with a capture before and after; never coordinate-click without a fresh screenshot taken immediately before; never reuse element references after a navigation or structural change; when several windows/tabs share a debug surface, select the page by a stable app marker (root selector, `data-*` attribute), not tab order — and if nothing matches, list available titles/URLs instead of guessing. Electron/Chromium apps attach via `--remote-debugging-port` + CDP connect.
+**Medium checks.** Pick what applies:
 
-## Step 5: Fix and re-verify (the loop)
+- 3D: silhouette and proportions from named angles, close-ups of key details, materials and lighting, intersections, seams, scale against the reference.
+- Animation: named beats, transitions, continuity, pacing, one complete natural playback. Stills cannot establish motion.
+- Interfaces: target viewports, content extremes, interaction states, keyboard path, reduced motion, no-JS where relevant.
+- Documents and static graphics: the rendered pages or exports, hierarchy, alignment, legibility, cropping, cross-page continuity.
+- Runtime: zero relevant console errors, zero failed resources, frame time measured under recorded conditions (viewport, hardware, workload). Triangle count and draw calls diagnose; frame time gates. Unrelated baseline errors are recorded separately with evidence.
 
-Confirmed findings go to one fixer whose brief is those findings and nothing else. The fixer reproduces each defect before fixing it and proves each fix with the same evidence discipline. Then verifiers run again against the fixed state. Repeat until a round produces zero confirmed findings or only honestly named residuals with causes. Cap rounds (about 5) and report unresolved residuals plainly rather than looping forever.
+## 3. State
 
-- Severity filters that gate the fix stage must match the words verifiers actually use: major, moderate, blocker, high, medium. A finding dropped by a too-narrow regex is a defect that ships.
-- Mid-loop user feedback becomes a mandatory named check in the verifier prompts, not a note: "if X is still true, that is a CONFIRMED major finding titled exactly Y".
+`.tmp/wow-loop/<slug>/` holds `state.json`, `spec.md`, `bar.md`, `check.sh`, `captures/<round>/<module>/`, `reports/<round>/<role>.json`. Gitignored, worktree-local: resume in the same worktree and keep that worktree until the loop passes; record its absolute path. The orchestrator alone writes `state.json`; agents write to assigned paths. Write to a temp file and rename so an interrupted save keeps the last checkpoint.
 
-## Step 6: Final gate (orchestrator's own eyes)
+```json
+{
+  "task": {"goal": "", "scope": "", "constraints": [], "worktree": ""},
+  "contract": {"spec": "spec.md", "bar": "bar.md", "version": 1, "amendments": [], "reference": ""},
+  "modules": {"<id>": {"paths": [], "gen_dirs": [], "deps": [], "fingerprint": "", "phase": "pending|building|reviewing|passed", "rounds": 0, "checks": []}},
+  "checks": {"<id>": {"status": "pending|passed|failed|unavailable|stale", "module": "", "gating": true, "evidence": [], "contract_version": 1}},
+  "findings": {"<id>": {"check": "", "module": "", "severity": "blocker|major|minor", "gating": true, "evidence": [], "status": "open|fixed|refuted|waived", "note": ""}},
+  "rounds": [{"n": 1, "module": "", "approach": "", "outcome": "", "reports": []}],
+  "limits": {"per_module": 4, "total": 12, "used": 0, "user_override": null},
+  "outcome": "in_progress|passed|blocked|budget_exhausted",
+  "next_action": ""
+}
+```
 
-The orchestrator, not an agent, runs the last pass: full test suite, typecheck, production build, banned-pattern sweeps (project copy rules), a natural end-to-end run, and its OWN reading of the money-shot frames. Only then ship. Report residuals with causes; never absorb them silently.
+Detailed evidence stays in `reports/` and `captures/`; the JSON holds paths and statuses only. Findings history is kept, never overwritten.
+
+**Fingerprint.** Content plus path, over the module's tracked and untracked files and its ignored generated dirs. `git diff` misses staged and untracked; `git ls-files --ignored` filters to ignored-only. Use:
+
+```bash
+{ git ls-files -z --cached --others --exclude-standard -- <module paths>; find <gen_dirs> -type f -print0 2>/dev/null; } \
+| sort -zu | while IFS= read -r -d '' f; do [ -f "$f" ] && printf '%s %s\n' "$f" "$(git hash-object "$f")"; done \
+| git hash-object --stdin | cut -c1-12
+```
+
+Whole-deliverable fingerprint is the hash of the module fingerprints in ID order.
+
+## 4. Build
+
+One implementer per module, briefed with the contract, the target module, its open findings ranked, allowed paths, `check.sh`, and the local checks. For a small target the orchestrator may implement itself; independence comes from the critics, not the builder. The implementer runs `check.sh` and self-verifies with the capture hook before returning: held-state captures at the named beats or views, one natural run, and it reads its own captures. Its report names changed files, states tested, evidence paths, known limits, remaining work. Treat the report as a claim.
+
+Repairs go to the same implementer via SendMessage (it keeps its context and reproduces cheaper) until a check fails twice on its approach; then a fresh implementer with the recorded cause and a different approach. Stop edits before review; review binds to the fingerprint it inspected, and any later edit marks that review `stale`.
+
+## 5. Critique
+
+Two fresh critics per round, distinct lenses, each briefed to disprove the work. They get the contract, references, baseline, artifact access, capture instructions, the browser rule, and the required report schema. They do not get builder explanations or prior verdicts until after their initial assessment; then they get the open findings for explicit resolution checks. A finding not mentioned is not fixed.
+
+- Experience critic: takes its own captures at every named state, view, and zoom the checks require, plus at least two the contract did not list (another viewport, a later page, an off-axis angle, a mid-transition frame) since defects hide where nobody planned to look, plus a natural run. It passes or fails each judged check from what it sees, comparing against the stored reference captures in the same session.
+- Engineering critic: reruns `check.sh`, tests, typecheck, build, console and resource checks, performance measurement under recorded conditions, full diff read for regressions, scope violations, nondeterminism, accessibility damage, leaked processes. Adapt the lens to the medium (export integrity and link checks for a document).
+
+Report is JSON, parsed by the orchestrator, so no finding is lost to vocabulary drift: `fingerprint`, `contract_version`, `checks: {id: {status: passed|failed|unavailable, evidence: []}}`, `findings: [{id, check, module, severity: blocker|major|minor, gating: bool, evidence: [], reproduction, repair}]`, `gaps: []`. A gating finding without an evidence path is returned to the critic, not accepted. Measure when a finding could be argued (pixel stats, bounding boxes, timings). Read every capture cited.
+
+Browser discipline for any agent touching a live page: one structural action per step with a capture before and after; fresh screenshot before any coordinate click; refresh element refs after navigation or DOM change; select the page by a stable app marker (`data-*` root), never tab order; Electron and Chromium apps attach via `--remote-debugging-port`.
+
+## 6. Repair loop
+
+The orchestrator reconciles findings against evidence and contract; disputed findings get a recorded reason, not silent deletion. Confirmed gating findings, ranked, go to the implementer (section 4). It reproduces each defect before fixing and proves each fix with a fresh capture under the same conditions. Rerun failed checks and every check the fix could affect; keep unrelated passes.
+
+Stagnation: the same check failing twice records the observed cause and forces a changed approach (implementation, decomposition, or evidence method), never a lowered bar. Failing a third time escalates to a bakeoff: two fresh implementers in separate worktrees get the same finding, both results are captured under the same rig, and one fresh judge picks between them blind (same product, so blinding holds); the winner's diff lands, the loser's worktree goes. Four rounds on one module is a reassessment checkpoint: rescope, change strategy, or ask the user; it is not a pass and not an automatic stop. Twelve rounds total (user may raise) yields `budget_exhausted` with unmet checks and `next_action`. A missing capability or external prerequisite yields `blocked`. Identical attempts without new evidence or a changed approach do not run.
+
+## 7. Whole deliverable and blind judging
+
+After every module passes locally, a fresh experience critic takes the complete deliverable and the whole-deliverable checks: full playback for animation, the complete journey for an interface, every rendered page for a document, composition and integration for a scene. The engineering critic reruns integration and regression checks on the same fingerprint.
+
+When reference fidelity is a goal and comparable evidence exists, two fresh judges each receive matched pairs (ours vs reference, same view, same conditions) labeled only A and B, order shuffled per judge, provenance and prior verdicts withheld, label mapping kept outside their briefs, file names free of any hint. Each judge states a preference or tie per pair, the visible reasons, and the contract criteria involved. A recognizable reference (a famous ship, a well-known site) limits blinding; record that. Preference votes locate unmet requirements; they do not gate on their own, and judges are not rerun to obtain a better vote.
+
+## 8. Accept and report
+
+The orchestrator reads the key captures itself, runs remaining project-required checks and any check invalidated since its last pass, and confirms process cleanup. `passed` requires: every gating check `passed` on the current fingerprint and contract version; both critic lenses and the whole-deliverable pass complete; no open gating finding; evidence paths present. Advisory findings may remain and are named. Any gating check `failed`, `unavailable`, or `stale` blocks acceptance.
+
+Report: outcome, what changed, the evidence behind acceptance, remaining findings with causes, the state path, and the exact next action if unfinished.
+
+## Role briefs (what each dispatch must contain)
+
+- Director: recon output, reference identity, user goal; returns `spec.md` and `bar.md` per section 2.
+- Implementer: contract, module, allowed paths, ranked findings, local checks, capture hook, browser rule; returns the section 4 report.
+- Critic: contract, references, baseline captures, artifact access, capture instructions, browser rule, report schema, lens; returns the section 5 report. Open findings arrive as a second message.
+- Judge: pairs labeled A and B only, the contract criteria list, browser rule if it must render; returns preference, reasons, criteria per pair.
 
 ## Anti-patterns
 
-- Don't end the loop because the work looks done; end it because adversaries armed with evidence failed to break it.
-- Don't let any agent claim a visual it did not read, or verify a visual claim by reading code.
-- Don't run parallel implementers on the same hot file, or parallel servers on a shared build dir.
-- Don't trust one capture angle: vary pointer position, viewport, scroll state, and timing so state-dependent defects get seen.
-- Don't average away a regression: compare against the reference in the same session, same viewport, same method.
-- Don't skip reproducing a defect before fixing it, and don't accept a fix without a fresh capture proving it.
-- Don't hide residuals; name them, with causes, in the final report.
-- Don't let verifiers hand out numeric scores; scores drift upward every round. Verdicts are binary per finding and per bar mechanism: confirmed or refuted, pass or fail.
+- Ending because the work looks done, rather than because critics armed with captures failed to break it.
+- Any agent claiming a visual it did not read, or verifying a visual claim from code.
+- Parallel writers on shared paths or shared build dirs.
+- One capture angle. Vary viewpoint, zoom, viewport, pointer, scroll, timing.
+- Comparing against a memory of the reference instead of its stored captures in the same session.
+- Fixing without reproducing, or closing a finding without a fresh capture.
+- Marking a module passed while its dependents or the whole-deliverable checks are stale.
+- Hiding residuals. Name them with causes.
