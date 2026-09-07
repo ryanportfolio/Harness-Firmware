@@ -116,7 +116,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 ### specialist tools · 13
 
 - [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Use proactively for hard layered work with dependent steps, load-bearing unknowns, repeated failures, or verification-sensitive handoff; also when the user asks for Fable mode.
-- [`wow-loop`](.claude/skills/wow-loop/SKILL.md) · Multi-agent perfection loop for any deliverable. Recon, one spec, one implementer, adversarial screenshot-verified critique until an evidence gate passes. Use when the user says /wow-loop, asks for "wow factor" or "dial it to 11".
+- [`wow-loop`](.claude/skills/wow-loop/SKILL.md) · Evidence-gated review and repair loop for one deliverable. Use on /wow-loop, requests for wow factor or dial it to 11, or substantial visual work (3D, animation, UI, rendered documents) that needs reference fidelity or repeated visual correction. Skip routine cosmetic edits and discussion of the skill itself.
 - [`arena`](.claude/skills/arena/SKILL.md) · Spawn N parallel candidate attempts at one task, pick the strongest as base, graft the losers' best parts in. Use when the user says /arena, "arena this", or when one attempt at a non-trivial artifact would lock in the wrong shape.
 - [`lab`](.claude/skills/lab/SKILL.md) · Use when the user explicitly asks to lab or prototype a visual, UI, motion, or game-feel element with live tuning before production implementation.
 - [`advocate`](.claude/skills/advocate/SKILL.md) · Use only when the user explicitly invokes /advocate to challenge a change just made before it lands. Do not trigger from natural-language requests.
