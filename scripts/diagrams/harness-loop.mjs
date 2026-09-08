@@ -42,7 +42,7 @@ const NODES = [
     [part("long-horizon", SKILL("long-horizon")), part(" · "), part("verify-this", SKILL("verify-this"))],
     [part("advocate", SKILL("advocate")), part(" · "), part("codex-review", SKILL("codex-review"))],
     [part("arena", SKILL("arena")), part(" · "), part("wow-loop", SKILL("wow-loop"))],
-    [part("impartial-review", SKILL("impartial-review"))],
+    [part("impartial-review", SKILL("impartial-review")), part(" · "), part("handoff-audit", SKILL("handoff-audit"))],
   ], href: SKILL("codex-review") },
   { deg: 288, name: "Integrate", minBoxW: 160, refRows: [
     [part("record verified result")],
