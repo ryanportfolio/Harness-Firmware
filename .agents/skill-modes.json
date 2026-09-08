@@ -15,6 +15,7 @@
     "perf-loop": "native",
     "recall": "native",
     "refine": "native",
+    "showpiece": "native",
     "unslop": "native",
     "why": "native",
     "wow-loop": "native",

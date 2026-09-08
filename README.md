@@ -4,7 +4,7 @@
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/boot-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/boot-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/boot-dark.svg">
-<img alt="Harness Firmware boots with 33 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
+<img alt="Harness Firmware boots with 34 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
 </picture>
 
 Harness Firmware stores agent instructions, project notes, reusable skills, and verification rules in the repository for Claude Code and Codex.
@@ -57,7 +57,7 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="33 canonical playbooks serve Claude Code directly and Codex through 34 skills, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="34 canonical playbooks serve Claude Code directly and Codex through 35 skills, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
@@ -65,9 +65,9 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 
 Both runtimes read the committed project topics under `.claude/reference/`. Shared workflows live under `.claude/skills/`; standalone Codex workflows live under `.agents/skills/`.
 
-## 33 workflows, loaded when called
+## 34 workflows, loaded when called
 
-**9 core · 11 discipline · 13 specialist**
+**9 core · 11 discipline · 14 specialist**
 
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
@@ -78,13 +78,13 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/skills-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/skills-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/skills-dark.svg">
-<img alt="A memory map of 33 on-demand workflows grouped into 9 core, 11 discipline, and 13 specialist skills." src="assets/readme/skills-light.svg" width="100%">
+<img alt="A memory map of 34 on-demand workflows grouped into 9 core, 11 discipline, and 14 specialist skills." src="assets/readme/skills-light.svg" width="100%">
 </picture>
 
 </details>
 
 <details>
-<summary><strong>Click to browse all 33 skills</strong></summary>
+<summary><strong>Click to browse all 34 skills</strong></summary>
 
 <!-- skill-list:start -->
 ### core workflows · 9
@@ -113,10 +113,11 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`verify-this`](.claude/skills/verify-this/SKILL.md) · Verify a claim with fresh local evidence: restate it falsifiably, capture baseline and treatment, compare, return VERIFIED, NOT VERIFIED, or INCONCLUSIVE. Use for /verify-this, "prove it works", "did this fix it", "show me the evidence".
 - [`dare`](.claude/skills/dare/SKILL.md) · First-principles chain: decompose, audit assumptions, recombine surviving blocks, test against reality; each step a fresh subagent fed only the prior artifact. Use on /dare, 'first principles', or 'are we solving the right problem'.
 
-### specialist tools · 13
+### specialist tools · 14
 
 - [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Use proactively for hard layered work with dependent steps, load-bearing unknowns, repeated failures, or verification-sensitive handoff; also when the user asks for Fable mode.
 - [`wow-loop`](.claude/skills/wow-loop/SKILL.md) · Evidence-gated review and repair loop for one deliverable. Use on /wow-loop, requests for wow factor or dial it to 11, or substantial visual work (3D, animation, UI, rendered documents) that needs reference fidelity or repeated visual correction. Skip routine cosmetic edits and discussion of the skill itself.
+- [`showpiece`](.claude/skills/showpiece/SKILL.md) · Create distinctive, crafted artifacts in any medium. Use for /showpiece, ambitious creative direction, portfolio-quality work, or substantial cleanup of generic AI styling. Skip routine edits unless explicitly invoked.
 - [`arena`](.claude/skills/arena/SKILL.md) · Spawn N parallel candidate attempts at one task, pick the strongest as base, graft the losers' best parts in. Use when the user says /arena, "arena this", or when one attempt at a non-trivial artifact would lock in the wrong shape.
 - [`lab`](.claude/skills/lab/SKILL.md) · Use when the user explicitly asks to lab or prototype a visual, UI, motion, or game-feel element with live tuning before production implementation.
 - [`advocate`](.claude/skills/advocate/SKILL.md) · Use only when the user explicitly invokes /advocate to challenge a change just made before it lands. Do not trigger from natural-language requests.

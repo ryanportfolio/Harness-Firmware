@@ -115,6 +115,11 @@
       "group": "specialist"
     },
     {
+      "name": "showpiece",
+      "label": "Showpiece",
+      "group": "specialist"
+    },
+    {
       "name": "arena",
       "label": "Arena",
       "group": "specialist"

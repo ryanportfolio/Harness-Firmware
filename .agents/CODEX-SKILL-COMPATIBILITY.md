@@ -21,7 +21,7 @@ for comparison, backup, reconciliation, and discovery checks.
 
 | Status | Skills |
 |---|---|
-| Native | `addskill`, `babysit-ci`, `brainstorming`, `bro`, `caveman`, `enhance-prompt`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `recall`, `refine`, `session-hub`, `unslop`, `verify-this`, `writing`, `writing-plans` |
+| Native | `addskill`, `babysit-ci`, `brainstorming`, `bro`, `caveman`, `enhance-prompt`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `recall`, `refine`, `session-hub`, `showpiece`, `unslop`, `verify-this`, `writing`, `writing-plans` |
 | Adapted | `astra-review`, `automate-me`, `claude-review`, `codex-review`, `init-project`, `lab`, `optimize-context`, `sync-starter`, `writing-skills` |
 | Capability-gated | `advocate`, `arena`, `dare`, `impartial-review`, `long-horizon`, `perf-loop`, `why`, `wow-loop` |
 | Dangerous | `adopt-repo`, `merge` |
