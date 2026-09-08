@@ -33,20 +33,23 @@ const fmt = (n) => Number(n.toFixed(1));
 const NODES = [
   { deg: 0, name: "Recall", refs: [part("/recall", SKILL("recall")), part(" · "), part(".claude/reference/", `${TREE}/.claude/reference`)], href: SKILL("recall") },
   { deg: 72, name: "Plan", minBoxW: 160, refRows: [
-    [part("long-horizon", SKILL("long-horizon"))],
-    [part("brainstorming", SKILL("brainstorming"))],
-    [part("why", SKILL("why"))],
+    [part("long-horizon", SKILL("long-horizon")), part(" · "), part("dare", SKILL("dare"))],
+    [part("brainstorming", SKILL("brainstorming")), part(" · "), part("why", SKILL("why"))],
+    [part("enhance-prompt", SKILL("enhance-prompt"))],
   ], href: SKILL("long-horizon") },
-  { deg: 144, name: "Execute", refs: [part("fable-mode", SKILL("fable-mode")), part(" discipline")], href: SKILL("fable-mode") },
+  { deg: 144, name: "Execute", refRows: [
+    [part("fable-mode", SKILL("fable-mode")), part(" discipline")],
+    [part("wow-loop", SKILL("wow-loop")), part(" · "), part("showpiece", SKILL("showpiece"))],
+  ], href: SKILL("fable-mode") },
   { deg: 216, name: "Audit", refRows: [
     [part("long-horizon", SKILL("long-horizon")), part(" · "), part("verify-this", SKILL("verify-this"))],
     [part("advocate", SKILL("advocate")), part(" · "), part("codex-review", SKILL("codex-review"))],
-    [part("arena", SKILL("arena")), part(" · "), part("wow-loop", SKILL("wow-loop"))],
-    [part("impartial-review", SKILL("impartial-review"))],
+    [part("astra-review", SKILL("astra-review")), part(" · "), part("arena", SKILL("arena")), part(" · "), part("wow-loop", SKILL("wow-loop"))],
+    [part("impartial-review", SKILL("impartial-review")), part(" · "), part("handoff-audit", SKILL("handoff-audit"))],
   ], href: SKILL("codex-review") },
   { deg: 288, name: "Integrate", minBoxW: 160, refRows: [
     [part("record verified result")],
-    [part("refine", SKILL("refine"))],
+    [part("refine", SKILL("refine")), part(" · "), part("writing", SKILL("writing"))],
   ], href: SKILL("long-horizon") },
 ];
 
