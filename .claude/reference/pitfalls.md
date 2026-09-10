@@ -100,6 +100,12 @@ or drive an independent Chrome via a repo-local `playwright-core` +
 `scripts/lib/launch-chrome.mjs`. Never point a verifier subagent and the main
 session at the shared plugin browser at the same time.
 
+Same shape, different tool (2026-09-09): the desktop app's Browser pane
+(`mcp__Claude_Browser__*`, `preview_start`) is one Chrome per app. A second
+session or subagent asking for it gets "Another task's Chrome owns browser
+slot". `--isolated` does not apply there; that string comes from the app, not
+from this repo. Use `playwright-iso` or `launchPlacedChrome()` instead.
+
 ## Bash tool cwd resets between calls (2026-08-29)
 
 The shell tool's working directory does not reliably persist across calls; it
