@@ -82,10 +82,7 @@ Always include:
 
 ## 6: Bake in project constraints
 
-Skim `CLAUDE.md` for rules touching this task. Read at most two more files, and only when named conditions hold:
-
-- `.claude/reference/pitfalls.md` when the task touches an area it covers (check its headings, not the whole file).
-- `AGENTS.md` only when the receiver is a Codex session.
+Skim `CLAUDE.md` for rules touching this task. Then `.claude/reference/`: pick files by subject, not by glob. `commands.md` when the receiver must build, test, or run gates; `deployment.md` for deploy or publish work; `secrets.md` when env vars are involved; `pitfalls.md` when a heading matches the touched area; `architecture.md` / `tech-stack.md` only for cross-cutting changes. Skip files whose subject the task never touches. `AGENTS.md` only when the receiver is a Codex session.
 
 **Inline only the rules that apply, stated as plain constraints.** Receiver may lack these files; never write "read the CLAUDE.md", "follow the project guidelines", or "CLAUDE.md says X". Rule matters → verbatim constraint in prompt. Doesn't → stays out.
 
