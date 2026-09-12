@@ -27,6 +27,8 @@ If uncertain between lanes, use the lighter lane until a material unknown appear
 
 Read the smallest useful set of project instructions, product/design documents, representative code, tests, and recent changes. Prefer discovering facts from the repository over asking the user.
 
+For an assumption that could change the recommendation, use a cheap, authorized check when available; otherwise state the uncertainty.
+
 Before discussion, identify:
 
 - desired outcome and success signal;
