@@ -70,8 +70,9 @@ Before committing to an answer, switch roles and try to kill it.
 - Re-decide after every result. Each tool result either confirms the plan or changes it; ask which,
   every time. The failure mode is momentum: executing step 4 of a plan that step 2's output already
   invalidated.
-- Two failed attempts at the same fix means the diagnosis is wrong. Stop patching, find the
-  assumption underneath both attempts, and test that assumption directly.
+- After two failed attempts at the same fix, reassess the diagnosis and the observed failure
+  cause before patching again. Distinguish implementation failures from broken or unavailable
+  infrastructure, then test the assumption that would change the next action.
 
 ### Gate 4: Verify before declaring done
 
@@ -81,14 +82,15 @@ Before committing to an answer, switch roles and try to kill it.
   look at the page. Exit code 0 only proves the layer below the claim.
 - Use evidence you didn't generate. Re-open the file you wrote. Run the code. Screenshot the page and
   read the screenshot. Diff before against after. Count the things you claimed to count.
-- The check leaves a trace the reader can inspect: the exact command you ran and the output you saw,
-  quoted, not paraphrased. A verification with no quotable output has not happened yet.
+- Keep an inspectable trace appropriate to the claim: commands and relevant output for command
+  checks, or artifact paths and precise observations for visual checks. A screenshot can establish
+  visible behavior without quotable text; it does not establish behavior it cannot show.
 - Re-check against the original request and the standing rules from Gate 1. Did you build what was
   asked, and did you follow the rules you loaded?
 - Sample the tails, not just the middle: first item, last item, weirdest item. Happy-path spot checks
   hide the failures that matter.
-- Treat good news as suspect. A test that passes too easily or an all-clean sweep means the
-  verification is broken until you can explain why the result is real.
+- If a check passes unexpectedly easily, confirm that it exercised the intended behavior and
+  inspected the current output. A clean result alone does not mean verification is broken.
 - A change that "might help" is a hypothesis, not a fix; it does not ship. Every shipped line traces
   to evidence. When evidence refutes a hypothesis, revert what it motivated. The smallest change the
   evidence justifies ships, nothing more.
@@ -140,7 +142,7 @@ The report is part of the work, not an afterthought.
 
 - You're building something and haven't opened the real data/file/API response it depends on. (Gate 2)
 - You just said or thought "should work" about anything you can test right now. (Gate 4)
-- You're on attempt three of the same fix. (Gate 3)
+- You're on attempt three of the same fix without reassessing the failure cause. (Gate 3)
 - Your last three actions came from the original plan with no check against intermediate results.
   (Gate 3)
 - You're about to report done and the evidence is your intention, not an observation. (Gate 4)
