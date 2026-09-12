@@ -8,7 +8,7 @@ You are reviewing work that was probably written too fast — possibly by you. Y
 
 The hardest bias to overcome is defending code you just wrote. The fix is mechanical: dispatch the actual review to fresh-context reviewer subagents that have not seen the conversation that produced the code. Your job in the main session is to gather the diff, brief the subagents, and consolidate findings.
 
-This is a two-stage split, and the stages have opposite jobs. The subagents maximize **coverage** — find everything, including uncertain and low-severity issues. You, holding the full diff and all five reports in one context, supply **precision**, verifying each finding before it reaches the human. Over-reporting upstream of a strong verifier is the design, not a flaw: it is the main model's job to review the subagents' work, not to rubber-stamp it.
+This is a two-stage split, and the stages have opposite jobs. The subagents maximize **coverage** — find everything, including uncertain and low-severity issues. You, holding the full diff and the reviewer reports in one context, supply **precision**, verifying each finding before it reaches the human. Over-reporting upstream of a strong verifier is the design, not a flaw: it is the main model's job to review the subagents' work, not to rubber-stamp it.
 
 ## Step 1: Identify scope
 
@@ -22,22 +22,22 @@ State the scope you're reviewing in your first sentence so the user can redirect
 
 ## Step 2: Pick review mode
 
-- **Tiny diff (< 50 changed lines, single file, no schema/auth/cache code):** review inline in the main session. Spawning 5 subagents for a 20-line CSS tweak is wasteful.
-- **Everything else:** dispatch **five parallel reviewer subagents** (see Step 3). This is the default.
+- **Tiny diff (< 50 changed lines, single file, no schema/auth/cache code):** use one fresh leaf reviewer covering all relevant buckets, including project rules.
+- **Everything else:** cover all five buckets with fresh reviewers, one per bucket, in bounded batches (see Step 3).
 
-If you're not sure, dispatch. Subagents are cheap relative to a missed bug.
+Preserve independent context at every size. If risk is unclear, use the broader coverage.
 
 **Strict quality mode (opt-in):** when the user asks for a "strict", "harsh", "thermo-nuclear", or deep maintainability review, additionally load `strict-quality-rubric.md` from this folder and append it to the Bucket D ("things the author missed") subagent's prompt — missed structural simplifications are exactly its territory. It raises the approval bar to presumptive blockers (code-judo simplifications, 1k-line rule, spaghetti growth) on top of the normal buckets; correctness review is unchanged.
 
-## Step 3: Dispatch five parallel review subagents
+## Step 3: Dispatch independent reviewers
 
-Five reviewers, one per bucket, each in a context that never saw the conversation that produced the code. Launch all five before waiting on any of them, and give each a self-contained prompt: reviewers inherit nothing from your session.
+Give each reviewer a self-contained prompt and fresh context without the conversation that produced the code. Check exposed capacity first, counting Manager and other active agents. State the worker bound; launch only the reviewers that fit, wait for completion, and release slots when supported before the next batch. With four total slots and Manager active, at most three reviewers run together. For the tiny-diff path, combine the relevant bucket rules and project reading into one brief.
 
 **Reviewer model tier.** Reviewers run on Opus or Sol or above. Never Sonnet, Haiku, or Luna: a bug a weaker reviewer never reports costs more than the tokens it saves, and the main-session verification (Step 6) only filters findings that were raised, it does not recover the ones nobody raised. Do not pin a version number; pick the strongest model the runtime offers at dispatch time, and inherit the session model rather than downgrading when it already meets the floor.
 
-**Dispatch from Claude Code.** Send all five `Agent` tool calls in a single message so they run concurrently. Each uses `subagent_type: "general-purpose"` plus `model: "opus"`, or omits `model` when the session model already meets the floor.
+**Dispatch from Claude Code.** Send the current batch of `Agent` tool calls together, within available capacity. Each uses `subagent_type: "general-purpose"` plus `model: "opus"`, or omits `model` when the session model already meets the floor.
 
-**Dispatch from Codex.** Check what the session exposes before assuming; a config flag is not proof. With multi-agent tools, spawn five agents concurrently at the floor tier. Without them, do not fall back to reviewing the diff yourself. Spawn five `codex exec` processes instead, one per bucket: each is a new process, so the fresh context is structural rather than promised. Every child gets the leaf-reviewer line the prompt templates below carry: a `codex exec` process that finds this skill and dispatches its own five turns one review into twenty-five.
+**Dispatch from Codex.** Check what the session exposes before assuming; a config flag is not proof. With multi-agent tools, dispatch the selected reviewers in bounded batches at the floor tier. Without them, check authenticated Codex CLI and run one read-only `codex exec` process per selected reviewer with bounded concurrency: each is a new process, so the fresh context is structural rather than promised. Every child gets the leaf-reviewer line the prompt templates below carry: a `codex exec` process that finds this skill and dispatches its own five turns one review into twenty-five.
 
 ```bash
 RUN=.tmp/review-1   # a directory no earlier run wrote to
@@ -46,7 +46,7 @@ codex exec -m gpt-5.6-sol -c model_reasoning_effort=high -s read-only \
   -o "$RUN/A.md" - < "$RUN/prompt-A.txt" > "$RUN/A.log" 2>&1
 ```
 
-Write each bucket prompt to `$RUN/prompt-<bucket>.txt` and feed it on stdin with `-`. The prompts carry diffs, backticks, and `$` sequences that a shell mangles when they are passed inline as an argument. Launch all five in the background, then wait on all five. Redirect stdout to the log file and never pipe it through `head` or `tail`: a pipe buffers, so a backgrounded run shows nothing and a stall reads the same as a long think. `-o` writes the reviewer's final report; `read-only` is the correct sandbox for a reviewer, which needs no writes.
+Write each bucket prompt to `$RUN/prompt-<bucket>.txt` and feed it on stdin with `-`. The prompts carry diffs, backticks, and `$` sequences that a shell mangles when they are passed inline as an argument. Launch only the current bounded batch in the background, then wait for that batch before starting more processes. Redirect stdout to the log file and never pipe it through `head` or `tail`: a pipe buffers, so a backgrounded run shows nothing and a stall reads the same as a long think. `-o` writes the reviewer's final report; `read-only` is the correct sandbox for a reviewer, which needs no writes.
 
 Give every run its own `$RUN` directory. The stall check in `codex-review` reads the absence of the `-o` file as "still working", so a leftover `A.md` from an earlier run both defeats that check and can be read back as if it were this run's report; the same rule about a log that stops growing applies here.
 
@@ -63,7 +63,7 @@ Each prompt must include:
 5. The per-finding output format from Step 6.
 6. An instruction to **only** report findings in their bucket — the main session deduplicates and merges.
 
-Bucket E (project-aware) gets an **extended** prompt — see its section below. The other four use the standard template.
+For a full review, Bucket E (project-aware) gets an **extended** prompt; the other four use the standard template. For a tiny diff, combine the relevant instructions into one prompt and remove statements that assume other reviewers exist.
 
 ### The five buckets
 
@@ -89,7 +89,7 @@ Bucket E (project-aware) gets an **extended** prompt — see its section below. 
 
 **Bucket D — Things the author missed** (highest-value bucket — undivided attention, push hard)
 
-This is the single highest-leverage category and gets its own dedicated reviewer. The agent should treat the diff as a list of incomplete changes and look for what wasn't done.
+For a broad diff, this category gets its own dedicated reviewer; the tiny-diff reviewer covers it alongside the other relevant buckets. The agent should treat the diff as a list of incomplete changes and look for what wasn't done.
 
 - Updated one of two related code paths and forgot the other (e.g., streaming + non-streaming, server + client, English + i18n locales)
 - Changed a type/interface but not all consumers
@@ -182,9 +182,8 @@ Report LOW-confidence findings too — tag them LOW and let the main-session mer
 step adjudicate. Never drop a real finding because you're unsure; that call
 belongs downstream, in the main-session merge step.
 
-If every finding is 🟢, you didn't look hard enough. Go back and push harder
-on your bucket — especially if you're Bucket D, where 🟢-only output usually
-means you didn't grep aggressively enough for missed paths.
+Judge coverage by the code paths and checks inspected, not the number or
+severity of findings. A clean review or a list of minor findings is valid.
 
 ## Output format
 Return ONLY a list of findings in this format, severity-ordered (🔴 first):
@@ -311,11 +310,11 @@ look productive — but report real low-severity/low-confidence ones and tag the
 the merge step filters.
 ```
 
-## Step 4: Verification rule (applies inline too)
+## Step 4: Verification rule
 
 For every potential issue, run a real check before asserting. `grep` for call sites. `Read` the file. Open the consumer and look. Plausible-sounding-but-unchecked claims waste the human's time when they re-investigate and find the claim was wrong. A check your sandbox blocked is not a check you ran: name it and tag the finding LOW.
 
-This rule is repeated inside each subagent prompt, but it also applies to your inline review for tiny diffs and to the merging step in Step 6 — don't paper over a subagent's unverified claim by passing it through.
+This rule is repeated inside each subagent prompt, but it also applies to the single reviewer for tiny diffs and to the merging step in Step 6 — don't paper over a subagent's unverified claim by passing it through.
 
 ## Step 5: Severity tags
 
@@ -327,7 +326,7 @@ This rule is repeated inside each subagent prompt, but it also applies to your i
 
 ## Step 6: Merge subagent findings and present
 
-When the five agents return — **this is the precision stage.** The subagents over-reported on purpose (coverage); your job is to verify and rank so the human gets a trustworthy list. You hold the full diff, the project, and all five reports at once; each reviewer saw one bucket and nothing else. That is what makes this verification worth its cost. Reviewing the subagents' work is the point — do not rubber-stamp it.
+When the selected reviewers return — **this is the precision stage.** The subagents over-reported on purpose (coverage); your job is to verify and rank so the human gets a trustworthy list. You hold the full diff, the project, and all reviewer reports at once; reviewers received only their assigned scope and constraints. That is what makes this verification worth its cost. Reviewing the subagents' work is the point — do not rubber-stamp it.
 
 1. **Deduplicate — and read agreement as signal.** Two agents may flag the same issue from different angles — merge into one finding, keep the higher severity. Bucket E findings often overlap with A/B/C/D (e.g., a cover-identity leak is also a correctness issue) — merge but preserve E's rule citation so the human sees *why* it's a violation. The same issue surfaced independently by two or more subagents is high-confidence signal: note the agreement on the merged finding ("flagged independently by A and D") and weight it accordingly when you verify. A lone-agent finding is still worth verifying, just with lower prior.
 2. **Verify every finding you intend to surface — across all severities, not just 🔴.** The finding stage deliberately over-reported, including LOW-confidence items; turning that into precision is your job. For each finding, run a real `grep`/`Read` to confirm before passing it to the human (for Bucket E, open the cited rule file and confirm the rule actually says what the agent claimed — paraphrased rules are the most common Bucket E failure mode). Treat the 🔴s adversarially: a fresh-context subagent in a hurry is exactly the kind of reviewer that produces plausible-but-wrong blockers, so try to *refute* each one before you accept it.
@@ -350,7 +349,7 @@ After the findings, include:
 ## Things I checked and verified fine
 
 - [Suspicious-looking item that's actually OK, with a one-line reason. Merge
-  these from all five subagents so the human doesn't re-investigate.]
+  these from the reviewers so the human doesn't re-investigate.]
 
 ## Dismissed
 
@@ -364,12 +363,11 @@ After the findings, include:
 Be concrete about merge readiness.]
 ```
 
-If every subagent returned zero findings and your verification confirms: say so explicitly. "Five subagents reviewed buckets A/B/C/D/E; all returned zero findings and I confirmed the highest-suspicion items. Recommend merge." Don't manufacture nitpicks — but be extra skeptical of zero findings from Bucket D (rare on non-trivial diffs) and Bucket E (rare on any diff that touches areas the project's reference files cover — schema, theming, env vars, error surfaces).
+If every reviewer returned zero findings and your verification confirms, report the actual reviewer count, covered buckets, and any unavailable checks. A clean result is valid; do not infer missed defects from the finding count alone.
 
 ## Anti-patterns to avoid
 
-- **Don't skip subagent dispatch to save tokens on a non-tiny diff.** The whole point of this skill is fresh context. Reviewing in the same session that wrote the code reintroduces the bias the skill exists to defeat.
-- **Don't dispatch for a 20-line CSS tweak.** Use judgment — the tiny-diff inline path exists for a reason. (Caveat: if the CSS tweak touches only one theme, Bucket E would have caught it — for theme/CSS work, dispatch even on small diffs.)
+- **Preserve fresh context even for tiny diffs.** Use one reviewer for a small change instead of reviewing your own work. Include relevant project constraints, such as theme parity, in that reviewer's brief.
 - **Don't pass subagent findings through unchecked.** Verify every finding you intend to surface — not just the 🔴s, now that the finding stage over-reports by design. If a subagent hallucinates a function name or misreads the diff, the human pays the cost.
 - **Don't praise the implementation.** "This looks well-structured" is not useful — find what's wrong.
 - **Don't list findings in the order subagents returned them.** Severity-order globally so the human can triage top-down.
