@@ -26,7 +26,7 @@ The N candidates receive the same prompt, so the prompt is the contract. Get it 
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric. State what success looks like for *this* task, then turn it into 3-6 concrete gradeable criteria. Concrete: "Adds a --dry-run flag that skips writes". Vague: "code is correct". The rubric is the picker's tool in Phase D; candidates only see the task.
-3. Pick the runners. Default: 3 subagents on the session model (never Haiku), each prompted from a distinct angle (e.g. simplest-thing-that-works, robustness-first, user-experience-first) so diversity comes from framing, not chance. When the Codex CLI is available and the task warrants cross-vendor diversity, one candidate may run there (see codex-review for driving it). Spawn more candidates when the arena covers multiple design directions.
+3. Pick the runners. Default: 3 subagents on the session model when it meets the kernel floor (Opus, the latest Fable, or above), otherwise on the floor model; never Sonnet or Haiku, each prompted from a distinct angle (e.g. simplest-thing-that-works, robustness-first, user-experience-first) so diversity comes from framing, not chance. When the Codex CLI is available and the task warrants cross-vendor diversity, one candidate may run there (see codex-review for driving it). Spawn more candidates when the arena covers multiple design directions.
 4. Assign output paths. Each candidate writes to its own location: a git worktree where possible (worktree isolation when spawning), otherwise `.tmp/arena-<slug>/candidate-<n>/`. N candidates writing to the same path is shared mutable state and corrupts the comparison.
 
 ## Phase B: Fan out
