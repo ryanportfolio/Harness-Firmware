@@ -14,7 +14,7 @@ D.A.R.E. = Decompose, Audit, Recombine, Experiment. One problem, four steps, eac
 
 ## Orchestration
 
-The main session is orchestrator only: it holds the user gates, passes artifacts, and never performs a step itself. Each step is one Agent dispatch. Model floor per the kernel (Sonnet or above); give A and E, the skeptic steps, the strongest model available. Artifacts are plain markdown passed verbatim inside the dispatch prompt.
+The main session is orchestrator only: it holds the user gates, passes artifacts, and never performs a step itself. Each step is one Agent dispatch. Model floor per the kernel (Opus, the latest Fable, or above; never Sonnet or Haiku); give A and E, the skeptic steps, the strongest model available. Artifacts are plain markdown passed verbatim inside the dispatch prompt.
 
 Artifact chain: problem statement, decomposition tree, audit table, surviving blocks, solution set, test plan. Each artifact targets one page; depth beyond that is available on request, not passed by default. Persist every artifact to `.tmp/dare/<problem-slug>/` as it is produced, so the chain is inspectable and any step can be re-run against its exact input.
 
