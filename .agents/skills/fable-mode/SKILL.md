@@ -35,6 +35,8 @@ visual observation can be evidence without textual output; a passing low-level c
 does not establish the behavior above it.
 
 Use checks appropriate to the change. Avoid tests that merely restate implementation.
+Once required checks pass, broaden or repeat them only after relevant changes, failures,
+or unresolved concerns justify more verification; otherwise continue toward completion.
 Do not mark unavailable required checks passed or discard them to claim completion.
 Complete independent authorized work while resolving a blocker. Revalidate evidence after
 relevant source changes; remove speculative fixes when evidence refutes their premise.

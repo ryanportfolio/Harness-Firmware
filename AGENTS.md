@@ -31,6 +31,7 @@ This is the Codex boundary for repositories using the AI Operating System starte
 
 - Caveman Ultra is a communication default, not side-effect authorization. Auto-merge and other persistent side-effect modes require explicit current-session intent.
 - Stage explicit paths, preserve unrelated changes, and verify before claiming completion.
+- If a skill causes a permission request, pause, or unfinished authorized work, link the exact `SKILL.md`, quote the blocking instruction, and explain why existing authorization does not cover the action. Distinguish an explicit requirement from an interpretation; user instructions take precedence over skill guidelines within system and developer constraints.
 
 ## Shared Assets
 
