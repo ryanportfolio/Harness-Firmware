@@ -27,7 +27,7 @@ Completion bar: every user correction and every backed-out action in the traject
 
 ## Step 2: Smallest edit per friction
 
-- One friction → one smallest edit → one commit. The commit message quotes the trajectory evidence. The commit is the rollback snapshot. Stage only the harness files that edit touched; the task's own in-flight work never rides along.
+- One friction → one smallest edit → one commit. Evaluate material changes below before retaining them, within the active runtime's authorization. The commit message quotes the trajectory evidence. The commit is the rollback snapshot. Stage only the harness files that edit touched; the task's own in-flight work never rides along.
 - If a code or config change would remove the friction outright, propose that instead of documenting the workaround. A note telling the next session to pass a flag is worse than the flag being unnecessary.
 - Structural enforcement check, before any prose edit lands: a rule a lint, hook, script, or permission entry can enforce beats prose stating it. Prefer the structural encoding; if it's too big for this pass, note it as the follow-up instead of writing the prose rule.
 - A skill that misfired is a description bug, not a one-off judgment error. Judgment executes descriptions; fix the trigger surface. Where writing-skills exists it governs the edit and its test loop applies. Without it, still verify: hand a fresh subagent the descriptions plus the scenario that misfired, confirm it now routes correctly, and confirm a neighbouring scenario does not over-fire.
@@ -35,6 +35,10 @@ Completion bar: every user correction and every backed-out action in the traject
 - A correction whose rule already exists → no edit. Attention failure is not a documentation gap; duplicating the rule weakens the kernel.
 - Edits landing outside a git repo (global skills, memory files) have no commit standing behind them. Name what you changed and where, so it can be reversed by hand.
 - Zero edits is a valid outcome. Say so and stop.
+
+## Evaluate material changes
+
+Use static validation for straightforward wording/metadata fixes. For material changes to routing, decisions, verification, or retained working behavior, use the local [evaluation record](references/evaluation.md) before trials. Compare the baseline and candidate on targeted and neighboring scenarios in fresh context when available. Judge observable actions, not copied headings. Separate local acceptance, later observed use, and demonstrated improvement; pending later use does not block a local edit.
 
 ## Red flags
 

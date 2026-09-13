@@ -90,6 +90,8 @@ The repository carries the loop:
 
 `optimize-context` removes guidance that no longer earns its per-turn cost.
 
+For material workflow changes, `refine` records a baseline, fixed criteria, targeted and neighboring checks, and a rollback reference. Keep that [evaluation record](.agents/skills/refine/references/evaluation.md) with the task's evidence and link it from the refinement report or existing task state. The [Claude copy](.claude/skills/refine/references/evaluation.md) follows the same protocol. Ordinary wording fixes stay lightweight. Local acceptance, use by a later task, and measured improvement are separate claims; later use can remain pending. See the [research review](docs/research/2026-09-13-rsi-harness.md) for the rationale and limits.
+
 ## runtime boundaries
 
 | Runtime | Entry point | Responsibility |

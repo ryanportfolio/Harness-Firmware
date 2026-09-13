@@ -21,10 +21,13 @@ does not authorize global edits or publication. Read before editing; preserve un
 work and a backup or diff for non-Git files. Route durable project facts through the
 project's memory conventions; keep session events and discoverable code facts out.
 
-Use static validation for straightforward wording/metadata fixes. For material routing or
-decision changes, check realistic and neighboring scenarios in fresh context when available.
-This skill requests bounded validation agents only when that validation is useful. Judge
-observable actions, not copied headings. A passing baseline does not need to be made to fail.
+Use static validation for straightforward wording/metadata fixes. For material changes to
+routing, decisions, verification, or retained working behavior, use the local
+[evaluation record](references/evaluation.md) before trials. Compare the baseline and
+candidate on targeted and neighboring scenarios in fresh context when available. This skill
+requests bounded validation agents only when useful. Judge observable actions, not copied
+headings. Separate local acceptance, later observed use, and demonstrated improvement;
+pending later use does not block a local edit.
 
 Report changed files, evidence, verification, and limits. Zero changes is valid. Commit,
 push, cross-project synchronization, and another provider's paid review need existing or
