@@ -19,6 +19,9 @@ Load only relevant guidance:
 - [Loading and delivery](references/loading.md): startup, page loads, assets, bundles, network requests, and readiness.
 - [Services and resources](references/services.md): APIs, databases, throughput, memory, CPU, disk, and sustained workloads.
 
+For experiment evidence and before/after presentation, read the packaged
+[evidence report](references/evidence-report.md); retain the measurement and review gates below.
+
 Use existing project tools first. This workflow does not grant permission to install tools, run disruptive production load, publish changes, or alter unrelated infrastructure.
 
 ## Record a repeatable baseline

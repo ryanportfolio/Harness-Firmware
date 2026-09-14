@@ -13,6 +13,9 @@ condensed.
 
 ### Changed
 
+- Evidence workflows package compact reports and comparable before/after presentation.
+  Design, planning and review workflows add selective shared-code refactoring guidance
+  for Claude and Codex, with standalone resources and existing authorization preserved.
 - Skill authoring now starts with `addskill`; `writing-skills` discovery is retired
   with authoring resources and licenses preserved. Caveman includes Unslop, with
   explicit prose and code cleanup retained after standalone Unslop retirement.

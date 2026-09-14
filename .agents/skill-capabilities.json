@@ -192,7 +192,9 @@
         ".agents/skills/brainstorming/scripts/server.cjs",
         ".agents/skills/brainstorming/scripts/start-server.sh",
         ".agents/skills/brainstorming/scripts/stop-server.sh",
-        ".agents/skills/brainstorming/visual-companion.md"
+        ".agents/skills/brainstorming/visual-companion.md",
+        ".claude/skills/brainstorming/references/shared-code-refactoring.md",
+        ".agents/skills/brainstorming/references/shared-code-refactoring.md"
       ],
       "exceptions": []
     },
@@ -405,7 +407,9 @@
         "evidence"
       ],
       "resources": [
-        ".claude/skills/impartial-review/strict-quality-rubric.md"
+        ".claude/skills/impartial-review/strict-quality-rubric.md",
+        ".claude/skills/impartial-review/references/shared-code-refactoring.md",
+        ".agents/skills/impartial-review/references/shared-code-refactoring.md"
       ],
       "exceptions": [
         "Codex may use authenticated leaf CLI processes when exposed agents are absent; fresh context remains required."
@@ -548,7 +552,9 @@
         ".claude/skills/perf-loop/references/services.md",
         ".agents/skills/perf-loop/references/loading.md",
         ".agents/skills/perf-loop/references/rendering.md",
-        ".agents/skills/perf-loop/references/services.md"
+        ".agents/skills/perf-loop/references/services.md",
+        ".claude/skills/perf-loop/references/evidence-report.md",
+        ".agents/skills/perf-loop/references/evidence-report.md"
       ],
       "exceptions": []
     },
@@ -671,7 +677,10 @@
       "sharedContracts": [
         "evidence"
       ],
-      "resources": [],
+      "resources": [
+        ".claude/skills/verify-this/references/evidence-report.md",
+        ".agents/skills/verify-this/references/evidence-report.md"
+      ],
       "exceptions": []
     },
     "why": {
@@ -717,7 +726,9 @@
       ],
       "resources": [
         ".agents/skills/wow-loop/references/state.md",
-        ".agents/skills/wow-loop/references/visual-review.md"
+        ".agents/skills/wow-loop/references/visual-review.md",
+        ".claude/skills/wow-loop/references/evidence-report.md",
+        ".agents/skills/wow-loop/references/evidence-report.md"
       ],
       "exceptions": []
     },
@@ -763,7 +774,9 @@
         ".claude/skills/writing-plans/LICENSE",
         ".claude/skills/writing-plans/plan-document-reviewer-prompt.md",
         ".agents/skills/writing-plans/LICENSE",
-        ".agents/skills/writing-plans/plan-document-reviewer-prompt.md"
+        ".agents/skills/writing-plans/plan-document-reviewer-prompt.md",
+        ".claude/skills/writing-plans/references/shared-code-refactoring.md",
+        ".agents/skills/writing-plans/references/shared-code-refactoring.md"
       ],
       "exceptions": []
     }

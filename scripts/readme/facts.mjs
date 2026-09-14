@@ -83,6 +83,8 @@ export function collectFacts() {
   return {
     skillCount: canonicalNames.length,
     codexSkillCount: codexNames.length,
+    codexNativeCount: codexNames.filter(name => modes[name] === "native").length,
+    codexAdapterCount: codexNames.filter(name => modes[name] !== "native").length,
     runtimeNames,
     runtimeCount: runtimeNames.length,
     referenceFileCount,

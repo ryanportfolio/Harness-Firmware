@@ -22,6 +22,24 @@ function fixture(t) {
   return {root,manifest,spec};
 }
 test('repository intended coverage and resources validate',()=>assert.deepEqual(validateCapabilities(repo).errors,[]));
+
+for (const [resource, skills] of [
+  ['evidence-report.md', ['perf-loop', 'verify-this', 'wow-loop']],
+  ['shared-code-refactoring.md', ['brainstorming', 'impartial-review', 'writing-plans']],
+]) {
+  test(`repository ${resource} copies are present and byte-identical`, () => {
+    const copies = ['.claude', '.agents'].flatMap(runtime =>
+      skills.map(skill => `${runtime}/skills/${skill}/references/${resource}`));
+    for (const copy of copies) {
+      assert.ok(fs.existsSync(path.join(repo, copy)), `Missing shared resource: ${copy}`);
+    }
+    const expected = fs.readFileSync(path.join(repo, copies[0]));
+    for (const copy of copies.slice(1)) {
+      assert.ok(fs.readFileSync(path.join(repo, copy)).equals(expected),
+        `Shared resource differs: ${copy} must match ${copies[0]} byte for byte`);
+    }
+  });
+}
 test('missing Claude performance coverage fails even with Codex intact',t=>{const {root}=fixture(t);fs.unlinkSync(path.join(root,'.claude/skills/perf-loop/SKILL.md'));assert.match(validateCapabilities(root).errors.join('\n'),/claude coverage mismatch/)});
 test('missing packaged resource fails',t=>{const {root,spec}=fixture(t);fs.unlinkSync(path.join(root,spec.resources[0]));assert.match(validateCapabilities(root).errors.join('\n'),/Missing or invalid resource/)});
 test('missing linked resource fails even outside explicit resource inventory',t=>{const {root}=fixture(t);write(root,'.agents/skills/perf-loop/SKILL.md','[Read](references/absent.md)');assert.match(validateCapabilities(root).errors.join('\n'),/missing local reference/)});

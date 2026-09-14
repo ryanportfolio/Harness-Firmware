@@ -10,6 +10,10 @@ The hardest bias to overcome is defending code you just wrote. The fix is mechan
 
 This is a two-stage split, and the stages have opposite jobs. The subagents maximize **coverage** — find everything, including uncertain and low-severity issues. You, holding the full diff and the reviewer reports in one context, supply **precision**, verifying each finding before it reaches the human. Over-reporting upstream of a strong verifier is the design, not a flaw: it is the main model's job to review the subagents' work, not to rubber-stamp it.
 
+When the diff extracts repeated operations or changes a shared boundary, read
+[selective shared-code refactoring](references/shared-code-refactoring.md)
+and include its applicable caller and invariant checks in reviewer briefs.
+
 ## Step 1: Identify scope
 
 Use `$ARGUMENTS` if the user named a specific scope (file path, PR number, "the Q&A changes", commit SHA, etc.). Otherwise default to recent work in this priority order:

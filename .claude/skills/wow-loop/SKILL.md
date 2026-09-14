@@ -9,6 +9,10 @@ Improve one deliverable until independent critics, working from their own captur
 
 Target comes from `$ARGUMENTS` or the conversation. Explicit invocation runs the loop even for a small deliverable; scale agent count to the task. Use `arena` when the solution shape is open, `lab` when the user wants to hand-tune values. Neither is a prerequisite.
 
+When recording review evidence or presenting before/after artifacts, read the packaged
+[evidence report](references/evidence-report.md) and retain this workflow's acceptance gates.
+Carry its applicable evidence requirements into critic briefs.
+
 ## Invariants (hold every round)
 
 - Self-review never establishes acceptance. Reading code never establishes a visual. Every visual verdict comes from a capture the verdict-giver read.
