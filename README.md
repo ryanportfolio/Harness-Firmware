@@ -57,7 +57,7 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="34 canonical playbooks serve Claude Code directly and Codex through 35 skills, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="34 canonical playbooks serve Claude Code directly and Codex through 34 skills, with shared project memory." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
@@ -89,46 +89,46 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <!-- skill-list:start -->
 ### core workflows · 9
 
-- [`init-project`](.claude/skills/init-project/SKILL.md) · Use once in a spawned starter repo when the user asks to initialize or configure it, or when FILL IN markers remain; never auto-run in a claude-starter template checkout.
-- [`recall`](.claude/skills/recall/SKILL.md) · Use before unfamiliar project-area edits, when the user asks what the project knows or its pitfalls, or when saving durable project-specific learning.
-- [`addskill`](.claude/skills/addskill/SKILL.md) · Use whenever a repo-local skill is being added, installed, or created for future Claude Code and Codex sessions, whether the user asked or you decided to write one; writing-skills covers authoring, not this repo's install contract.
+- [`init-project`](.claude/skills/init-project/SKILL.md) · Configure a starter project when setup is requested, using detected project facts and only necessary user questions.
+- [`recall`](.claude/skills/recall/SKILL.md) · Use before unfamiliar project-area work, when retrieving project decisions or pitfalls, or when saving an authorized durable project fact.
+- [`addskill`](.claude/skills/addskill/SKILL.md) · Create, import, update, or install repository or personal skills; includes runtime ownership, resources, and discovery validation.
 - [`sync-starter`](.claude/skills/sync-starter/SKILL.md) · Use when the user asks to pull template improvements into a spawned repo, compare starter drift, or push a generic improvement back to the starter.
 - [`optimize-context`](.claude/skills/optimize-context/SKILL.md) · Use when the user asks to reduce per-turn context or token load, trim kernels, skills, or connectors, or propagate a generic context optimization to the starter.
-- [`refine`](.claude/skills/refine/SKILL.md) · Use when a session or task is wrapping up ("wrap up", "that's everything", "done for today"), when the user invokes /refine, or after any task with friction: calls wasted rediscovering a fact, a skill that misfired, a user correction.
-- [`merge`](.claude/skills/merge/SKILL.md) · Use only when the user explicitly asks to enable session-wide automatic commit, push, PR, and merge; not for one-shot shipping requests.
+- [`refine`](.claude/skills/refine/SKILL.md) · Use for an explicit workflow-improvement review, or recurring task friction that may justify a narrow change to skills or project references.
+- [`merge`](.claude/skills/merge/SKILL.md) · Use when the user explicitly requests a merge or enables session-wide automatic commit, push, PR, and merge. A one-shot request does not enable persistent publication.
 - [`automate-me`](.claude/skills/automate-me/SKILL.md) · Use for "automate me", "/automate-me", "create/update my -mode skill", or "turn my preferences / working style into a skill". Mines the current project's transcripts plus direct questions, then drafts a personal <handle>-mode skill.
 - [`adopt-repo`](.claude/skills/adopt-repo/SKILL.md) · Mirror an existing external repo privately under the user's account and overlay the firmware: clone upstream, strip template-only files, privacy-sweep, run init-project. Use on /adopt-repo <url> or 'pull this repo into our firmware'.
 
 ### quality disciplines · 11
 
 - [`brainstorming`](.claude/skills/brainstorming/SKILL.md) · Use when brainstorming or designing a product, interface, workflow, architecture, or behavior change with unresolved goals or material tradeoffs; not for routine or fully specified work.
-- [`writing-plans`](.claude/skills/writing-plans/SKILL.md) · Use when you have a spec or requirements for a multi-step task, before touching code
+- [`writing-plans`](.claude/skills/writing-plans/SKILL.md) · Use when a clear task needs a multi-step implementation plan, dependency ordering, or a durable handoff. Skip for routine changes that can be executed directly.
 - [`impartial-review`](.claude/skills/impartial-review/SKILL.md) · Use when the user asks to review, audit, or stress-test recent code changes with fresh independent agents; requires exposed multi-agent tools or an authenticated Codex CLI.
-- [`writing-skills`](.claude/skills/writing-skills/SKILL.md) · Use when creating new skills, editing existing skills, or verifying skills work before deployment
+- [`perf-loop`](.claude/skills/perf-loop/SKILL.md) · Run measured optimization rounds with independent review for FPS, loading, latency, throughput, and resource use. Use for /perf-loop or broad performance improvement requests; skip routine isolated fixes.
 - [`long-horizon`](.claude/skills/long-horizon/SKILL.md) · Use for work too big for one context window: long multi-step tasks, progress lost to compaction or failed retries, work spanning hours or sessions, or when the user says /long-horizon or asks to run a task in verified rounds.
 - [`babysit-ci`](.claude/skills/babysit-ci/SKILL.md) · Watch a PR's checks and iterate on failures until green. Use for /babysit-ci, "watch CI", "fix CI", "get the checks green", or when a PR is waiting on failing or pending checks.
 - [`codex-review`](.claude/skills/codex-review/SKILL.md) · Cross-vendor second-opinion review. Drives OpenAI Codex CLI (codex exec review, gpt-5.6-sol, high reasoning) over a PR, branch, commit, or uncommitted diff, then verifies each finding. Trigger: /codex-review, "have Codex/Sol review this".
-- [`astra-review`](.claude/skills/astra-review/SKILL.md) · Cross-vendor review pinned to gpt-6-astra at medium reasoning. Same codex exec review workflow as codex-review (PR, branch, commit, or uncommitted diff; every finding verified). Trigger: /astra-review, "have Astra review this".
+- [`astra-review`](.claude/skills/astra-review/SKILL.md) · Cross-vendor review configured for gpt-6-astra at medium reasoning. Same verified CLI lifecycle as codex-review. Use for /astra-review or 'have Astra review this'.
 - [`claude-review`](.claude/skills/claude-review/SKILL.md) · Use when the user says /claude-review, asks Claude or Fable to review code written in Codex, or requests a cross-vendor review through Claude CLI.
-- [`verify-this`](.claude/skills/verify-this/SKILL.md) · Verify a claim with fresh local evidence: restate it falsifiably, capture baseline and treatment, compare, return VERIFIED, NOT VERIFIED, or INCONCLUSIVE. Use for /verify-this, "prove it works", "did this fix it", "show me the evidence".
-- [`dare`](.claude/skills/dare/SKILL.md) · First-principles chain: decompose, audit assumptions, recombine surviving blocks, test against reality; each step a fresh subagent fed only the prior artifact. Use on /dare, 'first principles', or 'are we solving the right problem'.
+- [`verify-this`](.claude/skills/verify-this/SKILL.md) · Verify a claim with fresh local evidence and return VERIFIED, NOT VERIFIED, or INCONCLUSIVE. Use for /verify-this, 'prove it works', 'did this fix it', or 'show me the evidence'.
+- [`dare`](.claude/skills/dare/SKILL.md) · Use for /dare, first principles, or questioning the problem: four fresh stages decompose, audit, recombine and test, preserving immutable goals and constraints.
 
 ### specialist tools · 14
 
-- [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Use proactively for hard layered work with dependent steps, load-bearing unknowns, repeated failures, or verification-sensitive handoff; also when the user asks for Fable mode.
+- [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Use for difficult multi-step work, uncertain diagnoses, repeated failures, or tasks where verification and handoff need particular care. Skip routine changes.
 - [`wow-loop`](.claude/skills/wow-loop/SKILL.md) · Evidence-gated review and repair loop for one deliverable. Use on /wow-loop, requests for wow factor or dial it to 11, or substantial visual work (3D, animation, UI, rendered documents) that needs reference fidelity or repeated visual correction. Skip routine cosmetic edits and discussion of the skill itself.
 - [`showpiece`](.claude/skills/showpiece/SKILL.md) · Create distinctive, crafted artifacts in any medium. Use for /showpiece, ambitious creative direction, portfolio-quality work, or substantial cleanup of generic AI styling. Skip routine edits unless explicitly invoked.
 - [`arena`](.claude/skills/arena/SKILL.md) · Spawn N parallel candidate attempts at one task, pick the strongest as base, graft the losers' best parts in. Use when the user says /arena, "arena this", or when one attempt at a non-trivial artifact would lock in the wrong shape.
 - [`lab`](.claude/skills/lab/SKILL.md) · Use when the user explicitly asks to lab or prototype a visual, UI, motion, or game-feel element with live tuning before production implementation.
 - [`advocate`](.claude/skills/advocate/SKILL.md) · Use only when the user explicitly invokes /advocate to challenge a change just made before it lands. Do not trigger from natural-language requests.
 - [`why`](.claude/skills/why/SKILL.md) · Use only when the user explicitly invokes /why to challenge the assistant's immediately prior recommendation; never trigger from ordinary why questions or paraphrases.
-- [`enhance-prompt`](.claude/skills/enhance-prompt/SKILL.md) · Use when the user asks to rewrite a rough request into a polished, copy/paste-ready prompt for another agent or a fresh session, or asks to "brief a new session" / write a "handoff prompt".
-- [`handoff-audit`](.claude/skills/handoff-audit/SKILL.md) · Use when the user asks for a self-contained audit prompt to paste into a separate fresh session for independent verification.
-- [`writing`](.claude/skills/writing/SKILL.md) · Use for text that leaves the session (READMEs, docs, site and UI copy, emails, release notes, application answers) or to unslop, humanize, voice-match, or audit a draft for AI tells. Chat, commits, and PRs stay with caveman.
+- [`enhance-prompt`](.claude/skills/enhance-prompt/SKILL.md) · Use when the user asks for a rewritten, copy-ready prompt for another agent or session. Produce the prompt without executing its task.
+- [`handoff-audit`](.claude/skills/handoff-audit/SKILL.md) · Draft a self-contained audit prompt for a separate fresh session, with exact scope and falsifiable checks. Does not run the audit.
+- [`writing`](.claude/skills/writing/SKILL.md) · Use for text that leaves the session (READMEs, docs, site and UI copy, emails, release notes, application answers) or to unslop, humanize, voice-match, or audit a draft for AI tells. Ordinary session replies use Caveman with built-in Unslop.
 - [`forge-repo-ui-skill`](.claude/skills/forge-repo-ui-skill/SKILL.md) · Use when the user wants a repository-specific UI or design skill synthesized from current agent skills; not for ordinary UI implementation or backend-only work.
-- [`caveman`](.claude/skills/caveman/SKILL.md) · Ultra-compressed communication mode. Cuts token usage ~75% by speaking like caveman while keeping full technical accuracy.
+- [`caveman`](.claude/skills/caveman/SKILL.md) · Use for every session reply to the user: concise Caveman prose with built-in Unslop. User-facing deliverables use Writing instead.
 - [`bro`](.claude/skills/bro/SKILL.md) · Restate the assistant's last message in plain human language, no jargon. Use when the user says /bro, "in plain english", "dumb it down", or "what does that actually mean".
-- [`session-hub`](.claude/skills/session-hub/SKILL.md) · Coordinate parallel Claude Code sessions via a shared append-only Desktop HTML hub. Use on /session-hub, 'run parallel sessions on this', joining a hub, or proactively when edits or commits this session did not make appear in the checkout.
+- [`session-hub`](.claude/skills/session-hub/SKILL.md) · Coordinate parallel Claude Code sessions via a shared append-only HTML hub. Use on /session-hub, 'run parallel sessions on this', joining a hub, or proactively when edits or commits this session did not make appear in the checkout.
 <!-- skill-list:end -->
 
 </details>

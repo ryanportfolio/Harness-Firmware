@@ -36,7 +36,8 @@ and say what it buys.
 - Shipped files are ASCII-only. Validation fails on anything else.
 - No secrets, tokens, private checkout paths, or maintainer-only assumptions in
   shipped files. See the safety rules below.
-- Claude skill authoring uses `writing-skills`; Codex uses built-in `skill-creator`.
+- Skill creation, import, updates and installation start with `addskill`.
+  Claude uses its packaged authoring reference; Codex uses built-in `skill-creator`.
   Keep descriptions precise, omit filler, and state how to verify useful behavior.
 - Update `CHANGELOG.md` under an unreleased or upcoming version heading when
   the change is user-visible.

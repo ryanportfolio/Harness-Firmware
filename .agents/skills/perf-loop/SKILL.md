@@ -58,7 +58,7 @@ Keep changes with repeatable, practically meaningful gains and no disallowed reg
 
 ## Independent challenge
 
-Before accepting a round, obtain fresh independent review through exposed agents. In Codex, use `collaboration.spawn_agent` with `fork_turns: "none"`. Provide the request, constraints, skill, exact source states, diff, reproduction commands, and raw evidence paths. Clearly label implementer conclusions as unverified. Reviewers must inspect evidence and code themselves.
+Before accepting a round, obtain fresh independent review through exposed agents. Inspect capacity, counting the manager and active workers; run the two review lenses in separate sequential fresh contexts when they cannot fit together. Honor explicit model choices; otherwise inherit the configured model. Disclose an unavailable requested model rather than silently substituting it. In Codex, use `collaboration.spawn_agent` with `fork_turns: "none"`. Provide the request, constraints, skill, exact source states, diff, reproduction commands, and raw evidence paths. Clearly label implementer conclusions as unverified. Reviewers must inspect evidence and code themselves.
 
 - Measurement reviewer: challenge comparability, sample sufficiency, benchmark relevance, overhead, noise, and interpretation. Independently reproduce the decisive comparison when feasible; otherwise state that runtime reproduction remains unverified.
 - Regression reviewer: inspect the full experiment diff, exercise affected behavior, and challenge quality losses, resource shifts, accessibility damage, and edge cases. Read actual captures when visual behavior changes.

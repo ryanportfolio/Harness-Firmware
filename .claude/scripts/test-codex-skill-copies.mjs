@@ -57,3 +57,30 @@ test("CLI compares enabled native modes and leaves disabled personal copies unto
   assert.match(changed.stdout, /changed: SKILL.md/);
   assert.equal(fs.readFileSync(path.join(root, "personal/active/SKILL.md"), "utf8"), "custom");
 });
+
+test("CLI accepts absent optional settings but rejects malformed settings", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "skill-copy-optional-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const write = (relative, content) => {
+    const file = path.join(root, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, content);
+  };
+  write(".claude/scripts/check-codex-skill-copies.mjs", fs.readFileSync(new URL("./check-codex-skill-copies.mjs", import.meta.url)));
+  write(".agents/skill-modes.json", JSON.stringify({ skills: { active: "native", disabled: "disabled" } }));
+  write(".agents/skills/active/SKILL.md", "approved");
+  write("personal/active/SKILL.md", "approved");
+  write("personal/disabled/SKILL.md", "personal");
+  const run = () => spawnSync(process.execPath, [path.join(root, ".claude/scripts/check-codex-skill-copies.mjs"), path.join(root, "personal")], { encoding: "utf8" });
+  const absent = run();
+  assert.equal(absent.status, 0, absent.stderr);
+  assert.match(absent.stdout, /MATCH:.*[\\/]active/);
+  assert.match(absent.stdout, /Compared 1 existing copies/);
+  assert.equal(fs.existsSync(path.join(root, ".claude/settings.json")), false);
+  write(".claude/settings.json", "{malformed");
+  const malformed = run();
+  assert.equal(malformed.status, 1, malformed.stderr);
+  assert.match(malformed.stderr, /SyntaxError/);
+  assert.doesNotMatch(malformed.stdout, /Compared/);
+  assert.equal(fs.readFileSync(path.join(root, "personal/disabled/SKILL.md"), "utf8"), "personal");
+});

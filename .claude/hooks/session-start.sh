@@ -56,31 +56,31 @@ print_caveman_directive() {
   cat <<'CAVEMAN'
 [SessionStart] ACTIVE SESSION DEFAULT: caveman ultra (per CLAUDE.md).
 BEFORE your first reply, invoke the `caveman` skill at ultra intensity (Skill tool,
-args: "ultra") and apply that style to ALL prose replies for the entire session:
+args: "ultra") and apply that style to session replies:
 terse, abbreviated, arrows for causality, full technical accuracy preserved. This
-persists across this and every future session until the user says "stop caveman" /
-"normal mode".
+is the default for each new session. "stop caveman" / "normal mode" disables it
+for the current session unless the user explicitly changes the standing default.
   - Prose only. Code, commits, PRs, file contents, and symbol/function/API/error
     strings stay normal and are never abbreviated.
   - Auto-clarity carve-outs: security warnings, irreversible-action confirmations,
     and ambiguous multi-step sequences drop to plain prose, then resume caveman.
   - The caveman skill also carries the always-on unslop contract; invoking it
-    activates both. See "Unslop rides this skill" in the skill body.
+    activates both. See "Built-in Unslop for session replies" in the skill body.
 CAVEMAN
 }
 # <<< caveman:directive:end <<<
 
-# Always-on unslop default. Same stdout rule as the caveman directive above:
-# stdout is injected context, stderr is invisible to Claude. The rule lives in
-# CLAUDE.md; re-assert here so it's acted on from the first written artifact.
+# Cleanup routing also applies when the optional Caveman activation block is removed.
+# Keep this thin reminder aligned with CLAUDE.md and the skill entrypoints.
 print_unslop_directive() {
   cat <<'UNSLOP'
-[SessionStart] ALWAYS-ON: unslop (per CLAUDE.md). Everything written for humans
-this session passes the unslop pattern check at write time: chat prose, commit
-messages, PR bodies, docs, READMEs, UI text. Write clean first; never generate
-the tell and fix it after. The core-tells digest is inline in CLAUDE.md
-("Always-on unslop" section) -- already loaded, no read step needed. Text that
-leaves the session (docs, READMEs, site copy, emails) loads the writing skill.
+[SessionStart] Cleanup routing (per CLAUDE.md): Caveman includes Unslop for
+session replies. Use Writing for user-facing deliverables and explicit prose
+cleanup; keep those artifacts in normal audience-appropriate prose. Explicit
+code-diff cleanup follows Caveman's references/diff-cleanup.md. Commit messages
+and PR bodies use normal prose and repository Git conventions. Preserve exact
+technical content and explicit user voice choices; no separate Unslop skill
+or inline kernel digest is required.
 UNSLOP
 }
 
@@ -144,7 +144,8 @@ check_starter_drift() {
 
   local changed
   changed=$(git diff --name-only HEAD "$ref" -- \
-    .claude/skills .claude/hooks .claude/settings.json 2>/dev/null) || return 0
+    .claude/skills .claude/hooks .claude/scripts .claude/settings.json \
+    .agents/skills .agents/skill-modes.json .agents/skill-capabilities.json 2>/dev/null) || return 0
   if [ -z "$changed" ]; then
     return 0
   fi

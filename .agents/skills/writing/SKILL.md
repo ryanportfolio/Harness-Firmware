@@ -1,6 +1,6 @@
 ---
 name: writing
-description: "Use for user-facing deliverables: website copy, product UI, onboarding, docs, emails, READMEs, captions, and release notes. Ordinary session replies use Caveman with built-in Unslop."
+description: "Use for user-facing prose, explicit cleanup, unslop, humanizing, voice matching or prose review. Keep deliverables in normal prose; ordinary session replies use Caveman with built-in Unslop."
 ---
 
 # Writing

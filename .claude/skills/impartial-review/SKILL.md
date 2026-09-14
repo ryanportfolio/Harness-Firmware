@@ -20,6 +20,8 @@ Use `$ARGUMENTS` if the user named a specific scope (file path, PR number, "the 
 
 State the scope you're reviewing in your first sentence so the user can redirect if it's wrong. Also count the changed lines (`git diff <range> --stat | tail -1`) — you'll need this for Step 2.
 
+Record the run ID, absolute workspace, exact base/head SHAs, staged/unstaged diff and relevant untracked path/content hashes. Exclude task-owned report artifacts. Bind findings to that manifest; source changes during review make affected findings stale and require renewed review.
+
 ## Step 2: Pick review mode
 
 - **Tiny diff (< 50 changed lines, single file, no schema/auth/cache code):** use one fresh leaf reviewer covering all relevant buckets, including project rules.
@@ -33,24 +35,24 @@ Preserve independent context at every size. If risk is unclear, use the broader 
 
 Give each reviewer a self-contained prompt and fresh context without the conversation that produced the code. Check exposed capacity first, counting Manager and other active agents. State the worker bound; launch only the reviewers that fit, wait for completion, and release slots when supported before the next batch. With four total slots and Manager active, at most three reviewers run together. For the tiny-diff path, combine the relevant bucket rules and project reading into one brief.
 
-**Reviewer model tier.** Reviewers run on Opus or Sol or above. Never Sonnet, Haiku, or Luna: a bug a weaker reviewer never reports costs more than the tokens it saves, and the main-session verification (Step 6) only filters findings that were raised, it does not recover the ones nobody raised. Do not pin a version number; pick the strongest model the runtime offers at dispatch time, and inherit the session model rather than downgrading when it already meets the floor.
+**Reviewer model tier.** Honor explicit user model choices and required quality floors; otherwise inherit the configured session model. Inspect actual model exposure. If a requested model or floor is unavailable, disclose the gap rather than silently substituting or inferring model quality from a name.
 
-**Dispatch from Claude Code.** Send the current batch of `Agent` tool calls together, within available capacity. Each uses `subagent_type: "general-purpose"` plus `model: "opus"`, or omits `model` when the session model already meets the floor.
+**Dispatch from Claude Code.** Send the current batch of `Agent` tool calls together, within available capacity. Each uses `subagent_type: "general-purpose"` with fresh context and the model selected above.
 
-**Dispatch from Codex.** Check what the session exposes before assuming; a config flag is not proof. With multi-agent tools, dispatch the selected reviewers in bounded batches at the floor tier. Without them, check authenticated Codex CLI and run one read-only `codex exec` process per selected reviewer with bounded concurrency: each is a new process, so the fresh context is structural rather than promised. Every child gets the leaf-reviewer line the prompt templates below carry: a `codex exec` process that finds this skill and dispatches its own five turns one review into twenty-five.
+**Dispatch from Codex.** Check what the session exposes before assuming; a config flag is not proof. With multi-agent tools, dispatch the selected reviewers in bounded batches with the selected model settings. Without them, check authenticated Codex CLI and run one read-only `codex exec` process per selected reviewer with bounded concurrency: each is a new process, so the fresh context is structural rather than promised. Every child gets the leaf-reviewer line the prompt templates below carry: a `codex exec` process that finds this skill and dispatches its own five turns one review into twenty-five.
 
 ```bash
-RUN=.tmp/review-1   # a directory no earlier run wrote to
-mkdir -p "$RUN"
+mkdir -p .tmp
+RUN=$(mktemp -d .tmp/impartial-review-XXXXXXXX)
 codex exec -m gpt-5.6-sol -c model_reasoning_effort=high -s read-only \
   -o "$RUN/A.md" - < "$RUN/prompt-A.txt" > "$RUN/A.log" 2>&1
 ```
 
 Write each bucket prompt to `$RUN/prompt-<bucket>.txt` and feed it on stdin with `-`. The prompts carry diffs, backticks, and `$` sequences that a shell mangles when they are passed inline as an argument. Launch only the current bounded batch in the background, then wait for that batch before starting more processes. Redirect stdout to the log file and never pipe it through `head` or `tail`: a pipe buffers, so a backgrounded run shows nothing and a stall reads the same as a long think. `-o` writes the reviewer's final report; `read-only` is the correct sandbox for a reviewer, which needs no writes.
 
-Give every run its own `$RUN` directory. The stall check in `codex-review` reads the absence of the `-o` file as "still working", so a leftover `A.md` from an earlier run both defeats that check and can be read back as if it were this run's report; the same rule about a log that stops growing applies here.
+Give every run its own `$RUN` directory. Require each process to exit successfully with a non-empty new report, and record its exit status, report hash, and observed model/effort. A report with failed inspection has incomplete coverage despite exit 0. Recheck source identity before accepting findings. Follow `codex-review` for bounded process monitoring; log silence alone does not establish a stall.
 
-`gpt-5.6-sol` is the identifier as of this writing, not a promise. If the installed catalog rejects it, drop `-m` and `-c` to inherit the user's `~/.codex/config.toml` default, or name the strongest Sol the catalog lists, then say which model actually ran.
+`gpt-5.6-sol` is an example configuration, not proof of availability. Inspect current local help/auth first. If a model is rejected, report the failure; any usage-consuming retry or fallback needs existing explicit authorization or user agreement. Record the requested and actually reported model separately, using "unverified" when the process does not reveal resolution. If neither agents nor an authenticated CLI can supply fresh context, disclose the missing independent review; self-review cannot replace it.
 
 Reviewers spawned from Codex share the author's vendor, so this buys fresh context, not a cross-vendor second opinion. Say which one you ran rather than implying vendor independence.
 

@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { collectFacts, expectedCodexNames } from "./facts.mjs";
 import { absolute, read } from "./lib.mjs";
@@ -11,7 +14,12 @@ const requiredLinks = ["GUIDE.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE",
 
 test("README facts match the canonical repository inventory", () => {
   assert.equal(facts.skillCount, 34);
-  assert.equal(facts.codexSkillCount, 35);
+  const capabilities = JSON.parse(read(".agents/skill-capabilities.json")).skills;
+  const modes = JSON.parse(read(".agents/skill-modes.json")).skills;
+  const overrides = fs.existsSync(absolute(".claude/settings.json")) ? JSON.parse(read(".claude/settings.json")).skillOverrides ?? {} : {};
+  const intendedCodex = Object.keys(capabilities).filter(name => capabilities[name].coverage.includes("codex") && modes[name] !== "disabled" && overrides[name] !== "off").sort();
+  assert.equal(facts.codexSkillCount, intendedCodex.length);
+  assert.deepEqual(expectedCodexNames(facts.canonicalNames, modes, overrides), intendedCodex);
   assert.equal(facts.referenceFileCount, 6);
   assert.deepEqual(facts.runtimeNames, ["Claude Code", "Codex"]);
   assert.equal(facts.runtimeCount, facts.runtimeNames.length);
@@ -156,4 +164,37 @@ test("Codex inventory honors native additions and both disabled sources", () => 
   const names = ['adapter', 'native', 'disabled', 'legacy'];
   assert.deepEqual(expectedCodexNames(names, {native: 'native', extra: 'native', disabled: 'disabled', legacy: 'native'}, {legacy: 'off'}), ['adapter', 'extra', 'native']);
   assert.deepEqual(expectedCodexNames(['old', 'ordinary']), ['old', 'ordinary']);
+});
+
+test("facts CLI accepts absent optional settings but rejects malformed settings", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "readme-facts-optional-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  for (const relative of ["scripts/readme/facts.mjs", "scripts/readme/lib.mjs", "scripts/readme/items.json", "CLAUDE.md"]) {
+    const target = path.join(root, relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(absolute(relative), target);
+  }
+  fs.mkdirSync(path.join(root, ".claude/reference"), { recursive: true });
+  // Only skill metadata is needed; no hooks or personal files enter the fixture.
+  for (const name of facts.canonicalNames) {
+    for (const runtime of [".claude", ".agents"]) {
+      const target = path.join(root, runtime, "skills", name, "SKILL.md");
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.copyFileSync(absolute(`.claude/skills/${name}/SKILL.md`), target);
+    }
+  }
+  fs.writeFileSync(path.join(root, ".agents/skill-modes.json"), JSON.stringify({ skills: {} }));
+  const run = () => spawnSync(process.execPath, [path.join(root, "scripts/readme/facts.mjs")], { encoding: "utf8" });
+  const absent = run();
+  assert.equal(absent.status, 0, absent.stderr);
+  const collected = JSON.parse(absent.stdout);
+  assert.equal(collected.skillCount, 34);
+  assert.equal(collected.codexSkillCount, 34);
+  assert.deepEqual(collected.canonicalNames, facts.canonicalNames);
+  assert.equal(fs.existsSync(path.join(root, ".claude/settings.json")), false);
+  fs.writeFileSync(path.join(root, ".claude/settings.json"), "{malformed");
+  const malformed = run();
+  assert.equal(malformed.status, 1, malformed.stderr);
+  assert.match(malformed.stderr, /SyntaxError/);
+  assert.equal(malformed.stdout, "");
 });

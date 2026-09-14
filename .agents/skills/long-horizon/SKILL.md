@@ -18,6 +18,9 @@ continue useful work that does not depend on an independent verdict.
 
 Create `.tmp/long-horizon/<task-slug>/state.md` before execution. Manager alone updates it.
 Store bulky output and per-round briefs alongside it, outside the active summary.
+Baseline identity must include path/content hashes for relevant dirty, staged, untracked,
+and ignored generated artifacts; record deletions and unavailable coverage. A Git revision
+alone cannot identify the actual working state.
 
 | Field | Required content |
 |---|---|
@@ -51,17 +54,23 @@ publication, deployments, migrations, installation, or external messages.
 
 1. **Plan one step.** Define allowed paths/actions, dependencies, local done-checks, and
    relevant task constraints. Capture a pre-round baseline, including dirty and untracked
-   files, sufficient to distinguish this round's changes from existing work.
+   files, sufficient to distinguish this round's changes from existing work. Save a
+   versioned auditor brief now, before spawning the executor, from the contract, scope,
+   checks, baseline identity and raw artifact paths. Record its path and content hash.
 2. **Execute.** Spawn a fresh agent with `fork_turns: "none"` when that parameter is exposed.
    Supply a standalone brief: step, scope, checks, necessary verified facts, relevant dead
    ends, absolute workspace/artifact paths, current permissions and style instructions.
    Keep the brief sufficient without Manager conversation history. Use the exposed runtime's
    equivalent if names differ. If only inherited context is possible, record the limitation;
-   do not claim a fresh independent audit. Inherit the session model unless explicitly directed
-   otherwise. Executor implements and verifies only its step, then returns changed paths,
+   do not claim a fresh independent audit. Honor explicit user model choices; otherwise
+   inherit the session model. If a requested model is unavailable, disclose the gap rather
+   than silently substituting. Executor implements and verifies only its step, then returns changed paths,
    commands/results, and blockers. It cannot edit Manager state or dispatch more agents.
-3. **Audit after execution stops.** Spawn a separate fresh agent. Give it the contract and
-   amendments, authorized step scope, local checks, baseline, and workspace paths. Exclude
+3. **Audit after execution stops.** Spawn a separate fresh agent with the prewritten
+   auditor brief byte for byte. Do not rewrite it after reading executor output. A Plan
+   defect belongs in the next round. An explicit user amendment requires reconciling
+   workers, retaining old briefs/baseline, and freezing a new version from the amended
+   contract and raw artifacts without executor assessments. Exclude
    executor reports, turns, and verdicts. If a report is itself the requested deliverable,
    the auditor must inspect it as an artifact, without receiving the executor's assessment.
    Auditor inspects actual changes and runs relevant

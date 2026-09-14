@@ -6,7 +6,7 @@ description: 'Use for work too big for one context window: long multi-step tasks
 
 Manager, Executor, Auditor. You (this context) are the Manager: hold the goal, keep the state
 file true, and delegate every round. Executors and auditors are fresh subagents; a fresh context
-per round is what keeps quality flat while the task grows.
+per round separates implementation from independent evidence. Discussing or editing this skill does not activate it.
 
 ## State file
 
@@ -75,10 +75,11 @@ that wants to add something after Execute has found a defect in the Plan, not in
 it goes into the next round, except for an explicit user amendment handled as above.
 Provenance is checkable; "do not paraphrase" is not.
 
-Where the runtime can spawn a fresh context, use it and never `subagent_type: fork` or any
-option that inherits the Manager context. Where it cannot, inherit the smallest recent slice
-that supplies otherwise unrecoverable data, record that in the audit log every round it
-applies, and say so in the Completion report: the independence claim is weaker there.
+Inspect exposed tools and capacity before dispatch. Use fresh context and never
+`subagent_type: fork` or an option that inherits Manager history for an auditor. If fresh
+independent context is unavailable, record the gap; inherited context or self-review cannot
+establish the audit gate. Continue useful authorized work that does not depend on it.
+Count Manager and other active workers against capacity; sequential fresh rounds are valid.
 
 The workspace belongs to the executor for the duration of a round. Edits from anyone else
 between Baseline and Audit make attribution impossible; the auditor reports integrity
@@ -101,8 +102,10 @@ between Baseline and Audit make attribution impossible; the auditor reports inte
    tracked file with uncommitted changes. In a git workspace also pin a tracked snapshot:
    `git stash create` (touches neither tree nor index; empty output means clean, use HEAD)
    and `git update-ref refs/long-horizon/<task-slug>/round-<N> <sha>` so gc cannot prune it
-   across sessions. Ignored paths are outside the manifest; the auditor names them
-   unverifiable rather than clean. Sizes and mtimes are not a baseline; hashes are.
+   across sessions. An equivalent immutable snapshot plus content manifest is valid when
+   these Git operations are unavailable. Include relevant ignored generated artifacts
+   explicitly; name unavailable coverage rather than calling it clean. Record deleted paths
+   too. Sizes and mtimes are not a baseline; hashes are.
 2. **Execute** — set phase `executing`, spawn a fresh subagent with the brief alone and no
    Manager conversation history. Record its agent/process ID as soon as dispatch returns.
    It does the step and reports what changed and how to check it. Confirm it has stopped
@@ -160,15 +163,13 @@ Record recovery actions and pending checks before continuing.
 
 ## Stagnation
 
-A round cap stops a stalled run; it does not unstick one. Rounds can fail the same way
-repeatedly while the cap is still far off, so watch for it directly:
+A round count alone cannot resolve a stalled run. Watch for repeated failures directly:
 
 - Same step fails audit twice in a row → the next brief must change approach, not retry the
   old one. Move the failed approach to Dead ends first.
 - Three rounds with nothing new entering Verified progress → stop spawning and rewrite
-  Remaining. The decomposition itself is the suspect, not the executor. The lifetime cap does
-  not shrink with it: a rewrite grants one extension of 2× the rewritten count on top of the
-  rounds already spent, once per task, recorded in the state file.
+  Remaining. The decomposition itself is the suspect, not the executor. Preserve consumed
+  attempts; a new decomposition does not reset a user budget.
 
 Either trigger optionally escalates to a cross-vendor supervisor. Manager, executor, and
 auditor are all Claude, so they share blindspots, and a shared blindspot is exactly what a
@@ -181,7 +182,7 @@ codex login status
 
 Logged in → one `codex exec` run (custom prompt, no scope selector) carrying the contract, the
 audit log, and Dead ends, asking for a plateau diagnosis and a different strategy. See the
-`codex-review` skill for the CLI mechanics and its Windows sandbox-helper caveat. Its answer is
+`codex-review` skill for current local preflight, CLI mechanics, and run identity. Its answer is
 an opinion: check the proposal against the current contract version and acceptance checks
 before it rewrites Remaining, and drop anything that drifts. Not logged in or the run fails → skip it, the rewrite
 rules above stand on their own.
@@ -197,19 +198,25 @@ contract, its amendments, and the workspace root. Have it run every current acce
 against the final workspace. Anything that fails moves back to Remaining.
 
 Then answer from Verified progress alone. Unfinished is a valid report: state what is verified
-and what remains, and whether any round ran with inherited context.
+and what remains, including missing independent checks. Bind final evidence to the
+inspected revision and content manifest; later relevant changes require revalidation.
 
 ## Guardrails
 
-- Subagents run Opus or Sol or above, never Sonnet, Haiku, or Luna; inheriting the session
-  model is fine when it already meets that floor.
+- Honor explicit user model choices and required quality floors. Otherwise inherit the
+  configured session model. Check actual exposure before dispatch; if a requested model or
+  floor is unavailable, disclose it rather than silently downgrading or claiming it ran.
 - Size each step so one fresh context finishes it: one slice, one migration, one bug.
 - Audit independence is the point — verdicts come from the auditor's own inspection in a
   fresh subagent, never from this Manager context.
 - Executors and auditors follow fable-mode discipline inside their round; fable-mode governs
   one context, this skill governs work spanning many.
 - Under ~3 dependent steps: skip the harness, run fable-mode directly.
-- Cap rounds at 2× the initial Remaining count (floor 5), plus at most one Stagnation
-  extension. Cap hit → stop and report Verified vs Remaining honestly.
-- Auditor blocked or a step needs a decision only the user owns → stop and ask; a guessed
-  answer poisons every later round's verified state.
+- At `max(5, 2 * initial step count)` rounds, reassess strategy and remaining work before
+  continuing. This default is a reassessment threshold, not a completion or abandonment
+  rule. Track executor attempts, auditor calls, and retries separately. Explicit user round,
+  time, or cost limits are binding; checkpoint before exceeding them and report unfinished
+  checks. A budget of zero permits inspection but no budgeted execution.
+- An unavailable required check blocks that step and its dependents; complete independent
+  authorized work and ask only for missing user-owned decisions or authority. Invocation
+  does not authorize publication, installation, deployments, or external messages.

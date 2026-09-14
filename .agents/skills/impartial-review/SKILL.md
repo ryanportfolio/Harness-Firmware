@@ -11,7 +11,8 @@ and reports actionable results. Review requests do not authorize implementation 
 Resolve the requested files, commit, or PR. Otherwise inspect uncommitted changes first,
 then the latest commit and any relevant open PR. Record exact base/head revisions and
 dirty/untracked content. Capture enough baseline to distinguish existing work. State scope.
-Review evidence applies to that content; relevant later edits require renewed review.
+Use path/content hashes for relevant dirty and untracked content; exclude task-owned
+report artifacts. Review evidence applies to that content; relevant later edits require renewed review.
 
 ## Dispatch
 
@@ -34,7 +35,12 @@ vendor independence.
 If native agents are unavailable, check authenticated Codex CLI and its current help.
 Run separate read-only `codex exec` processes with standalone prompts on stdin, unique
 output/log files, and bounded concurrency. Pass exact scope and forbid nested review.
-Track processes and wait for completion; stale files are not new results. Use supported
+Track processes and wait for completion; stale files are not new results. Require a
+successful process exit and non-empty report in a newly created run directory, record
+report hash and observed model/effort, and recheck source identity. Missing required
+inspection remains incomplete coverage despite exit 0; unknown model resolution stays
+unverified. Model fallback or a usage-consuming retry requires existing explicit
+authorization or user agreement. Use supported
 options and authorized model settings. If neither route can supply independent context,
 report the gap; do not call Manager self-review an impartial review.
 

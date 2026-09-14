@@ -7,7 +7,7 @@ description: "Give a fresh critical second look at the previous recommendation o
 
 Scope to the recommendation the user names, otherwise the immediately preceding recommendation. If none exists, say so. Ask only if several materially different choices cannot be disambiguated.
 
-Verify the few facts the recommendation depends on. With an exposed collaboration tool, give one fresh read-only leaf reviewer the recommendation and minimal necessary context using fork_turns: "none". Inherit the configured model; do not require an unavailable vendor/model. Ask for missed assumptions, costs and circumstances that would change the decision. No nested review or mutation.
+Verify the few facts the recommendation depends on. With an exposed collaboration tool, give one fresh read-only leaf reviewer the recommendation and minimal necessary context using fork_turns: "none". Honor an explicit user model choice; otherwise inherit the configured model. Check actual exposure and disclose an unavailable requested model rather than silently substituting it. Ask for missed assumptions, costs and circumstances that would change the decision. No nested review or mutation.
 
 If the independent reviewer is unavailable or fails, explicitly report the missing independent check. You may provide clearly labeled personal reasoning, but cannot claim the independent workflow completed. Do not silently replace it with self-review.
 

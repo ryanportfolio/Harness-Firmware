@@ -38,7 +38,12 @@ export function collectFacts() {
   const inventoryNames = inventory.skills.map((skill) => skill.name).sort();
   sameMembers(inventoryNames, canonicalNames, "README skill inventory");
   const modes = fs.existsSync(absolute(".agents/skill-modes.json")) ? readJson(".agents/skill-modes.json").skills : {};
-  const overrides = readJson(".claude/settings.json").skillOverrides ?? {};
+  let overrides = {};
+  try {
+    overrides = readJson(".claude/settings.json").skillOverrides ?? {};
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   sameMembers(codexNames, expectedCodexNames(canonicalNames, modes, overrides), "Codex skill inventory");
 
   const tierCounts = Object.fromEntries(groupIds.map((group) => [group, 0]));

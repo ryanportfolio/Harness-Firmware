@@ -113,6 +113,7 @@ Generated Codex adapters delegate to `.claude/skills/`. Native entries in `.agen
 | `.claude/hooks/session-start.sh` | Claude Code startup checks and reminders. |
 | `.claude/scripts/context-weight.sh` | Always-loaded source weight measurement. |
 | `.claude/scripts/doctor.mjs` | Installation health check. |
+| `.claude/scripts/memory-audit.mjs` | Optional local Claude transcript usage counts for skills and memory. Counts are lower bounds, not proof that a resource is unused or ineffective. |
 | `.claude/settings.json` | Claude hook wiring and Bash permission allowlist. |
 | `.claude-plugin/` | Claude plugin and marketplace manifests used by the template. |
 | `bootstrap/` | Project creation, fork retargeting, machine setup, and Windows launcher release files. |

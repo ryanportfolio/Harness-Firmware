@@ -13,9 +13,11 @@ Choose the smallest surface that can disprove the claim, then select the evidenc
 
 - **Current state:** inspect actual output or behavior against the criterion. An export's
   dimensions or a command's current result needs no historical baseline.
-- **Change or causation:** capture baseline and treatment using comparable commands, data,
-  warmup, and environment. A claim that a fix removed a bug or improved performance needs
-  a valid comparison; a passing current-state check alone cannot establish that claim.
+- **Change:** capture baseline and treatment using comparable commands, data, warmup,
+  and environment. A passing current-state check alone cannot establish improvement.
+- **Causation:** also isolate the proposed cause, using a controlled change, rollback/reapply,
+  or another justified design. A before/after difference with plausible competing causes
+  supports a change, not the stronger causal claim.
 
 Verify at the claimed layer: focused tests or a repro for code behavior, real command output
 for CLI behavior, HTTP responses for APIs, rendered evidence for layout, and measurements
@@ -24,14 +26,16 @@ Prefer text capture for textual facts and screenshots for visual facts. Do not s
 a code read for observed behavior or a screenshot for a performance measurement.
 
 Keep commands, outputs, and artifact paths sufficient to reproduce consequential findings.
-When useful, save minimal evidence under `.tmp/verify-this/<claim-slug>/`; avoid retaining
+When useful, save minimal evidence under `.tmp/verify-this/<claim-slug>/<run-id>/`;
+identify the inspected source/output with content hashes and record the command and environment; avoid retaining
 sensitive payloads unnecessarily. Work within existing authorization and storage constraints.
 Do not alter unrelated state to manufacture a baseline.
 
 Return one verdict with the claim, evidence, and material limits:
 
 - `VERIFIED`: current-state evidence meets the criterion, or a valid comparison supports
-  the claimed change without an evident confound.
+  the claimed change without an evident confound. A causal verdict additionally needs
+  evidence isolating the proposed cause from plausible competing explanations.
 - `NOT VERIFIED`: valid evidence contradicts the claim or misses its criterion.
 - `INCONCLUSIVE`: evidence is unavailable, noisy, or invalid; a required comparative
   baseline is missing; or the acceptance criterion remains unresolved.

@@ -13,6 +13,17 @@ condensed.
 
 ### Changed
 
+- Skill authoring now starts with `addskill`; `writing-skills` discovery is retired
+  with authoring resources and licenses preserved. Caveman includes Unslop, with
+  explicit prose and code cleanup retained after standalone Unslop retirement.
+- Claude and Codex workflows align evidence, independent review, authorization,
+  runtime discovery and selective native propagation. Claude gains `perf-loop`.
+- Capability coverage, resources, ownership and retirement now have a manifest
+  and regression checks. Older disabled retirement entries remain compatible;
+  startup and contributor guidance follow the consolidated routes.
+- Existing projects receive explicit retirement migration steps, a native Codex
+  drift reminder, and optional-settings compatibility in copy and README tooling.
+
 - `writing` skill: pattern 31 carries the Latinate-dress-up trap table
   from Corewise.Academy `plain-words` (prohibition → ban, verbatim →
   word-for-word, and so on) plus the what-never-changes list; the

@@ -43,4 +43,4 @@ Local acceptance can rest on scoped correctness or regression checks even when b
 - Benefit: unmeasured / <supported verdict and bounded claim>
 ```
 
-Maintainers: keep this resource identical in the Claude and Codex `refine` folders. Each copy belongs beside its skill so a personal installation works without the repository.
+Maintainers: keep this resource identical in the Claude and Codex `refine` and `addskill` folders. Each copy belongs beside its skill so a personal installation works without the repository.

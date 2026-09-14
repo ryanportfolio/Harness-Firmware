@@ -24,8 +24,8 @@ set -euo pipefail
 TEMPLATE='ryanportfolio/Harness-Firmware'
 TEMPLATE_URL='https://github.com/ryanportfolio/Harness-Firmware.git'
 
-# Mirrors $script:TemplateOnlyPaths in NewProjectCore.psm1 and the Step 3
-# deletion list in .claude/skills/init-project/SKILL.md. Keep all three in sync.
+# Mirrors $script:TemplateOnlyPaths in NewProjectCore.psm1 and the potential cleanup
+# paths in .claude/skills/init-project/references/profiles.md. Keep all three in sync.
 # These files maintain or distribute the template itself; a spawned project must
 # not inherit them as if they were its own history, process, or support links.
 TEMPLATE_ONLY_PATHS=(

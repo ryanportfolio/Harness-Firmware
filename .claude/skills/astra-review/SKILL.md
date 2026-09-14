@@ -1,38 +1,28 @@
 ---
-description: "Cross-vendor review pinned to gpt-6-astra at medium reasoning. Same codex exec review workflow as codex-review (PR, branch, commit, or uncommitted diff; every finding verified). Trigger: /astra-review, \"have Astra review this\"."
+name: astra-review
+description: "Cross-vendor review configured for gpt-6-astra at medium reasoning. Same verified CLI lifecycle as codex-review. Use for /astra-review or 'have Astra review this'."
 ---
 
-# Astra review — codex-review on gpt-6-astra, medium reasoning
+# Astra review
 
-Same skill as `codex-review`, different model pin. Read `.claude/skills/codex-review/SKILL.md` and follow it end to end (preflight, scope, launch, collect, verify, present, common mistakes, anti-patterns), with these substitutions and nothing else changed:
+Read `.claude/skills/codex-review/SKILL.md` and follow its complete execution contract: current local preflight, exact scope, unique run directory, source manifest, process completion, report identity, finding verification, and honest attribution. This entrypoint changes only the defaults:
 
-| In `codex-review` | Here |
+| Setting | Astra default |
 |---|---|
-| `-m gpt-5.6-sol` | `-m gpt-6-astra` |
-| `-c model_reasoning_effort=high` | `-c model_reasoning_effort=medium` |
-| "Effort by diff size" paragraph (high for small diffs, medium for large) | Skip. Effort is `medium` regardless of diff size. |
-| Attribution `Codex (gpt-5.6-sol, high reasoning) reviewed <scope>` | `Codex (gpt-6-astra, medium reasoning) reviewed <scope>` |
-| Common-mistakes row "model rejected / unknown: `gpt-5.6-sol` renamed" | Same fix, for `gpt-6-astra`: drop `-m`/`-c` to inherit `~/.codex/config.toml`, tell the user |
+| Model | `gpt-6-astra` |
+| Effort | `medium`, regardless of diff size |
+| Run directory prefix | `.tmp/astra-review-` |
 
-Launch command after substitution (branch scope shown; `--uncommitted` and `--commit <SHA>` map exactly as in `codex-review`):
+Honor an explicit user model/effort choice. Confirm supported local options before inference; a model identifier in this file is not proof of availability. `$ARGUMENTS` carries scope as in `codex-review`.
+
+Example after creating a fresh `$RUN` directory (POSIX shell):
 
 ```bash
 mkdir -p .tmp
-codex exec review --base origin/main -m gpt-6-astra -c model_reasoning_effort=medium -o .tmp/astra-review.md < /dev/null > .tmp/astra-run.log 2>&1
+RUN=$(mktemp -d .tmp/astra-review-XXXXXXXX)
+codex exec review --base origin/main -m gpt-6-astra -c model_reasoning_effort=medium -o "$RUN/report.md" < /dev/null > "$RUN/run.log" 2>&1
 ```
 
-`< /dev/null` keeps `codex exec` from parking on an open stdin pipe when backgrounded. PowerShell rejects `<` at parse time (`The '<' operator is reserved for future use`), so from a PowerShell shell run the same command through cmd:
+On PowerShell use a GUID-named directory and supported stdin/output redirection as described in `codex-review`. Distinct prefixes do not prevent collisions between two Astra invocations; every run must still be unique.
 
-```powershell
-cmd /c "codex exec review --base origin/main -m gpt-6-astra -c model_reasoning_effort=medium -o .tmp/astra-review.md < NUL > .tmp/astra-run.log 2>&1"
-```
-
-Use the `astra-` file names so a leftover `codex-review.md` from an earlier `codex-review` run cannot be read back as this run's report.
-
-`$ARGUMENTS` carries the scope the same way it does for `codex-review`.
-
-## Anti-patterns
-
-- Don't raise effort to `high` because the diff is small; the model pin is the point of this skill. The user picks `codex-review` when they want Sol at high.
-- Don't fork the workflow here. Behavior changes belong in `codex-review`; this file only carries the model and effort overrides.
-- Everything under `codex-review`'s anti-patterns applies unchanged.
+If Astra is unavailable, report that outcome. Do not silently inherit another model or attribute a fallback to Astra. Any authorized retry uses a new directory and reports its observed model/effort, or explicitly marks model resolution unverified. Keep lifecycle fixes in `codex-review` rather than forking them here.
