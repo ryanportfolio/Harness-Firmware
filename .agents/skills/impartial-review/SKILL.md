@@ -14,6 +14,10 @@ dirty/untracked content. Capture enough baseline to distinguish existing work. S
 Use path/content hashes for relevant dirty and untracked content; exclude task-owned
 report artifacts. Review evidence applies to that content; relevant later edits require renewed review.
 
+When the diff extracts repeated operations or changes a shared boundary, read
+[selective shared-code refactoring](references/shared-code-refactoring.md)
+and include its applicable caller and invariant checks in reviewer briefs.
+
 ## Dispatch
 
 Use currently exposed native agents first. Spawn with `fork_turns: "none"` or the runtime's

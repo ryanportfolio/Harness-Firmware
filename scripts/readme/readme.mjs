@@ -26,17 +26,11 @@ const readme = `${marker}
 
 ${picture("boot", `Harness Firmware boots with ${facts.skillCount} skills, ${facts.referenceFileCount} project-memory files, and ${facts.runtimeCount} runtime boundaries ready.`)}
 
-Harness Firmware stores agent instructions, project notes, reusable skills, and verification rules in the repository for Claude Code and Codex.
+A repository starter for **Claude Code and Codex**. Harness Firmware gives both agents versioned instructions, durable project memory, reusable skills, and workflows for testing and independent review.
+
+Keep project decisions and pitfalls with the code. Carry useful lessons into the next session. Review changes before carrying them into another repository.
 
 [Install the skills or start a repository](#quickstart).
-
-## the repository feedback loop
-
-${picture("feedback", "Recall, work, verify, refine, and a reviewed repository change form a local loop. A separate human-approved sync can carry generic changes into future repositories.")}
-
-The everyday loop is **recall → work → verify → refine → reviewed repository change → next task**. Project facts load before unfamiliar work. Verification captures evidence. \`refine\` turns observed friction into a small, reviewable change that strengthens the repository before the next task begins.
-
-The dotted branch is separate: after human review, \`sync-starter\` can move a generic improvement into the template so future repositories begin with it. Keeping the lesson local remains the default.
 
 ## quickstart
 
@@ -65,9 +59,32 @@ In the created repository, run \`node .claude/scripts/doctor.mjs\`. Success mean
 
 [Open the complete setup guide](GUIDE.md#full-template) · [View validation runs](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml)
 
-## one source, two runtime boundaries
+## what the firmware adds
 
-${picture("runtime", `${facts.skillCount} canonical playbooks serve Claude Code directly and Codex through ${facts.codexSkillCount} skills, with shared project memory.`)}
+| Need | Workflow built into the repository |
+| --- | --- |
+| Remember the project | \`recall\` loads relevant committed facts, decisions, and pitfalls before unfamiliar work |
+| Finish sustained work | \`long-horizon\` records progress and evidence across bounded rounds, with fresh audit context |
+| Challenge a result | Independent and cross-vendor review skills check work through available agents or authenticated CLIs |
+| Verify a claim | \`verify-this\` separates current checks, comparisons, and causal claims; \`perf-loop\` measures optimization against a baseline |
+| Maintain skills | \`addskill\` handles creating, importing, updating, and installing skills with the resources each runtime needs |
+| Improve the workflow | \`refine\` captures observed friction; \`sync-starter\` carries selected generic fixes between repositories |
+
+These are agent instructions and supporting tools. Structural checks validate the package; actual execution still needs the appropriate model, tools, credentials, and evidence.
+
+## the repository feedback loop
+
+${picture("feedback", "Recall, work, verify, refine, and a reviewed repository change form a local loop. A separate human-approved sync can carry generic changes into future repositories.")}
+
+The everyday loop is **recall → work → verify → refine → reviewed repository change → next task**. Project facts load before unfamiliar work. Verification captures evidence. \`refine\` turns observed friction into a small, reviewable change that strengthens the repository before the next task begins.
+
+The dotted branch is separate: after human review, \`sync-starter\` can move a generic improvement into the template so future repositories begin with it. Keeping the lesson local remains the default.
+
+## two runtimes, explicit ownership
+
+${picture("runtime", `${facts.skillCount} Claude Code skills and ${facts.codexSkillCount} Codex skills share project memory. Codex has ${facts.codexNativeCount} native workflows and ${facts.codexAdapterCount} generated adapters.`)}
+
+**${facts.skillCount} Claude Code skills · ${facts.codexSkillCount} Codex skills · ${facts.codexNativeCount} native Codex workflows · ${facts.codexAdapterCount} adapters**
 
 - **Claude Code:** reads \`CLAUDE.md\`, \`.claude/skills/\`, and hooks for canonical playbooks and Claude-specific startup behavior.
 - **Codex:** reads \`AGENTS.md\` and \`.agents/skills/\` for standalone Codex workflows and generated adapters with explicit capability and safety boundaries. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
@@ -96,7 +113,9 @@ ${skillLists()}
 
 ## checked on every change
 
-The validation workflow checks shell and PowerShell entry points, generated Codex adapters, the Codex skill contract, JSON manifests, the Windows project generator, README facts, and generated README assets.
+The validation workflow checks shell and PowerShell entry points, generated adapters, native skill propagation, required resources, intended runtime coverage, retired entrypoints, the Windows project generator, and this README's generated facts and assets. [Inspect the CI runs](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml).
+
+The [capability manifest](.agents/skill-capabilities.json) records ownership and intended coverage independently of discovery. [Maintenance guidance](docs/codex-skills.md) covers native updates, disabled skills, and personal copies.
 
 Run the local health check:
 

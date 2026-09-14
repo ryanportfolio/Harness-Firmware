@@ -25,6 +25,9 @@ for performance or memory. Confirm that a UI under test serves the intended curr
 Prefer text capture for textual facts and screenshots for visual facts. Do not substitute
 a code read for observed behavior or a screenshot for a performance measurement.
 
+For a multi-check report or before/after presentation, read the packaged
+[evidence report](references/evidence-report.md). Keep small current-state checks brief.
+
 Keep commands, outputs, and artifact paths sufficient to reproduce consequential findings.
 When useful, save minimal evidence under `.tmp/verify-this/<claim-slug>/<run-id>/`;
 identify the inspected source/output with content hashes and record the command and environment; avoid retaining

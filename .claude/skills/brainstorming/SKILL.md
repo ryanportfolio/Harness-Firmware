@@ -7,6 +7,9 @@ description: Use when brainstorming or designing a product, interface, workflow,
 
 Resolve only the decisions that materially affect implementation. Match discovery depth to uncertainty and risk; do not turn clear work into ceremony.
 
+When deciding whether repeated operations need a shared boundary, read
+[selective shared-code refactoring](references/shared-code-refactoring.md).
+
 ## Choose the lane
 
 | Situation | Lane | Required outcome |

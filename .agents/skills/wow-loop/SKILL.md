@@ -13,6 +13,10 @@ Maintain this native Codex skill directly. Arena explores competing approaches; 
 supports human tuning. Neither is required. This workflow owns its resume state without
 nesting another orchestration skill.
 
+When recording review evidence or presenting before/after artifacts, read the packaged
+[evidence report](references/evidence-report.md) and retain this workflow's acceptance gates.
+Carry its applicable evidence requirements into critic briefs.
+
 ## 1. Preflight
 
 Inspect the artifact, project requirements, current edits, and exposed tools. Preserve

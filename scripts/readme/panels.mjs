@@ -2,6 +2,13 @@ import { collectFacts } from "./facts.mjs";
 import { MONO, SANS, THEMES, esc, writeText } from "./lib.mjs";
 
 const facts = collectFacts();
+/* Project README contract: a repository circuit, with two independently owned
+ * runtime lanes connected to committed memory. Setup precedes explanatory art.
+ * Counts come from the filesystem and ownership registry. No performance claims.
+ * Four variants must read at 880px and a real 390px viewport, in both themes.
+ * SVGs require no scripts, hover, fonts, or external requests; motion loops and
+ * reduced motion preserves every label. Plain Markdown carries usage and links.
+ */
 const fmtKiB = (bytes) => `${(bytes / 1024).toFixed(1)} KiB`;
 
 function svg({ width, height, title, label, themeName, body, extraCss = "" }) {
@@ -61,15 +68,17 @@ function feedback(themeName, narrow) {
   const centers = positions.map(center);
   const segments = centers.map((point, index) => {
     const next = centers[(index + 1) % centers.length];
-    if (index === centers.length - 1) {
-      return narrow
-        ? `<path class="wire" marker-end="url(#arrow)" d="M${point.x} ${point.y}H376V122H108V${centers[0].y - 8}"/>`
-        : `<path class="wire" marker-end="url(#arrow)" d="M${point.x} ${point.y}H20V138H${centers[0].x}V${centers[0].y - 8}"/>`;
+    let d;
+    if(index === centers.length - 1) {
+      d = narrow ? 'M366 438H376V122H108V140' : 'M40 374H20V206H38';
+    } else if (point.y === next.y) {
+      const direction = Math.sign(next.x-point.x);
+      d = `M${point.x+direction*nodeWidth/2} ${point.y}H${next.x-direction*(nodeWidth/2+2)}`;
+    } else {
+      const direction = Math.sign(next.y-point.y);
+      d = `M${point.x} ${point.y+direction*nodeHeight/2}V${next.y-direction*(nodeHeight/2+2)}`;
     }
-    const elbow = index % 2 === 0
-      ? `M${point.x} ${point.y}H${next.x - 9}`
-      : `M${point.x} ${point.y}V${next.y}H${next.x + (next.x < point.x ? 9 : -9)}`;
-    return `<path class="wire" marker-end="url(#arrow)" d="${elbow}"/>`;
+    return `<path class="wire" marker-end="url(#arrow)" d="${d}"/>`;
   }).join("");
   const nodes = stages.map(([name, description], index) => {
     const { x, y } = positions[index];
@@ -127,45 +136,35 @@ function boot(themeName, narrow) {
     : `<text class="eyebrow mute" x="40" y="46">REPOSITORY FIRMWARE</text><text class="headline" x="40" y="100">Harness Firmware</text><text class="subhead mute" x="40" y="132">Instructions, project memory, and verification for Claude Code and Codex.</text>`;
   const ready = narrow
     ? `<g class="boot-ready"><rect class="tag" x="24" y="548" width="342" height="30" rx="6"/><text class="label accent" x="195" y="569" text-anchor="middle">READY · ${facts.skillCount}/${facts.skillCount}</text></g>`
-    : `<g class="boot-ready"><rect class="tag" x="660" y="58" width="180" height="174" rx="8"/><text class="small mute" x="680" y="88">BOOT STATUS</text><text class="count accent" x="680" y="136">READY</text><text class="small" x="680" y="170">${facts.skillCount}/${facts.skillCount} skills indexed</text><text class="small" x="680" y="196">${facts.codexSkillCount}/${facts.codexSkillCount} skills current</text></g>`;
+    : `<g class="boot-ready"><rect class="tag" x="660" y="174" width="180" height="174" rx="8"/><text class="small mute" x="680" y="204">BOOT STATUS</text><text class="count accent" x="680" y="252">READY</text><text class="small" x="680" y="286">${facts.skillCount} Claude skills</text><text class="small" x="680" y="312">${facts.codexSkillCount} Codex skills</text></g>`;
   return svg({
     width, height, title: "Harness Firmware boot trace",
     label: `Harness Firmware boots with ${facts.skillCount} skills, ${facts.referenceFileCount} project-memory files, and ${facts.runtimeCount} runtime boundaries ready.`,
     themeName,
-    extraCss: `@keyframes bootCursor{${cursorFrames}84%,100%{transform:translateY(${(rows.length - 1) * rowGap}px)}}@keyframes bootReady{0%,83%{opacity:.25}84%,100%{opacity:1}}.boot-cursor{animation:bootCursor 12s steps(1,end) infinite}.boot-ready{animation:bootReady 12s steps(1,end) infinite}`,
+    extraCss: `@keyframes bootCursor{${cursorFrames}84%,100%{transform:translateY(${(rows.length - 1) * rowGap}px)}}.boot-cursor{animation:bootCursor 12s steps(1,end) infinite}`,
     body: `${grid(width, height)}${title}${rowsMarkup}<circle class="signal boot-cursor" cx="${xDot}" cy="${startY - 5}" r="7"/>${ready}`,
   });
 }
 
 function runtime(themeName, narrow) {
   const width = narrow ? 390 : 880;
-  const height = narrow ? 650 : 420;
-  const theme = THEMES[themeName];
-  const node = (x, y, w, h, kicker, label, detail, memory = false) => `<g transform="translate(${x} ${y})"><rect class="cell" width="${w}" height="${h}"${memory ? " rx=\"6\"" : ""}/><text class="small mute" x="16" y="25">${kicker}</text><text class="label" x="16" y="51">${label}</text><text class="copy mute" x="16" y="74">${detail}</text></g>`;
-  let body;
-  if (narrow) {
-    body = `${grid(width, height)}${arrowDefs(theme)}<text class="eyebrow mute" x="24" y="36">ONE SOURCE · TWO BOUNDARIES</text><text class="subhead" x="24" y="70">Canonical playbooks stay together.</text>
-${node(40, 108, 310, 92, "SOURCE OF TRUTH", ".claude/skills/", `${facts.skillCount} canonical workflows`)}
-<path class="wire" marker-end="url(#arrow)" d="M195 200V240H108V264"/><path class="wire dash" marker-end="url(#arrow)" d="M195 240H282V264"/>
-${node(24, 274, 168, 104, "DIRECT", "CLAUDE CODE", "kernel + hooks")}${node(198, 274, 168, 104, "DISCOVERED", "CODEX", "AGENTS.md boundary")}
-<path class="wire" marker-end="url(#arrow)" d="M108 378V428H184"/><path class="wire" marker-end="url(#arrow)" d="M282 378V428H206"/>
-${node(40, 438, 310, 96, "SHARED PROJECT MEMORY", ".claude/reference/", `${facts.referenceFileCount} committed topics`, true)}
-<rect class="tag" x="40" y="570" width="310" height="48" rx="6"/><text class="label accent" x="195" y="600" text-anchor="middle">${facts.codexSkillCount} CODEX SKILLS VERIFIED</text><circle class="signal runtime-packet" cx="195" cy="240" r="6"/>`;
-  } else {
-    body = `${grid(width, height)}${arrowDefs(theme)}<text class="eyebrow mute" x="40" y="42">ONE SOURCE · TWO RUNTIME BOUNDARIES</text><text class="headline" x="40" y="92" style="font-size:38px">Playbooks stay canonical.</text><text class="subhead mute" x="40" y="122">Adapters translate discovery and safety rules without copying workflow bodies.</text>
-${node(40, 170, 234, 106, "SOURCE OF TRUTH", ".claude/skills/", `${facts.skillCount} canonical workflows`)}
-<path class="wire" marker-end="url(#arrow)" d="M274 218H348"/><path class="wire dash" marker-end="url(#arrow)" d="M274 250H330V326H590"/>
-${node(358, 170, 212, 106, "DIRECT", "CLAUDE CODE", "kernel · hooks · skills")}${node(600, 170, 240, 106, "DISCOVERED", "CODEX", `${facts.codexSkillCount} skills · AGENTS.md`)}
-<path class="wire" marker-end="url(#arrow)" d="M464 276V314H444"/><path class="wire" marker-end="url(#arrow)" d="M720 276V314H610"/>
-${node(252, 326, 368, 76, "SHARED PROJECT MEMORY", ".claude/reference/", `${facts.referenceFileCount} committed topics`, true)}<circle class="signal runtime-packet" cx="310" cy="218" r="6"/>`;
-  }
-  return svg({
-    width, height, title: "Harness Firmware runtime bus",
-    label: `${facts.skillCount} canonical playbooks serve Claude Code directly and Codex through ${facts.codexSkillCount} skills, with shared project memory.`,
-    themeName,
-    extraCss: "@keyframes runtimePacket{0%,8%{opacity:0;transform:translateX(0)}12%{opacity:1}82%{opacity:1;transform:translateX(280px)}88%,100%{opacity:0;transform:translateX(280px)}}.runtime-packet{animation:runtimePacket 12s linear infinite}",
-    body,
-  });
+  const height = narrow ? 630 : 430;
+  const x = narrow ? 24 : 40;
+  const cardWidth = narrow ? 342 : 382;
+  const card = (left, top, name, kernel, count, detail) => `<g transform="translate(${left} ${top})"><rect class="cell" width="${cardWidth}" height="150"/><text class="label accent" x="20" y="30">${name}</text><text class="subhead" x="20" y="66">${kernel}</text><text class="copy" x="20" y="98">${count}</text><text class="copy mute" x="20" y="126">${detail}</text></g>`;
+  const memoryY = narrow ? 488 : 318;
+  const body = `${grid(width,height)}
+<text class="eyebrow mute" x="${x}" y="36">TWO RUNTIMES · SHARED MEMORY</text>
+<text class="subhead" x="${x}" y="72">Two runtimes. One project.</text>
+${card(x,108,'CLAUDE CODE','CLAUDE.md + hooks',`${facts.skillCount} canonical workflows`,'.claude/skills/')}
+${card(narrow ? x : 458,narrow ? 294 : 108,'CODEX','AGENTS.md',`${facts.codexSkillCount} skills · ${facts.codexNativeCount} native · ${facts.codexAdapterCount} adapters`,'.agents/skills/')}
+<path class="wire active" d="${narrow ? 'M195 258V294 M195 444V488' : 'M231 258V292H649V258 M440 292V318'}"/>
+<rect class="tag" x="${x}" y="${memoryY}" width="${width-2*x}" height="90"/>
+<text class="label" x="${x+20}" y="${memoryY+28}">COMMITTED PROJECT MEMORY</text>
+<text class="copy" x="${x+20}" y="${memoryY+54}">.claude/reference/ · ${facts.referenceFileCount} topics</text>
+<text class="copy mute" x="${x+20}" y="${memoryY+76}">Facts, decisions, commands, and pitfalls</text>`;
+  return svg({width,height,title:'Harness Firmware runtime ownership',
+    label:`${facts.skillCount} Claude Code workflows and ${facts.codexSkillCount} Codex skills, including ${facts.codexNativeCount} native and ${facts.codexAdapterCount} adapters, share committed project memory.`,themeName,body});
 }
 
 function wrapLabel(label, max = 14) {

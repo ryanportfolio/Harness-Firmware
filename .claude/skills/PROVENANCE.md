@@ -11,8 +11,8 @@ LICENSE/NOTICE files in the skill folder.
 
 | Skill | Upstream | License | Our deltas |
 |---|---|---|---|
-| `brainstorming` | [obra/superpowers](https://github.com/obra/superpowers) (Jesse Vincent) | MIT (in folder) | Two-lane scope calibration, authorization-safe artifacts, optional visual companion |
-| `writing-plans` | obra/superpowers | MIT (in folder) | Proportionate plans, useful interfaces and checks, authorized continuation; removed mandatory complete-code duplication and execution-choice gate. Native Codex implementation retained. |
+| `brainstorming` | [obra/superpowers](https://github.com/obra/superpowers) (Jesse Vincent) | MIT (in folder) | Two-lane scope calibration, authorization-safe artifacts, optional visual companion; added an original shared-code refactoring reference for caller compatibility and scoped design decisions. |
+| `writing-plans` | obra/superpowers | MIT (in folder) | Proportionate plans, useful interfaces and checks, authorized continuation; removed mandatory complete-code duplication and execution-choice gate. Native Codex implementation retained. Added an original shared-code refactoring reference for staged changes and caller verification. |
 | `writing-skills` (retired entrypoint) | obra/superpowers | MIT (in both legacy folders) | SKILL.md retired; legacy manuals, examples and scripts retained outside discovery in both runtime folders. Condensed authoring/evaluation guidance moved into addskill with copied MIT license; universal failure-first and automatic publication requirements removed. |
 | `addskill` authoring resource | obra/superpowers writing-skills | MIT (`references/LICENSE` in both runtime folders) | Adapted discovery, structure and behavioral evaluation guidance into optional local authoring references; end-to-end addskill workflow remains homegrown. |
 | `caveman` | Community token-compression pattern (viral skill, author attribution unclear) | Reimplemented here | Intensity tiers, clarity carve-outs, persistence and built-in session cleanup; removed unsupported savings claim and duplicated kernel digest. Explicit prose and scoped code-diff cleanup remain available through existing routes. |
@@ -28,6 +28,14 @@ LICENSE/NOTICE files in the skill folder.
 `why`.
 
 Homegrown skills are MIT, same as the repo (see the root `LICENSE`).
+
+The `evidence-report.md` references in `perf-loop`, `verify-this`, and `wow-loop`,
+and the `shared-code-refactoring.md` references in `brainstorming`,
+`impartial-review`, and `writing-plans`, use concept-only inspiration from
+[`michaelshimeles/skills` at `513f8a24aae6383b00356fa285144b1bc3730dc1`](https://github.com/michaelshimeles/skills/tree/513f8a24aae6383b00356fa285144b1bc3730dc1).
+Both resources were authored here in original wording and packaged in both
+runtimes. No upstream source text was copied; this attribution makes no claim
+about the upstream repository's license.
 
 `perf-loop` now has a Claude entrypoint adapted from the repository's native Codex workflow,
 with the same three domain references and measurement gates. Dispatch remains runtime-specific.
