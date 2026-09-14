@@ -1,13 +1,13 @@
 ---
 name: writing
-description: "Use for text that leaves the session (READMEs, docs, site and UI copy, emails, release notes, application answers) or to unslop, humanize, voice-match, or audit a draft for AI tells. Chat, commits, and PRs stay with caveman."
+description: "Use for text that leaves the session (READMEs, docs, site and UI copy, emails, release notes, application answers) or to unslop, humanize, voice-match, or audit a draft for AI tells. Ordinary session replies use Caveman with built-in Unslop."
 ---
 
 # Writing
 
 For prose that lives outside this session, read by someone who was not here. Write for the reader's next decision: find the job the text has to do, do it early, cut everything that does not help. Nothing that ships reads as machine-made, and nothing distinctive gets sanded off to get there.
 
-Out of scope: chat, commits, PR text (caveman and its digest govern those); code, identifiers, error strings, quoted text (never reworded); research, legal, technical-reference, and book-chapter work when a specialized skill exists.
+Ordinary chat uses Caveman. Deliverables, including commit and PR prose, use normal audience-appropriate language and repository conventions. Code, identifiers, error strings, and quotations remain exact. Use specialized artifact workflows where applicable.
 
 ## Precedence
 
@@ -15,7 +15,7 @@ Out of scope: chat, commits, PR text (caveman and its digest govern those); code
 2. The repo's voice file, if its CLAUDE.md indexes one.
 3. The rules below.
 
-The em dash ban outranks all three.
+Explicit user choices override all style defaults, including punctuation. Preserve facts, uncertainty, quotations, identifiers, and technical meaning.
 
 ## Before drafting
 
@@ -23,7 +23,7 @@ Settle silently: who reads this; what they should understand, decide, or do; wha
 
 Form follows the job. Application answer: answer, one example, what it reveals. Email: purpose, context, next step. Explanation: answer, then how. Proposal: problem, recommendation, why. Memo: decision, then implications. Bio: most relevant work first. Essay: a claim, then earn it. Product copy: the user's outcome, never the product describing itself.
 
-## Hard bans
+## Style defaults
 
 - **Em dashes (U+2014), anywhere.** No en-dash or double-hyphen stand-ins. Period, comma, colon, semicolon, parentheses; middle dot (U+00B7) for label separators.
 - **Trailing periods on headings** and display text.
@@ -82,6 +82,8 @@ Words naming a real thing in the repo ("harness") are terms, not tells.
 
 ## Review sweep, in order
 
+Apply only unoverridden defaults; preserve requested voice and quoted or technical material.
+
 1. Em dashes and stand-ins: replace every one.
 2. Trailing periods off headings.
 3. Negation pivots, including split-sentence forms.
@@ -93,7 +95,7 @@ Words naming a real thing in the repo ("harness") are terms, not tells.
 9. Repeated abstract nouns: rewrite the leaning sentences.
 10. Title says what the reader gets?
 
-Verdict, no exceptions: **PASS** (nothing above still violated) or **FAIL** (each violation named with its rule). Label every remaining note **Requirement** or **Suggestion**; an open requirement means FAIL.
+For an explicitly requested prose review, give **PASS** when no applicable, unoverridden requirement remains, otherwise **FAIL** with the concrete violations. Label notes **Requirement** or **Suggestion**. Ordinary drafting needs no verdict; a requested style is not a violation.
 
 ## Anti-patterns
 

@@ -21,6 +21,10 @@ does not authorize global edits or publication. Read before editing; preserve un
 work and a backup or diff for non-Git files. Route durable project facts through the
 project's memory conventions; keep session events and discoverable code facts out.
 
+For skill authoring or installation, use addskill when available; Codex authoring uses
+built-in skill-creator. A standalone refinement can use the local evaluation resource
+without requiring the repository or another installed skill.
+
 Use static validation for straightforward wording/metadata fixes. For material changes to
 routing, decisions, verification, or retained working behavior, use the local
 [evaluation record](references/evaluation.md) before trials. Compare the baseline and

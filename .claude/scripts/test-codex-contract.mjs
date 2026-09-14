@@ -4,10 +4,12 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { validateCapabilities } from "./check-skill-capabilities.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, "..", "..");
 const failures = [];
+failures.push(...validateCapabilities(root).errors);
 const maxDescriptionChars = 240;
 const maxCatalogChars = 7000;
 
@@ -52,7 +54,7 @@ function frontmatter(relativePath) {
   return { name: value("name"), description: value("description") };
 }
 
-const settings = JSON.parse(read(".claude/settings.json"));
+const settings = exists(".claude/settings.json") ? JSON.parse(read(".claude/settings.json")) : {};
 const disabled = new Set(
   Object.entries(settings.skillOverrides ?? {})
     .filter(([, state]) => state === "off")
@@ -132,8 +134,8 @@ for (const skill of classifications.keys()) {
   }
 }
 
-const initProject = read(".claude/skills/init-project/SKILL.md");
-for (const target of [".claude-plugin/", "bootstrap/", ".github/workflows/validate-template.yml"]) {
+const initProject = read(".claude/skills/init-project/SKILL.md") + read(".claude/skills/init-project/references/profiles.md");
+for (const target of [".claude-plugin/", "bootstrap/", ".github/workflows/validate-template.yml", ".github/ISSUE_TEMPLATE/", "CHANGELOG.md", "CONTRIBUTING.md"]) {
   if (!initProject.includes(target)) failures.push(`init-project: cleanup contract omits ${target}`);
 }
 

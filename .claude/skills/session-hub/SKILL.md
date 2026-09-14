@@ -1,6 +1,6 @@
 ---
 name: session-hub
-description: "Coordinate parallel Claude Code sessions via a shared append-only Desktop HTML hub. Use on /session-hub, 'run parallel sessions on this', joining a hub, or proactively when edits or commits this session did not make appear in the checkout."
+description: "Coordinate parallel Claude Code sessions via a shared append-only HTML hub. Use on /session-hub, 'run parallel sessions on this', joining a hub, or proactively when edits or commits this session did not make appear in the checkout."
 ---
 
 # session-hub: shared ledger for parallel sessions
@@ -12,14 +12,16 @@ One effort, several sessions, one hub file every session reads and appends to. T
 - Use when the effort splits into scopes different sessions can own without touching the same files: separate directories, repos, or lanes (build vs docs vs verification tooling).
 - Skip when all sessions would edit the same few files. Parallelism there loses to merge conflicts; run serial instead and say so.
 - Skip for single-session tasks. The hub earns its overhead only with 2+ concurrent sessions.
-- Never open a second hub for an effort. Before creating one, check the Desktop for an existing `HUB-*.html` and join it.
+- Never open a second hub for an effort. Before creating one, check the established effort location (Desktop or authorized workspace) for an existing `HUB-*.html` and join it.
 
 ## Hub file
 
-- Location: the user's Desktop, named `HUB-<effort-slug>.html`, one per effort.
+- Location: the user's Desktop when accessible and authorized; otherwise use an authorized workspace location and share its absolute path with every participant. Name it `HUB-<effort-slug>.html`, one per effort.
 - Self-contained HTML with `<meta http-equiv="refresh" content="15">` so an open browser tab updates itself. No external assets, no scripts required.
 - Created once from `template.html` in this skill's directory (fill the title placeholder). Never rewrite the file wholesale after creation.
 - Two permanent anchors: `<!-- HUB:ROSTER:END -->` and `<!-- HUB:LOG:END -->`. Every write is an insert immediately before one of them. Append-only: never edit or delete another session's entries, including typos; correct with a new entry.
+
+The hub is a cooperative ownership ledger, not an OS lock or atomic transaction. Use exposed messaging and nonoverlapping file ownership; verify inserts survived after writing. If concurrent writes keep colliding, designate one writer or serialize updates. Do not claim the HTML enforces exclusivity.
 
 ## Protocol
 

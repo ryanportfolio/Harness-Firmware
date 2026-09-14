@@ -21,7 +21,7 @@ separate ports and build directories. Confirm the preview serves the intended ch
 
 Independent review requires separate agents. Spawn subagents with `fork_turns: "none"`
 and self-contained briefs by default. Critics always start fresh. Use native subagents,
-not new sidebar tasks. Keep model settings inherited unless the user directs otherwise.
+not new sidebar tasks. Honor explicit user model choices; otherwise inherit the configured model. Report an unavailable requested model rather than silently substituting it.
 If independent context or a required evidence tool is unavailable, record the affected
 check as unavailable and continue useful work without claiming that gate passed.
 
@@ -67,7 +67,7 @@ progress. Select the next ready scope by blockers, severity, and dependencies. R
 never resets the budget or silently restarts the artifact.
 
 Default budget: 12 implementation-and-review rounds across the entire run, including
-initial attempts and repairs after final review. Reserve a round before dispatching its
+initial attempts, any competing candidate writers, and repairs after final review. Reserve a round before dispatching its
 writer. Interrupted or failed attempts still count; review-only passes do not. Track
 critic retries separately and change the evidence method after two consecutive identical
 review failures. Honor explicit user limits in place of the default. Exhaustion prevents

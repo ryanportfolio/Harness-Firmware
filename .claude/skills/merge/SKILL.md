@@ -1,100 +1,47 @@
 ---
-description: Use only when the user explicitly asks to enable session-wide automatic commit, push, PR, and merge; not for one-shot shipping requests.
+name: merge
+description: "Use when the user explicitly requests a merge or enables session-wide automatic commit, push, PR, and merge. A one-shot request does not enable persistent publication."
 ---
 
-# Merge — Auto-Merge Mode (Session-Wide)
+# Merge verified work
 
-> Note: inside a git worktree this skill may be exposed under a directory-scoped name (e.g. `.claude/worktrees/<name>:merge`). Invoke the scoped name — same skill, same behavior.
+Determine authorization first. A plain merge request applies to the current work only.
+Enable persistent auto-merge only when explicitly requested as a session-wide mode; announce
+that scope in plain prose. Stop it when the user asks or the session ends. A skill mentioning
+merge does not grant publication authority. Reading or editing this skill does not activate it.
 
-Invoking `/merge` does NOT do a one-off merge. It **flips on Auto-Merge Mode for the rest of the session**, like `/caveman` persists. From the moment it is on, every time a task is complete and verified (to the extent this environment allows), you run the **integration cycle** below automatically — no waiting to be asked, no per-merge confirmation.
+## Integration
 
-Invoking `/merge` IS the user's standing authorization to merge into `main` repeatedly for the session. That is why there is no per-merge confirm gate (see [Why no confirm](#why-no-per-merge-confirm)).
+1. Inspect repository, remote, branch, working changes, and existing PR. Confirm the target
+   branch from the task or repository default. Preserve unrelated work. For detached HEAD
+   or work on the target branch, create a task branch before committing; respect any branch
+   explicitly chosen by the user. Do not modify another checkout without authorization.
+2. Complete relevant local checks. Stage explicit paths, inspect the staged diff, commit,
+   and push. Never bypass hooks. Reuse the branch's open PR; create one if needed with a
+   description of final behavior and validation. Pass multiline bodies through a file or
+   structured argument. Verify PR base, head, and remote before continuing.
+3. Fetch the target branch and inspect mergeability. Resolve unambiguous conflicts while
+   preserving both changes' intent. Investigate semantic conflicts; ask only when resolution
+   needs a missing user decision. Reverify affected behavior and push before checking CI.
+4. Inspect **all PR checks** with `gh pr checks --json name,bucket,state,workflow,link` or
+   the current equivalent. Wait for pending checks with bounded monitoring. Diagnose failed
+   checks and fix in scope; do not rely only on branch protection or MERGEABLE. Verify the
+   expected workflows actually ran. Explain absent, skipped, or unavailable required checks;
+   they do not count as passing.
+   Defer merging while a required check is absent, skipped, or unavailable unless the
+   established verification contract explicitly permits that outcome.
+   A repository with no CI can use its established local verification contract, with that
+   limit reported. Never bypass checks with admin options.
+5. Re-read the PR head after checks. If it changed, verify the new content and checks again.
+   Squash is this repository's default unless the user or target repository specifies
+   otherwise. Use `gh pr merge <number> --squash --match-head-commit <verified-head>` when
+   supported. If no atomic head guard exists, disclose that limitation and use a supported
+   guarded API or defer; do not silently merge unverified new commits.
+6. Verify the PR is merged and fetch the target ref to confirm the merge commit. Report
+   the PR and observed result. Keep the branch unless cleanup was requested. After squash, start the next change on a new
+   task branch from the updated target while preserving uncommitted work. Never reset
+   unrelated work, force-push, or push directly to the target branch.
 
-## Step 0: Activate the mode
-
-On `/merge`, announce activation in **plain prose** (not caveman), so the user can immediately correct a misread of this standing authorization. Say, concisely:
-
-> **Auto-Merge Mode is ON for this session.** From now on, when a task is complete I will, without asking: commit the touched files, push, ensure a PR exists, and merge it into `main` (resolving conflicts where unambiguous). The session branch is kept the whole session. Say "stop merge" to turn this off.
-
-Then continue the current work. The cycle fires on the **next** task completion (and every one after), not retroactively.
-
-## The Integration Cycle
-
-Run this whenever a task is complete and verified. "Complete" = the requested change is finished and verified to the extent this environment allows (read code / logs / headless rasterize) — NOT mid-task, exploratory, or throwaway work. Never fabricate verification to trigger the cycle.
-
-### 1. Identify the branch
-- `git branch --show-current`.
-- If on `main` (should not happen mid-session): create a session branch first, never commit to `main` directly. The one session branch is reused for the whole session.
-
-### 2. Commit + push the work
-- Stage **only the files this task touched** — never blanket-commit unrelated changes (`git status --short` to see what's there).
-- Commit with a clear message; end with the standard `Co-Authored-By:` trailer.
-- `git push` (set upstream on first push of the branch).
-
-### 3. Ensure a PR exists — reuse the open one, never open a second
-- Check for an existing **open** PR on this branch first: `gh pr list --head "$(git branch --show-current)" --state open --json number,url`.
-- If one is open, that IS the PR for this unit of work — the `git push` in step 2 already updated it. Do not open another. **One open PR per unit of work.**
-- Open a fresh PR only when none is open — the branch has no PR yet, or its prior PR is `MERGED`/`CLOSED` (a reused branch's old PR closes after each merge): `gh pr create --base main --fill` (or use the `pr` skill). Confirm `baseRefName` is `main`.
-
-### 4. Sync with main + check conflicts
-- `git fetch origin`.
-- Inspect `mergeable` / `mergeStateStatus`. `main` advances fast (other sessions land work), so expect occasional divergence.
-- If clean (`MERGEABLE`), go to step 6.
-
-### 5. Resolve conflicts (like normal)
-If `mergeable` is `CONFLICTING` or the merge is blocked by divergence:
-- `git merge origin/main` into the session branch.
-- Resolve conflicts the normal way: open each conflicted file, keep both sides' intent, remove markers, `git add`, commit the merge, `git push`.
-- **Auto-clarity carve-out:** resolve only conflicts where the correct resolution is unambiguous. If both sides changed the same logic and the right merge is a real judgment call (risk of silently dropping someone's work), **stop, report the conflicted hunks in plain prose, and ask** before committing. Do not guess on semantic conflicts.
-- Re-check `mergeable`, then proceed.
-
-### 6. Merge into main
-```
-gh pr merge <number> --squash
-```
-- `--squash` → the PR's commits collapse into one commit on `main`. This is what the user means by `/merge`; use it as the first and only attempt, and don't probe other methods first.
-- Many repos allow squash *only*. Trying `--merge` there fails outright with `GraphQL: Merge commits are not allowed on this repository. (mergePullRequest)`, and `--rebase` fails the same way when rebase merging is off. To see what a repo permits: `gh api repos/{owner}/{repo} --jq '{merge:.allow_merge_commit,squash:.allow_squash_merge,rebase:.allow_rebase_merge}'`.
-- Resulting history is `<title> (#1234)`, not `Merge pull request #...`. Don't infer the method from existing history and don't "match" an older style.
-- **No `--delete-branch`** — the one session branch is kept until the session is done.
-- **No `--merge` / `--rebase`** unless the user explicitly asked — squash is the default.
-- **No `--admin`** — do not bypass branch protection or failing required checks. If the merge is blocked by checks/protection, report why and stop (pause the cycle for that task); do not force it.
-
-### 7. Re-sync the session branch (squash-specific, do NOT skip)
-A squash-merge lands the branch's work on `main` as **one new commit whose parents do not include the branch's commits**. The session branch is therefore instantly divergent, and its original commits are still not ancestors of `main`. Because this skill reuses ONE branch for the whole session, this happens after *every* merge, not just once. Reusing the branch for the next task without syncing makes the next PR's three-dot diff replay work that already landed, which surfaces as phantom conflicts or as silently re-applying superseded content.
-
-After each successful squash-merge, before starting the next task:
-```
-git fetch origin && git merge origin/main
-```
-The incoming squash commit carries content identical to what the branch already has, so this is normally clean. Resolve anything that does conflict under the step 5 rules (unambiguous only), then `git push`.
-
-Sanity check that it worked: `git diff origin/main --stat` should be empty, or show only work that genuinely hasn't merged yet.
-
-### 8. Report
-Confirm the merge landed, give the PR URL, note the branch was kept. Verify before claiming: `git fetch origin && git log origin/main --oneline -1` should show the squash commit — a locally-stale `origin/main` will otherwise show the *previous* PR and make a successful merge look like it did not land. If anything blocked it (failing checks, protection, unresolved/ambiguous conflict), report the exact `gh`/`git` output and the reason — never claim success you did not verify.
-
-## Why no per-merge confirm
-
-Merging into `main` is outward-facing and hard to fully undo. The single confirmation is **turning the mode on** — that is the explicit, standing authorization for the session. After that, per-merge prompts would defeat the purpose. The safety valves that remain:
-- the mode only fires on genuinely-complete, verified work;
-- ambiguous/semantic conflicts still stop and ask;
-- branch protection / required checks are still respected (no `--admin`);
-- the user can say "stop merge" at any time.
-
-## Deactivation
-
-Turn the mode OFF when the user says "stop merge", "stop auto-merge", "normal mode for merging", or the session ends. The session branch is **not** deleted on deactivation — clean up manually only when the session's work is truly done.
-
-## Anti-patterns
-
-- Don't merge mid-task, exploratory, or unverified work — "complete + verified" is the gate.
-- Don't fabricate verification just to trigger the cycle.
-- Don't blanket-commit unrelated files — stage only what the task touched.
-- Don't open a second PR for a branch that already has an open one — reuse it (`gh pr list --head <branch>` first). One open PR per unit of work.
-- Don't push straight to `main` via `git push` — always integrate through `gh pr merge`.
-- Don't delete the branch (`--delete-branch`) — one branch for the whole session.
-- Don't switch away from squash (to `--merge`/`--rebase`) on your own — squash is the default; other methods need an explicit ask.
-- Don't reuse the session branch for the next task without the step 7 re-sync — squash leaves it divergent every time.
-- Don't bypass protections/checks (`--admin`) without an explicit ask — report the block and stop.
-- Don't guess on semantic merge conflicts — resolve the unambiguous ones, stop and ask on the rest.
-- Don't fabricate success — report the real `gh pr merge` / `git merge` outcome, checked against freshly-fetched refs.
+Use current tool help for unavailable options. On interruption, inspect actual Git and PR
+state before retrying; a lost command response does not mean the write failed. Pause only
+the blocked action, finish independent authorized work, and report the exact blocker.

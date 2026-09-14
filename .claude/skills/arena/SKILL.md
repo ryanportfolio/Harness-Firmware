@@ -26,26 +26,26 @@ The N candidates receive the same prompt, so the prompt is the contract. Get it 
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric. State what success looks like for *this* task, then turn it into 3-6 concrete gradeable criteria. Concrete: "Adds a --dry-run flag that skips writes". Vague: "code is correct". The rubric is the picker's tool in Phase D; candidates only see the task.
-3. Pick the runners. Default: 3 subagents on the session model when it meets the kernel floor (Opus, the latest Fable, or above), otherwise on the floor model; never Sonnet or Haiku, each prompted from a distinct angle (e.g. simplest-thing-that-works, robustness-first, user-experience-first) so diversity comes from framing, not chance. When the Codex CLI is available and the task warrants cross-vendor diversity, one candidate may run there (see codex-review for driving it). Spawn more candidates when the arena covers multiple design directions.
+3. Pick the runners. Default: 3 candidates, scheduled within exposed capacity (count the parent and active workers; use batches if necessary). Honor explicit user model choices and required floors, otherwise inherit the configured session model; disclose unavailable choices rather than silently substituting. Each is prompted from a distinct angle (e.g. simplest-thing-that-works, robustness-first, user-experience-first) so diversity comes from framing, not chance. When the Codex CLI is available and the task warrants cross-vendor diversity, one candidate may run there (see codex-review for driving it). Spawn more candidates when the arena covers multiple design directions.
 4. Assign output paths. Each candidate writes to its own location: a git worktree where possible (worktree isolation when spawning), otherwise `.tmp/arena-<slug>/candidate-<n>/`. N candidates writing to the same path is shared mutable state and corrupts the comparison.
 
 ## Phase B: Fan out
 
-Spawn all N subagents in one message so they run concurrently, each with the task, the path to any shared grounding, its own output path, and instructions to produce both the artifact and a short rationale.
+Spawn each capacity-bounded batch with fresh context, each with the task, the path to any shared grounding, its own output path, and instructions to produce both the artifact and a short rationale.
 
-The rationale is mandatory. Without it, the parent cannot tell whether a candidate's structure is principled or accidental, which makes Phase E grafting unreliable. Each rationale names the alternatives the candidate considered and what it rejected.
+Store each rationale separately from its judge-facing artifact. Keep angle/vendor labels and rationale paths in a parent-only record. The rationale is mandatory. Without it, the parent cannot tell whether a candidate's structure is principled or accidental, which makes Phase E grafting unreliable. Each rationale names the alternatives the candidate considered and what it rejected.
 
 If a candidate fails to produce output, proceed with N-1 and note the dropout in the synthesis record.
 
 ## Phase C: Cross-judge
 
-After all Phase B candidates complete, spawn one fresh read-only judge subagent. Prefer a different vendor from the candidates (Codex CLI) when available; otherwise a fresh same-model subagent still removes the parent's authorship bias. The judge sees the rubric and the candidates by path label only — never which angle or vendor produced which — scores each criterion, and recommends a base with rationale. It runs in parallel with the parent's own reading in Phase D, not with the candidates themselves: spawning while candidates are still writing means the judge sees partial outputs and reports them as dropouts.
+After all Phase B candidates complete, spawn one fresh read-only judge subagent. Prefer a different vendor from the candidates (Codex CLI) when available; otherwise a fresh same-model subagent still removes the parent's authorship bias. Give the judge a separate directory containing only neutral-labeled artifact snapshots and the rubric. Exclude candidate rationales, angle/vendor metadata, revealing filenames, parent conclusions, and access instructions for the parent-only record; remove incidental author metadata without changing the artifact being compared. Record any unavoidable recognizable content as a blinding limitation. The judge scores each criterion and recommends a base with evidence. It runs in parallel with the parent's own reading in Phase D, not with the candidates themselves: spawning while candidates are still writing means the judge sees partial outputs and reports them as dropouts.
 
 ## Phase D: Pick a base
 
 Read every candidate end to end before picking. Skimming N candidates surfaces only the candidate whose surface looks most familiar.
 
-Score each candidate against the rubric criterion by criterion, not on holistic feel. Compare against the cross-judge. Agreement on the base confirms the pick. Disagreement means one of you is biased or the rubric was ambiguous; read both rationales before deciding.
+Score each candidate against the rubric criterion by criterion, not on holistic feel. Compare against the cross-judge. Agreement is a preference signal, not proof of correctness. Disagreement calls for checking the cited evidence and criteria; it does not prove bias. Read both assessments before deciding, and verify the artifact independently of votes.
 
 Pick the base on which candidate a future maintainer can extend most easily without breaking invariants. Prefer the cleaner boundary or smaller surface area when two feel tied.
 
@@ -59,7 +59,7 @@ Fold each graft in by hand, redesigning it to fit the base's shape. Don't paste 
 
 Record what was grafted, from which candidate, and what was rejected and why. The rejection notes are the highest-signal part of the record: future readers learn from what you considered and dropped, not just what you kept.
 
-When N candidates converge on the same shape, that is a strong agreement signal. Note the convergence in the record and ship the consensus shape; no graft needed. When N candidates wildly diverge, Phase A was under-specified. Reframe and re-run rather than averaging the divergence.
+When candidates converge, record the shared shape and verify it against the contract; shared assumptions may still be wrong, and no graft may be needed. Divergence can expose real alternatives or an underspecified contract. Inspect it before deciding whether to reframe; do not average incompatible designs. Additional runs respect the user's budget and any CLI retry authorization.
 
 ## Phase F: Verify
 

@@ -70,6 +70,8 @@ State the rejection reason. Popularity is not evidence.
 
 Read [references/synthesis-and-validation.md](references/synthesis-and-validation.md) completely. Choose the canonical skill location from repository instructions; do not assume `.codex/skills`, `.agents/skills`, or `.claude/skills`.
 
+Select the authoring runtime explicitly from the request and repository ownership: Claude uses `addskill` authoring guidance; Codex uses its built-in `skill-creator` through `addskill`. For both runtimes, choose native versus adapter ownership deliberately and validate discovery in each target. Do not infer Claude-canonical ownership from this workflow's source location.
+
 Prefer:
 
 - one verb-led, repo-specific skill name;

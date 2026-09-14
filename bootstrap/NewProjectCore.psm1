@@ -7,8 +7,8 @@ $script:RequiredProjectFiles = @(
     '.claude\scripts\sync-codex-skills.mjs'
 )
 
-# Mirrors TEMPLATE_ONLY_PATHS in new-claude-project.sh and the Step 3 deletion
-# list in .claude\skills\init-project\SKILL.md. Keep all three in sync. These
+# Mirrors TEMPLATE_ONLY_PATHS in new-claude-project.sh and the potential cleanup
+# paths in .claude\skills\init-project\references\profiles.md. Keep all three in sync. These
 # files maintain or distribute the template itself; a spawned project must not
 # inherit them as if they were its own history, process, or support links.
 $script:TemplateOnlyPaths = @(

@@ -7,8 +7,9 @@ retain adapter behavior. Maintain native skills directly in `.agents/skills/<nam
 they do not load Claude workflow bodies. Sync preserves native content and validates
 metadata and local references. Legacy `skillOverrides: off` remains disabled. Move a
 maintained skill outside discovery explicitly before disabling it. Ownership is separate
-from the capability classifications below. Use built-in `skill-creator` for Codex authoring;
-`writing-skills` remains disabled for Codex.
+from the capability classifications below. `writing-skills` and `unslop` entrypoints are
+retired in both runtimes. Use `addskill` for create/import/update/install; it uses built-in
+`skill-creator` as the Codex authoring mechanism.
 
 Personal installations are explicit copies of these sources. See `docs/codex-skills.md`
 for comparison, backup, reconciliation, and discovery checks.
@@ -21,8 +22,8 @@ for comparison, backup, reconciliation, and discovery checks.
 
 | Status | Skills |
 |---|---|
-| Native | `addskill`, `babysit-ci`, `brainstorming`, `bro`, `caveman`, `enhance-prompt`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `recall`, `refine`, `session-hub`, `showpiece`, `unslop`, `verify-this`, `writing`, `writing-plans` |
-| Adapted | `astra-review`, `automate-me`, `claude-review`, `codex-review`, `init-project`, `lab`, `optimize-context`, `sync-starter`, `writing-skills` |
+| Native | `addskill`, `babysit-ci`, `brainstorming`, `bro`, `caveman`, `enhance-prompt`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `recall`, `refine`, `session-hub`, `showpiece`, `verify-this`, `writing`, `writing-plans` |
+| Adapted | `astra-review`, `automate-me`, `claude-review`, `codex-review`, `init-project`, `lab`, `optimize-context`, `sync-starter` |
 | Capability-gated | `advocate`, `arena`, `dare`, `impartial-review`, `long-horizon`, `perf-loop`, `why`, `wow-loop` |
 | Dangerous | `adopt-repo`, `merge` |
 | Claude-only | None in the starter source set. |
@@ -32,3 +33,8 @@ for comparison, backup, reconciliation, and discovery checks.
 `perf-loop` is a standalone Codex skill requiring fresh independent measurement and regression reviewers, plus a working measurement path for each performance claim. Benchmarks and competing resource-heavy work run serially on shared hardware. Missing capabilities permit scoped progress but leave the full verification gate incomplete.
 
 `node .claude/scripts/test-codex-contract.mjs` verifies that every active skill has exactly one classification and that Codex routing metadata stays within its context budget.
+
+`unslop` and `writing-skills` are retired from both discovery catalogs. Route cleanup to
+Caveman/Writing and authoring to addskill. Legacy licensed writing-skills resources remain.
+Run `node .claude/scripts/check-skill-capabilities.mjs` to check intended runtime coverage,
+ownership, resource closure and retirement. The generated catalog is in `docs/codex-skills.md`.

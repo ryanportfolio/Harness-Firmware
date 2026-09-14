@@ -1,80 +1,49 @@
 ---
 name: verify-this
-description: "Verify a claim with fresh local evidence: restate it falsifiably, capture baseline and treatment, compare, return VERIFIED, NOT VERIFIED, or INCONCLUSIVE. Use for /verify-this, \"prove it works\", \"did this fix it\", \"show me the evidence\"."
+description: "Verify a claim with fresh local evidence and return VERIFIED, NOT VERIFIED, or INCONCLUSIVE. Use for /verify-this, 'prove it works', 'did this fix it', or 'show me the evidence'."
 ---
 
-# Verify this
+# Verify a claim
 
-Verification is not a recap. It proves or disproves a specific claim with repeatable evidence.
+Restate the claim as an observable condition and acceptance criterion. Infer these from
+the request and context when clear. Investigate discoverable facts before asking; ask only
+when a material criterion remains unresolved. Do not invent a threshold for a vague claim.
 
-## When to use
+Choose the smallest surface that can disprove the claim, then select the evidence needed:
 
-- The user asks "verify this", "prove it works", "did this fix it", or "show me the evidence".
-- A bug fix needs a before/after repro.
-- A UI, CLI, API, performance, or memory claim needs measurement.
-- A test passes but the user-visible behavior still needs confirmation.
+- **Current state:** inspect actual output or behavior against the criterion. An export's
+  dimensions or a command's current result needs no historical baseline.
+- **Change:** capture baseline and treatment using comparable commands, data, warmup,
+  and environment. A passing current-state check alone cannot establish improvement.
+- **Causation:** also isolate the proposed cause, using a controlled change, rollback/reapply,
+  or another justified design. A before/after difference with plausible competing causes
+  supports a change, not the stronger causal claim.
 
-Do not use this for vague claims like "the code is cleaner". Ask for a measurable claim first.
+Verify at the claimed layer: focused tests or a repro for code behavior, real command output
+for CLI behavior, HTTP responses for APIs, rendered evidence for layout, and measurements
+for performance or memory. Confirm that a UI under test serves the intended current code.
+Prefer text capture for textual facts and screenshots for visual facts. Do not substitute
+a code read for observed behavior or a screenshot for a performance measurement.
 
-## Workflow
+Keep commands, outputs, and artifact paths sufficient to reproduce consequential findings.
+When useful, save minimal evidence under `.tmp/verify-this/<claim-slug>/<run-id>/`;
+identify the inspected source/output with content hashes and record the command and environment; avoid retaining
+sensitive payloads unnecessarily. Work within existing authorization and storage constraints.
+Do not alter unrelated state to manufacture a baseline.
 
-1. Restate the claim in falsifiable form: condition, metric, and threshold.
-2. Pick the smallest local surface that can disprove it.
-3. Capture a baseline from the old state: merge base, parent commit, failing branch, or current broken repro.
-4. Capture treatment from the changed state with the same command, data, warmup, and environment.
-5. Compare raw artifacts: numbers, screenshots, terminal transcripts, HTTP responses, profiles, heap snapshots, or test output.
-6. Return exactly one verdict: `VERIFIED`, `NOT VERIFIED`, or `INCONCLUSIVE`.
+Return one verdict with the claim, evidence, and material limits:
 
-## Local surfaces
+- `VERIFIED`: current-state evidence meets the criterion, or a valid comparison supports
+  the claimed change without an evident confound. A causal verdict additionally needs
+  evidence isolating the proposed cause from plausible competing explanations.
+- `NOT VERIFIED`: valid evidence contradicts the claim or misses its criterion.
+- `INCONCLUSIVE`: evidence is unavailable, noisy, or invalid; a required comparative
+  baseline is missing; or the acceptance criterion remains unresolved.
 
-- Code behavior: focused unit/integration tests or a minimal repro script.
-- CLI/TUI behavior: a terminal transcript of the real command.
-- UI behavior: browser screenshots, page-text extraction, accessibility snapshots (see the `run` skill and the sentinel check in `pitfalls.md` — confirm the page under test is serving the current code before trusting any capture).
-- API behavior: local HTTP/RPC request and response diff.
-- Performance: same-machine baseline/treatment timings or CPU profiles.
-- Memory: heap snapshots before and after the suspected operation.
-
-Prefer the text form of the evidence whenever the fact is text: page text, accessibility
-snapshot, log line, test output, response body. Text diffs exactly and cites in one line, while
-a screenshot of the same fact has to be re-read and described. Screenshot when the claim is
-genuinely visual (layout, spacing, color, motion), and pair it with the text capture when both
-apply.
-
-## Artifact layout
-
-When safe to write artifacts:
-
-```text
-.tmp/verify-this/<claim-slug>/
-├── claim.md
-├── baseline/
-├── treatment/
-├── diff/
-└── verdict.md
-```
-
-If artifacts may contain sensitive code, prompts, screenshots, HTTP bodies, or heap data, keep only the minimal inline evidence unless the user agrees to disk storage.
-
-## Verdict rules
-
-- `VERIFIED`: baseline and treatment differ in the predicted direction, by the claimed threshold, with no obvious confound.
-- `NOT VERIFIED`: the behavior is unchanged, moves the wrong way, or misses the threshold.
-- `INCONCLUSIVE`: no valid baseline, noisy signal, failed measurement, or an environment difference invalidates the comparison.
-
-## Output
-
-```text
-VERIFIED | NOT VERIFIED | INCONCLUSIVE
-Claim: <falsifiable claim>
-
-Evidence:
-<metric/artifact>: baseline=<...>, treatment=<...>, delta=<...>, threshold=<...>
-
-Reasoning:
-<one tight paragraph naming the evidence and any confounds>
-```
-
-Do not soften a negative result. A clear `NOT VERIFIED` is useful.
+For comparisons, report baseline, treatment, and the relevant difference. For current-state
+claims, report the observed result and criterion. Preserve uncertainty; missing evidence
+is not proof of failure. Once sufficient checks pass, repeat or broaden only for relevant
+changes, failures, or unresolved concerns. Report unavailable required checks honestly.
 
 ---
 Adapted from the `verify-this` skill in [cursor/plugins cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (MIT).

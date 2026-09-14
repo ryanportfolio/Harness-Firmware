@@ -37,7 +37,7 @@ This is the Codex boundary for repositories using the AI Operating System starte
 
 - `.claude/skills/` remains Claude’s library. Codex uses maintained native skills and generated adapters under `.agents/skills/`, selected by `.agents/skill-modes.json`. Read native files directly and resolve resources there; adapters resolve resources from their canonical Claude skill. Treat `$ARGUMENTS` in adapters as invocation input.
 - Read relevant `.claude/reference/` material before unfamiliar work and `.agents/CODEX-SKILL-COMPATIBILITY.md` before adapted, gated, or dangerous skills.
-- After skill, ownership-mode, or legacy override changes run `node .claude/scripts/sync-codex-skills.mjs --write`. Sync preserves native files; do not hand-edit marked generated adapters. Use the built-in `skill-creator` for Codex skill authoring.
+- After skill, ownership-mode, or legacy override changes run `node .claude/scripts/sync-codex-skills.mjs --write`. Sync preserves native files; do not hand-edit marked generated adapters. Use `addskill` for create/import/update/install; it uses built-in `skill-creator` for Codex authoring. Update `.agents/skill-capabilities.json` and run `node .claude/scripts/check-skill-capabilities.mjs` for coverage, resources and retired routes.
 - For Codex setup, skills, or runtime troubleshooting, inspect local configuration, exposed tools, and relevant installed sources first. Consult official documentation when local evidence is insufficient or current product behavior needs verification.
 - Tool mapping: `.agents/codex-tools.md`.
 

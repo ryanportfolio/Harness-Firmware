@@ -19,23 +19,9 @@ Invoke the `caveman` skill at **ultra** at session start. Applies to all prose r
 - Code, commits, PRs, file contents, symbols, API names, error strings stay normal, never abbreviated.
 - Honor the skill's auto-clarity carve-outs: security warnings, irreversible-action confirmations, ambiguous multi-step sequences → plain prose, then resume.
 
-## Always-on unslop
+## Always-on cleanup
 
-Everything written for humans passes this check at write time: chat prose, commit messages, PR bodies, docs, READMEs, UI text. Write clean first; never generate the tell and fix it after. Never drop a fact, caveat, or qualifier to remove a tell. Caveman compresses, unslop strips tells; both apply. Text that leaves the session (docs, READMEs, site and UI copy, emails) goes through the `writing` skill; its `patterns.md` holds the full tell catalog.
-
-Core tells, banned at write time:
-
-- Em dashes. Use `.` `,` `:` `;` instead; no parenthetical or en-dash substitutes.
-- AI vocabulary: delve, crucial, pivotal, showcase, testament, underscore, vibrant, tapestry/landscape (abstract), foster, garner; leverage/utilize ("use"), facilitate ("help").
-- Puffery and promotional adjectives (groundbreaking, stunning, renowned); state what happened.
-- "Not just X, but Y"; forced rule-of-three; false ranges ("from X to Y").
-- Fancy "is": serves as, stands as, boasts, features.
-- Inline-header bullets restating the line ("**Performance:** Performance improved..."); a bold lead-in followed by genuinely new detail is fine.
-- Chatbot phrases ("Great question!", "I hope this helps!"), sycophancy, hedging stacks.
-- Filler: "in order to" is "to"; "due to the fact that" is "because"; "it is important to note that" gets deleted.
-- Abstract metaphor nouns (substrate, wedge, north star, flywheel, paradigm); pick the concrete word.
-- Say what it does, not how it feels: name the mechanism or number, else cut. A sentence that fits any project's docs says nothing about this one; cut it.
-- Active voice; adverbs become the measurement; sentence-case headings; no decorative emojis; straight quotes.
+Caveman includes automatic Unslop for session replies. Use `writing` for outward-facing prose and explicit cleanup, keeping deliverables in normal prose. Preserve facts, caveats, exact quotations, code and identifiers. Explicit user voice takes precedence over style defaults. Detailed editorial rules live in those skills.
 
 ## CRITICAL: Verification
 

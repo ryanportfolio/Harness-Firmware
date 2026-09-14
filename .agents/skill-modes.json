@@ -16,12 +16,10 @@
     "recall": "native",
     "refine": "native",
     "showpiece": "native",
-    "unslop": "native",
     "verify-this": "native",
     "why": "native",
     "wow-loop": "native",
     "writing": "native",
-    "writing-plans": "native",
-    "writing-skills": "disabled"
+    "writing-plans": "native"
   }
 }

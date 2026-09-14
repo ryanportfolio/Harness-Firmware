@@ -56,7 +56,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   } else {
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
     const modes = JSON.parse(fs.readFileSync(path.join(root, ".agents/skill-modes.json"), "utf8")).skills;
-    const overrides = JSON.parse(fs.readFileSync(path.join(root, ".claude/settings.json"), "utf8")).skillOverrides ?? {};
+    let overrides = {};
+    try {
+      overrides = JSON.parse(fs.readFileSync(path.join(root, ".claude/settings.json"), "utf8")).skillOverrides ?? {};
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
     const names = Object.entries(modes)
       .filter(([name, mode]) => mode === "native" && overrides[name] !== "off")
       .map(([name]) => name);
