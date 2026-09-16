@@ -113,3 +113,10 @@ intermittently resets to the parent workspace directory. Symptoms observed:
 `npx tsc` resolving the dummy "not the tsc command you are looking for"
 package from the wrong directory, and `git add` failing with "fatal: not a git
 repository". Start compound commands with `cd <repo> &&` or use `git -C`.
+
+## README panels embed skill byte counts (2026-09-16)
+
+`assets/readme/skills-*.svg` print the total on-demand skill size, so any edit to a
+`SKILL.md` makes them stale and `scripts/readme/verify.mjs` fails CI on main. Run
+`node scripts/readme/build.mjs` before opening a PR that touches `.claude/skills/`, and
+commit only the panels whose content changed (autocrlf marks the rest modified).
