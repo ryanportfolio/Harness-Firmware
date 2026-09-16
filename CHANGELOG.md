@@ -13,6 +13,11 @@ condensed.
 
 ### Changed
 
+- `refine` gates edits on three checks before changing anything: the failure is
+  attributable to an instruction, tool, or configuration; the causal link is stated from
+  evidence; and the rule being changed was active in the failure. It also checks what the
+  agent saw and remembered before blaming instructions. Informed by ModularRSI's
+  failure-mode checklist, in original wording.
 - Evidence workflows package compact reports and comparable before/after presentation.
   Design, planning and review workflows add selective shared-code refactoring guidance
   for Claude and Codex, with standalone resources and existing authorization preserved.
