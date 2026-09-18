@@ -1,6 +1,6 @@
 ---
 name: recall
-description: "Use before unfamiliar project-area work, when retrieving project decisions or pitfalls, or when saving an authorized durable project fact."
+description: "Use before unfamiliar project-area work, when retrieving project decisions or pitfalls, when saving an authorized durable fact, or when a quirk just cost a retry, a backed-out change, or a user correction and belongs in pitfalls."
 ---
 
 # Retrieve and maintain project knowledge
