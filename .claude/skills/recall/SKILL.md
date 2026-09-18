@@ -1,6 +1,6 @@
 ---
 name: recall
-description: "Use before unfamiliar project-area work, when retrieving project decisions or pitfalls, or when saving an authorized durable project fact."
+description: "Use before unfamiliar project-area work, when retrieving project decisions or pitfalls, when saving an authorized durable fact, or when a quirk just cost a retry, a backed-out change, or a user correction and belongs in pitfalls."
 ---
 
 # Retrieve and maintain project knowledge
@@ -14,14 +14,18 @@ For lookup, answer from relevant entries with evidence pointers. If no entry ans
 question, inspect the project or state the gap. Do not create facts or edit memory merely
 because a lookup found nothing. Stay within the requested project's history and references.
 
-Save only when the user requested or authorized capture and all these conditions hold:
+Pitfalls carry standing authorization. When a project quirk cost a wasted attempt, a
+backed-out change, or a user correction in this session, and its cause is confirmed rather
+than guessed, save it to the project's pitfalls reference before the task ends without
+asking. Waiting for an explicit save request is how quirks get lost. Every other durable
+fact saves only when the user requested or authorized capture. All saves need:
 
 - The fact changes future decisions and cannot be recovered cheaply from the code.
 - It is a durable constraint, decision, or recurring pitfall, not a task status or PR event.
 - Evidence supports it; uncertainty and exceptions are preserved.
 
-If capture lacks authorization, finish useful lookup and propose the specific note.
-Existing authorization to save a fact does not require another confirmation. Read the
+If a non-pitfall capture lacks authorization, finish useful lookup and propose the specific
+note. Existing authorization to save a fact does not require another confirmation. Read the
 target first. Amend stale entries instead of stacking contradictory notes. Keep entries
 short, dated, topic-specific, and linked to evidence. Preserve unrelated content.
 

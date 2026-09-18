@@ -107,7 +107,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 ### core workflows · 9
 
 - [`init-project`](.claude/skills/init-project/SKILL.md) · Configure a starter project when setup is requested, using detected project facts and only necessary user questions.
-- [`recall`](.claude/skills/recall/SKILL.md) · Use before unfamiliar project-area work, when retrieving project decisions or pitfalls, or when saving an authorized durable project fact.
+- [`recall`](.claude/skills/recall/SKILL.md) · Use before unfamiliar project-area work, when retrieving project decisions or pitfalls, when saving an authorized durable fact, or when a quirk just cost a retry, a backed-out change, or a user correction and belongs in pitfalls.
 - [`addskill`](.claude/skills/addskill/SKILL.md) · Create, import, update, or install repository or personal skills; includes runtime ownership, resources, and discovery validation.
 - [`sync-starter`](.claude/skills/sync-starter/SKILL.md) · Use when the user asks to pull template improvements into a spawned repo, compare starter drift, or push a generic improvement back to the starter.
 - [`optimize-context`](.claude/skills/optimize-context/SKILL.md) · Use when the user asks to reduce per-turn context or token load, trim kernels, skills, or connectors, or propagate a generic context optimization to the starter.

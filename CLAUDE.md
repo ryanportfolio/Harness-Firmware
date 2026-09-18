@@ -83,7 +83,7 @@ Topical reference lives in `.claude/reference/`. Consult BEFORE non-trivial work
 | `tech-stack.md` | Non-default picks + why |
 | `deployment.md` | Deploy target, artifacts |
 
-New quirk bites → `/recall save <text>`.
+New quirk bites → save it to `.claude/reference/pitfalls.md` before the task ends, without asking, when it cost a retry, a backed-out change, or a user correction and its cause is confirmed. Amend an existing entry over adding one. Other reference edits stay behind `/recall save`.
 
 Stays in this file: cross-cutting safety/process rules. Moves out: anything area-specific. Don't bloat the kernel.
 ## Codex compatibility
