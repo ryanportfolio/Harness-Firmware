@@ -114,9 +114,13 @@ intermittently resets to the parent workspace directory. Symptoms observed:
 package from the wrong directory, and `git add` failing with "fatal: not a git
 repository". Start compound commands with `cd <repo> &&` or use `git -C`.
 
-## README panels embed skill byte counts (2026-09-16)
+## README panels embed repo metrics (2026-09-16, amended 2026-09-19)
 
-`assets/readme/skills-*.svg` print the total on-demand skill size, so any edit to a
-`SKILL.md` makes them stale and `scripts/readme/verify.mjs` fails CI on main. Run
-`node scripts/readme/build.mjs` before opening a PR that touches `.claude/skills/`, and
-commit only the panels whose content changed (autocrlf marks the rest modified).
+`assets/readme/skills-*.svg` print the total on-demand skill size and
+`assets/readme/boot-*.svg` print the always-loaded context weight, so an edit to any
+`SKILL.md`, to `CLAUDE.md`, to `skillOverrides` in `.claude/settings.json`, or to the
+`.claude/reference/` file set makes them stale and
+`scripts/readme/verify.mjs` fails CI on main. Run `node scripts/readme/build.mjs` before
+opening a PR that touches those paths, and commit only the panels whose content changed
+(autocrlf marks the rest modified). `gh pr merge` does not block on a red check here (no
+required checks), so read `gh pr checks <n>` before merging; #132 landed red this way.
