@@ -196,64 +196,84 @@ const a = args
 const manifest = `${a.roundDir}/baseline-manifest.json`
 const delta = `${a.roundDir}/audit/delta.md`
 const checkOut = `${a.roundDir}/audit/check-output.txt`
+const artifacts = { manifest, delta, checkOut }
 const blocked = (reason) => ({
   status: 'blocked', blockedReason: reason, integrity: 'suspect',
   contract: 'aligned', contractVersion: 'n/a', evidence: reason,
 })
+// Stage results live outside the try so a throw mid-round still returns what was collected.
+let base = null, executorReport = null, executed = false, inspector = null, judges = []
 
-phase('Baseline')
-const base = await agent(
-  `Take a long-horizon baseline. Write scope: ${JSON.stringify(a.writeScope)}. ` +
-  `Write a manifest to ${manifest}: path and content hash for every file under write scope ` +
-  `(including paths outside the repo), every untracked file, every tracked file with ` +
-  `uncommitted changes, and deleted paths. In a git workspace also run \`git stash create\` ` +
-  `(empty output means clean: use HEAD) and ` +
-  `\`git update-ref refs/long-horizon/${a.taskSlug}/round-${a.round} <sha>\`. ` +
-  `Change nothing else. List coverage you could not take under uncovered.`,
-  { schema: BASELINE, effort: 'low' })
-if (!base) return { verdict: blocked('baseline agent returned null'), executorReport: null }
+try {
+  phase('Baseline')
+  base = await agent(
+    `Take a long-horizon baseline. Write scope: ${JSON.stringify(a.writeScope)}. ` +
+    `Write a manifest to ${manifest}: path and content hash for every file under write scope ` +
+    `(including paths outside the repo), every untracked file, every tracked file with ` +
+    `uncommitted changes, and deleted paths. In a git workspace also run \`git stash create\` ` +
+    `(empty output means clean: use HEAD) and ` +
+    `\`git update-ref refs/long-horizon/${a.taskSlug}/round-${a.round} <sha>\`. ` +
+    `Change nothing else. List coverage you could not take under uncovered.`,
+    { schema: BASELINE, effort: 'low' })
+  if (!base) return { verdict: blocked('baseline agent returned null'), executed, executorReport, artifacts }
 
-phase('Execute')
-const executorReport = await agent(
-  `Read ${a.executorBrief} and do exactly what it says. Apply fable-mode discipline. ` +
-  `Return what changed and how to check it.`)
-// Kept for the Audit log only. Never passed to an audit agent.
+  phase('Execute')
+  executed = true
+  executorReport = await agent(
+    `Read ${a.executorBrief} and do exactly what it says. Apply fable-mode discipline. ` +
+    `Return what changed and how to check it.`)
+  // Kept for the Audit log only. Never passed to an audit agent.
+  // Null means skipped or died, possibly after partial edits: the Manager reconciles this as
+  // an interrupted execution against the baseline; the workspace is never audited as complete.
+  if (executorReport === null) {
+    return { verdict: blocked('executor returned null; reconcile as interrupted execution'), executed, executorReport, baseline: base, artifacts }
+  }
 
-phase('Audit')
-const inspector = await agent(
-  `Read ${a.auditorBrief} and follow it. Work in this order. ` +
-  `1: rebuild the manifest with the same coverage as ${manifest}, diff it (added, modified, ` +
-  `deleted), append \`git diff ${base.gitRef} --stat\`, and write the result to ${delta}. ` +
-  `2: run the done-check from the recorded cwd and write the complete raw output to ${checkOut}. ` +
-  `3: return your verdicts with evidence.`,
-  { schema: VERDICT, phase: 'Audit' })
-if (!inspector) return { verdict: blocked('inspector returned null'), executorReport, baseline: base }
+  phase('Audit')
+  inspector = await agent(
+    `Read ${a.auditorBrief} and follow it. Work in this order. ` +
+    `1: rebuild the manifest with the same coverage as ${manifest}, diff it (added, modified, ` +
+    `deleted), append \`git diff ${base.gitRef} --stat\`, and write the result to ${delta}. ` +
+    `2: run the done-check from the recorded cwd and write the complete raw output to ${checkOut}. ` +
+    `3: return your verdicts with evidence.`,
+    { schema: VERDICT, phase: 'Audit' })
+  if (!inspector) return { verdict: blocked('inspector returned null'), executed, executorReport, baseline: base, artifacts }
 
-const judgeCount = Math.max(0, (a.judges ?? 1) - 1)
-const judges = (await parallel(Array.from({ length: judgeCount }, (_, i) => () => agent(
-  `Independent audit judge ${i + 1}, lens: ${LENSES[i % LENSES.length]}. ` +
-  `Read ${a.auditorBrief}, then read ${delta} and ${checkOut}. ` +
-  `Do not run anything and do not modify files. Return your own verdicts. ` +
-  `Default to incomplete or suspect when the evidence is unclear.`,
-  { schema: VERDICT, phase: 'Audit' })))).filter(Boolean)
-if (judges.length < judgeCount) log(`${judgeCount - judges.length} judge(s) returned null; integrity capped at suspect`)
+  const judgeCount = Math.max(0, (a.judges ?? 1) - 1)
+  judges = (await parallel(Array.from({ length: judgeCount }, (_, i) => () => agent(
+    `Independent audit judge ${i + 1}, lens: ${LENSES[i % LENSES.length]}. ` +
+    `Read ${a.auditorBrief}, then read ${delta} and ${checkOut}. ` +
+    `Do not run anything and do not modify files. Return your own verdicts. ` +
+    `Default to incomplete or suspect when the evidence is unclear.`,
+    { schema: VERDICT, phase: 'Audit' })))).filter(Boolean)
+  if (judges.length < judgeCount) log(`${judgeCount - judges.length} judge(s) returned null; integrity capped at suspect`)
 
-const all = [inspector, ...judges]
-const blockedVote = all.find(v => v.status === 'blocked')
-const verdict = blockedVote ? blockedVote : {
-  status: all.every(v => v.status === 'complete') ? 'complete' : 'incomplete',
-  integrity: all.some(v => v.integrity === 'violation') ? 'violation'
-    : (judges.length === judgeCount && all.every(v => v.integrity === 'clean')) ? 'clean' : 'suspect',
-  contract: all.every(v => v.contract === 'aligned') ? 'aligned' : 'drifted',
-  contractVersion: inspector.contractVersion,
-  evidence: all.map((v, i) => `[${i === 0 ? 'inspector' : `judge ${i}`}] ${v.evidence}`).join('\n'),
-  deltaPaths: inspector.deltaPaths ?? [],
+  const all = [inspector, ...judges]
+  const blockedVote = all.find(v => v.status === 'blocked')
+  const verdict = blockedVote ? blockedVote : {
+    status: all.every(v => v.status === 'complete') ? 'complete' : 'incomplete',
+    integrity: all.some(v => v.integrity === 'violation') ? 'violation'
+      : (judges.length === judgeCount && all.every(v => v.integrity === 'clean')) ? 'clean' : 'suspect',
+    contract: all.every(v => v.contract === 'aligned') ? 'aligned' : 'drifted',
+    contractVersion: inspector.contractVersion,
+    evidence: all.map((v, i) => `[${i === 0 ? 'inspector' : `judge ${i}`}] ${v.evidence}`).join('\n'),
+    deltaPaths: inspector.deltaPaths ?? [],
+  }
+  return { verdict, votes: all, executed, executorReport, baseline: base, artifacts }
+} catch (error) {
+  // agent() throws at the +Nk budget ceiling and on runtime faults. Return what exists so the
+  // Manager can checkpoint; the executor may already have changed files.
+  const reason = `blocked: agent() threw (budget ceiling or runtime error): ${error && error.message ? error.message : String(error)}`
+  log(reason)
+  return { verdict: blocked(reason), votes: [inspector, ...judges].filter(Boolean), executed, executorReport, baseline: base, artifacts }
 }
-return { verdict, votes: all, baseline: base, executorReport, artifacts: { manifest, delta, checkOut } }
 ```
 
 After the call returns: record the runId and transcript directory under Workers, copy
-`verdict` and `votes` into the Audit log, then Integrate as below. A cached return on resume
+`verdict` and `votes` into the Audit log, then Integrate as below. A `blocked` verdict with
+`executed: true` means the executor ran, or may have, before the round stopped (null return,
+budget ceiling, runtime fault): reconcile it as an interrupted execution against the recorded
+baseline, never as a clean round. A cached return on resume
 is not evidence until `journal.jsonl` in the transcript directory shows the agent's actual
 output.
 
