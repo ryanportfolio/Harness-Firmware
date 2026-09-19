@@ -41,6 +41,11 @@ condensed.
 
 ### Added
 
+- `long-horizon-workflows` skill: the `long-horizon` contract with each round's
+  baseline, executor, inspector and judges run as one Workflow script, so audit
+  agents cannot inherit Manager context, verdicts are schema enums, and the run
+  journal records every agent's input and output. Judge count is chosen per round.
+  Claude Code only; Codex keeps `long-horizon`.
 - `scripts/lib/launch-chrome.mjs`: headed Chrome launcher that puts the
   window on a display the operator is not using and hands the keyboard
   back, so the real-GPU browser rule stops interrupting them.

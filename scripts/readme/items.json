@@ -80,6 +80,11 @@
       "group": "discipline"
     },
     {
+      "name": "long-horizon-workflows",
+      "label": "Long horizon workflows",
+      "group": "discipline"
+    },
+    {
       "name": "babysit-ci",
       "label": "Babysit CI",
       "group": "discipline"
