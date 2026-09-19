@@ -169,16 +169,35 @@ for (const dir of transcriptDirs()) {
   }
 }
 
-// Stale dated entries: recall appends "### YYYY-MM-DD: <title>" headers.
+// Stale dated entries. Reference headings carry their date in parentheses,
+// "## <title> (YYYY-MM-DD)" or "## <title> (YYYY-MM-DD, amended YYYY-MM-DD)",
+// where the first date is when the entry was recorded. The older
+// "### YYYY-MM-DD: <title>" form is still accepted. Entries retired by recall
+// leave a "retired YYYY-MM-DD: <old claim>; reason: ..." line; those are
+// listed separately once old enough to prune.
 const SIX_MONTHS_MS = 183 * 24 * 60 * 60 * 1000;
+const HEADING_PATTERNS = [
+  /^##\s+(?<title>.+?)\s+\((?<date>\d{4}-\d{2}-\d{2})[^)]*\)\s*$/gm,
+  /^###\s+(?<date>\d{4}-\d{2}-\d{2}):?\s*(?<title>.*)$/gm,
+];
+const RETIRED_PATTERN = /^retired\s+(?<date>\d{4}-\d{2}-\d{2}):\s*(?<claim>.*)$/gm;
+const isStale = (date) => {
+  const age = Date.now() - Date.parse(date);
+  return Number.isFinite(age) && age > SIX_MONTHS_MS;
+};
 const staleEntries = [];
+const staleRetired = [];
 for (const file of referenceFiles) {
   const text = fs.readFileSync(path.join(referenceDir, file), "utf8");
-  for (const match of text.matchAll(/^###\s+(\d{4}-\d{2}-\d{2}):?\s*(.*)$/gm)) {
-    const age = Date.now() - Date.parse(match[1]);
-    if (Number.isFinite(age) && age > SIX_MONTHS_MS) {
-      staleEntries.push({ file, date: match[1], title: match[2].trim() });
+  for (const pattern of HEADING_PATTERNS) {
+    for (const match of text.matchAll(pattern)) {
+      const { date, title } = match.groups;
+      if (isStale(date)) staleEntries.push({ file, date, title: title.trim() });
     }
+  }
+  for (const match of text.matchAll(RETIRED_PATTERN)) {
+    const { date, claim } = match.groups;
+    if (isStale(date)) staleRetired.push({ file, date, claim: claim.trim() });
   }
 }
 
@@ -191,7 +210,7 @@ const memoryFiles = Object.keys(stats.memory);
 const memoryNeverRead = memoryFiles.filter((f) => stats.memory[f].reads === 0);
 
 if (jsonMode) {
-  console.log(JSON.stringify({ ...stats, staleEntries, neverRead, neverInvoked }, null, 2));
+  console.log(JSON.stringify({ ...stats, staleEntries, staleRetired, neverRead, neverInvoked }, null, 2));
   process.exit(0);
 }
 
@@ -226,6 +245,10 @@ if (neverRead.length > 0) {
 if (staleEntries.length > 0) {
   console.log("\ndated entries older than 6 months (moment or standing truth?):");
   for (const e of staleEntries) console.log(`  ${e.file}  ${e.date}  ${e.title}`);
+}
+if (staleRetired.length > 0) {
+  console.log("\nretired lines older than 6 months (prune candidates):");
+  for (const e of staleRetired) console.log(`  ${e.file}  ${e.date}  ${e.claim}`);
 }
 if (memoryFiles.length > 0) {
   console.log(

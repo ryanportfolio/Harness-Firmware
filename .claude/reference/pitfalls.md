@@ -124,3 +124,16 @@ repository". Start compound commands with `cd <repo> &&` or use `git -C`.
 opening a PR that touches those paths, and commit only the panels whose content changed
 (autocrlf marks the rest modified). `gh pr merge` does not block on a red check here (no
 required checks), so read `gh pr checks <n>` before merging; #132 landed red this way.
+Same root cause: `node .claude/scripts/check-skill-capabilities.mjs` reports "Capability
+catalog stale" on a CRLF checkout while CI (LF) passes; `--write` then produces a
+line-ending-only diff. Trust CI for that check, not the local run.
+
+## Bash tool collapses doubled backslashes in heredocs (2026-09-19)
+
+Text sent through the Bash tool loses one level of backslash escaping before the shell
+sees it, even inside a quoted `<<'EOF'` heredoc: a Python literal `'a\\nb'` arrives as
+`'a\nb'` (length 3, real newline). Writing JavaScript that must contain `"\n"` through a
+Python heredoc therefore produced a string literal split across two lines and a
+SyntaxError; a second heredoc "fix" did the same thing. Write files that need literal
+backslash sequences with the Edit or Write tool, or keep the sequence out of the command
+text (read it from a file).
