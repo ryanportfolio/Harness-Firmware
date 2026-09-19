@@ -61,7 +61,7 @@ export function collectFacts() {
     };
   });
 
-  const requiredCounts = { core: 9, discipline: 11, specialist: 14 };
+  const requiredCounts = { core: 9, discipline: 12, specialist: 14 };
   for (const [group, expected] of Object.entries(requiredCounts)) {
     if (tierCounts[group] !== expected) throw new Error(`${group}: expected ${expected}, found ${tierCounts[group]}`);
   }

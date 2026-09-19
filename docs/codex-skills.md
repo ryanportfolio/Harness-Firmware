@@ -132,6 +132,7 @@ real project. It proves selective file adoption and preserved customization, not
 | init-project | claude, codex | native | No additional gate | authorization | Claude hook management remains Claude-specific; Codex does not execute Claude hooks. |
 | lab | claude, codex | adapter | files, preview-server, browser | scope | None |
 | long-horizon | claude, codex | native | fresh-context-review | independence, evidence | None |
+| long-horizon-workflows | claude | none | fresh-context-review, workflow-tool | independence, evidence | Claude Code only: rounds run through the Claude Code Workflow tool, which Codex does not expose; Codex uses long-horizon. |
 | merge | claude, codex | native | No additional gate | authorization | None |
 | optimize-context | claude, codex | adapter | No additional gate | scope | Measure the executing runtime catalog/kernel and verify retrieval after relocation; Claude hook measurements are not Codex measurements. |
 | perf-loop | claude, codex | native | fresh-context-review, repeatable-measurement | independence, evidence | None |

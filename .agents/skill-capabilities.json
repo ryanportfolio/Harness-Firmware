@@ -486,6 +486,29 @@
       "resources": [],
       "exceptions": []
     },
+    "long-horizon-workflows": {
+      "coverage": [
+        "claude"
+      ],
+      "owners": {
+        "claude": "source"
+      },
+      "entrypoints": [
+        "long-horizon-workflows"
+      ],
+      "requiredTools": [
+        "fresh-context-review",
+        "workflow-tool"
+      ],
+      "sharedContracts": [
+        "independence",
+        "evidence"
+      ],
+      "resources": [],
+      "exceptions": [
+        "Claude Code only: rounds run through the Claude Code Workflow tool, which Codex does not expose; Codex uses long-horizon."
+      ]
+    },
     "merge": {
       "coverage": [
         "claude",
