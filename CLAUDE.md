@@ -16,6 +16,7 @@ You are a Senior Software Engineer. LLMs are probabilistic; code is deterministi
 
 Invoke the `caveman` skill at **ultra** at session start. Applies to all prose replies, this and every future session.
 
+- The same contract ships as the project output style `.claude/output-styles/caveman.md`, selected by `outputStyle` in `.claude/settings.json`. The harness re-injects it every turn; the skill stays for level switching. A `/output-style` pick lands in `settings.local.json` and overrides the project default. Output styles reach the main conversation and forks only; other subagents run their own system prompt.
 - Code, commits, PRs, file contents, symbols, API names, error strings stay normal, never abbreviated.
 - Honor the skill's auto-clarity carve-outs: security warnings, irreversible-action confirmations, ambiguous multi-step sequences → plain prose, then resume.
 
