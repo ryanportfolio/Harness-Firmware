@@ -36,7 +36,7 @@ RUN=$(mktemp -d .tmp/codex-review-XXXXXXXX)
 codex exec review --base origin/main -m gpt-5.6-sol -c model_reasoning_effort=high -o "$RUN/report.md" < /dev/null > "$RUN/run.log" 2>&1
 ```
 
-Adapt shell quoting and stdin closure to the active runtime. On PowerShell, create a GUID-named directory and use supported process redirection or `cmd /c` for `< NUL`; PowerShell does not support `<` redirection. Keep report/log paths inside that unique directory. Redirect complete output to a file, never through `head` or `tail`.
+Launch it as a background or detached process and poll its log and exit status; a foreground tool call is killed at the harness ceiling (10 minutes for the Claude Code Bash tool) and takes the review with it, while a background call is not (verified 2026-09-19 with a 20 s job under a 3 s cap). Adapt shell quoting and stdin closure to the active runtime. On PowerShell, create a GUID-named directory and use supported process redirection or `cmd /c` for `< NUL`; PowerShell does not support `<` redirection. Keep report/log paths inside that unique directory. Redirect complete output to a file, never through `head` or `tail`.
 
 Before launch, write run metadata: run ID, absolute workspace, requested scope, resolved base/head SHAs, staged/unstaged diff identities and relevant untracked path/content hashes, CLI version, command, requested model/effort, and start time. Exclude task-owned report artifacts from the requested review. For uncommitted work, inventory all relevant content; a HEAD SHA alone does not identify it. Use an isolated snapshot if concurrent writers cannot stop. Do not silently expand scope to unrelated changes.
 
