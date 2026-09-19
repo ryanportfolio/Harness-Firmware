@@ -127,6 +127,10 @@ required checks), so read `gh pr checks <n>` before merging; #132 landed red thi
 Same root cause: `node .claude/scripts/check-skill-capabilities.mjs` reports "Capability
 catalog stale" on a CRLF checkout while CI (LF) passes; `--write` then produces a
 line-ending-only diff. Trust CI for that check, not the local run.
+Adding or removing a skill also breaks the pinned counts: `requiredCounts` in
+`scripts/readme/facts.mjs` and three `skillCount`/`tierCounts` assertions in
+`scripts/readme/readme.test.mjs` (the fixture there copies every skill into both runtimes,
+so its Codex count equals the Claude count). `build.mjs` throws until they match.
 
 ## Bash tool collapses doubled backslashes in heredocs (2026-09-19)
 
