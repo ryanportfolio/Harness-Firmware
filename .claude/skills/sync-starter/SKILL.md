@@ -20,7 +20,7 @@ git fetch starter
 Only these paths are sync candidates:
 
 ```
-git diff --stat HEAD starter/main -- AGENTS.md .agents/CODEX-SKILL-COMPATIBILITY.md .agents/skill-modes.json .agents/skill-capabilities.json .agents/skills .claude/skills .claude/hooks .claude/scripts .claude/settings.json
+git diff --stat HEAD starter/main -- AGENTS.md .agents/CODEX-SKILL-COMPATIBILITY.md .agents/skill-modes.json .agents/skill-capabilities.json .agents/skills .claude/skills .claude/hooks .claude/scripts .claude/output-styles .claude/settings.json
 ```
 
 **Diverged-by-design — NEVER bulk-pull these:**
@@ -74,7 +74,7 @@ When the user authorized propagation of a generic skill fix / new skill / hook i
    - That dual trigger means a PR shows two check runs and sits at `mergeStateStatus: UNSTABLE` until the second finishes. Wait for it (`gh run watch <id> --exit-status`); don't merge on the first green.
    - The template allows squash only: `gh pr merge <n> --squash`.
    - If the change touched a skill, run `node .claude/scripts/sync-codex-skills.mjs --check` and include any regenerated adapters — CI fails on stale ones.
-4. **Bump the plugin version** when the change touches the shared surface (`.claude/skills`, `.claude/hooks`, `.claude/settings.json`): edit `version` in the template's `.claude-plugin/plugin.json` — patch for fixes, minor for new skills. Plugin installs only receive updates when this number changes; spawned projects get changes via Direction A regardless.
+4. **Bump the plugin version** when the change touches the shared surface (`.claude/skills`, `.claude/hooks`, `.claude/output-styles`, `.claude/settings.json`): edit `version` in the template's `.claude-plugin/plugin.json` — patch for fixes, minor for new skills. Plugin installs only receive updates when this number changes; spawned projects get changes via Direction A regardless.
 5. Mention that other spawned projects pick it up via Direction A.
 
 ## Anti-patterns
