@@ -118,7 +118,8 @@ repository". Start compound commands with `cd <repo> &&` or use `git -C`.
 
 `assets/readme/skills-*.svg` print the total on-demand skill size and
 `assets/readme/boot-*.svg` print the always-loaded context weight, so an edit to any
-`SKILL.md`, to `CLAUDE.md`, or to `.claude-plugin/plugin.json` makes them stale and
+`SKILL.md`, to `CLAUDE.md`, to `skillOverrides` in `.claude/settings.json`, or to the
+`.claude/reference/` file set makes them stale and
 `scripts/readme/verify.mjs` fails CI on main. Run `node scripts/readme/build.mjs` before
 opening a PR that touches those paths, and commit only the panels whose content changed
 (autocrlf marks the rest modified). `gh pr merge` does not block on a red check here (no
