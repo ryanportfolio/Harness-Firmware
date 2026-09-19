@@ -11,6 +11,9 @@ failure to follow an existing rule. A correction is evidence to examine, not aut
 a universal preference. If the rule already exists, avoid duplicating it.
 
 Look at consequential decisions, wasted tool calls, repeated failures, and backed-out actions.
+Run `node .claude/scripts/memory-audit.mjs` for the read-side view of reference entries,
+memory files, and skills: never-read files, dated entries older than six months, and retired
+lines old enough to prune are candidates to check, not verdicts.
 For each recurring problem, identify the smallest change that would have prevented it.
 Prefer an in-scope tool fix over documenting a workaround. A description change needs
 evidence that the trigger is wrong; an isolated misread can require no edit.
