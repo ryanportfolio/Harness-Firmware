@@ -77,7 +77,11 @@ publication, deployments, migrations, installation, or external messages.
    checks itself. It does not fix implementation or write Manager state. Keep other writers
    off the audited files until the verdict is integrated.
 4. **Integrate.** Accept only `complete + clean + aligned` backed by evidence. Otherwise
-   record findings, schedule repair, and invalidate prior claims affected by failed changes.
+   record findings, invalidate prior claims affected by failed changes, and schedule the
+   next round by the auditor's `repairable` verdict: `yes` earns one recovery round on the
+   same approach with the auditor's diagnostic in its brief, counted as the step's second
+   attempt; `no` sends the approach to Dead ends and the next brief changes approach. One
+   recovery per step: a failed recovery is the second failure and Stagnation applies.
    Preserve unrelated verified claims. Persist state before the next round.
 
 Use native subagents for rounds; creating sidebar tasks is not a substitute. Wait for
@@ -93,6 +97,10 @@ Auditor returns:
 - `integrity`: clean / suspect / violation. Clean requires observed artifacts and changes
   within scope, established against the baseline; missing evidence means suspect.
 - `contract`: aligned / drifted, justified against the current contract version.
+- `repairable`: yes / no, on `incomplete` only, with the diagnostic from the auditor's own
+  check run. Yes means a mechanical fault the approach survives (build error, missing
+  dependency, harness or resource failure); no means the approach itself failed. A
+  diagnostic that exists only in the executor's report is a claim and does not count.
 - Each applicable check: passed / failed / unavailable, command or inspection, actual
   result, and evidence location. Record the inspected revision and dirty-file fingerprints.
 
@@ -113,12 +121,20 @@ to the inspected workspace; later relevant edits require revalidation.
 
 ## Stagnation and stopping
 
-- Same step fails twice: record the cause and change approach based on evidence.
+- Same step fails twice: record the cause and change approach based on evidence. A failed
+  recovery round is the second failure.
 - Three rounds produce no new verified progress: pause dispatch and reconsider the
   decomposition. A blocked tool or missing authority needs recovery, not repeated code edits.
-- At `max(5, 2 * initial step count)` rounds, reassess scope and remaining work. Record a
-  changed strategy before continuing; a numeric cap alone is not completion or a reason to
-  abandon feasible authorized work. Honor explicit user limits and runtime stop rules.
+- Count both triggers from the Audit log, never from memory. A rewrite may route the stuck
+  step through `arena` (parallel candidates, pick, graft) inside the executor agent; the
+  Manager never reads candidates, picks or grafts, and the auditor sees only the workspace
+  result. Candidates need Contract and Dead ends copied in, and a worktree starts from HEAD,
+  so use `.tmp/arena-*` copies or commit a WIP first or earlier uncommitted edits are lost.
+- At `max(5, 2 * initial step count)` rounds, reassess scope and remaining work. Tag every
+  Remaining item continue, reserve, or close with a one-line reason; a reserved item reopens
+  only through the final audit's failed checks or a user instruction. Record a changed
+  strategy before continuing; a numeric cap alone is not completion or a reason to abandon
+  feasible authorized work. Honor explicit user limits and runtime stop rules.
 
 Track executor attempts and auditor invocations, including retries. A user-stated budget
 or a bound agreed with the user is binding; checkpoint before exceeding it. Distinguish

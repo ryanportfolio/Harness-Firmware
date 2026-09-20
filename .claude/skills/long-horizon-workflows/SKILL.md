@@ -180,10 +180,11 @@ const VERDICT = {
     deltaPaths: { type: 'array', items: { type: 'string' } },
     // On incomplete only: yes = mechanical fault from the auditor's own check run, no = the
     // approach failed. Judges read the raw check output, never the executor's report.
+    // diagnostic is the fault as seen in that output; empty on complete or blocked.
     repairable: { enum: ['yes', 'no', 'n/a'] },
     diagnostic: { type: 'string' },
   },
-  required: ['status', 'integrity', 'contract', 'contractVersion', 'evidence', 'repairable'],
+  required: ['status', 'integrity', 'contract', 'contractVersion', 'evidence', 'repairable', 'diagnostic'],
 }
 const BASELINE = {
   type: 'object',
@@ -203,7 +204,7 @@ const checkOut = `${a.roundDir}/audit/check-output.txt`
 const artifacts = { manifest, delta, checkOut }
 const blocked = (reason) => ({
   status: 'blocked', blockedReason: reason, integrity: 'suspect',
-  contract: 'aligned', contractVersion: 'n/a', evidence: reason, repairable: 'n/a',
+  contract: 'aligned', contractVersion: 'n/a', evidence: reason, repairable: 'n/a', diagnostic: '',
 })
 // Stage results live outside the try so a throw mid-round still returns what was collected.
 let base = null, executorReport = null, executed = false, inspector = null, judges = []
@@ -262,10 +263,11 @@ try {
     contractVersion: inspector.contractVersion,
     evidence: all.map((v, i) => `[${i === 0 ? 'inspector' : `judge ${i}`}] ${v.evidence}`).join('\n'),
     deltaPaths: inspector.deltaPaths ?? [],
-    // Any judge calling the failure unrepairable wins; a repairable claim needs everyone.
+    // Any judge calling the failure unrepairable wins; a repairable claim needs everyone,
+    // plus a non-empty inspector diagnostic, since the recovery brief has to carry it.
     repairable: all.every(v => v.status === 'complete') ? 'n/a'
       : all.some(v => v.repairable === 'no') ? 'no'
-      : all.every(v => v.repairable === 'yes') ? 'yes' : 'no',
+      : (all.every(v => v.repairable === 'yes') && (inspector.diagnostic ?? '').trim()) ? 'yes' : 'no',
     diagnostic: inspector.diagnostic ?? '',
   }
   return { verdict, votes: all, executed, executorReport, baseline: base, artifacts }
@@ -348,9 +350,9 @@ output.
    and schedule the next round by the combined `repairable` verdict. `yes`: one recovery
    round on the same approach, its brief carrying the inspector's diagnostic, counted as the
    step's second attempt under Stagnation. `no`: the approach goes to Dead ends now and the
-   next brief changes approach. `invalid check` is a Plan defect and goes to neither. A second
-   recovery round on one step needs new evidence: the inspector's own run showed a different
-   failing output than the round before, not the same fault restated. Either way, archive the
+   next brief changes approach. `invalid check` is a Plan defect and goes to neither. One
+   recovery per step: a failed recovery is the step's second failure, and Stagnation then
+   forces a new approach whatever the second diagnostic says. Either way, archive the
    Current round block into the Audit log and clear it; a stale one would feed the next
    auditor the wrong done-check.
 

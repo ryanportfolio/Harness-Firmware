@@ -140,9 +140,9 @@ between Baseline and Audit make attribution impossible; the auditor reports inte
    and schedule the next round by the auditor's `repairable` verdict. `yes`: one recovery
    round on the same approach, its brief carrying the auditor's diagnostic, counted as the
    step's second attempt under Stagnation. `no`: the approach goes to Dead ends now and the
-   next brief changes approach. `invalid check` is a Plan defect and goes to neither. A second
-   recovery round on one step needs new evidence: the auditor's own run showed a different
-   failing output than the round before, not the same fault restated. Either way, archive the
+   next brief changes approach. `invalid check` is a Plan defect and goes to neither. One
+   recovery per step: a failed recovery is the step's second failure, and Stagnation then
+   forces a new approach whatever the second diagnostic says. Either way, archive the
    Current round block into the Audit log and clear it; a stale one would feed the next
    auditor the wrong done-check.
 

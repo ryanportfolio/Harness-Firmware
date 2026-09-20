@@ -59,7 +59,7 @@ Check correctness and affected user journeys alongside performance. Preserve fea
 
 Keep changes with repeatable, practically meaningful gains and no disallowed regressions. Discard failed experiments by reverting only this round's edits. Treat improvements indistinguishable from run variation as inconclusive. Re-profile after meaningful wins because the bottleneck may move. Do not keep speculative changes merely because they look efficient.
 
-Pick the next hypothesis from the whole experiment record (kept, discarded, inconclusive, and why), not from the best result so far. Two consecutive discards on one bottleneck move the next round to a different bottleneck; the same hypothesis returns only with new profile evidence.
+Pick the next hypothesis from the whole experiment record (kept, discarded, inconclusive, and why), not from the best result so far. After a discard, the next round moves to the next-ranked bottleneck unless new profile evidence justifies staying; a discarded hypothesis returns only with such evidence. The stop rule below still applies: two consecutive rounds without a retained gain end the loop, whichever bottleneck they targeted.
 
 ## Independent challenge
 

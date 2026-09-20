@@ -59,6 +59,8 @@ Check correctness and affected user journeys alongside performance. Preserve fea
 
 Keep changes with repeatable, practically meaningful gains and no disallowed regressions. Discard failed experiments by reverting only this round's edits. Treat improvements indistinguishable from run variation as inconclusive. Re-profile after meaningful wins because the bottleneck may move. Do not keep speculative changes merely because they look efficient.
 
+Pick the next hypothesis from the whole experiment record (kept, discarded, inconclusive, and why), not from the best result so far. After a discard, the next round moves to the next-ranked bottleneck unless new profile evidence justifies staying; a discarded hypothesis returns only with such evidence. The stop rule below still applies: two consecutive rounds without a retained gain end the loop, whichever bottleneck they targeted.
+
 ## Independent challenge
 
 Before accepting a round, obtain fresh independent review through exposed agents. Inspect capacity, counting the manager and active workers; run the two review lenses in separate sequential fresh contexts when they cannot fit together. Honor explicit model choices; otherwise inherit the configured model. Disclose an unavailable requested model rather than silently substituting it. In Codex, use `collaboration.spawn_agent` with `fork_turns: "none"`. Provide the request, constraints, skill, exact source states, diff, reproduction commands, and raw evidence paths. Clearly label implementer conclusions as unverified. Reviewers must inspect evidence and code themselves.
