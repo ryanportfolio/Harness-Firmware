@@ -59,6 +59,8 @@ Check correctness and affected user journeys alongside performance. Preserve fea
 
 Keep changes with repeatable, practically meaningful gains and no disallowed regressions. Discard failed experiments by reverting only this round's edits. Treat improvements indistinguishable from run variation as inconclusive. Re-profile after meaningful wins because the bottleneck may move. Do not keep speculative changes merely because they look efficient.
 
+Pick the next hypothesis from the whole experiment record (kept, discarded, inconclusive, and why), not from the best result so far. Two consecutive discards on one bottleneck move the next round to a different bottleneck; the same hypothesis returns only with new profile evidence.
+
 ## Independent challenge
 
 Before accepting a round, obtain fresh independent review through exposed agents. Inspect capacity, counting the manager and active workers; run the two review lenses in separate sequential fresh contexts when they cannot fit together. Honor explicit model choices; otherwise inherit the configured model. Disclose an unavailable requested model rather than silently substituting it. In Claude Code, use the exposed `Agent` tool with a standalone brief and fresh context, without conversation inheritance. Other runtimes must use their exposed fresh-context equivalent; configuration alone does not establish availability. Provide the request, constraints, skill, exact source states, diff, reproduction commands, and raw evidence paths. Clearly label implementer conclusions as unverified. Reviewers must inspect evidence and code themselves.

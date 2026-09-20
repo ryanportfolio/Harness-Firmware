@@ -178,8 +178,12 @@ const VERDICT = {
     contractVersion: { type: 'string' },
     evidence: { type: 'string' },
     deltaPaths: { type: 'array', items: { type: 'string' } },
+    // On incomplete only: yes = mechanical fault from the auditor's own check run, no = the
+    // approach failed. Judges read the raw check output, never the executor's report.
+    repairable: { enum: ['yes', 'no', 'n/a'] },
+    diagnostic: { type: 'string' },
   },
-  required: ['status', 'integrity', 'contract', 'contractVersion', 'evidence'],
+  required: ['status', 'integrity', 'contract', 'contractVersion', 'evidence', 'repairable'],
 }
 const BASELINE = {
   type: 'object',
@@ -199,7 +203,7 @@ const checkOut = `${a.roundDir}/audit/check-output.txt`
 const artifacts = { manifest, delta, checkOut }
 const blocked = (reason) => ({
   status: 'blocked', blockedReason: reason, integrity: 'suspect',
-  contract: 'aligned', contractVersion: 'n/a', evidence: reason,
+  contract: 'aligned', contractVersion: 'n/a', evidence: reason, repairable: 'n/a',
 })
 // Stage results live outside the try so a throw mid-round still returns what was collected.
 let base = null, executorReport = null, executed = false, inspector = null, judges = []
@@ -258,6 +262,11 @@ try {
     contractVersion: inspector.contractVersion,
     evidence: all.map((v, i) => `[${i === 0 ? 'inspector' : `judge ${i}`}] ${v.evidence}`).join('\n'),
     deltaPaths: inspector.deltaPaths ?? [],
+    // Any judge calling the failure unrepairable wins; a repairable claim needs everyone.
+    repairable: all.every(v => v.status === 'complete') ? 'n/a'
+      : all.some(v => v.repairable === 'no') ? 'no'
+      : all.every(v => v.repairable === 'yes') ? 'yes' : 'no',
+    diagnostic: inspector.diagnostic ?? '',
   }
   return { verdict, votes: all, executed, executorReport, baseline: base, artifacts }
 } catch (error) {
@@ -319,7 +328,12 @@ output.
      it did not produce this round counts only if it fetched it itself from an authenticated
      source (a CI run by URL, a receipt from the external system); executor-produced logs and
      test output are claims. If the check itself is broken, say `blocked: invalid check`, which
-     is a Plan defect, not a Dead end.
+     is a Plan defect, not a Dead end. On `incomplete`, add `repairable: yes` or
+     `repairable: no` with the diagnostic from the inspector's own done-check run (the raw
+     check output under the round directory). Yes means a mechanical fault the approach
+     survives (build error, missing dependency, harness or resource failure); no means the
+     approach itself failed. A diagnostic that exists only in the executor's report is a
+     claim and does not make a step repairable. With several judges, any `no` is `no`.
    - integrity: clean / suspect / violation. Clean only when the step-1 delta touches nothing
      outside Write scope and every artifact the step promised exists. A delta that reaches
      test or gate definitions the step did not own is `suspect` at best: a passing check
@@ -330,9 +344,13 @@ output.
 4. **Integrate**: pass: move the step into Verified progress with the auditor's evidence, the
    round's brief paths, baseline ref and runId, so the round can be re-examined later. Fail:
    preserve unaffected Verified progress and mark affected claims stale; append the audit
-   findings, add the approach that failed to Dead ends (unless the verdict was
-   `invalid check`), record the delta's paths under Residue with a decision to revert or keep
-   each, and schedule rework with those findings in the next brief. Either way, archive the
+   findings, record the delta's paths under Residue with a decision to revert or keep each,
+   and schedule the next round by the combined `repairable` verdict. `yes`: one recovery
+   round on the same approach, its brief carrying the inspector's diagnostic, counted as the
+   step's second attempt under Stagnation. `no`: the approach goes to Dead ends now and the
+   next brief changes approach. `invalid check` is a Plan defect and goes to neither. A second
+   recovery round on one step needs new evidence: the inspector's own run showed a different
+   failing output than the round before, not the same fault restated. Either way, archive the
    Current round block into the Audit log and clear it; a stale one would feed the next
    auditor the wrong done-check.
 
@@ -372,6 +390,13 @@ A round count alone cannot resolve a stalled run. Watch for repeated failures di
 - Three rounds with nothing new entering Verified progress: stop spawning and rewrite
   Remaining. The decomposition itself is the suspect, not the executor. Preserve consumed
   attempts; a new decomposition does not reset a user budget.
+
+Count both triggers from the Audit log, never from memory; a recovery round is an attempt.
+A rewrite of Remaining may route the stuck step through `arena` (parallel candidates, pick,
+graft), and arena then runs inside the executor agent: the Manager never reads candidates,
+picks or grafts, and the inspector sees only the workspace result. Candidates need the state
+file's Contract and Dead ends copied in, and a worktree starts from HEAD, so use `.tmp/arena-*`
+copies or commit a WIP first; otherwise earlier rounds' uncommitted edits are lost.
 
 Either trigger optionally escalates to a cross-vendor supervisor. Manager, executor, and
 auditor are all Claude, so they share blindspots, and a shared blindspot is exactly what a
@@ -417,9 +442,11 @@ inspected revision and content manifest; later relevant changes require revalida
 - Under ~3 dependent steps: skip the harness, run fable-mode directly.
 - At `max(5, 2 * initial step count)` rounds, reassess strategy and remaining work before
   continuing. This default is a reassessment threshold, not a completion or abandonment
-  rule. Track executor attempts, auditor calls, and retries separately. Explicit user round,
-  time, or cost limits are binding; checkpoint before exceeding them and report unfinished
-  checks. A budget of zero permits inspection but no budgeted execution.
+  rule. At reassessment, tag every Remaining item continue, reserve, or close with a one-line
+  reason; a reserved item reopens only through the final auditor's failed checks or a user
+  instruction. Track executor attempts, auditor calls, and retries separately. Explicit user
+  round, time, or cost limits are binding; checkpoint before exceeding them and report
+  unfinished checks. A budget of zero permits inspection but no budgeted execution.
 - An unavailable required check blocks that step and its dependents; complete independent
   authorized work and ask only for missing user-owned decisions or authority. Invocation
   does not authorize publication, installation, deployments, or external messages.
