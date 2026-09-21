@@ -4,7 +4,7 @@
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/boot-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/boot-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/boot-dark.svg">
-<img alt="Harness Firmware boots with 35 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
+<img alt="Harness Firmware boots with 34 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
 </picture>
 
 A repository starter for **Claude Code and Codex**. Harness Firmware gives both agents versioned instructions, durable project memory, reusable skills, and workflows for testing and independent review.
@@ -72,19 +72,19 @@ The dotted branch is separate: after human review, `sync-starter` can move a gen
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="35 Claude Code skills and 34 Codex skills share project memory. Codex has 20 native workflows and 14 generated adapters." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="34 Claude Code skills and 33 Codex skills share project memory. Codex has 19 native workflows and 14 generated adapters." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
-**35 Claude Code skills · 34 Codex skills · 20 native Codex workflows · 14 adapters**
+**34 Claude Code skills · 33 Codex skills · 19 native Codex workflows · 14 adapters**
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
 - **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows and generated adapters with explicit capability and safety boundaries. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
 Both runtimes read the committed project topics under `.claude/reference/`. Shared workflows live under `.claude/skills/`; standalone Codex workflows live under `.agents/skills/`.
 
-## 35 workflows, loaded when called
+## 34 workflows, loaded when called
 
-**9 core · 12 discipline · 14 specialist**
+**8 core · 12 discipline · 14 specialist**
 
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
@@ -95,16 +95,16 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/skills-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/skills-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/skills-dark.svg">
-<img alt="A memory map of 35 on-demand workflows grouped into 9 core, 12 discipline, and 14 specialist skills." src="assets/readme/skills-light.svg" width="100%">
+<img alt="A memory map of 34 on-demand workflows grouped into 8 core, 12 discipline, and 14 specialist skills." src="assets/readme/skills-light.svg" width="100%">
 </picture>
 
 </details>
 
 <details>
-<summary><strong>Click to browse all 35 skills</strong></summary>
+<summary><strong>Click to browse all 34 skills</strong></summary>
 
 <!-- skill-list:start -->
-### core workflows · 9
+### core workflows · 8
 
 - [`init-project`](.claude/skills/init-project/SKILL.md) · Configure a starter project when setup is requested, using detected project facts and only necessary user questions.
 - [`recall`](.claude/skills/recall/SKILL.md) · Use before unfamiliar project-area work, when retrieving project decisions or pitfalls, when saving an authorized durable fact, or when a quirk just cost a retry, a backed-out change, or a user correction and belongs in pitfalls.
@@ -112,7 +112,6 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`sync-starter`](.claude/skills/sync-starter/SKILL.md) · Use when the user asks to pull template improvements into a spawned repo, compare starter drift, or push a generic improvement back to the starter.
 - [`optimize-context`](.claude/skills/optimize-context/SKILL.md) · Use when the user asks to reduce per-turn context or token load, trim kernels, skills, or connectors, or propagate a generic context optimization to the starter.
 - [`refine`](.claude/skills/refine/SKILL.md) · Use for an explicit workflow-improvement review, or recurring task friction that may justify a narrow change to skills or project references.
-- [`merge`](.claude/skills/merge/SKILL.md) · Use when the user explicitly requests a merge or enables session-wide automatic commit, push, PR, and merge. A one-shot request does not enable persistent publication.
 - [`automate-me`](.claude/skills/automate-me/SKILL.md) · Use for "automate me", "/automate-me", "create/update my -mode skill", or "turn my preferences / working style into a skill". Mines the current project's transcripts plus direct questions, then drafts a personal <handle>-mode skill.
 - [`adopt-repo`](.claude/skills/adopt-repo/SKILL.md) · Mirror an existing external repo privately under the user's account and overlay the firmware: clone upstream, strip template-only files, privacy-sweep, run init-project. Use on /adopt-repo <url> or 'pull this repo into our firmware'.
 

@@ -12,7 +12,6 @@
     "init-project": "native",
     "long-horizon": "native",
     "long-horizon-workflows": "disabled",
-    "merge": "native",
     "perf-loop": "native",
     "recall": "native",
     "refine": "native",

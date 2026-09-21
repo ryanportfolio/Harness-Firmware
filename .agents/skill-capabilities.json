@@ -509,25 +509,6 @@
         "Claude Code only: rounds run through the Claude Code Workflow tool, which Codex does not expose; Codex uses long-horizon."
       ]
     },
-    "merge": {
-      "coverage": [
-        "claude",
-        "codex"
-      ],
-      "owners": {
-        "claude": "source",
-        "codex": "native"
-      },
-      "entrypoints": [
-        "merge"
-      ],
-      "requiredTools": [],
-      "sharedContracts": [
-        "authorization"
-      ],
-      "resources": [],
-      "exceptions": []
-    },
     "optimize-context": {
       "coverage": [
         "claude",
