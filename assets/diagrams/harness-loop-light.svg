@@ -105,10 +105,10 @@ a:hover text,a:focus-visible text,text a:hover tspan,text a:focus-visible tspan{
 <text class="tiny" fill="#bc4c00" x="872" y="240">conditional intervention</text>
 <g transform="translate(860 350)">
 <rect class="panel" width="170" height="120" rx="8"/>
-<a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/merge/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="Merge skill"><text class="subhead ink" x="16" y="32" font-weight="600">Candidate</text></a>
+<a href="https://cli.github.com/manual/gh_pr" target="_blank" rel="noopener noreferrer" aria-label="gh pr manual"><text class="subhead ink" x="16" y="32" font-weight="600">Candidate</text></a>
 <text class="copy mute" x="16" y="58">branch + PR,</text>
 <text class="copy mute" x="16" y="78">evidence attached</text>
-<text class="ref accent" x="16" y="102"><a href="https://github.com/ryanportfolio/Harness-Firmware/blob/main/.claude/skills/merge/SKILL.md" target="_blank" rel="noopener noreferrer" aria-label="/merge cycle"><tspan>/merge cycle</tspan></a><tspan> · </tspan><a href="https://cli.github.com/manual/gh_pr" target="_blank" rel="noopener noreferrer" aria-label="gh pr"><tspan>gh pr</tspan></a></text>
+<text class="ref accent" x="16" y="102"><a href="https://cli.github.com/manual/gh_pr" target="_blank" rel="noopener noreferrer" aria-label="gh pr merge --squash"><tspan>gh pr merge --squash</tspan></a></text>
 </g>
 <path class="wire" marker-end="url(#arrow)" d="M820 410H856"/>
 <path class="wire" marker-end="url(#arrow)" d="M1030 410H1041"/>

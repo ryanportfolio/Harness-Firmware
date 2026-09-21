@@ -24,7 +24,7 @@ LICENSE/NOTICE files in the skill folder.
 
 `addskill`, `enhance-prompt`,
 `forge-repo-ui-skill`, `handoff-audit`, `impartial-review`, `init-project`, `lab`,
-`merge`, `optimize-context`, `recall`, `sync-starter`,
+`optimize-context`, `recall`, `sync-starter`,
 `why`.
 
 Homegrown skills are MIT, same as the repo (see the root `LICENSE`).

@@ -11,6 +11,13 @@ condensed.
 
 ## [Unreleased]
 
+### Removed
+
+- The `merge` skill leaves the template. Session-wide auto-merge is a personal
+  authorization policy, not a repository one, so it now lives as a global skill in
+  `~/.claude/skills/merge`. The kernel's squash-by-default and one-PR-per-unit rules
+  are unchanged.
+
 ### Changed
 
 - `refine` gates edits on three checks before changing anything: the failure is

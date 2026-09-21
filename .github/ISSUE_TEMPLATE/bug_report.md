@@ -10,7 +10,7 @@ assignees: ''
 Claude Code / Codex / both. Include the version if you have it.
 
 **where**
-Skill, script, or file involved (for example `.claude/skills/merge`,
+Skill, script, or file involved (for example `.claude/skills/recall`,
 `sync-codex-skills.mjs`, a spawned project vs. the template checkout).
 
 **what happened**

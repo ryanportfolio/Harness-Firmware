@@ -169,10 +169,10 @@ function build(themeName) {
 
   const candidate = `<g transform="translate(860 350)">
 <rect class="panel" width="170" height="120" rx="8"/>
-<a href="${SKILL("merge")}" target="_blank" rel="noopener noreferrer" aria-label="Merge skill"><text class="subhead ink" x="16" y="32" font-weight="600">Candidate</text></a>
+<a href="${GITHUB_PR}" target="_blank" rel="noopener noreferrer" aria-label="gh pr manual"><text class="subhead ink" x="16" y="32" font-weight="600">Candidate</text></a>
 <text class="copy mute" x="16" y="58">branch + PR,</text>
 <text class="copy mute" x="16" y="78">evidence attached</text>
-<text class="ref accent" x="16" y="102">${linkedText([part("/merge cycle", SKILL("merge")), part(" · "), part("gh pr", GITHUB_PR)])}</text>
+<text class="ref accent" x="16" y="102">${linkedText([part("gh pr merge --squash", GITHUB_PR)])}</text>
 </g>
 <path class="wire" marker-end="url(#arrow)" d="M820 410H856"/>
 <path class="wire" marker-end="url(#arrow)" d="M1030 410H1041"/>
