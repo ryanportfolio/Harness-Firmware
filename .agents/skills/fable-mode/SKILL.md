@@ -13,9 +13,10 @@ inside the current task; it does not require a separate document, agent, or cere
 
 Read the applicable Codex instructions and relevant project facts. Define the output and
 how completion will be established. Separate observed facts from assumptions that could
-change the solution. For a defect, establish what changed before it broke (a commit, a
-dependency, a config, an input) before hypothesising about the code. Run the cheapest
-useful probe before asking the user for an observable fact. Ask for missing preferences or consequential decisions when needed; continue work
+change the solution. For a defect that once worked, establish what changed since (a commit,
+a dependency, a config, an input) before hypothesising about the code; with no known working
+state, say so and reproduce first. Run the cheapest useful probe before asking the user for
+an observable fact. Ask for missing preferences or consequential decisions when needed; continue work
 that either answer would preserve. Do not repeat approval already given within its scope.
 
 Use a lightweight plan when dependencies warrant one. Build a thin working path before
