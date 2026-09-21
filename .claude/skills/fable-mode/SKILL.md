@@ -13,8 +13,10 @@ inside the current task; it does not require a separate document, agent, or cere
 
 Read the applicable Claude instructions and relevant project facts. Define the output and
 how completion will be established. Separate observed facts from assumptions that could
-change the solution. Run the cheapest useful probe before asking the user for an observable
-fact. Ask for missing preferences or consequential decisions when needed; continue work
+change the solution. For a defect that once worked, establish what changed since (a commit,
+a dependency, a config, an input) before hypothesising about the code; with no known working
+state, say so and reproduce first. Run the cheapest useful probe before asking the user for
+an observable fact. Ask for missing preferences or consequential decisions when needed; continue work
 that either answer would preserve. Do not repeat approval already given within its scope.
 
 Use a lightweight plan when dependencies warrant one. Build a thin working path before
@@ -24,8 +26,10 @@ the steps instead of continuing through contradicted assumptions.
 ## Challenge and verify
 
 Explain the purpose of the existing design before changing it. Look for concrete inputs or
-conditions that refute the proposed change and exercise them where useful. After two failed
-fixes, revisit the diagnosis rather than repeating the same patch. Finding no defect is valid.
+conditions that refute the proposed change and exercise them where useful. A hypothesis is
+ruled out only when the probe that refuted it is named. After two failed fixes, revisit the
+diagnosis from what was ruled out rather than repeating the same patch. Finding no defect
+is valid.
 
 Verify at the layer of the claim: command success, generated content, visible behavior,
 performance, and live integration require different evidence. Reopen outputs, inspect
@@ -43,7 +47,8 @@ relevant source changes; remove speculative fixes when evidence refutes their pr
 
 ## Report and hand off
 
-Lead with the result, then the evidence needed to assess it. Summarize routine checks;
+Lead with the result, then the evidence needed to assess it. A defect fix names its tier:
+mitigation, root cause, or prevention. Summarize routine checks;
 link detailed evidence when useful. Name material uncertainty and unfinished requirements.
 Use labels or checklists only when they improve clarity; no empty assumptions section or
 verbatim copy of another skill's workflow is required.
