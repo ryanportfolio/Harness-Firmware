@@ -13,7 +13,7 @@ Read `.claude/skills/codex-review/SKILL.md` and follow its complete execution co
 | Effort | `medium`, regardless of diff size |
 | Run directory prefix | `.tmp/astra-review-` |
 
-Honor an explicit user model/effort choice. Confirm supported local options before inference; a model identifier in this file is not proof of availability. `$ARGUMENTS` carries scope as in `codex-review`.
+Skip the newest-Sol check in `codex-review` Step 1; this entrypoint never swaps Astra for Sol. Honor an explicit user model/effort choice. Confirm supported local options before inference; a model identifier in this file is not proof of availability. `$ARGUMENTS` carries scope as in `codex-review`.
 
 Example after creating a fresh `$RUN` directory (POSIX shell):
 
