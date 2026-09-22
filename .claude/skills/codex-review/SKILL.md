@@ -1,5 +1,5 @@
 ---
-description: "Cross-vendor second-opinion review. Drives OpenAI Codex CLI (codex exec review, gpt-5.6-sol, high reasoning) over a PR, branch, commit, or uncommitted diff, then verifies each finding. Trigger: /codex-review, \"have Codex/Sol review this\"."
+description: "Cross-vendor second-opinion review. Drives OpenAI Codex CLI (codex exec review, gpt-6-sol, high reasoning) over a PR, branch, commit, or uncommitted diff, then verifies each finding. Trigger: /codex-review, \"have Codex/Sol review this\"."
 ---
 
 # Codex review — cross-vendor second opinion
@@ -11,6 +11,8 @@ The requested review does not authorize fixes, publication, machine configuratio
 ## Step 1: Preflight
 
 Inspect `codex --version`, `codex login status`, and `codex exec review --help` locally before inference. Verify current support for the selector, model/effort configuration, and output options used below; examples are not product guarantees. Do not probe models by spending usage.
+
+**Model: always the newest Sol, named by its exact id.** `-m` takes a literal model id; there is no "latest Sol" alias, so the command pins one. The pin is `gpt-6-sol`. Before launch, check the `model` in `~/.codex/config.toml` and the Sol entries at developers.openai.com/api/docs/models. If a newer Sol exists, run with its exact id and tell the user the pin is stale. Do not edit the pins during the review: bumping them in this skill and in the Codex example in `impartial-review` is a separate change the user authorizes. An explicit user model choice still wins. `astra-review` is exempt: it stays on Astra.
 
 Require the intended ChatGPT/subscription authentication route. If logged out, ask the user to log in through their own terminal. If authentication or billing is ambiguous, stop before inference; never print credentials or switch to an API key or paid credits. A user-authorized alternative route must be explicit.
 
@@ -33,7 +35,7 @@ Run from the repository root. Create a new run directory atomically; never reuse
 ```bash
 mkdir -p .tmp
 RUN=$(mktemp -d .tmp/codex-review-XXXXXXXX)
-codex exec review --base origin/main -m gpt-5.6-sol -c model_reasoning_effort=high -o "$RUN/report.md" < /dev/null > "$RUN/run.log" 2>&1
+codex exec review --base origin/main -m gpt-6-sol -c model_reasoning_effort=high -o "$RUN/report.md" < /dev/null > "$RUN/run.log" 2>&1
 ```
 
 Launch it as a background or detached process and poll its log and exit status; a foreground tool call is killed at the harness ceiling (10 minutes for the Claude Code Bash tool) and takes the review with it, while a background call is not (verified 2026-09-19 with a 20 s job under a 3 s cap). Adapt shell quoting and stdin closure to the active runtime. On PowerShell, create a GUID-named directory and use supported process redirection or `cmd /c` for `< NUL`; PowerShell does not support `<` redirection. Keep report/log paths inside that unique directory. Redirect complete output to a file, never through `head` or `tail`.
