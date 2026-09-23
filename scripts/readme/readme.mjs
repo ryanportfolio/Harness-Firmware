@@ -82,12 +82,12 @@ The dotted branch is separate: after human review, \`sync-starter\` can move a g
 
 ## two runtimes, explicit ownership
 
-${picture("runtime", `${facts.skillCount} Claude Code skills and ${facts.codexSkillCount} Codex skills share project memory. Codex has ${facts.codexNativeCount} native workflows and ${facts.codexAdapterCount} generated adapters.`)}
+${picture("runtime", `${facts.skillCount} Claude Code skills and ${facts.codexSkillCount} Codex skills share project memory. Codex has ${facts.codexNativeCount} native workflows${facts.codexAdapterCount ? ` and ${facts.codexAdapterCount} generated adapters` : ''}.`)}
 
-**${facts.skillCount} Claude Code skills · ${facts.codexSkillCount} Codex skills · ${facts.codexNativeCount} native Codex workflows · ${facts.codexAdapterCount} adapters**
+**${facts.skillCount} Claude Code skills · ${facts.codexSkillCount} Codex skills · ${facts.codexNativeCount} native Codex workflows${facts.codexAdapterCount ? ` · ${facts.codexAdapterCount} adapters` : ''}**
 
 - **Claude Code:** reads \`CLAUDE.md\`, \`.claude/skills/\`, and hooks for canonical playbooks and Claude-specific startup behavior.
-- **Codex:** reads \`AGENTS.md\` and \`.agents/skills/\` for standalone Codex workflows and generated adapters with explicit capability and safety boundaries. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
+- **Codex:** reads \`AGENTS.md\` and \`.agents/skills/\` for standalone Codex workflows with explicit capability and safety boundaries; a skill without a native version gets a generated adapter. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
 Both runtimes read the committed project topics under \`.claude/reference/\`. Shared workflows live under \`.claude/skills/\`; standalone Codex workflows live under \`.agents/skills/\`.
 

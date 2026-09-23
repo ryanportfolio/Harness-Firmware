@@ -45,7 +45,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "adopt-repo"
@@ -64,7 +64,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "advocate"
@@ -85,7 +85,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "arena"
@@ -106,7 +106,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "astra-review"
@@ -129,7 +129,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "automate-me"
@@ -150,7 +150,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "babysit-ci"
@@ -246,7 +246,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "claude-review"
@@ -269,7 +269,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "codex-review"
@@ -292,7 +292,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "dare"
@@ -351,7 +351,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "forge-repo-ui-skill"
@@ -361,6 +361,10 @@
         "authorization"
       ],
       "resources": [
+        ".agents/skills/forge-repo-ui-skill/agents/openai.yaml",
+        ".agents/skills/forge-repo-ui-skill/references/repo-intake.md",
+        ".agents/skills/forge-repo-ui-skill/references/research.md",
+        ".agents/skills/forge-repo-ui-skill/references/synthesis-and-validation.md",
         ".claude/skills/forge-repo-ui-skill/agents/openai.yaml",
         ".claude/skills/forge-repo-ui-skill/references/repo-intake.md",
         ".claude/skills/forge-repo-ui-skill/references/research.md",
@@ -446,7 +450,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "lab"
@@ -460,6 +464,7 @@
         "scope"
       ],
       "resources": [
+        ".agents/skills/lab/templates.md",
         ".claude/skills/lab/templates.md"
       ],
       "exceptions": []
@@ -516,7 +521,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "optimize-context"
@@ -611,7 +616,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "session-hub"
@@ -623,6 +628,7 @@
         "scope"
       ],
       "resources": [
+        ".agents/skills/session-hub/template.html",
         ".claude/skills/session-hub/template.html"
       ],
       "exceptions": []
@@ -653,7 +659,7 @@
       ],
       "owners": {
         "claude": "source",
-        "codex": "adapter"
+        "codex": "native"
       },
       "entrypoints": [
         "sync-starter"

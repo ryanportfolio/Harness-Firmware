@@ -72,13 +72,13 @@ The dotted branch is separate: after human review, `sync-starter` can move a gen
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="34 Claude Code skills and 33 Codex skills share project memory. Codex has 19 native workflows and 14 generated adapters." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="34 Claude Code skills and 33 Codex skills share project memory. Codex has 33 native workflows." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
-**34 Claude Code skills · 33 Codex skills · 19 native Codex workflows · 14 adapters**
+**34 Claude Code skills · 33 Codex skills · 33 native Codex workflows**
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
-- **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows and generated adapters with explicit capability and safety boundaries. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
+- **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows with explicit capability and safety boundaries; a skill without a native version gets a generated adapter. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
 Both runtimes read the committed project topics under `.claude/reference/`. Shared workflows live under `.claude/skills/`; standalone Codex workflows live under `.agents/skills/`.
 
