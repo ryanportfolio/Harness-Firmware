@@ -17,7 +17,7 @@ The useful recommendation is narrower than building an autonomous improvement sy
 | Existing mechanism | Contribution |
 |---|---|
 | [Codex refine](../../.agents/skills/refine/SKILL.md) and [Claude refine](../../.claude/skills/refine/SKILL.md) | Inspect actual friction, choose small edits, and check affected behavior. |
-| [verify-this](../../.claude/skills/verify-this/SKILL.md) | Compare baseline and treatment, then report VERIFIED, NOT VERIFIED, or INCONCLUSIVE. |
+| [verify-this](https://github.com/ryanportfolio/Harness-Firmware/blob/419fbda/.claude/skills/verify-this/SKILL.md) | Compare baseline and treatment, then report VERIFIED, NOT VERIFIED, or INCONCLUSIVE. |
 | [Codex long-horizon](../../.agents/skills/long-horizon/SKILL.md) | Keep bounded rounds, revision evidence, and independent audit decisions. |
 | [Codex recall](../../.agents/skills/recall/SKILL.md) | Retain durable, decision-relevant knowledge while excluding task status and recoverable facts. |
 | [memory-audit](../../.claude/scripts/memory-audit.mjs) | Estimate local Claude usage counts, with explicit coverage limits. |

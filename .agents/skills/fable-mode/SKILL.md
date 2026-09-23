@@ -1,6 +1,6 @@
 ---
 name: fable-mode
-description: "Use for difficult multi-step work, uncertain diagnoses, repeated failures, or tasks where verification and handoff need particular care. Skip routine changes."
+description: "Use for difficult multi-step work, uncertain diagnoses, repeated failures, 'did it work/is it fixed/prove it' questions, or tasks where verification and handoff need particular care. Skip routine changes."
 ---
 
 # Evidence-led execution
@@ -31,12 +31,18 @@ ruled out only when the probe that refuted it is named. After two failed fixes, 
 diagnosis from what was ruled out rather than repeating the same patch. Finding no defect
 is valid.
 
-Verify at the layer of the claim: command success, generated content, visible behavior,
-performance, and live integration require different evidence. Reopen outputs, inspect
-relevant edge cases, and check the original acceptance criteria. Preserve exact commands,
-exit codes, artifact paths, or screenshots when they support a consequential claim. A
-visual observation can be evidence without textual output; a passing low-level check
-does not establish the behavior above it.
+Classify a claim before collecting evidence. Current state ("it works") needs the output
+observed against the criterion, with no baseline. Change ("it fixed X", "it is faster")
+needs a before measurement that can be reproduced: check out the commit from before the
+change or rebuild the old failing repro, and run exactly the same steps both times. Cause
+("X did it") also needs X isolated by reverting and reapplying it or by a controlled
+change; a before/after gap alone shows change only. Verify at the layer of the claim:
+command success, generated content, visible behavior, performance, and live integration
+require different evidence. Rendered evidence first confirms the page serves the current
+build. Reopen outputs, inspect relevant edge cases, and check the original
+acceptance criteria. Preserve exact commands, exit codes, artifact paths, or screenshots
+when they support a consequential claim. A visual observation can be evidence without
+textual output; a passing low-level check does not establish the behavior above it.
 
 Use checks appropriate to the change. Avoid tests that merely restate implementation.
 Once required checks pass, broaden or repeat them only after relevant changes, failures,
@@ -47,9 +53,12 @@ relevant source changes; remove speculative fixes when evidence refutes their pr
 
 ## Report and hand off
 
-Lead with the result, then the evidence needed to assess it. A defect fix names its tier:
-mitigation, root cause, or prevention. Summarize routine checks;
-link detailed evidence when useful. Name material uncertainty and unfinished requirements.
+Lead with the result, then the evidence needed to assess it. Answer "did it work" with
+VERIFIED, NOT VERIFIED, or INCONCLUSIVE; for several items, give the count ("2 of 12 fixed")
+and list the rest as open. Contradicting evidence is NOT VERIFIED, stated plainly. Absent
+evidence is INCONCLUSIVE, never a failure; name what would decide it. A defect fix names its tier: mitigation, root cause, or prevention. Summarize
+routine checks; link detailed evidence when useful. Name material uncertainty and
+unfinished requirements.
 Use labels or checklists only when they improve clarity; no empty assumptions section or
 verbatim copy of another skill's workflow is required.
 

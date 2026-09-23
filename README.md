@@ -4,7 +4,7 @@
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/boot-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/boot-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/boot-dark.svg">
-<img alt="Harness Firmware boots with 36 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
+<img alt="Harness Firmware boots with 34 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
 </picture>
 
 A repository starter for **Claude Code and Codex**. Harness Firmware gives both agents versioned instructions, durable project memory, reusable skills, and workflows for testing and independent review.
@@ -47,7 +47,7 @@ In the created repository, run `node .claude/scripts/doctor.mjs`. Success means 
 | Remember the project | `recall` loads relevant committed facts, decisions, and pitfalls before unfamiliar work |
 | Finish sustained work | `long-horizon` records progress and evidence across bounded rounds, with fresh audit context |
 | Challenge a result | Independent and cross-vendor review skills check work through available agents or authenticated CLIs |
-| Verify a claim | `verify-this` separates current checks, comparisons, and causal claims; `perf-loop` measures optimization against a baseline |
+| Verify a claim | `fable-mode` separates current-state, change, and causal claims and returns a verdict; `perf-loop` measures optimization against a baseline |
 | Maintain skills | `addskill` handles creating, importing, updating, and installing skills with the resources each runtime needs |
 | Improve the workflow | `refine` captures observed friction; `sync-starter` carries selected generic fixes between repositories |
 
@@ -72,19 +72,19 @@ The dotted branch is separate: after human review, `sync-starter` can move a gen
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="36 Claude Code skills and 34 Codex skills share project memory. Codex has 34 native workflows." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="34 Claude Code skills and 32 Codex skills share project memory. Codex has 32 native workflows." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
-**36 Claude Code skills · 34 Codex skills · 34 native Codex workflows**
+**34 Claude Code skills · 32 Codex skills · 32 native Codex workflows**
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
 - **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows with explicit capability and safety boundaries; a skill without a native version gets a generated adapter. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
 Both runtimes read the committed project topics under `.claude/reference/`. Shared workflows live under `.claude/skills/`; standalone Codex workflows live under `.agents/skills/`.
 
-## 36 workflows, loaded when called
+## 34 workflows, loaded when called
 
-**8 core · 14 discipline · 14 specialist**
+**7 core · 13 discipline · 14 specialist**
 
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
@@ -95,27 +95,26 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/skills-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/skills-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/skills-dark.svg">
-<img alt="A memory map of 36 on-demand workflows grouped into 8 core, 14 discipline, and 14 specialist skills." src="assets/readme/skills-light.svg" width="100%">
+<img alt="A memory map of 34 on-demand workflows grouped into 7 core, 13 discipline, and 14 specialist skills." src="assets/readme/skills-light.svg" width="100%">
 </picture>
 
 </details>
 
 <details>
-<summary><strong>Click to browse all 36 skills</strong></summary>
+<summary><strong>Click to browse all 34 skills</strong></summary>
 
 <!-- skill-list:start -->
-### core workflows · 8
+### core workflows · 7
 
 - [`init-project`](.claude/skills/init-project/SKILL.md) · Configure a starter project when setup is requested, using detected project facts and only necessary user questions.
 - [`recall`](.claude/skills/recall/SKILL.md) · Use before unfamiliar project-area work, when retrieving project decisions or pitfalls, when saving an authorized durable fact, or when a quirk just cost a retry, a backed-out change, or a user correction and belongs in pitfalls.
 - [`addskill`](.claude/skills/addskill/SKILL.md) · Create, import, update, or install repository or personal skills; includes runtime ownership, resources, and discovery validation.
 - [`sync-starter`](.claude/skills/sync-starter/SKILL.md) · Use when the user asks to pull template improvements into a spawned repo, compare starter drift, or push a generic improvement back to the starter.
 - [`optimize-context`](.claude/skills/optimize-context/SKILL.md) · Use when the user asks to reduce per-turn context or token load, trim kernels, skills, or connectors, or propagate a generic context optimization to the starter.
-- [`refine`](.claude/skills/refine/SKILL.md) · Use for an explicit workflow-improvement review, or recurring task friction that may justify a narrow change to skills or project references.
-- [`automate-me`](.claude/skills/automate-me/SKILL.md) · Use for "automate me", "/automate-me", "create/update my -mode skill", or "turn my preferences / working style into a skill". Mines the current project's transcripts plus direct questions, then drafts a personal <handle>-mode skill.
+- [`refine`](.claude/skills/refine/SKILL.md) · Use for an explicit workflow-improvement review, turning the user's preferences into rules or a skill, or recurring task friction that may justify a narrow change to skills or project references.
 - [`adopt-repo`](.claude/skills/adopt-repo/SKILL.md) · Mirror an existing external repo privately under the user's account and overlay the firmware: clone upstream, strip template-only files, privacy-sweep, run init-project. Use on /adopt-repo <url> or 'pull this repo into our firmware'.
 
-### quality disciplines · 14
+### quality disciplines · 13
 
 - [`brainstorming`](.claude/skills/brainstorming/SKILL.md) · Use when brainstorming or designing a product, interface, workflow, architecture, or behavior change with unresolved goals or material tradeoffs; not for routine or fully specified work.
 - [`writing-plans`](.claude/skills/writing-plans/SKILL.md) · Use when a clear task needs a multi-step implementation plan, dependency ordering, or a durable handoff. Skip for routine changes that can be executed directly.
@@ -123,21 +122,20 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`perf-loop`](.claude/skills/perf-loop/SKILL.md) · Run measured optimization rounds with independent review for FPS, loading, latency, throughput, and resource use. Use for /perf-loop or broad performance improvement requests; skip routine isolated fixes.
 - [`long-horizon`](.claude/skills/long-horizon/SKILL.md) · Use for work too big for one context window: long multi-step tasks, progress lost to compaction or failed retries, work spanning hours or sessions, or when the user says /long-horizon or asks to run a task in verified rounds.
 - [`long-horizon-workflows`](.claude/skills/long-horizon-workflows/SKILL.md) · Long-horizon rounds run through the Workflow tool: fresh executor, inspector, and judges per round with schema verdicts and a run journal. Use on /long-horizon-workflows or to run a big task in Workflow-audited rounds. Claude Code only.
-- [`babysit-ci`](.claude/skills/babysit-ci/SKILL.md) · Watch a PR's checks and iterate on failures until green. Use for /babysit-ci, "watch CI", "fix CI", "get the checks green", or when a PR is waiting on failing or pending checks.
+- [`babysit-ci`](.claude/skills/babysit-ci/SKILL.md) · Watches a PR's checks and fixes failures. Use for /babysit-ci, "watch CI", "fix CI", "get checks green", or a PR with failing or pending checks; not a bare merge request.
 - [`codex-review`](.claude/skills/codex-review/SKILL.md) · Cross-vendor second-opinion review. Drives OpenAI Codex CLI (codex exec review, gpt-6-sol, high reasoning) over a PR, branch, commit, or uncommitted diff, then verifies each finding. Trigger: /codex-review, "have Codex/Sol review this".
 - [`astra-review`](.claude/skills/astra-review/SKILL.md) · Cross-vendor review configured for gpt-6-astra at medium reasoning. Same verified CLI lifecycle as codex-review. Use for /astra-review or 'have Astra review this'.
 - [`codex-fullreview`](.claude/skills/codex-fullreview/SKILL.md) · Full multi-agent Codex review: codex exec runs $impartial-review as Manager with fresh-context sub-reviewers (gpt-6-sol, high), then each finding is verified. Trigger: /codex-fullreview, "full Codex review with sub-reviewers".
 - [`astra-fullreview`](.claude/skills/astra-fullreview/SKILL.md) · Full multi-agent Codex review on gpt-6-astra at medium reasoning. Same verified lifecycle as codex-fullreview. Use for /astra-fullreview or 'full Astra review with sub-reviewers'.
 - [`claude-review`](.claude/skills/claude-review/SKILL.md) · Use when the user says /claude-review, asks Claude or Fable to review code written in Codex, or requests a cross-vendor review through Claude CLI.
-- [`verify-this`](.claude/skills/verify-this/SKILL.md) · Verify a claim with fresh local evidence and return VERIFIED, NOT VERIFIED, or INCONCLUSIVE. Use for /verify-this, 'prove it works', 'did this fix it', or 'show me the evidence'.
 - [`dare`](.claude/skills/dare/SKILL.md) · Use for /dare, first principles, or questioning the problem: four fresh stages decompose, audit, recombine and test, preserving immutable goals and constraints.
 
 ### specialist tools · 14
 
-- [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Use for difficult multi-step work, uncertain diagnoses, repeated failures, or tasks where verification and handoff need particular care. Skip routine changes.
+- [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Use for difficult multi-step work, uncertain diagnoses, repeated failures, 'did it work/is it fixed/prove it' questions, or tasks where verification and handoff need particular care. Skip routine changes.
 - [`wow-loop`](.claude/skills/wow-loop/SKILL.md) · Evidence-gated review and repair loop for one deliverable. Use on /wow-loop, requests for wow factor or dial it to 11, or substantial visual work (3D, animation, UI, rendered documents) that needs reference fidelity or repeated visual correction. Skip routine cosmetic edits and discussion of the skill itself.
 - [`showpiece`](.claude/skills/showpiece/SKILL.md) · Create distinctive, crafted artifacts in any medium. Use for /showpiece, ambitious creative direction, portfolio-quality work, or substantial cleanup of generic AI styling. Skip routine edits unless explicitly invoked.
-- [`arena`](.claude/skills/arena/SKILL.md) · Spawn N parallel candidate attempts at one task, pick the strongest as base, graft the losers' best parts in. Use when the user says /arena, "arena this", or when one attempt at a non-trivial artifact would lock in the wrong shape.
+- [`arena`](.claude/skills/arena/SKILL.md) · Builds parallel attempts at one task, judges them blind, and grafts the best ideas onto the strongest. Use for /arena, "try a few approaches", "build me options", bakeoffs, competing versions, or a stalled long-horizon or wow-loop step.
 - [`lab`](.claude/skills/lab/SKILL.md) · Use when the user explicitly asks to lab or prototype a visual, UI, motion, or game-feel element with live tuning before production implementation.
 - [`advocate`](.claude/skills/advocate/SKILL.md) · Use only when the user explicitly invokes /advocate to challenge a change just made before it lands. Do not trigger from natural-language requests.
 - [`why`](.claude/skills/why/SKILL.md) · Use only when the user explicitly invokes /why to challenge the assistant's immediately prior recommendation; never trigger from ordinary why questions or paraphrases.
@@ -146,7 +144,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`writing`](.claude/skills/writing/SKILL.md) · Use for text that leaves the session (READMEs, docs, site and UI copy, emails, release notes, application answers) or to unslop, humanize, voice-match, or audit a draft for AI tells. Ordinary session replies use Caveman with built-in Unslop.
 - [`forge-repo-ui-skill`](.claude/skills/forge-repo-ui-skill/SKILL.md) · Use when the user wants a repository-specific UI or design skill synthesized from current agent skills; not for ordinary UI implementation or backend-only work.
 - [`caveman`](.claude/skills/caveman/SKILL.md) · Use for every session reply to the user: concise Caveman prose with built-in Unslop. User-facing deliverables use Writing instead.
-- [`bro`](.claude/skills/bro/SKILL.md) · Restate the assistant's last message in plain human language, no jargon. Use when the user says /bro, "in plain english", "dumb it down", or "what does that actually mean".
+- [`bro`](.claude/skills/bro/SKILL.md) · Plain-language restatement. Use on /bro anywhere in a message, "plain english", "plain language", "dumb it down", "I don't understand", or "what does that mean".
 - [`session-hub`](.claude/skills/session-hub/SKILL.md) · Coordinate parallel Claude Code sessions via a shared append-only HTML hub. Use on /session-hub, 'run parallel sessions on this', joining a hub, or proactively when edits or commits this session did not make appear in the checkout.
 <!-- skill-list:end -->
 

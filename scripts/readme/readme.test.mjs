@@ -13,7 +13,7 @@ const variants = ["light", "dark", "narrow-light", "narrow-dark"];
 const requiredLinks = ["GUIDE.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "actions/workflows/validate-template.yml"];
 
 test("README facts match the canonical repository inventory", () => {
-  assert.equal(facts.skillCount, 36);
+  assert.equal(facts.skillCount, 34);
   const capabilities = JSON.parse(read(".agents/skill-capabilities.json")).skills;
   const modes = JSON.parse(read(".agents/skill-modes.json")).skills;
   const overrides = fs.existsSync(absolute(".claude/settings.json")) ? JSON.parse(read(".claude/settings.json")).skillOverrides ?? {} : {};
@@ -25,7 +25,7 @@ test("README facts match the canonical repository inventory", () => {
   assert.equal(facts.referenceFileCount, 6);
   assert.deepEqual(facts.runtimeNames, ["Claude Code", "Codex"]);
   assert.equal(facts.runtimeCount, facts.runtimeNames.length);
-  assert.deepEqual(facts.tierCounts, { core: 8, discipline: 14, specialist: 14 });
+  assert.deepEqual(facts.tierCounts, { core: 7, discipline: 13, specialist: 14 });
   assert.deepEqual(facts.inventoryNames, facts.canonicalNames);
   assert.ok(facts.onDemandBytes > facts.residentBytes);
 });
@@ -98,7 +98,8 @@ test("skill memory map draws every skill within its narrow canvas", () => {
     for (const skill of facts.canonicalNames) {
       assert.equal((source.match(new RegExp(`data-skill="${skill}"`, "g")) ?? []).length, 1, `${variant}: ${skill}`);
     }
-    assert.match(source, /data-group-count="8"/);
+    assert.match(source, /data-group-count="7"/);
+    assert.match(source, /data-group-count="13"/);
     assert.match(source, /data-group-count="14"/);
     if (variant.startsWith("narrow")) {
       const height = Number(source.match(/viewBox="0 0 390 (\d+)"/)?.[1]);
@@ -192,8 +193,8 @@ test("facts CLI accepts absent optional settings but rejects malformed settings"
   const absent = run();
   assert.equal(absent.status, 0, absent.stderr);
   const collected = JSON.parse(absent.stdout);
-  assert.equal(collected.skillCount, 36);
-  assert.equal(collected.codexSkillCount, 36);
+  assert.equal(collected.skillCount, 34);
+  assert.equal(collected.codexSkillCount, 34);
   assert.deepEqual(collected.canonicalNames, facts.canonicalNames);
   assert.equal(fs.existsSync(path.join(root, ".claude/settings.json")), false);
   fs.writeFileSync(path.join(root, ".claude/settings.json"), "{malformed");
