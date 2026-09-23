@@ -20,6 +20,17 @@ condensed.
 
 ### Changed
 
+- Every Codex skill is now a maintained native skill. The 14 that were generated
+  adapters (`adopt-repo`, `advocate`, `arena`, `astra-review`, `automate-me`,
+  `babysit-ci`, `claude-review`, `codex-review`, `dare`, `forge-repo-ui-skill`, `lab`,
+  `optimize-context`, `session-hub`, `sync-starter`) no longer tell Codex to read the
+  Claude workflow. Each is written for Codex: exposed agents with fresh context that
+  fail closed, `update_plan` and direct questions instead of Claude-only tools,
+  `~/.codex/sessions/` for `automate-me`, and the same-vendor disclosure when
+  `codex-review` or `astra-review` runs from Codex. Supporting files for
+  `forge-repo-ui-skill` and `session-hub` now sit beside their Codex skill. The Claude
+  skills are unchanged, and a new skill without a native version still gets a generated
+  adapter.
 - `refine` gates edits on three checks before changing anything: the failure is
   attributable to an instruction, tool, or configuration; the causal link is stated from
   evidence; and the rule being changed was active in the failure. It also checks what the

@@ -112,34 +112,34 @@ real project. It proves selective file adoption and preserved customization, not
 | Skill | Coverage | Codex owner | Required capabilities | Shared contracts | Runtime exceptions |
 |---|---|---|---|---|---|
 | addskill | claude, codex | native | No additional gate | authorization, proportion | Codex authors through built-in skill-creator; Claude uses packaged authoring guidance. Both use addskill for the full lifecycle. |
-| adopt-repo | claude, codex | adapter | No additional gate | authorization | None |
-| advocate | claude, codex | adapter | fresh-context-review | independence | None |
-| arena | claude, codex | adapter | fresh-context-review | independence | None |
-| astra-review | claude, codex | adapter | authenticated-codex-cli | evidence | A Codex author and Astra reviewer share a vendor; the requested model must be verified or uncertainty disclosed. |
-| automate-me | claude, codex | adapter | No additional gate | authorization | History paths and input tools follow the executing runtime and remain project-scoped. |
-| babysit-ci | claude, codex | adapter | No additional gate | authorization | None |
+| adopt-repo | claude, codex | native | No additional gate | authorization | None |
+| advocate | claude, codex | native | fresh-context-review | independence | None |
+| arena | claude, codex | native | fresh-context-review | independence | None |
+| astra-review | claude, codex | native | authenticated-codex-cli | evidence | A Codex author and Astra reviewer share a vendor; the requested model must be verified or uncertainty disclosed. |
+| automate-me | claude, codex | native | No additional gate | authorization | History paths and input tools follow the executing runtime and remain project-scoped. |
+| babysit-ci | claude, codex | native | No additional gate | authorization | None |
 | brainstorming | claude, codex | native | No additional gate | proportion | None |
 | bro | claude, codex | native | No additional gate | style | None |
 | caveman | claude, codex | native | No additional gate | style | None |
-| claude-review | claude, codex | adapter | subscription-routed-claude-cli | evidence | Cross-vendor only when the author runtime uses a different vendor; subscription routing is proved locally. |
-| codex-review | claude, codex | adapter | authenticated-codex-cli | evidence | A Codex author and Codex reviewer share a vendor; fresh context does not imply cross-vendor review. |
-| dare | claude, codex | adapter | fresh-context-review | independence | None |
+| claude-review | claude, codex | native | subscription-routed-claude-cli | evidence | Cross-vendor only when the author runtime uses a different vendor; subscription routing is proved locally. |
+| codex-review | claude, codex | native | authenticated-codex-cli | evidence | A Codex author and Codex reviewer share a vendor; fresh context does not imply cross-vendor review. |
+| dare | claude, codex | native | fresh-context-review | independence | None |
 | enhance-prompt | claude, codex | native | No additional gate | proportion | None |
 | fable-mode | claude, codex | native | No additional gate | proportion | None |
-| forge-repo-ui-skill | claude, codex | adapter | No additional gate | authorization | None |
+| forge-repo-ui-skill | claude, codex | native | No additional gate | authorization | None |
 | handoff-audit | claude, codex | native | No additional gate | evidence | None |
 | impartial-review | claude, codex | native | fresh-context-review | independence, evidence | Codex may use authenticated leaf CLI processes when exposed agents are absent; fresh context remains required. |
 | init-project | claude, codex | native | No additional gate | authorization | Claude hook management remains Claude-specific; Codex does not execute Claude hooks. |
-| lab | claude, codex | adapter | files, preview-server, browser | scope | None |
+| lab | claude, codex | native | files, preview-server, browser | scope | None |
 | long-horizon | claude, codex | native | fresh-context-review | independence, evidence | None |
 | long-horizon-workflows | claude | none | fresh-context-review, workflow-tool | independence, evidence | Claude Code only: rounds run through the Claude Code Workflow tool, which Codex does not expose; Codex uses long-horizon. |
-| optimize-context | claude, codex | adapter | No additional gate | scope | Measure the executing runtime catalog/kernel and verify retrieval after relocation; Claude hook measurements are not Codex measurements. |
+| optimize-context | claude, codex | native | No additional gate | scope | Measure the executing runtime catalog/kernel and verify retrieval after relocation; Claude hook measurements are not Codex measurements. |
 | perf-loop | claude, codex | native | fresh-context-review, repeatable-measurement | independence, evidence | None |
 | recall | claude, codex | native | No additional gate | authorization | None |
 | refine | claude, codex | native | No additional gate | authorization, proportion | None |
-| session-hub | claude, codex | adapter | writable-hub-location | scope | None |
+| session-hub | claude, codex | native | writable-hub-location | scope | None |
 | showpiece | claude, codex | native | No additional gate | scope | None |
-| sync-starter | claude, codex | adapter | No additional gate | authorization | None |
+| sync-starter | claude, codex | native | No additional gate | authorization | None |
 | verify-this | claude, codex | native | No additional gate | evidence | None |
 | why | claude, codex | native | fresh-context-review | independence | None |
 | wow-loop | claude, codex | native | fresh-context-review, visual-capture | independence, evidence | None |

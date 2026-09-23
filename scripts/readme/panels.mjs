@@ -157,14 +157,14 @@ function runtime(themeName, narrow) {
 <text class="eyebrow mute" x="${x}" y="36">TWO RUNTIMES · SHARED MEMORY</text>
 <text class="subhead" x="${x}" y="72">Two runtimes. One project.</text>
 ${card(x,108,'CLAUDE CODE','CLAUDE.md + hooks',`${facts.skillCount} canonical workflows`,'.claude/skills/')}
-${card(narrow ? x : 458,narrow ? 294 : 108,'CODEX','AGENTS.md',`${facts.codexSkillCount} skills · ${facts.codexNativeCount} native · ${facts.codexAdapterCount} adapters`,'.agents/skills/')}
+${card(narrow ? x : 458,narrow ? 294 : 108,'CODEX','AGENTS.md',`${facts.codexSkillCount} skills · ${facts.codexNativeCount} native${facts.codexAdapterCount ? ` · ${facts.codexAdapterCount} adapters` : ''}`,'.agents/skills/')}
 <path class="wire active" d="${narrow ? 'M195 258V294 M195 444V488' : 'M231 258V292H649V258 M440 292V318'}"/>
 <rect class="tag" x="${x}" y="${memoryY}" width="${width-2*x}" height="90"/>
 <text class="label" x="${x+20}" y="${memoryY+28}">COMMITTED PROJECT MEMORY</text>
 <text class="copy" x="${x+20}" y="${memoryY+54}">.claude/reference/ · ${facts.referenceFileCount} topics</text>
 <text class="copy mute" x="${x+20}" y="${memoryY+76}">Facts, decisions, commands, and pitfalls</text>`;
   return svg({width,height,title:'Harness Firmware runtime ownership',
-    label:`${facts.skillCount} Claude Code workflows and ${facts.codexSkillCount} Codex skills, including ${facts.codexNativeCount} native and ${facts.codexAdapterCount} adapters, share committed project memory.`,themeName,body});
+    label:`${facts.skillCount} Claude Code workflows and ${facts.codexSkillCount} Codex skills, including ${facts.codexNativeCount} native${facts.codexAdapterCount ? ` and ${facts.codexAdapterCount} adapters` : ''}, share committed project memory.`,themeName,body});
 }
 
 function wrapLabel(label, max = 14) {
