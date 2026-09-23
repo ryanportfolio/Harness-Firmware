@@ -46,7 +46,7 @@ Replace it with a concise Claude authoring workflow and optional evaluation refe
 
 Do not simply delete it. `addskill`, `automate-me`, and `refine` depend on it. Update those references and the catalog in the same migration. Codex already routes authoring to its built-in `skill-creator`; that does not establish an equivalent authoring capability in every Claude installation. A replacement can keep the existing name initially to reduce migration risk.
 
-Sources: [writing-skills](../../.claude/skills/writing-skills/SKILL.md), [Claude addskill](../../.claude/skills/addskill/SKILL.md), [automate-me](../../.claude/skills/automate-me/SKILL.md), [Claude refine](../../.claude/skills/refine/SKILL.md).
+Sources: [writing-skills](../../.claude/skills/writing-skills/SKILL.md), [Claude addskill](../../.claude/skills/addskill/SKILL.md), [automate-me](https://github.com/ryanportfolio/Harness-Firmware/blob/419fbda/.claude/skills/automate-me/SKILL.md), [Claude refine](../../.claude/skills/refine/SKILL.md).
 
 ### 5. Bring verification and refinement decisions into alignment
 
@@ -54,7 +54,7 @@ Claude `verify-this` always requires old-state baseline and changed-state treatm
 
 Claude `refine` also says every skill misfire is a description bug. That can produce unnecessary trigger edits when the actual cause is an ignored instruction, a missing tool, or a conflicting rule. Codex already separates these diagnoses. Reconcile the Claude trigger, diagnosis, testing, and commit rules with the narrower evidence-based approach. Preserve the shared material-change evaluation record.
 
-Sources: [Claude verification](../../.claude/skills/verify-this/SKILL.md), [Codex verification](../../.agents/skills/verify-this/SKILL.md), [Claude refinement](../../.claude/skills/refine/SKILL.md), [Codex refinement](../../.agents/skills/refine/SKILL.md).
+Sources: [Claude verification](https://github.com/ryanportfolio/Harness-Firmware/blob/419fbda/.claude/skills/verify-this/SKILL.md), [Codex verification](https://github.com/ryanportfolio/Harness-Firmware/blob/419fbda/.agents/skills/verify-this/SKILL.md), [Claude refinement](../../.claude/skills/refine/SKILL.md), [Codex refinement](../../.agents/skills/refine/SKILL.md).
 
 ### 6. Make independence and evidence identity consistent
 

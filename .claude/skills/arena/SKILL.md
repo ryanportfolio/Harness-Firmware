@@ -60,4 +60,4 @@ The artifact passes the real checks it claims (tests, build, render, measurement
 3. For each non-base candidate: every idea you looked at, marked taken or left, with the reason. Put the base choice and its reason at the top of this section.
 4. Check commands and their results.
 
-Candidate folders stay in scratch; only the final artifact ships.
+The parent writes the final artifact to the path the user named, or else where the base candidate's work belongs in the repo. Candidate folders stay in scratch.

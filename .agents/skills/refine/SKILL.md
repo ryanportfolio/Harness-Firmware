@@ -37,14 +37,15 @@ the rule itself only: no quoted chat, no paths to session files, no credentials 
 Codex threads are `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` and
 `~/.codex/archived_sessions/rollout-*.jsonl` (`$CODEX_HOME` replaces `~/.codex` when set).
 Decide scope from the first line alone, a `session_meta` record: keep the thread when
-`git.repository_url` equals this repo's origin or `cwd` falls inside the repo or one of its
+`git.repository_url` equals this repo's origin (ignore a trailing `.git` and letter case) or `cwd` falls inside the repo or one of its
 worktrees; Codex worktrees live at `~/.codex/worktrees/<id>/`, so match the origin too.
 User turns are `response_item` records with `payload.type` `message` and role `user`; skip
 the injected `AGENTS.md` text and `<environment_context>` blocks in them. A thread whose
 `source` is `exec` or a subagent had an agent typing the user turns: treat it as evidence of
 delegation only, never as the user's preference.
 
-Before editing, pass three checks; failing any means zero changes is the correct outcome.
+A preference the user asked to save needs only the evidence table above. To fix a failure,
+pass three checks before editing; failing any means zero changes is the correct outcome.
 The failure is attributable to an instruction, tool, or configuration, not to the model
 reasoning wrong on correct inputs with working tools. The causal link is stated from the
 evidence: which behavior caused the failure and how the change removes it. The rule or

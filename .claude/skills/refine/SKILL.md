@@ -36,7 +36,8 @@ Past sessions: this project's folder under `~/.claude/projects/<munged-path>/` p
 contain the rule itself only: no quoted chat, no paths to session files, no credentials or
 tokens.
 
-Before editing, pass three checks; failing any means zero changes is the correct outcome.
+A preference the user asked to save needs only the evidence table above. To fix a failure,
+pass three checks before editing; failing any means zero changes is the correct outcome.
 The failure is attributable to an instruction, tool, or configuration, not to the model
 reasoning wrong on correct inputs with working tools. The causal link is stated from the
 evidence: which behavior caused the failure and how the change removes it. The rule or

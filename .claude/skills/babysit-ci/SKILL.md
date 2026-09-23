@@ -19,7 +19,7 @@ description: "Watches a PR's checks and fixes failures. Use for /babysit-ci, \"w
    - Actions check: take the run id from its link; `gh run view <run-id> --log-failed`.
    - External check: open its link and find the step or service that failed.
 4. Pending checks: start `gh pr checks <pr> --watch --fail-fast` with Bash `run_in_background`. The harness re-invokes you when it exits; keep diagnosing meanwhile.
-5. Watch mode stops here with a report. Fix mode continues below.
+5. Watch mode: once the watcher exits, reread the checks and the head SHA, report, and stop. Fix mode continues below.
 
 ## Fix
 
@@ -31,7 +31,7 @@ Sort each failure before touching code:
 
 After any push, restart at step 2. A push can trigger workflows the old list lacked or retire ones it showed, so check state read before the push is stale.
 
-## Stop and report
+## Stop, report, and ask before continuing
 
 - 3 fix pushes done.
 - The same failure survives a fix: switch to `fable-mode`, rethink the cause, and name the fix tier.
