@@ -39,7 +39,7 @@ const NODES = [
   ], href: SKILL("long-horizon") },
   { deg: 144, name: "Execute", refs: [part("fable-mode", SKILL("fable-mode")), part(" discipline")], href: SKILL("fable-mode") },
   { deg: 216, name: "Audit", refRows: [
-    [part("long-horizon", SKILL("long-horizon")), part(" · "), part("verify-this", SKILL("verify-this"))],
+    [part("long-horizon", SKILL("long-horizon"))],
     [part("advocate", SKILL("advocate")), part(" · "), part("codex-review", SKILL("codex-review"))],
     [part("arena", SKILL("arena")), part(" · "), part("wow-loop", SKILL("wow-loop"))],
     [part("impartial-review", SKILL("impartial-review"))],
@@ -149,7 +149,7 @@ function build(themeName) {
     inputBox(470, "Evaluators", [
       "CI, tests, audited evidence:",
       "evidence beats claims",
-    ], [part(".github/workflows/", `${TREE}/.github/workflows`), part(" · "), part("/verify-this", SKILL("verify-this"))], `${TREE}/.github/workflows`,
+    ], [part(".github/workflows/", `${TREE}/.github/workflows`), part(" · "), part("/fable-mode", SKILL("fable-mode"))], `${TREE}/.github/workflows`,
     `<path class="glyph" d="M-9 4A9 9 0 0 1 9 4"/><path class="glyph" d="M0 4L5-3"/><path class="glyph" d="M-11 8H11"/>`),
   ];
 

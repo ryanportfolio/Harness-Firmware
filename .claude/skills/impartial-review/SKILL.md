@@ -33,7 +33,7 @@ Record the run ID, absolute workspace, exact base/head SHAs, staged/unstaged dif
 
 Preserve independent context at every size. If risk is unclear, use the broader coverage.
 
-**Strict quality mode (opt-in):** when the user asks for a "strict", "harsh", "thermo-nuclear", or deep maintainability review, additionally load `strict-quality-rubric.md` from this folder and append it to the Bucket D ("things the author missed") subagent's prompt — missed structural simplifications are exactly its territory. It raises the approval bar to presumptive blockers (code-judo simplifications, 1k-line rule, spaghetti growth) on top of the normal buckets; correctness review is unchanged.
+**Strict quality mode (opt-in):** for a strict, harsh, or deep maintainability review request, load `strict-quality-rubric.md` from this folder and append it to the Bucket D ("things the author missed") subagent's prompt, because maintainability gaps fall in that bucket. The rubric adds six checks that block unless the author gives a reason (Size, Reach, Layers, Types, Ownership, Partial failure) on top of the normal buckets; correctness review stays the same.
 
 ## Step 3: Dispatch independent reviewers
 

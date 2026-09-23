@@ -58,5 +58,5 @@ confounded checks. Follow existing data-handling rules and omit sensitive payloa
 Local presentation grants no authority to upload, publish, install a recorder or other
 tool, or change external access.
 
-Maintainers: keep this reference identical in the Claude and Codex `verify-this`,
-`wow-loop` and `perf-loop` folders. Package each copy with its skill for standalone use.
+Maintainers: keep this reference identical in the Claude and Codex `wow-loop` and
+`perf-loop` folders. Package each copy with its skill for standalone use.
