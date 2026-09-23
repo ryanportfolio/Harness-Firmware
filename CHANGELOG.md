@@ -59,6 +59,16 @@ condensed.
 
 ### Added
 
+- `external-review`, a Codex-only leaf review: one reviewer, one fresh context, one
+  exact diff scope, no agents or edits. `codex-review` and `astra-review` in both
+  runtimes now launch it through a custom prompt when the reviewed repository has it,
+  and fall back to the `--base`/`--commit`/`--uncommitted` selector with Codex's
+  built-in rubric when it does not. New Claude skills `codex-fullreview` (Sol, high)
+  and `astra-fullreview` (Astra, medium) run a full multi-agent review instead: plain
+  `codex exec` runs `impartial-review` as Manager with fresh-context sub-reviewers,
+  and the launcher counts the spawns from the Codex session file and reports a
+  zero-spawn run as "no sub-reviewers ran". They use more Codex usage than the
+  single-context launchers.
 - `long-horizon-workflows` skill: the `long-horizon` contract with each round's
   baseline, executor, inspector and judges run as one Workflow script, so audit
   agents cannot inherit Manager context, verdicts are schema enums, and the run
