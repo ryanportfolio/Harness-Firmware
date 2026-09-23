@@ -20,7 +20,8 @@ Everything lives under `.tmp/arena/<slug>/`. These access rules carry the blindi
 
 | Path | Contents | Written by | Read by |
 |---|---|---|---|
-| `brief.md` | Artifact, inputs, constraints, and 3 to 6 pass/fail criteria an outsider could check, such as "adds a `--dry-run` flag that performs no writes" ("clean code" is too vague) | Parent | Candidates get everything except the criteria; the judge gets only the criteria |
+| `brief.md` | Artifact, inputs, and constraints | Parent | Candidates and parent |
+| `criteria.md` | 3 to 6 pass/fail criteria an outsider could check, such as "adds a `--dry-run` flag that performs no writes" ("clean code" is too vague) | Parent | Parent and judge only; never copied into a candidate's folder or worktree |
 | `c1/` ... `cN/` | One candidate's artifact plus `rationale.md`: the options it considered and dropped, with reasons | That candidate only, in this folder or its own git worktree | Parent only; the judge never sees `rationale.md` |
 | `judge/` | Each artifact copied under a neutral letter, with names, angle, vendor, and model traces removed and content otherwise unaltered | Parent | Judge, read-only |
 | `note.md` | The run record listed under "Done when" | Parent | Parent, then the user |
@@ -37,7 +38,7 @@ For browser-rendered artifacts, each candidate brief includes the `CLAUDE.md` br
 
 A candidate that returns nothing, or a Codex run the sandbox blocks, is a dropout. Record it and continue with the rest.
 
-**Judge.** Start it only after all candidates return. Fresh and read-only, it sees only the criteria and `judge/`, and returns pass/fail per criterion with evidence for every letter, plus a recommended base.
+**Judge.** Start it only after all candidates return. Fresh and read-only, it sees only `criteria.md` and `judge/`, and returns pass/fail per criterion with evidence for every letter, plus a recommended base.
 
 ## Deciding
 

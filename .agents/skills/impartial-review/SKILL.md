@@ -18,7 +18,7 @@ When the diff extracts repeated operations or changes a shared boundary, read
 [selective shared-code refactoring](references/shared-code-refactoring.md)
 and include its applicable caller and invariant checks in reviewer briefs.
 
-When the user asks for a strict or harsh review, read the
+When the user asks for a strict, harsh, or deep maintainability review, read the
 [strict quality rubric](strict-quality-rubric.md) and append it to the brief of the
 reviewer covering missing integration/cleanup (the sole reviewer on a small change). It adds maintainability blockers on top
 of the normal areas; correctness coverage is unchanged.

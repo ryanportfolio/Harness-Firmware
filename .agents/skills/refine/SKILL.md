@@ -20,7 +20,9 @@ evidence that the trigger is wrong; an isolated misread can require no edit.
 
 Only the user's own words count as evidence of a preference. Before reading deeply, grep
 the user's turns case-insensitively for phrases that set or repeat a standing rule:
-"from now on", "going forward", "every time", "I already told you", "why do you keep".
+"from now on", "going forward", "every time", "always", "never", "I already told you",
+"why do you keep". The grep only picks where to read first; a standing rule phrased any
+other way still counts.
 Decide each candidate by this table:
 
 | Evidence in the user's turns | Action |
