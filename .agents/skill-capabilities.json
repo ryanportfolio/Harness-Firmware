@@ -99,6 +99,28 @@
       "resources": [],
       "exceptions": []
     },
+    "astra-fullreview": {
+      "coverage": [
+        "claude"
+      ],
+      "owners": {
+        "claude": "source"
+      },
+      "entrypoints": [
+        "astra-fullreview"
+      ],
+      "requiredTools": [
+        "authenticated-codex-cli"
+      ],
+      "sharedContracts": [
+        "independence",
+        "evidence"
+      ],
+      "resources": [],
+      "exceptions": [
+        "Claude launcher for a full multi-agent Codex review on gpt-6-astra; from Codex use $impartial-review directly."
+      ]
+    },
     "astra-review": {
       "coverage": [
         "claude",
@@ -262,6 +284,28 @@
         "Cross-vendor only when the author runtime uses a different vendor; subscription routing is proved locally."
       ]
     },
+    "codex-fullreview": {
+      "coverage": [
+        "claude"
+      ],
+      "owners": {
+        "claude": "source"
+      },
+      "entrypoints": [
+        "codex-fullreview"
+      ],
+      "requiredTools": [
+        "authenticated-codex-cli"
+      ],
+      "sharedContracts": [
+        "independence",
+        "evidence"
+      ],
+      "resources": [],
+      "exceptions": [
+        "Claude launcher for a full multi-agent Codex review; from Codex use $impartial-review directly."
+      ]
+    },
     "codex-review": {
       "coverage": [
         "claude",
@@ -324,6 +368,29 @@
       ],
       "resources": [],
       "exceptions": []
+    },
+    "external-review": {
+      "coverage": [
+        "codex"
+      ],
+      "owners": {
+        "codex": "native"
+      },
+      "entrypoints": [
+        "external-review"
+      ],
+      "requiredTools": [],
+      "sharedContracts": [
+        "independence",
+        "evidence"
+      ],
+      "resources": [
+        ".agents/skills/external-review/agents/openai.yaml",
+        ".agents/skills/external-review/references/shared-code-refactoring.md"
+      ],
+      "exceptions": [
+        "Codex-only leaf review invoked by the codex-review and astra-review launchers in both runtimes; it has no Claude counterpart."
+      ]
     },
     "fable-mode": {
       "coverage": [

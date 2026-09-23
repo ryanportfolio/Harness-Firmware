@@ -23,13 +23,14 @@ function fixture(t) {
 }
 test('repository intended coverage and resources validate',()=>assert.deepEqual(validateCapabilities(repo).errors,[]));
 
-for (const [resource, skills] of [
+for (const [resource, skills, codexOnly = []] of [
   ['evidence-report.md', ['perf-loop', 'verify-this', 'wow-loop']],
-  ['shared-code-refactoring.md', ['brainstorming', 'impartial-review', 'writing-plans']],
+  ['shared-code-refactoring.md', ['brainstorming', 'impartial-review', 'writing-plans'], ['external-review']],
 ]) {
   test(`repository ${resource} copies are present and byte-identical`, () => {
     const copies = ['.claude', '.agents'].flatMap(runtime =>
-      skills.map(skill => `${runtime}/skills/${skill}/references/${resource}`));
+      skills.map(skill => `${runtime}/skills/${skill}/references/${resource}`))
+      .concat(codexOnly.map(skill => `.agents/skills/${skill}/references/${resource}`));
     for (const copy of copies) {
       assert.ok(fs.existsSync(path.join(repo, copy)), `Missing shared resource: ${copy}`);
     }

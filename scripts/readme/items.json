@@ -95,6 +95,16 @@
       "group": "discipline"
     },
     {
+      "name": "codex-fullreview",
+      "label": "Codex full review",
+      "group": "discipline"
+    },
+    {
+      "name": "astra-fullreview",
+      "label": "Astra full review",
+      "group": "discipline"
+    },
+    {
       "name": "claude-review",
       "label": "Claude review",
       "group": "discipline"

@@ -115,6 +115,7 @@ real project. It proves selective file adoption and preserved customization, not
 | adopt-repo | claude, codex | native | No additional gate | authorization | None |
 | advocate | claude, codex | native | fresh-context-review | independence | None |
 | arena | claude, codex | native | fresh-context-review | independence | None |
+| astra-fullreview | claude | none | authenticated-codex-cli | independence, evidence | Claude launcher for a full multi-agent Codex review on gpt-6-astra; from Codex use $impartial-review directly. |
 | astra-review | claude, codex | native | authenticated-codex-cli | evidence | A Codex author and Astra reviewer share a vendor; the requested model must be verified or uncertainty disclosed. |
 | automate-me | claude, codex | native | No additional gate | authorization | History paths and input tools follow the executing runtime and remain project-scoped. |
 | babysit-ci | claude, codex | native | No additional gate | authorization | None |
@@ -122,9 +123,11 @@ real project. It proves selective file adoption and preserved customization, not
 | bro | claude, codex | native | No additional gate | style | None |
 | caveman | claude, codex | native | No additional gate | style | None |
 | claude-review | claude, codex | native | subscription-routed-claude-cli | evidence | Cross-vendor only when the author runtime uses a different vendor; subscription routing is proved locally. |
+| codex-fullreview | claude | none | authenticated-codex-cli | independence, evidence | Claude launcher for a full multi-agent Codex review; from Codex use $impartial-review directly. |
 | codex-review | claude, codex | native | authenticated-codex-cli | evidence | A Codex author and Codex reviewer share a vendor; fresh context does not imply cross-vendor review. |
 | dare | claude, codex | native | fresh-context-review | independence | None |
 | enhance-prompt | claude, codex | native | No additional gate | proportion | None |
+| external-review | codex | native | No additional gate | independence, evidence | Codex-only leaf review invoked by the codex-review and astra-review launchers in both runtimes; it has no Claude counterpart. |
 | fable-mode | claude, codex | native | No additional gate | proportion | None |
 | forge-repo-ui-skill | claude, codex | native | No additional gate | authorization | None |
 | handoff-audit | claude, codex | native | No additional gate | evidence | None |

@@ -45,5 +45,5 @@ finding. Verification should cover behavior and relevant integration guarantees,
 than only matching the extracted implementation.
 
 Maintainers: keep this reference identical in the Claude and Codex `brainstorming`,
-`writing-plans` and `impartial-review` folders. Package each copy with its skill for
-standalone use.
+`writing-plans` and `impartial-review` folders and the Codex `external-review` folder.
+Package each copy with its skill for standalone use.
