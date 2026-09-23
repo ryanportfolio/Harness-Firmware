@@ -31,7 +31,7 @@ No two workers share a writable path. The parent holds the letter-to-candidate m
 
 **Candidates.** Three by default; more on request or when the options are many. Each brief names a different angle, such as minimal change, failure-proof, or end-user-first. Agent workers run with `isolation: "worktree"` on Opus, the latest Fable, or higher, never `sonnet` or `haiku`. A user-chosen model that meets that floor wins.
 
-Mix vendors without asking. If `codex login status` reports logged in, one candidate and the judge run through `codex exec` with the Sol model id that `codex-review` pins. Take flags from local `codex exec --help`, and never bypass approvals or the sandbox. Only the user's explicit request skips Codex. Logged out: all workers run on Claude, noted.
+Mix vendors without asking. If `codex login status` reports a ChatGPT (subscription) login, one candidate and the judge run through `codex exec` with the Sol model id that `codex-review` pins. Take flags from local `codex exec --help`, and never bypass approvals or the sandbox. Only the user's explicit request skips Codex. Logged out, logged in with an API key, or unclear billing: all workers run on Claude, noted; never switch Codex to an API key or paid credits.
 
 For browser-rendered artifacts, each candidate brief includes the `CLAUDE.md` browser rule.
 
