@@ -4,30 +4,43 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { collectFacts, expectedCodexNames } from "./facts.mjs";
+import { collectFacts, expectedCodexNames, readmeRemovedSkills } from "./facts.mjs";
 import { absolute, read } from "./lib.mjs";
 
 const facts = collectFacts();
 const panelNames = ["boot", "feedback", "runtime", "skills"];
 const variants = ["light", "dark", "narrow-light", "narrow-dark"];
+// A project that removed skills keeps the template's README until it runs build.mjs; those
+// artifacts still describe the full template inventory (see verify.mjs).
+const templateReadme = facts.removed.length > 0 && readmeRemovedSkills(read("README.md")).length === 0;
+const shown = templateReadme
+  ? { skillCount: facts.templateNames.length, canonicalNames: facts.templateNames, tierCounts: facts.templateTierCounts }
+  : facts;
 const requiredLinks = ["GUIDE.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "actions/workflows/validate-template.yml"];
 
 test("README facts match the canonical repository inventory", () => {
-  assert.equal(facts.skillCount, 34);
+  if (!facts.removed.length) {
+    // Template inventory tripwire: adding or moving a skill updates these on purpose.
+    assert.equal(facts.skillCount, 34);
+    assert.deepEqual(facts.tierCounts, { core: 7, discipline: 13, specialist: 14 });
+    assert.ok(facts.onDemandBytes > facts.residentBytes);
+  }
+  assert.equal(facts.skillCount, facts.templateNames.filter(name => !facts.removed.includes(name)).length);
+  for (const [group, count] of Object.entries(facts.tierCounts)) {
+    assert.equal(count, facts.skills.filter(skill => skill.group === group).length, group);
+  }
   const capabilities = JSON.parse(read(".agents/skill-capabilities.json")).skills;
   const modes = JSON.parse(read(".agents/skill-modes.json")).skills;
   const overrides = fs.existsSync(absolute(".claude/settings.json")) ? JSON.parse(read(".claude/settings.json")).skillOverrides ?? {} : {};
-  const intendedCodex = Object.keys(capabilities).filter(name => capabilities[name].coverage.includes("codex") && modes[name] !== "disabled" && overrides[name] !== "off").sort();
+  const intendedCodex = Object.keys(capabilities).filter(name => capabilities[name].coverage.includes("codex") && modes[name] !== "disabled" && overrides[name] !== "off" && !facts.removed.includes(name)).sort();
   assert.equal(facts.codexSkillCount, intendedCodex.length);
   assert.equal(facts.codexNativeCount, intendedCodex.filter(name => modes[name] === "native").length);
   assert.equal(facts.codexNativeCount + facts.codexAdapterCount, facts.codexSkillCount);
-  assert.deepEqual(expectedCodexNames(facts.canonicalNames, modes, overrides), intendedCodex);
+  assert.deepEqual(expectedCodexNames(facts.canonicalNames, modes, overrides, facts.removed), intendedCodex);
   assert.equal(facts.referenceFileCount, 6);
   assert.deepEqual(facts.runtimeNames, ["Claude Code", "Codex"]);
   assert.equal(facts.runtimeCount, facts.runtimeNames.length);
-  assert.deepEqual(facts.tierCounts, { core: 7, discipline: 13, specialist: 14 });
   assert.deepEqual(facts.inventoryNames, facts.canonicalNames);
-  assert.ok(facts.onDemandBytes > facts.residentBytes);
 });
 
 test("all panels ship four accessible local-only variants", () => {
@@ -94,13 +107,12 @@ test("boot trace contains every row and one sequenced cursor", () => {
 test("skill memory map draws every skill within its narrow canvas", () => {
   for (const variant of variants) {
     const source = read(`assets/readme/skills-${variant}.svg`);
-    assert.equal((source.match(/data-skill="/g) ?? []).length, facts.skillCount);
-    for (const skill of facts.canonicalNames) {
+    assert.equal((source.match(/data-skill="/g) ?? []).length, shown.skillCount);
+    for (const skill of shown.canonicalNames) {
       assert.equal((source.match(new RegExp(`data-skill="${skill}"`, "g")) ?? []).length, 1, `${variant}: ${skill}`);
     }
-    assert.match(source, /data-group-count="7"/);
-    assert.match(source, /data-group-count="13"/);
-    assert.match(source, /data-group-count="14"/);
+    const drawn = [...source.matchAll(/data-group-count="(\d+)"/g)].map((match) => Number(match[1]));
+    assert.deepEqual(drawn, Object.values(shown.tierCounts).filter((count) => count > 0));
     if (variant.startsWith("narrow")) {
       const height = Number(source.match(/viewBox="0 0 390 (\d+)"/)?.[1]);
       const bottoms = [...source.matchAll(/data-bottom="(\d+)"/g)].map((match) => Number(match[1]));
@@ -115,11 +127,11 @@ test("boot and runtime panels use measured counts", () => {
   for (const variant of variants) {
     const boot = read(`assets/readme/boot-${variant}.svg`);
     const runtime = read(`assets/readme/runtime-${variant}.svg`);
-    assert.match(boot, new RegExp(`${facts.skillCount} workflows ready`));
+    assert.match(boot, new RegExp(`${shown.skillCount} workflows ready`));
     assert.match(boot, new RegExp(`${facts.referenceFileCount} files mounted`));
     assert.match(boot, new RegExp(`${facts.runtimeCount} targets declared`));
-    assert.match(runtime, new RegExp(`${facts.skillCount} canonical workflows`));
-    assert.match(runtime, new RegExp(`${facts.codexSkillCount} (?:CODEX SKILLS VERIFIED|skills)`, "i"));
+    assert.match(runtime, new RegExp(`${shown.skillCount} canonical workflows`));
+    if (!templateReadme) assert.match(runtime, new RegExp(`${facts.codexSkillCount} (?:CODEX SKILLS VERIFIED|skills)`, "i"));
   }
 });
 
@@ -128,15 +140,15 @@ test("generated README keeps installation early and maps exact picture variants"
   assert.ok(readme.startsWith("<!-- generated by scripts/readme/build.mjs. do not edit by hand. -->"));
   assert.ok(readme.indexOf("/plugin marketplace add") < readme.indexOf("GUIDE.md"));
   assert.ok(readme.indexOf("/plugin marketplace add") < readme.indexOf("## the repository feedback loop"));
-  assert.match(readme, new RegExp(`${facts.codexNativeCount} native Codex workflows`));
+  if (!templateReadme) assert.match(readme, new RegExp(`${facts.codexNativeCount} native Codex workflows`));
   assert.equal((readme.match(/<picture>/g) ?? []).length, panelNames.length);
-  assert.match(readme, new RegExp(`## ${facts.skillCount} workflows, loaded when called`));
-  assert.match(readme, new RegExp(`${facts.tierCounts.core} core · ${facts.tierCounts.discipline} discipline · ${facts.tierCounts.specialist} specialist`));
+  assert.match(readme, new RegExp(`## ${shown.skillCount} workflows, loaded when called`));
+  assert.match(readme, new RegExp(`${shown.tierCounts.core} core · ${shown.tierCounts.discipline} discipline · ${shown.tierCounts.specialist} specialist`));
   assert.match(readme, /recall → work → verify → refine → reviewed repository change → next task/);
   assert.match(readme, /Success means the doctor reports no failures/);
   assert.ok(readme.indexOf("[Install the skills or start a repository](#quickstart)") < readme.indexOf("## the repository feedback loop"));
   assert.match(readme, /<summary><strong>Click to open the generated skill memory map<\/strong><\/summary>/);
-  assert.match(readme, new RegExp(`<summary><strong>Click to browse all ${facts.skillCount} skills<\\/strong><\\/summary>`));
+  assert.match(readme, new RegExp(`<summary><strong>Click to browse all ${shown.skillCount} skills<\\/strong><\\/summary>`));
   for (const link of requiredLinks) assert.ok(readme.includes(link), `README links ${link}`);
 
   for (const name of panelNames) {
@@ -151,7 +163,8 @@ test("generated README keeps installation early and maps exact picture variants"
 
   const list = readme.match(/<!-- skill-list:start -->([\s\S]+)<!-- skill-list:end -->/)?.[1] ?? "";
   assert.ok(list);
-  for (const skill of facts.canonicalNames) {
+  assert.equal((list.match(/^- \[`/gm) ?? []).length, shown.skillCount);
+  for (const skill of shown.canonicalNames) {
     assert.equal((list.match(new RegExp(`\\[\\\`${skill}\\\`\\]`, "g")) ?? []).length, 1, skill);
   }
 });
@@ -174,7 +187,8 @@ test("Codex inventory honors native additions and both disabled sources", () => 
 test("facts CLI accepts absent optional settings but rejects malformed settings", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "readme-facts-optional-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  for (const relative of ["scripts/readme/facts.mjs", "scripts/readme/lib.mjs", "scripts/readme/items.json", "CLAUDE.md"]) {
+  for (const relative of ["scripts/readme/facts.mjs", "scripts/readme/lib.mjs", "scripts/readme/items.json", "CLAUDE.md", ".agents/removed-skills.json"]) {
+    if (!fs.existsSync(absolute(relative))) continue;
     const target = path.join(root, relative);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(absolute(relative), target);
@@ -193,8 +207,8 @@ test("facts CLI accepts absent optional settings but rejects malformed settings"
   const absent = run();
   assert.equal(absent.status, 0, absent.stderr);
   const collected = JSON.parse(absent.stdout);
-  assert.equal(collected.skillCount, 34);
-  assert.equal(collected.codexSkillCount, 34);
+  assert.equal(collected.skillCount, facts.skillCount);
+  assert.equal(collected.codexSkillCount, facts.skillCount);
   assert.deepEqual(collected.canonicalNames, facts.canonicalNames);
   assert.equal(fs.existsSync(path.join(root, ".claude/settings.json")), false);
   fs.writeFileSync(path.join(root, ".claude/settings.json"), "{malformed");

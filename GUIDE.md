@@ -62,7 +62,33 @@ Run:
 node .claude/scripts/doctor.mjs
 ```
 
-The doctor checks hook wiring, skill frontmatter, generated Codex adapters, the reference library, plugin manifests, leftover `FILL IN` markers, and always-loaded context weight.
+The doctor checks hook wiring, skill frontmatter, generated Codex adapters, skill coverage against the removed-skills record, the reference library, plugin manifests, leftover `FILL IN` markers, and always-loaded context weight.
+
+## remove a skill
+
+Delete a skill you do not want, then record it so the checks treat the gap as deliberate. harnessfirmware.com/new does this for every skill you untick.
+
+1. Delete `.claude/skills/<name>/` and `.agents/skills/<name>/`, whichever exist.
+2. Add the name to `.agents/removed-skills.json`. Keep the list sorted, each name once:
+
+   ```json
+   {
+     "version": 1,
+     "removed": ["lab", "why"]
+   }
+   ```
+
+3. Run `node .claude/scripts/removed-skills.mjs`, then `node .claude/scripts/doctor.mjs`.
+
+The creator also sets each removed name to `"off"` under `skillOverrides` in `.claude/settings.json`. The checks accept the record with or without that setting.
+
+The `removal` block in `.agents/skill-capabilities.json` sets the limits. `required` lists skills that cannot be removed: `init-project` and `external-review`. `dependencies` lists skills that need others; for example `astra-review` reads `codex-review`, so removing `codex-review` means removing `astra-review` as well. A record that breaks either rule fails and names both skills.
+
+A skill folder that is missing without a record still fails, and so does a recorded skill whose folder is still there. Retired skills are a separate list in the same manifest; never record them as removed.
+
+The README and its images keep describing the full template until you run `node scripts/readme/build.mjs`. The rebuilt README names the removed skills on its second line, and from then on `node scripts/readme/verify.mjs` requires it to stay current.
+
+To bring a skill back, restore its folders from the template, for example `git checkout starter/main -- .claude/skills/<name> .agents/skills/<name>` (only the paths that exist upstream), then delete its name from the record and its `skillOverrides` entry. When you pull other template updates with `sync-starter`, skip paths under removed skills; the session-start drift notice already ignores them.
 
 ## measure the always-loaded layer
 
@@ -109,6 +135,7 @@ Generated Codex adapters delegate to `.claude/skills/`. Native entries in `.agen
 | `AGENTS.md` | Codex instruction and safety boundary. |
 | `.claude/skills/` | Canonical workflow playbooks. |
 | `.agents/skills/` | Standalone Codex workflows and generated discovery adapters. |
+| `.agents/removed-skills.json` | Skills this project deleted on purpose. Checks skip the names it lists. |
 | `.claude/reference/` | Committed project memory for architecture, commands, deployment, pitfalls, secrets, and technology choices. |
 | `.claude/hooks/session-start.sh` | Claude Code startup checks and reminders. |
 | `.claude/scripts/context-weight.sh` | Always-loaded source weight measurement. |

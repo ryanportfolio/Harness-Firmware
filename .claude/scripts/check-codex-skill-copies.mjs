@@ -62,8 +62,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
+    // Skills deleted on purpose (.agents/removed-skills.json) have no repository copy to compare.
+    const removedPath = path.join(root, ".agents/removed-skills.json");
+    const removed = new Set(fs.existsSync(removedPath) ? JSON.parse(fs.readFileSync(removedPath, "utf8")).removed ?? [] : []);
     const names = Object.entries(modes)
-      .filter(([name, mode]) => mode === "native" && overrides[name] !== "off")
+      .filter(([name, mode]) => mode === "native" && overrides[name] !== "off" && !removed.has(name))
       .map(([name]) => name);
     let checked = 0;
     for (const target of targets) {

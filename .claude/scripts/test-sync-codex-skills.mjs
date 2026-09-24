@@ -69,3 +69,17 @@ test("unregistered hand-authored adapters remain protected", (t) => {
   assert.match(result.stderr, /refusing to overwrite a hand-authored Codex skill/);
   assert.equal(f.read(".agents/skills/ordinary/SKILL.md"), "Personal content\n");
 });
+
+test("recorded removals need no folder, and a recorded skill that remains fails", (t) => {
+  const f = fixture(t);
+  f.write(".agents/removed-skills.json", JSON.stringify({ version: 1, removed: ["long-horizon"] }));
+  let result = f.run("--write");
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /long-horizon: recorded as removed in \.agents\/removed-skills\.json but still present/);
+  for (const runtime of [".claude", ".agents"]) fs.rmSync(path.join(f.root, runtime, "skills", "long-horizon"), { recursive: true });
+  result = f.run("--write");
+  assert.equal(result.status, 0, result.stderr);
+  result = f.run("--check");
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fs.existsSync(path.join(f.root, ".agents/skills/long-horizon")), false);
+});

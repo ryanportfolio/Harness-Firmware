@@ -12,6 +12,7 @@ const sourceRoot = path.join(root, ".claude", "skills");
 const targetRoot = path.join(root, ".agents", "skills");
 const settingsPath = path.join(root, ".claude", "settings.json");
 const modesPath = path.join(root, ".agents", "skill-modes.json");
+const removedPath = path.join(root, ".agents", "removed-skills.json");
 const mode = process.argv[2] ?? "--check";
 
 if (!new Set(["--check", "--write"]).has(mode)) {
@@ -120,6 +121,16 @@ function disabledSkills() {
   );
 }
 
+// Skills the project deleted on purpose (see .claude/scripts/removed-skills.mjs for the full checks).
+function removedSkills() {
+  if (!fs.existsSync(removedPath)) return new Set();
+  const record = JSON.parse(fs.readFileSync(removedPath, "utf8"));
+  if (record?.version !== 1 || !Array.isArray(record.removed) || record.removed.some((name) => typeof name !== "string")) {
+    throw new Error(`${removedPath}: expected {"version": 1, "removed": [...]}`);
+  }
+  return new Set(record.removed);
+}
+
 function codexDescription(description) {
   return description.replace(
     /(^|[\s("'\x60])\/([a-z][a-z0-9-]*)(?=$|[\s,.:;)"'\x60])/g,
@@ -137,6 +148,14 @@ function generatedAdapter(filePath) {
 }
 
 const disabled = disabledSkills();
+const removed = removedSkills();
+for (const name of removed) {
+  for (const directory of [sourceRoot, targetRoot]) {
+    if (fs.existsSync(path.join(directory, name))) {
+      throw new Error(`${path.join(directory, name)}: recorded as removed in .agents/removed-skills.json but still present`);
+    }
+  }
+}
 const modes = fs.existsSync(modesPath) ? JSON.parse(fs.readFileSync(modesPath, "utf8")) : { version: 1, skills: {} };
 if (modes.version !== 1 || !modes.skills || typeof modes.skills !== "object" || Array.isArray(modes.skills)) {
   throw new Error(`${modesPath}: expected version 1 and a skills object`);
@@ -152,7 +171,7 @@ const native = new Set();
 
 // Native skills are maintained directly. Sync validates, but never writes them.
 for (const [name, ownership] of Object.entries(modes.skills)) {
-  if (ownership !== "native" || disabled.has(name)) continue;
+  if (ownership !== "native" || disabled.has(name) || removed.has(name)) continue;
   const skillPath = path.join(targetRoot, name, "SKILL.md");
   if (!fs.existsSync(skillPath) || generatedAdapter(skillPath)) {
     throw new Error(`${skillPath}: native mode requires a maintained SKILL.md without the generated marker`);

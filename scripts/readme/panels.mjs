@@ -177,16 +177,15 @@ function wrapLabel(label, max = 14) {
 
 function skillsPanel(themeName, narrow) {
   const width = narrow ? 390 : 880;
-  const height = narrow ? 1560 : 700;
   const groups = facts.groups.map((group) => ({
     ...group,
     skills: facts.skills.filter((skill) => skill.group === group.id).sort((a, b) => a.name.localeCompare(b.name)),
-  }));
-  let markup = `${grid(width, height)}<text class="eyebrow mute" x="${narrow ? 24 : 40}" y="${narrow ? 36 : 42}">ON-DEMAND MEMORY MAP</text><text class="${narrow ? "subhead" : "headline"}" x="${narrow ? 24 : 40}" y="${narrow ? 72 : 92}"${narrow ? "" : " style=\"font-size:38px\""}>${facts.skillCount} workflows. Loaded when called.</text>`;
+  })).filter((group) => group.skills.length > 0);
+  let markup = `<text class="eyebrow mute" x="${narrow ? 24 : 40}" y="${narrow ? 36 : 42}">ON-DEMAND MEMORY MAP</text><text class="${narrow ? "subhead" : "headline"}" x="${narrow ? 24 : 40}" y="${narrow ? 72 : 92}"${narrow ? "" : " style=\"font-size:38px\""}>${facts.skillCount} workflows. Loaded when called.</text>`;
   markup += narrow
     ? `<text class="copy mute" x="24" y="104">Repository source estimate:</text><text class="small mute" x="24" y="132">${fmtKiB(facts.residentBytes)} kernel + index</text><text class="small mute" x="24" y="158">${fmtKiB(facts.onDemandBytes)} on-demand skill bodies</text>`
     : `<text class="copy mute" x="40" y="122">Repository source estimate · ${fmtKiB(facts.residentBytes)} kernel + index · ${fmtKiB(facts.onDemandBytes)} on-demand skill bodies</text>`;
-  let footerY;
+  let footerY, height;
   if (narrow) {
     let y = 188;
     for (const group of groups) {
@@ -201,6 +200,8 @@ function skillsPanel(themeName, narrow) {
       y += 88;
     }
     footerY = y + 12;
+    // The narrow canvas grows and shrinks with the skills present.
+    height = footerY + 46;
     markup += `<text class="small mute" x="24" y="${footerY}">COUNTS VERIFIED AGAINST</text><text class="small mute" x="24" y="${footerY + 26}">.claude/skills/</text>`;
   } else {
     const starts = [158, 314, 470];
@@ -218,12 +219,14 @@ function skillsPanel(themeName, narrow) {
         markup += `<g data-skill="${skill.name}" data-bottom="${cellY + 54}" transform="translate(${x} ${cellY})"><rect class="cell" width="${cellWidth}" height="54" rx="6"/><text class="small" x="10" y="${lines.length === 1 ? 31 : 23}">${esc(lines[0])}</text>${lines[1] ? `<text class="small" x="10" y="40">${esc(lines[1])}</text>` : ""}</g>`;
       });
     });
+    height = 700;
     footerY = height - 22;
     markup += `<text class="small mute" x="40" y="${footerY}">CELL AND GROUP COUNTS VERIFIED AGAINST .claude/skills/</text>`;
   }
   const scanTop = narrow ? 188 : 158;
   const scanDistance = narrow ? Math.max(0, footerY - scanTop - 60) : 430;
   markup += `<g class="scan-bar" aria-hidden="true" style="--scan-distance:${scanDistance}px"><rect class="signal" x="${narrow ? 18 : 34}" y="${scanTop}" width="4" height="32" style="animation:scanY 12s linear infinite"/></g>`;
+  markup = `${grid(width, height)}${markup}`;
   return svg({
     width, height, title: "Harness Firmware skill memory map",
     label: `A memory map of ${facts.skillCount} on-demand workflows grouped into ${facts.tierCounts.core} core, ${facts.tierCounts.discipline} discipline, and ${facts.tierCounts.specialist} specialist skills.`,

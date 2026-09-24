@@ -3,8 +3,8 @@
 // doctor.mjs: cross-platform install health check for this harness firmware repo.
 //
 // Verifies the wiring a session depends on: settings + SessionStart hook, skill
-// frontmatter, Codex adapter sync, the reference library, leftover template
-// markers, and plugin manifests. Reports an approximate always-loaded context
+// frontmatter, Codex adapter sync, skill coverage and the removed-skills record, the
+// reference library, leftover template markers, and plugin manifests. Reports an approximate always-loaded context
 // weight as an INFO line.
 //
 // Usage: node .claude/scripts/doctor.mjs [--json]
@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, "..", "..");
@@ -186,6 +186,25 @@ function checkCodexSync() {
   record("codex-sync", "FAIL", `adapter drift; run sync-codex-skills.mjs --write: ${drift}`);
 }
 
+// --- skill coverage and the removed-skills record (.agents/removed-skills.json) ---
+// A skill folder may be missing only when the record lists it; the capability check enforces that.
+async function checkSkillCoverage() {
+  const modulePath = ".claude/scripts/check-skill-capabilities.mjs";
+  if (!exists(modulePath) || !exists(".agents/skill-capabilities.json")) {
+    record("skill-coverage", "WARN", "capability manifest or checker is absent; skipping the coverage check");
+    return;
+  }
+  try {
+    const { validateCapabilities } = await import(pathToFileURL(abs(modulePath)).href);
+    const { errors, removed } = validateCapabilities(root);
+    const note = removed?.size ? `; deliberately removed: ${[...removed].join(", ")}` : "";
+    if (errors.length) record("skill-coverage", "FAIL", `${errors.length} problem(s): ${errors.join("; ")}`);
+    else record("skill-coverage", "PASS", `registered skills match their folders${note}`);
+  } catch (error) {
+    record("skill-coverage", "FAIL", `could not check skill coverage: ${error.message}`);
+  }
+}
+
 // --- reference library ---
 function checkReference() {
   const core = [
@@ -272,6 +291,7 @@ function checkContextWeight() {
 checkSettings();
 checkSkills();
 checkCodexSync();
+await checkSkillCoverage();
 checkReference();
 checkTemplateMarkers();
 checkPluginManifests();

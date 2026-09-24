@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { validateCapabilities } from './check-skill-capabilities.mjs';
+import { readRemovedSkills } from './removed-skills.mjs';
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 function write(root, p, text) { fs.mkdirSync(path.dirname(path.join(root,p)), {recursive:true}); fs.writeFileSync(path.join(root,p),text); }
 function json(root,p,value) { write(root,p,JSON.stringify(value,null,2)+'\n'); }
@@ -23,14 +24,16 @@ function fixture(t) {
 }
 test('repository intended coverage and resources validate',()=>assert.deepEqual(validateCapabilities(repo).errors,[]));
 
+const removedHere = new Set(readRemovedSkills(repo));
 for (const [resource, skills, codexOnly = []] of [
   ['evidence-report.md', ['perf-loop', 'wow-loop']],
   ['shared-code-refactoring.md', ['brainstorming', 'impartial-review', 'writing-plans'], ['external-review']],
 ]) {
   test(`repository ${resource} copies are present and byte-identical`, () => {
     const copies = ['.claude', '.agents'].flatMap(runtime =>
-      skills.map(skill => `${runtime}/skills/${skill}/references/${resource}`))
-      .concat(codexOnly.map(skill => `.agents/skills/${skill}/references/${resource}`));
+      skills.filter(skill => !removedHere.has(skill)).map(skill => `${runtime}/skills/${skill}/references/${resource}`))
+      .concat(codexOnly.filter(skill => !removedHere.has(skill)).map(skill => `.agents/skills/${skill}/references/${resource}`));
+    if (copies.length < 2) return;
     for (const copy of copies) {
       assert.ok(fs.existsSync(path.join(repo, copy)), `Missing shared resource: ${copy}`);
     }
@@ -155,4 +158,163 @@ test('selective native body/resource/registry adoption preserves project customi
   execFileSync(process.execPath,['.claude/scripts/sync-codex-skills.mjs','--write'],{cwd:root});
   assert.equal(fs.readFileSync(path.join(root,body),'utf8'),nextBody);assert.equal(fs.readFileSync(path.join(root,resource),'utf8'),'New domain metrics.\n');
   assert.equal(localModes.skills['local-choice'],'disabled');assert.equal(fs.readFileSync(path.join(root,'CLAUDE.md'),'utf8'),'Project kernel customization.\n');assert.equal(fs.readFileSync(path.join(root,'.claude/reference/project.md'),'utf8'),'Project-only facts.\n');assert.deepEqual(validateCapabilities(root).errors,[]);
+});
+
+// Removal record (.agents/removed-skills.json). These cases copy this repository and repeat the
+// file operations harnessfirmware.com/new performs for unticked skills: delete the skill folders
+// in both runtimes, write the record, and switch the skills off in .claude/settings.json.
+const node = (root, ...args) => spawnSync(process.execPath, args, {cwd: root, encoding: 'utf8'});
+const manifestOf = root => JSON.parse(fs.readFileSync(path.join(root, '.agents/skill-capabilities.json'), 'utf8'));
+function repoCopy(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'removed-skills-'));
+  t.after(() => fs.rmSync(root, {recursive: true, force: true}));
+  fs.cpSync(repo, root, {recursive: true, filter: source => !/^(?:\.git|\.tmp|node_modules)(?:[\\/]|$)/.test(path.relative(repo, source))});
+  return root;
+}
+function removeLikeCreator(root, names, {record = true, overrides = true} = {}) {
+  for (const name of names) for (const directory of ['.claude/skills', '.agents/skills']) fs.rmSync(path.join(root, directory, name), {recursive: true, force: true});
+  if (record) json(root, '.agents/removed-skills.json', {version: 1, removed: [...new Set([...readRemovedSkills(root), ...names])].sort()});
+  if (overrides) {
+    const settings = JSON.parse(fs.readFileSync(path.join(root, '.claude/settings.json'), 'utf8'));
+    settings.skillOverrides = {...settings.skillOverrides, ...Object.fromEntries(names.map(name => [name, 'off']))};
+    json(root, '.claude/settings.json', settings);
+  }
+}
+function checks(root) {
+  const steps = {
+    sync: ['.claude/scripts/sync-codex-skills.mjs', '--check'],
+    contract: ['.claude/scripts/test-codex-contract.mjs'],
+    capabilities: ['.claude/scripts/check-skill-capabilities.mjs'],
+    readmeVerify: ['scripts/readme/verify.mjs'],
+    readmeTest: ['--test', 'scripts/readme/readme.test.mjs'],
+    doctor: ['.claude/scripts/doctor.mjs'],
+  };
+  return Object.fromEntries(Object.entries(steps).map(([step, args]) => {
+    const result = node(root, ...args);
+    return [step, {status: result.status, output: result.stdout + result.stderr}];
+  }));
+}
+function assertGreen(results) {
+  for (const [step, result] of Object.entries(results)) assert.equal(result.status, 0, `${step}: ${result.output}`);
+}
+
+const baseManifest = manifestOf(repo);
+const policy = baseManifest.removal;
+const presentHere = name => !removedHere.has(name);
+const optional = Object.keys(baseManifest.skills).filter(name => presentHere(name) && !policy.required.includes(name));
+// A skill plus every present skill that depends on it, directly or through another dependent.
+function withDependents(name) {
+  const closure = new Set([name]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const [owner, needs] of Object.entries(policy.dependencies)) {
+      if (presentHere(owner) && !closure.has(owner) && needs.some(need => closure.has(need))) { closure.add(owner); grew = true; }
+    }
+  }
+  return [...closure].sort();
+}
+const pick = coverage => optional.find(name => baseManifest.skills[name].coverage.join() === coverage && withDependents(name).length === 1);
+const one = coverage => pick(coverage) ? [pick(coverage)] : null;
+const scenarios = [
+  ['one dual-runtime skill', one('claude,codex')],
+  ['one Claude-only skill', one('claude')],
+  ['several skills with a dependency chain', optional.includes('codex-fullreview') && optional.includes('astra-fullreview') ? ['astra-fullreview', 'codex-fullreview'] : null],
+  ['every optional skill', optional.length ? optional : null],
+];
+
+test('removal policy keeps init-project and external-review required', () => {
+  for (const name of ['external-review', 'init-project']) assert.ok(policy.required.includes(name), name);
+});
+
+test('each optional skill can be removed with its declared dependents', t => {
+  const root = repoCopy(t);
+  const before = readRemovedSkills(root);
+  for (const name of optional) {
+    const names = withDependents(name);
+    const moved = [];
+    for (const skill of names) for (const directory of ['.claude/skills', '.agents/skills']) {
+      const from = path.join(root, directory, skill);
+      if (!fs.existsSync(from)) continue;
+      const to = path.join(root, 'parked', directory, skill);
+      fs.mkdirSync(path.dirname(to), {recursive: true});
+      fs.renameSync(from, to);
+      moved.push([from, to]);
+    }
+    json(root, '.agents/removed-skills.json', {version: 1, removed: [...new Set([...before, ...names])].sort()});
+    assert.deepEqual(validateCapabilities(root).errors, [], `removing ${names.join(', ')}`);
+    for (const [from, to] of moved) fs.renameSync(to, from);
+  }
+});
+
+for (const [label, names] of scenarios) {
+  test(`creator removal of ${label} passes every check`, {skip: !names && 'no such optional skill present'}, t => {
+    const root = repoCopy(t);
+    removeLikeCreator(root, names);
+    assertGreen(checks(root));
+    // After a rebuild the README names the removals and the byte-for-byte check applies again.
+    const build = node(root, 'scripts/readme/build.mjs');
+    assert.equal(build.status, 0, build.stderr);
+    assert.match(fs.readFileSync(path.join(root, 'README.md'), 'utf8'), /^<!-- removed skills: /m);
+    assertGreen(checks(root));
+  });
+}
+
+test('removal without the record still fails', {skip: !scenarios[0][1]}, t => {
+  const root = repoCopy(t);
+  removeLikeCreator(root, scenarios[0][1], {record: false});
+  const results = checks(root);
+  assert.match(results.capabilities.output, /claude coverage mismatch/);
+  assert.notEqual(results.contract.status, 0);
+  assert.match(results.readmeVerify.output, /README skill inventory drift/);
+  assert.match(results.doctor.output, /FAIL skill-coverage .*coverage mismatch/);
+});
+
+test('unrecorded removal of a native skill without a settings override fails the Codex sync', {skip: !scenarios[0][1]}, t => {
+  const root = repoCopy(t);
+  removeLikeCreator(root, scenarios[0][1], {record: false, overrides: false});
+  const results = checks(root);
+  assert.notEqual(results.sync.status, 0);
+  assert.notEqual(results.doctor.status, 0);
+});
+
+test('a removed skill that a present skill depends on fails with a clear message', {skip: !optional.includes('codex-fullreview') || !optional.includes('astra-fullreview')}, t => {
+  const root = repoCopy(t);
+  removeLikeCreator(root, ['codex-fullreview']);
+  const results = checks(root);
+  assert.match(results.capabilities.output, /astra-fullreview depends on codex-fullreview, which is recorded as removed/);
+  assert.notEqual(results.contract.status, 0);
+  assert.notEqual(results.doctor.status, 0);
+});
+
+for (const [label, record, pattern] of [
+  ['a required skill', ['init-project'], /init-project: required skill cannot be removed/],
+  ['an unknown name', ['no-such-skill'], /no-such-skill: recorded as removed but not a registered skill/],
+  ['a retired name', ['verify-this'], /verify-this: retired skills are not removals/],
+  ['a skill whose folder remains', ['init-project'], /init-project: recorded as removed but .* still exists/],
+  ['unsorted names', ['init-project', 'external-review'], /list names once, sorted/],
+]) {
+  test(`record listing ${label} fails`, t => {
+    const root = repoCopy(t);
+    json(root, '.agents/removed-skills.json', {version: 1, removed: [...readRemovedSkills(root), ...record]});
+    assert.match(validateCapabilities(root).errors.join('\n'), pattern);
+  });
+}
+
+test('malformed removal record fails every reader', t => {
+  const root = repoCopy(t);
+  write(root, '.agents/removed-skills.json', '{"removed": "lab"}\n');
+  assert.throws(() => validateCapabilities(root), /expected/);
+  for (const args of [['.claude/scripts/sync-codex-skills.mjs', '--check'], ['scripts/readme/facts.mjs'], ['.claude/scripts/doctor.mjs']]) {
+    assert.notEqual(node(root, ...args).status, 0, args[0]);
+  }
+});
+
+test('retired entrypoints still fail after a removal', {skip: !scenarios[0][1]}, t => {
+  const root = repoCopy(t);
+  removeLikeCreator(root, scenarios[0][1]);
+  for (const name of ['verify-this', 'automate-me']) {
+    write(root, `.claude/skills/${name}/SKILL.md`, `---\nname: ${name}\ndescription: Retired.\n---\n`);
+    assert.match(validateCapabilities(root).errors.join('\n'), new RegExp(`${name}: retired entrypoint reappeared`));
+    fs.rmSync(path.join(root, '.claude/skills', name), {recursive: true});
+  }
 });

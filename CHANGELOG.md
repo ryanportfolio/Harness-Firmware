@@ -59,6 +59,14 @@ condensed.
 
 ### Added
 
+- A removal record, `.agents/removed-skills.json`, for skills a project deletes on
+  purpose. Every check and generator skips the recorded names: Codex sync, the
+  capability and contract checks, the doctor, and the README facts, build, and
+  verify steps. A skill folder missing without a record still fails. The new
+  `removal` block in `.agents/skill-capabilities.json` lists the required skills
+  (`init-project`, `external-review`) and which skills need others, and a record
+  that breaks either rule fails with the skill names. README group counts and the
+  narrow memory map are now computed from the skills present.
 - `external-review`, a Codex-only leaf review: one reviewer, one fresh context, one
   exact diff scope, no agents or edits. `codex-review` and `astra-review` in both
   runtimes now launch it through a custom prompt when the reviewed repository has it,

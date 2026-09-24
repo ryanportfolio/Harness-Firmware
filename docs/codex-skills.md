@@ -81,6 +81,12 @@ moved outside discovery explicitly before disabling it; required supporting reso
 The validator rejects a disabled entrypoint that reappears. An unexplained missing Claude or
 enabled Codex entrypoint still fails.
 
+A project that deletes an optional skill lists it in `.agents/removed-skills.json`; the
+validator then expects no folder for it in either runtime. The manifest's `removal` block
+names the skills that cannot be removed and the skills that need others. Removal keeps the
+manifest entry, so the catalog below still lists the skill. See
+[remove a skill](../GUIDE.md#remove-a-skill).
+
 Update the manifest deliberately with source changes. Run the validator with `--write` to
 refresh the catalog below, then run it without arguments to check for drift. Retired routes
 cannot retain SKILL.md in either root. A deliberate single-runtime capability requires an

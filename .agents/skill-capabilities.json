@@ -842,5 +842,27 @@
       ],
       "reason": "Preference evidence rules from transcripts live in refine."
     }
+  },
+  "removal": {
+    "required": [
+      "external-review",
+      "init-project"
+    ],
+    "dependencies": {
+      "astra-fullreview": [
+        "codex-fullreview",
+        "impartial-review"
+      ],
+      "astra-review": [
+        "codex-review",
+        "external-review"
+      ],
+      "codex-fullreview": [
+        "impartial-review"
+      ],
+      "codex-review": [
+        "external-review"
+      ]
+    }
   }
 }
