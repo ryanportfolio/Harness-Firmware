@@ -278,9 +278,11 @@ test('an unrecorded hand deletion warns and exits 0', {skip: !firstDual}, t => {
   assertGreen(results);
   const warning = `${firstDual[0]}: not installed in any runtime; record it in .agents/removed-skills.json or restore it`;
   assert.ok(results.capabilities.output.includes(`WARN: ${warning}`), results.capabilities.output);
-  assert.ok(results.contract.output.includes(warning), results.contract.output);
+  // The contract step does not repeat capability warnings, so CI shows each one once.
+  assert.ok(!results.contract.output.includes(warning), results.contract.output);
   assert.match(results.doctor.output, /WARN skill-coverage/);
-  assert.match(results.readmeVerify.output, /README\.md is stale; run node scripts\/readme\/build\.mjs/);
+  assert.match(results.readmeVerify.output, /README artifacts are stale \([^)]*README\.md[^)]*\); run node scripts\/readme\/build\.mjs/);
+  assert.equal((results.readmeVerify.output.match(/^WARN: README artifacts are stale/gm) ?? []).length, 1);
 });
 
 test('an unrecorded deletion of a native skill without a settings override warns in the Codex sync', {skip: !firstDual}, t => {
@@ -315,7 +317,7 @@ test('a hand-edited README warns and exits 0', t => {
   fs.appendFileSync(path.join(root, 'README.md'), '\nA note added by hand.\n');
   const results = checks(root);
   assertGreen(results);
-  assert.match(results.readmeVerify.output, /README\.md is stale; run node scripts\/readme\/build\.mjs to rebuild the README/);
+  assert.match(results.readmeVerify.output, /README artifacts are stale \([^)]*README\.md[^)]*\); run node scripts\/readme\/build\.mjs to rebuild the README/);
 });
 
 for (const [label, record, pattern, remove = false] of [
@@ -340,15 +342,21 @@ test('a malformed removal record fails every reader', t => {
   write(root, '.agents/removed-skills.json', '{"removed": "lab"}\n');
   assert.throws(() => validateCapabilities(root), /expected/);
   for (const args of [steps.sync, steps.capabilities, steps.contract, steps.doctor, ['.claude/scripts/removed-skills.mjs']]) {
-    assert.notEqual(node(root, ...args).status, 0, args[0]);
+    const result = node(root, ...args);
+    assert.notEqual(result.status, 0, args[0]);
+    assert.match(result.stdout + result.stderr, /removed-skills\.json: expected/, args[0]);
+    assert.doesNotMatch(result.stdout + result.stderr, /^\s+at /m, `${args[0]} prints a stack trace`);
   }
 });
 
 test('a malformed capability manifest fails', t => {
   const root = repoCopy(t);
   write(root, '.agents/skill-capabilities.json', '{"version": 1,');
-  for (const args of [steps.capabilities, steps.contract, steps.doctor]) {
-    assert.notEqual(node(root, ...args).status, 0, args[0]);
+  for (const args of [steps.sync, steps.capabilities, steps.contract, steps.doctor]) {
+    const result = node(root, ...args);
+    assert.notEqual(result.status, 0, args[0]);
+    assert.match(result.stdout + result.stderr, /\.agents\/skill-capabilities\.json: /, args[0]);
+    assert.doesNotMatch(result.stdout + result.stderr, /^\s+at /m, `${args[0]} prints a stack trace`);
   }
 });
 
@@ -361,6 +369,13 @@ test('retired entrypoints warn with their replacement after a removal', {skip: !
     const result = node(root, ...steps.capabilities);
     assert.equal(result.status, 0, result.stderr);
     assert.ok(result.stdout.includes(`${name}: retired entrypoint reappeared; ${name} is retired and its behavior now lives in ${replacement[name]}. Remove .claude/skills/${name}/ unless you mean to bring it back`), result.stdout);
+    const sync = node(root, ...steps.sync);
+    assert.equal(sync.status, 0, sync.stderr);
+    assert.match(sync.stdout, new RegExp(`${name} is retired, so no adapter is generated`));
+    assert.doesNotMatch(sync.stdout, new RegExp(`adapter needs create: ${name}`));
+    const contract = node(root, ...steps.contract);
+    assert.equal(contract.status, 0, contract.stderr);
+    assert.doesNotMatch(contract.stdout, /sync-codex-skills\.mjs --write/);
     fs.rmSync(path.join(root, '.claude/skills', name), {recursive: true});
   }
 });

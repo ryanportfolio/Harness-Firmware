@@ -32,7 +32,11 @@ condensed.
   committed files and no longer pin the template's skill counts.
 - README counts read naturally at one ("1 workflow", "browse the only skill") and leave
   out empty groups; group counts and the narrow memory map follow the skills installed.
-  The template's own README is unchanged.
+  After a rebuild, the quickstart, the "what the firmware adds" table, and the feedback
+  loop text name only installed skills. The template's own README is unchanged.
+- Check failures caused by unreadable JSON print one line naming the file instead of a
+  stack trace. Codex sync generates no adapter for a retired skill, and each warning
+  appears once in CI.
 
 - General Writing now checks evidence and reader understanding before style, scopes
   clarity and style verdicts, and allows explanations to follow reader needs. Claude

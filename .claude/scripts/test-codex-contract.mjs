@@ -5,7 +5,13 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { validateCapabilities } from "./check-skill-capabilities.mjs";
-import { printWarnings } from "./removed-skills.mjs";
+import { parseJson, printWarnings } from "./removed-skills.mjs";
+
+// Unreadable input fails with one line naming the file, not a stack trace.
+process.on("uncaughtException", (error) => {
+  console.error(`FAIL: ${error.message}`);
+  process.exit(1);
+});
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, "..", "..");
@@ -14,7 +20,7 @@ const failures = [];
 const warnings = [];
 const capabilities = validateCapabilities(root);
 failures.push(...capabilities.errors);
-warnings.push(...capabilities.warnings);
+// Capability warnings are printed once, by check-skill-capabilities.mjs.
 // Skills deleted on purpose and listed in .agents/removed-skills.json.
 const removed = capabilities.removed;
 const maxDescriptionChars = 240;
@@ -61,19 +67,21 @@ function frontmatter(relativePath) {
   return { name: value("name"), description: value("description") };
 }
 
-const settings = exists(".claude/settings.json") ? JSON.parse(read(".claude/settings.json")) : {};
+const settings = exists(".claude/settings.json") ? parseJson(read(".claude/settings.json"), ".claude/settings.json") : {};
 const disabled = new Set(
   Object.entries(settings.skillOverrides ?? {})
     .filter(([, state]) => state === "off")
     .map(([name]) => name),
 );
 
-const modes = exists(".agents/skill-modes.json") ? JSON.parse(read(".agents/skill-modes.json")) : { skills: {} };
+const modes = exists(".agents/skill-modes.json") ? parseJson(read(".agents/skill-modes.json"), ".agents/skill-modes.json") : { skills: {} };
 for (const [name, mode] of Object.entries(modes.skills)) if (mode === "disabled") disabled.add(name);
 for (const name of disabled) if (exists(`.agents/skills/${name}/SKILL.md`)) warnings.push(`${name}: disabled skill remains discoverable in .agents/skills/`);
 const skillsRoot = path.join(root, ".claude", "skills");
+// A retired skill that reappears is reported by check-skill-capabilities.mjs with its replacement.
+const retired = new Set(Object.keys(capabilities.manifest.retired ?? {}));
 const canonicalEntries = fs.readdirSync(skillsRoot, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && !disabled.has(entry.name) && !removed.has(entry.name))
+  .filter((entry) => entry.isDirectory() && !disabled.has(entry.name) && !removed.has(entry.name) && !retired.has(entry.name))
   .filter((entry) => fs.existsSync(path.join(skillsRoot, entry.name, "SKILL.md")))
   .map((entry) => ({name: entry.name}));
 const activeNames = new Set(canonicalEntries.map(entry => entry.name));
@@ -87,7 +95,9 @@ const skills = [...activeNames].map(name => ({name}))
     }
     const relativePath = `.agents/skills/${entry.name}/SKILL.md`;
     if (!exists(relativePath)) {
-      warnings.push(`${relativePath}: missing Codex skill; run node .claude/scripts/sync-codex-skills.mjs --write`);
+      warnings.push(modes.skills[entry.name] === "native"
+        ? `${relativePath}: native Codex skill is missing; restore .agents/skills/${entry.name}/ or delete .claude/skills/${entry.name}/ too`
+        : `${relativePath}: missing Codex adapter; run node .claude/scripts/sync-codex-skills.mjs --write`);
       return null;
     }
     const metadata = frontmatter(relativePath);
@@ -138,7 +148,7 @@ for (const skill of skills) {
 }
 for (const skill of classifications.keys()) {
   if (!disabled.has(skill) && !removed.has(skill) && !skills.some((entry) => entry.directory === skill)) {
-    warnings.push(`${skill}: compatibility classification has no active Codex skill`);
+    warnings.push(`${skill}: compatibility classification has no active Codex skill; delete its entry from .agents/CODEX-SKILL-COMPATIBILITY.md or restore the skill`);
   }
 }
 

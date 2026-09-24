@@ -15,6 +15,17 @@ const modesPath = path.join(root, ".agents", "skill-modes.json");
 const removedPath = path.join(root, ".agents", "removed-skills.json");
 const mode = process.argv[2] ?? "--check";
 
+// Unreadable input fails with one line naming the file, not a stack trace.
+process.on("uncaughtException", (error) => {
+  console.error(error.message);
+  process.exit(1);
+});
+
+// Parses JSON and names the file when it cannot be read.
+function parseJson(text, file) {
+  try { return JSON.parse(text); } catch (error) { throw new SyntaxError(`${file}: ${error.message}`); }
+}
+
 if (!new Set(["--check", "--write"]).has(mode)) {
   console.error("Usage: node .claude/scripts/sync-codex-skills.mjs [--check|--write]");
   process.exit(2);
@@ -113,7 +124,7 @@ function localReferences(text) {
 
 function disabledSkills() {
   if (!fs.existsSync(settingsPath)) return new Set();
-  const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+  const settings = parseJson(fs.readFileSync(settingsPath, "utf8"), ".claude/settings.json");
   return new Set(
     Object.entries(settings.skillOverrides ?? {})
       .filter(([, value]) => value === "off")
@@ -125,9 +136,9 @@ function disabledSkills() {
 // missing skill only warns. See .claude/scripts/removed-skills.mjs for the full review.
 function removedSkills() {
   if (!fs.existsSync(removedPath)) return new Set();
-  const record = JSON.parse(fs.readFileSync(removedPath, "utf8"));
+  const record = parseJson(fs.readFileSync(removedPath, "utf8"), ".agents/removed-skills.json");
   if (record?.version !== 1 || !Array.isArray(record.removed) || record.removed.some((name) => typeof name !== "string")) {
-    throw new Error(`${removedPath}: expected {"version": 1, "removed": [...]}`);
+    throw new Error(`.agents/removed-skills.json: expected {"version": 1, "removed": [...]}`);
   }
   return new Set(record.removed);
 }
@@ -153,7 +164,7 @@ const removed = removedSkills();
 // Missing, unregistered, or mismatched skills are warnings: projects add and remove skills
 // freely. Only unreadable files and writes that would escape the repository fail.
 const warnings = [];
-const modes = fs.existsSync(modesPath) ? JSON.parse(fs.readFileSync(modesPath, "utf8")) : { version: 1, skills: {} };
+const modes = fs.existsSync(modesPath) ? parseJson(fs.readFileSync(modesPath, "utf8"), ".agents/skill-modes.json") : { version: 1, skills: {} };
 if (modes.version !== 1 || !modes.skills || typeof modes.skills !== "object" || Array.isArray(modes.skills)) {
   throw new Error(`${modesPath}: expected version 1 and a skills object`);
 }
@@ -163,6 +174,9 @@ for (const [name, ownership] of Object.entries(modes.skills)) {
   }
   if (ownership === "disabled") disabled.add(name);
 }
+// Retired skills never receive an adapter; check-skill-capabilities.mjs names their replacement.
+const capabilitiesPath = path.join(root, ".agents", "skill-capabilities.json");
+const retired = new Set(fs.existsSync(capabilitiesPath) ? Object.keys(parseJson(fs.readFileSync(capabilitiesPath, "utf8"), ".agents/skill-capabilities.json").retired ?? {}) : []);
 const desired = new Map();
 const native = new Set();
 // Registered native skills never receive a generated adapter, even while their file is missing.
@@ -201,6 +215,10 @@ if (fs.existsSync(sourceRoot)) {
     if (!entry.isDirectory() || disabled.has(entry.name) || nativeMode.has(entry.name)) continue;
     const skillPath = path.join(sourceRoot, entry.name, "SKILL.md");
     if (!fs.existsSync(skillPath)) continue;
+    if (retired.has(entry.name)) {
+      warnings.push(`${skillPath}: ${entry.name} is retired, so no adapter is generated; see its retirement note in .agents/skill-capabilities.json and delete the folder unless you mean to bring it back`);
+      continue;
+    }
     const metadata = readMetadata(entry.name, skillPath);
     metadata.description = codexDescription(metadata.description);
     desired.set(entry.name, adapterText(entry.name, metadata));

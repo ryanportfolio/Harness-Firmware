@@ -19,12 +19,17 @@ export const RECORD_PATH = ".agents/removed-skills.json";
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RUNTIME_ROOTS = [".claude/skills", ".agents/skills"];
 
+// Parses JSON and names the file when it cannot be read.
+export function parseJson(text, file) {
+  try { return JSON.parse(text); } catch (error) { throw new SyntaxError(`${file}: ${error.message}`); }
+}
+
 // Returns the recorded names in file order. An absent record means nothing was removed.
 // A malformed record throws: a check must never guess which skills were meant.
 export function readRemovedSkills(root) {
   const file = path.join(root, RECORD_PATH);
   if (!fs.existsSync(file)) return [];
-  const record = JSON.parse(fs.readFileSync(file, "utf8"));
+  const record = parseJson(fs.readFileSync(file, "utf8"), RECORD_PATH);
   if (!record || typeof record !== "object" || Array.isArray(record) || record.version !== 1 || !Array.isArray(record.removed)) {
     throw new Error(`${RECORD_PATH}: expected {"version": 1, "removed": [...]}`);
   }
@@ -89,7 +94,7 @@ const ownPath = fileURLToPath(import.meta.url);
 if (process.argv[1] && path.resolve(process.argv[1]) === ownPath) {
   try {
     const root = path.resolve(path.dirname(ownPath), "../..");
-    const manifest = JSON.parse(fs.readFileSync(path.join(root, ".agents/skill-capabilities.json"), "utf8"));
+    const manifest = parseJson(fs.readFileSync(path.join(root, ".agents/skill-capabilities.json"), "utf8"), ".agents/skill-capabilities.json");
     const removed = readRemovedSkills(root);
     const { errors, warnings } = reviewRemovals(root, manifest, removed);
     printWarnings(warnings);

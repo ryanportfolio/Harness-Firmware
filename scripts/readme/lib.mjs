@@ -20,7 +20,12 @@ export function read(relativePath) {
 }
 
 export function readJson(relativePath) {
-  return JSON.parse(read(relativePath));
+  try {
+    return JSON.parse(read(relativePath));
+  } catch (error) {
+    if (error instanceof SyntaxError) throw new SyntaxError(`${relativePath}: ${error.message}`);
+    throw error;
+  }
 }
 
 // Generated files go to README_OUT_DIR when set, so verify.mjs and the tests can build into a

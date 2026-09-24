@@ -10,6 +10,65 @@ ${removedLine(facts.removed)}` : marker;
 // Group counts with empty groups left out: "7 core", "13 discipline", "14 specialist".
 const groupCounts = facts.groups.filter((group) => facts.tierCounts[group.id] > 0).map((group) => `${facts.tierCounts[group.id]} ${group.id}`);
 
+// Prose that names a skill only when the skill is installed, so a project that removed
+// skills never advertises them. With every template skill present the text is unchanged.
+const has = (name) => facts.inventoryNames.includes(name);
+
+function pluginTry() {
+  const examples = [["recall", "`/claude-starter:recall`"], ["brainstorming", "`/claude-starter:brainstorming plan the next feature`"]]
+    .filter(([name]) => has(name)).map(([, text]) => text);
+  return examples.length ? `Then try ${examples.join(" or ")}. ` : "";
+}
+
+function templateStep() {
+  return has("init-project")
+    ? "clone the new repository, then run Claude Code's `/init-project` command or ask Codex to use the `init-project` skill."
+    : "clone the new repository, then follow the [setup guide](GUIDE.md#full-template).";
+}
+
+function recallStep() {
+  return has("recall") ? " Then ask Claude Code or Codex to use `recall` before the first unfamiliar change." : "";
+}
+
+function either(parts, joiner = "; ") {
+  return parts.filter(Boolean).join(joiner);
+}
+
+function addsTable() {
+  const reviews = facts.inventoryNames.some((name) => name.endsWith("review"));
+  const rows = [
+    has("recall") && "| Remember the project | `recall` loads relevant committed facts, decisions, and pitfalls before unfamiliar work |",
+    has("long-horizon") && "| Finish sustained work | `long-horizon` records progress and evidence across bounded rounds, with fresh audit context |",
+    reviews && "| Challenge a result | Independent and cross-vendor review skills check work through available agents or authenticated CLIs |",
+    (has("fable-mode") || has("perf-loop")) && `| Verify a claim | ${either([
+      has("fable-mode") && "`fable-mode` separates current-state, change, and causal claims and returns a verdict",
+      has("perf-loop") && "`perf-loop` measures optimization against a baseline",
+    ])} |`,
+    has("addskill") && "| Maintain skills | `addskill` handles creating, importing, updating, and installing skills with the resources each runtime needs |",
+    (has("refine") || has("sync-starter")) && `| Improve the workflow | ${either([
+      has("refine") && "`refine` captures observed friction",
+      has("sync-starter") && "`sync-starter` carries selected generic fixes between repositories",
+    ])} |`,
+  ].filter(Boolean);
+  if (!rows.length) return "";
+  return `## what the firmware adds
+
+| Need | Workflow built into the repository |
+| --- | --- |
+${rows.join("\n")}
+
+These are agent instructions and supporting tools. Structural checks validate the package; actual execution still needs the appropriate model, tools, credentials, and evidence.
+
+`;
+}
+
+const refineLine = has("refine")
+  ? "`refine` turns observed friction into a small, reviewable change that strengthens the repository before the next task begins."
+  : "Observed friction becomes a small, reviewable change that strengthens the repository before the next task begins.";
+const syncLine = has("sync-starter")
+  ? "The dotted branch is separate: after human review, `sync-starter` can move a generic improvement into the template so future repositories begin with it."
+  : "The dotted branch is separate: after human review, a generic improvement can move into the template so future repositories begin with it.";
+
 function picture(name, alt) {
   return `<picture>
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/${name}-narrow-dark.svg">
@@ -51,40 +110,27 @@ Run these commands inside Claude Code:
 /plugin install claude-starter@claude-starter
 \`\`\`
 
-Then try \`/claude-starter:recall\` or \`/claude-starter:brainstorming plan the next feature\`. Plugin skills use the \`claude-starter\` namespace.
+${pluginTry()}Plugin skills use the \`claude-starter\` namespace.
 
 ### new repository · full template
 
 Create a repository with the kernel, hooks, committed memory, skills, and synchronization tools:
 
-- GitHub: select **Use this template**, clone the new repository, then run Claude Code's \`/init-project\` command or ask Codex to use the \`init-project\` skill.
+- GitHub: select **Use this template**, ${templateStep()}
 - From a cloned Harness Firmware checkout on macOS or Linux: \`bash bootstrap/new-claude-project.sh --name my-app --dest ~/code\`
 - From a cloned checkout on Windows: double-click \`bootstrap/New-ClaudeProject.cmd\`.
 
-In the created repository, run \`node .claude/scripts/doctor.mjs\`. Success means the doctor reports no failures. Then ask Claude Code or Codex to use \`recall\` before the first unfamiliar change.
+In the created repository, run \`node .claude/scripts/doctor.mjs\`. Success means the doctor reports no failures.${recallStep()}
 
 [Open the complete setup guide](GUIDE.md#full-template) · [View validation runs](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml)
 
-## what the firmware adds
-
-| Need | Workflow built into the repository |
-| --- | --- |
-| Remember the project | \`recall\` loads relevant committed facts, decisions, and pitfalls before unfamiliar work |
-| Finish sustained work | \`long-horizon\` records progress and evidence across bounded rounds, with fresh audit context |
-| Challenge a result | Independent and cross-vendor review skills check work through available agents or authenticated CLIs |
-| Verify a claim | \`fable-mode\` separates current-state, change, and causal claims and returns a verdict; \`perf-loop\` measures optimization against a baseline |
-| Maintain skills | \`addskill\` handles creating, importing, updating, and installing skills with the resources each runtime needs |
-| Improve the workflow | \`refine\` captures observed friction; \`sync-starter\` carries selected generic fixes between repositories |
-
-These are agent instructions and supporting tools. Structural checks validate the package; actual execution still needs the appropriate model, tools, credentials, and evidence.
-
-## the repository feedback loop
+${addsTable()}## the repository feedback loop
 
 ${picture("feedback", "Recall, work, verify, refine, and a reviewed repository change form a local loop. A separate human-approved sync can carry generic changes into future repositories.")}
 
-The everyday loop is **recall → work → verify → refine → reviewed repository change → next task**. Project facts load before unfamiliar work. Verification captures evidence. \`refine\` turns observed friction into a small, reviewable change that strengthens the repository before the next task begins.
+The everyday loop is **recall → work → verify → refine → reviewed repository change → next task**. Project facts load before unfamiliar work. Verification captures evidence. ${refineLine}
 
-The dotted branch is separate: after human review, \`sync-starter\` can move a generic improvement into the template so future repositories begin with it. Keeping the lesson local remains the default.
+${syncLine} Keeping the lesson local remains the default.
 
 ## two runtimes, explicit ownership
 

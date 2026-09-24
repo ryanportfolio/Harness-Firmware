@@ -31,7 +31,7 @@ try {
     return normalize(fs.readFileSync(absolute(relativePath))) !== normalize(fs.readFileSync(path.join(out, relativePath)));
   });
   if (stale.length) {
-    for (const relativePath of stale) warn(`${relativePath} is stale; ${fix}`);
+    warn(`README artifacts are stale (${stale.join(", ")}); ${fix}`);
   } else {
     process.stdout.write("README artifacts are current.\n");
   }
