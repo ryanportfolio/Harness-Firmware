@@ -136,3 +136,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Corewise.Academy plain-words
+
+Pattern 31 includes editorial rulings developed in Corewise.Academy on
+2026-07-18, contributed by this project's author under the included MIT license.

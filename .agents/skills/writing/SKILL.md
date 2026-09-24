@@ -31,6 +31,8 @@ Keep these checks proportional and silent for routine drafting. A style-only req
 
 ## Style defaults
 
+Avoid the following patterns unless an explicit style choice overrides them. Style choices never permit invented facts or altered technical meaning.
+
 - **Em dashes (U+2014), anywhere.** No en-dash or double-hyphen stand-ins. Period, comma, colon, semicolon, parentheses; middle dot (U+00B7) for label separators.
 - **Trailing periods on headings** and display text.
 - **Negation pivots, every disguise.** "Not just X, it's Y", "The point isn't X. It's Y", "Not a X. Not a Y. A Z." Splitting across sentences does not cure it. Delete the denial half, open with the point. A negation survives only when it corrects a misconception the reader holds, after the positive claim.
@@ -84,7 +86,7 @@ Words naming a real thing in the repo ("harness") are terms, not tells.
 - Keep edge: opinions, blunt language, profanity, self-interruptions, asides that create context or tension.
 - Keep structure unless it hurts the piece; if you reorganize, say why.
 - Keep meaning. No new claims; unsourced ones get removed or flagged, never given an invented source.
-- Asked only whether it reads as AI: per finding, the quoted line, the pattern name, a fix in a few words. No rewrite, no score, no guess at authorship; named patterns are evidence, detectors guess.
+- Asked only whether it reads as AI: per finding, the quoted line, the pattern name, a fix in a few words. Use a Style-only verdict, with no rewrite, numeric score, or guess at authorship; named patterns are evidence, detectors guess.
 
 ## Reader-understanding review
 

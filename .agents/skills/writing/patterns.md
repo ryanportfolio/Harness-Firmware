@@ -333,7 +333,7 @@ Ask what the sentence tells the reader to do or know. If it cannot be restated a
 > When the reader has to backtrack to parse a sentence, the fix is usually to break it in two or drop a clause rather than add another qualifier.
 
 **After:**
-> If a sentence needs a second read, split it. One idea per sentence.
+> If a sentence is hard to follow, split it or remove an unnecessary clause. Keep the connections the reader needs.
 
 ### 31. Weak adverbs, fancy synonyms, and Latinate dress-ups
 

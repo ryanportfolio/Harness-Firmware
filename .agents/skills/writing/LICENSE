@@ -12,9 +12,9 @@ furnished to do so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-Individual skills under .claude/skills/ may carry their own licenses and
-attributions (see .claude/skills/PROVENANCE.md and per-skill LICENSE/NOTICE
-files); those terms govern for the respective skill contents.
+Third-party material in this skill carries its own licenses and
+attributions in the adjacent NOTICE.md; those terms govern for the
+respective contents.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
