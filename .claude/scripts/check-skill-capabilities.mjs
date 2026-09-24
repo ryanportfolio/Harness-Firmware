@@ -20,8 +20,9 @@ export function validateCapabilities(root) {
   const disabled = n => modes[n] === 'disabled' || overrides[n] === 'off';
   const active = manifest.skills;
   if (manifest.version !== 1 || !active || !manifest.contracts || !manifest.retired) throw new Error('Unsupported capability manifest');
-  const removed = new Set(readRemovedSkills(root));
-  const review = reviewRemovals(root, manifest, [...removed]);
+  const recorded = readRemovedSkills(root);
+  const removed = new Set(recorded);
+  const review = reviewRemovals(root, manifest, recorded);
   errors.push(...review.errors);
   warnings.push(...review.warnings);
   const checkFile = p => {

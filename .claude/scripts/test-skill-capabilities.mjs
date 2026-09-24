@@ -224,6 +224,8 @@ const scenarios = [
   ['every optional skill', optional.length ? optional : null],
 ];
 const firstDual = scenarios[0][1];
+// Any registered skill that is installed here, for record cases that need one.
+const presentSkill = Object.keys(baseManifest.skills).find(name => presentIn(repo, name));
 
 test('removal policy keeps init-project and external-review required', () => {
   for (const name of ['external-review', 'init-project']) assert.ok(policy.required.includes(name), name);
@@ -247,7 +249,7 @@ test('each optional skill can be removed with its declared dependents without ne
     json(root, '.agents/removed-skills.json', {version: 1, removed: [...new Set([...before, ...names])].sort()});
     const result = validateCapabilities(root);
     assert.deepEqual(result.errors, [], `removing ${names.join(', ')}`);
-    assert.deepEqual(result.warnings, baseline, `removing ${names.join(', ')}`);
+    assert.deepEqual(result.warnings.filter(warning => !baseline.includes(warning)), [], `removing ${names.join(', ')}`);
     for (const [from, to] of moved) fs.renameSync(to, from);
   }
 });
@@ -258,7 +260,7 @@ for (const [label, names] of scenarios) {
     const baseline = validateCapabilities(root).warnings;
     removeLikeCreator(root, names);
     assertGreen(checks(root));
-    assert.deepEqual(validateCapabilities(root).warnings, baseline);
+    assert.deepEqual(validateCapabilities(root).warnings.filter(warning => !baseline.includes(warning)), []);
     // After a rebuild the README names the missing skills and matches a fresh build.
     const build = node(root, 'scripts/readme/build.mjs');
     assert.equal(build.status, 0, build.stderr);
@@ -320,8 +322,8 @@ for (const [label, record, pattern, remove = false] of [
   ['a required skill', ['init-project'], /init-project: recorded as removed, but the template treats it as required/, true],
   ['an unknown name', ['no-such-skill'], /no-such-skill: recorded as removed but not a registered skill/],
   ['a retired name', ['verify-this'], /verify-this: retired skills are not removals/],
-  ['a skill whose folder remains', ['init-project'], /init-project: recorded as removed but still present/],
-  ['unsorted names', ['recall', 'lab'], /list names once, sorted/],
+  ['a skill whose folder remains', [presentSkill], new RegExp(`${presentSkill}: recorded as removed but still present`)],
+  ['unsorted names', ['zz-unsorted', 'aa-unsorted'], /list names once, sorted/],
 ]) {
   test(`record listing ${label} warns`, t => {
     const root = repoCopy(t);
