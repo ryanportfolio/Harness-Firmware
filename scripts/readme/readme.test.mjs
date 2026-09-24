@@ -4,51 +4,45 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { collectFacts, expectedCodexNames, readmeRemovedSkills } from "./facts.mjs";
-import { absolute, read } from "./lib.mjs";
+import { collectFacts, expectedCodexNames } from "./facts.mjs";
+import { absolute, listPhrase, plural, read } from "./lib.mjs";
 
+// These tests check the generator, not the committed files: README drift is only a warning
+// (see verify.mjs). Every artifact below comes from a fresh build in a scratch directory.
 const facts = collectFacts();
 const panelNames = ["boot", "feedback", "runtime", "skills"];
 const variants = ["light", "dark", "narrow-light", "narrow-dark"];
-// A project that removed skills keeps the template's README until it runs build.mjs; those
-// artifacts still describe the full template inventory (see verify.mjs).
-const templateReadme = facts.removed.length > 0 && readmeRemovedSkills(read("README.md")).length === 0;
-const shown = templateReadme
-  ? { skillCount: facts.templateNames.length, canonicalNames: facts.templateNames, tierCounts: facts.templateTierCounts }
-  : facts;
+const out = fs.mkdtempSync(path.join(os.tmpdir(), "readme-test-"));
+process.on("exit", () => fs.rmSync(out, { recursive: true, force: true }));
+const build = spawnSync(process.execPath, [absolute("scripts/readme/build.mjs")], { env: { ...process.env, README_OUT_DIR: out }, encoding: "utf8" });
+const built = (relativePath) => fs.readFileSync(path.join(out, relativePath), "utf8");
+const groupCounts = facts.groups.filter((group) => facts.tierCounts[group.id] > 0).map((group) => `${facts.tierCounts[group.id]} ${group.id}`);
 const requiredLinks = ["GUIDE.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "actions/workflows/validate-template.yml"];
 
-test("README facts match the canonical repository inventory", () => {
-  if (!facts.removed.length) {
-    // Template inventory tripwire: adding or moving a skill updates these on purpose.
-    assert.equal(facts.skillCount, 34);
-    assert.deepEqual(facts.tierCounts, { core: 7, discipline: 13, specialist: 14 });
-    assert.ok(facts.onDemandBytes > facts.residentBytes);
-  }
-  assert.equal(facts.skillCount, facts.templateNames.filter(name => !facts.removed.includes(name)).length);
+test("the generator builds every README artifact", () => {
+  assert.equal(build.status, 0, build.stderr);
+});
+
+test("README facts match the installed skills", () => {
+  assert.equal(facts.skillCount, facts.skills.length);
+  assert.deepEqual(facts.inventoryNames, facts.skills.map((skill) => skill.name).sort());
+  assert.deepEqual(facts.removed, facts.templateNames.filter((name) => !fs.existsSync(absolute(`.claude/skills/${name}/SKILL.md`))));
   for (const [group, count] of Object.entries(facts.tierCounts)) {
-    assert.equal(count, facts.skills.filter(skill => skill.group === group).length, group);
+    assert.equal(count, facts.skills.filter((skill) => skill.group === group).length, group);
   }
-  const capabilities = JSON.parse(read(".agents/skill-capabilities.json")).skills;
-  const modes = JSON.parse(read(".agents/skill-modes.json")).skills;
-  const overrides = fs.existsSync(absolute(".claude/settings.json")) ? JSON.parse(read(".claude/settings.json")).skillOverrides ?? {} : {};
-  const intendedCodex = Object.keys(capabilities).filter(name => capabilities[name].coverage.includes("codex") && modes[name] !== "disabled" && overrides[name] !== "off" && !facts.removed.includes(name)).sort();
-  assert.equal(facts.codexSkillCount, intendedCodex.length);
-  assert.equal(facts.codexNativeCount, intendedCodex.filter(name => modes[name] === "native").length);
   assert.equal(facts.codexNativeCount + facts.codexAdapterCount, facts.codexSkillCount);
-  assert.deepEqual(expectedCodexNames(facts.canonicalNames, modes, overrides, facts.removed), intendedCodex);
-  assert.equal(facts.referenceFileCount, 6);
+  assert.ok(Number.isInteger(facts.referenceFileCount) && facts.referenceFileCount >= 0);
   assert.deepEqual(facts.runtimeNames, ["Claude Code", "Codex"]);
   assert.equal(facts.runtimeCount, facts.runtimeNames.length);
-  assert.deepEqual(facts.inventoryNames, facts.canonicalNames);
+  assert.ok(Array.isArray(facts.warnings));
 });
 
 test("all panels ship four accessible local-only variants", () => {
   for (const name of panelNames) {
     for (const variant of variants) {
       const relativePath = `assets/readme/${name}-${variant}.svg`;
-      assert.ok(fs.existsSync(absolute(relativePath)), `${relativePath} should exist`);
-      const source = read(relativePath);
+      assert.ok(fs.existsSync(path.join(out, relativePath)), `${relativePath} should exist`);
+      const source = built(relativePath);
       assert.match(source, /role="img"/);
       assert.match(source, /aria-label="[^"]+"/);
       assert.match(source, /<title>[^<]+<\/title>/);
@@ -61,7 +55,7 @@ test("all panels ship four accessible local-only variants", () => {
 
 test("narrow SVG typography stays above 12 rendered pixels at 390 CSS pixels", () => {
   for (const name of panelNames) {
-    const source = read(`assets/readme/${name}-narrow-light.svg`);
+    const source = built(`assets/readme/${name}-narrow-light.svg`);
     for (const className of ["eyebrow", "label", "copy", "small"]) {
       assert.match(source, new RegExp(`\\.${className}\\{font-size:(?:1[4-9]|[2-9][0-9])px`), `${name}: ${className}`);
     }
@@ -70,7 +64,7 @@ test("narrow SVG typography stays above 12 rendered pixels at 390 CSS pixels", (
 
 test("feedback circuit separates local learning from human-gated propagation", () => {
   for (const variant of variants) {
-    const source = read(`assets/readme/feedback-${variant}.svg`);
+    const source = built(`assets/readme/feedback-${variant}.svg`);
     for (const label of ["RECALL", "WORK", "VERIFY", "REFINE", "REVIEWED CHANGE", "NEXT TASK", "HUMAN REVIEW", "FUTURE REPOS"]) {
       assert.equal((source.match(new RegExp(`>${label}<`, "g")) ?? []).length, 1, `${variant}: ${label}`);
     }
@@ -85,7 +79,7 @@ test("feedback circuit separates local learning from human-gated propagation", (
 
 test("skill scan bar uses no rounded corner", () => {
   for (const variant of variants) {
-    const source = read(`assets/readme/skills-${variant}.svg`);
+    const source = built(`assets/readme/skills-${variant}.svg`);
     const scan = source.match(/<g class="scan-bar"[\s\S]*?<\/g>/)?.[0] ?? "";
     assert.ok(scan);
     assert.doesNotMatch(scan, /\brx=/);
@@ -94,7 +88,7 @@ test("skill scan bar uses no rounded corner", () => {
 
 test("boot trace contains every row and one sequenced cursor", () => {
   for (const variant of variants) {
-    const source = read(`assets/readme/boot-${variant}.svg`);
+    const source = built(`assets/readme/boot-${variant}.svg`);
     for (const label of ["RULE KERNEL", "SKILL INDEX", "PROJECT MEMORY", "RUNTIME BOUNDARY", "VALIDATION"]) {
       assert.equal((source.match(new RegExp(`>${label}<`, "g")) ?? []).length, 1, `${variant}: ${label}`);
     }
@@ -106,13 +100,15 @@ test("boot trace contains every row and one sequenced cursor", () => {
 
 test("skill memory map draws every skill within its narrow canvas", () => {
   for (const variant of variants) {
-    const source = read(`assets/readme/skills-${variant}.svg`);
-    assert.equal((source.match(/data-skill="/g) ?? []).length, shown.skillCount);
-    for (const skill of shown.canonicalNames) {
+    const source = built(`assets/readme/skills-${variant}.svg`);
+    assert.equal((source.match(/data-skill="/g) ?? []).length, facts.skillCount);
+    for (const skill of facts.inventoryNames) {
       assert.equal((source.match(new RegExp(`data-skill="${skill}"`, "g")) ?? []).length, 1, `${variant}: ${skill}`);
     }
     const drawn = [...source.matchAll(/data-group-count="(\d+)"/g)].map((match) => Number(match[1]));
-    assert.deepEqual(drawn, Object.values(shown.tierCounts).filter((count) => count > 0));
+    assert.deepEqual(drawn, Object.values(facts.tierCounts).filter((count) => count > 0));
+    const label = `A memory map of ${plural(facts.skillCount, "on-demand workflow")} grouped into ${listPhrase(groupCounts)} ${facts.skillCount === 1 ? "skill" : "skills"}.`;
+    assert.ok(source.includes(`aria-label="${label}"`), `${variant}: memory map label`);
     if (variant.startsWith("narrow")) {
       const height = Number(source.match(/viewBox="0 0 390 (\d+)"/)?.[1]);
       const bottoms = [...source.matchAll(/data-bottom="(\d+)"/g)].map((match) => Number(match[1]));
@@ -125,30 +121,31 @@ test("skill memory map draws every skill within its narrow canvas", () => {
 
 test("boot and runtime panels use measured counts", () => {
   for (const variant of variants) {
-    const boot = read(`assets/readme/boot-${variant}.svg`);
-    const runtime = read(`assets/readme/runtime-${variant}.svg`);
-    assert.match(boot, new RegExp(`${shown.skillCount} workflows ready`));
-    assert.match(boot, new RegExp(`${facts.referenceFileCount} files mounted`));
-    assert.match(boot, new RegExp(`${facts.runtimeCount} targets declared`));
-    assert.match(runtime, new RegExp(`${shown.skillCount} canonical workflows`));
-    if (!templateReadme) assert.match(runtime, new RegExp(`${facts.codexSkillCount} (?:CODEX SKILLS VERIFIED|skills)`, "i"));
+    const boot = built(`assets/readme/boot-${variant}.svg`);
+    const runtime = built(`assets/readme/runtime-${variant}.svg`);
+    assert.ok(boot.includes(`${plural(facts.skillCount, "workflow")} ready`));
+    assert.ok(boot.includes(`${plural(facts.referenceFileCount, "file")} mounted`));
+    assert.ok(boot.includes(`${plural(facts.runtimeCount, "target")} declared`));
+    assert.ok(runtime.includes(plural(facts.skillCount, "canonical workflow")));
+    assert.ok(runtime.includes(plural(facts.codexSkillCount, "skill")));
   }
 });
 
 test("generated README keeps installation early and maps exact picture variants", () => {
-  const readme = read("README.md");
+  const readme = built("README.md");
   assert.ok(readme.startsWith("<!-- generated by scripts/readme/build.mjs. do not edit by hand. -->"));
+  assert.equal(readme.includes("<!-- removed skills: "), facts.removed.length > 0);
   assert.ok(readme.indexOf("/plugin marketplace add") < readme.indexOf("GUIDE.md"));
   assert.ok(readme.indexOf("/plugin marketplace add") < readme.indexOf("## the repository feedback loop"));
-  if (!templateReadme) assert.match(readme, new RegExp(`${facts.codexNativeCount} native Codex workflows`));
+  assert.ok(readme.includes(plural(facts.codexNativeCount, "native Codex workflow")));
   assert.equal((readme.match(/<picture>/g) ?? []).length, panelNames.length);
-  assert.match(readme, new RegExp(`## ${shown.skillCount} workflows, loaded when called`));
-  assert.match(readme, new RegExp(`${shown.tierCounts.core} core · ${shown.tierCounts.discipline} discipline · ${shown.tierCounts.specialist} specialist`));
+  assert.ok(readme.includes(`## ${plural(facts.skillCount, "workflow")}, loaded when called`));
+  assert.ok(readme.includes(`**${groupCounts.join(" · ")}**`));
   assert.match(readme, /recall → work → verify → refine → reviewed repository change → next task/);
   assert.match(readme, /Success means the doctor reports no failures/);
   assert.ok(readme.indexOf("[Install the skills or start a repository](#quickstart)") < readme.indexOf("## the repository feedback loop"));
   assert.match(readme, /<summary><strong>Click to open the generated skill memory map<\/strong><\/summary>/);
-  assert.match(readme, new RegExp(`<summary><strong>Click to browse all ${shown.skillCount} skills<\\/strong><\\/summary>`));
+  assert.ok(readme.includes(`<summary><strong>Click to browse ${facts.skillCount === 1 ? "the only skill" : `all ${facts.skillCount} skills`}</strong></summary>`));
   for (const link of requiredLinks) assert.ok(readme.includes(link), `README links ${link}`);
 
   for (const name of panelNames) {
@@ -158,24 +155,38 @@ test("generated README keeps installation early and maps exact picture variants"
   }
 
   for (const match of readme.matchAll(/(?:src|srcset)="(assets\/readme\/[^"]+)"/g)) {
-    assert.ok(fs.existsSync(absolute(match[1])), `${match[1]} should exist`);
+    assert.ok(fs.existsSync(path.join(out, match[1])), `${match[1]} should exist`);
   }
 
   const list = readme.match(/<!-- skill-list:start -->([\s\S]+)<!-- skill-list:end -->/)?.[1] ?? "";
   assert.ok(list);
-  assert.equal((list.match(/^- \[`/gm) ?? []).length, shown.skillCount);
-  for (const skill of shown.canonicalNames) {
+  assert.equal((list.match(/^- \[`/gm) ?? []).length, facts.skillCount);
+  for (const skill of facts.inventoryNames) {
     assert.equal((list.match(new RegExp(`\\[\\\`${skill}\\\`\\]`, "g")) ?? []).length, 1, skill);
   }
 });
 
-test("human-facing README files follow the writing contract", () => {
-  for (const relativePath of ["README.md", "GUIDE.md"]) {
-    const source = read(relativePath);
-    assert.doesNotMatch(source, /—/u, `${relativePath} contains an em dash`);
-    assert.doesNotMatch(source, /^#{1,6} .+\.$/mu, `${relativePath} has a heading with a trailing period`);
-  }
-  assert.doesNotMatch(read("README.md"), /repo-resident operating layer|The repository learns|hot path/i);
+test("generated README follows the writing contract", () => {
+  const source = built("README.md");
+  assert.doesNotMatch(source, /—/u, "README.md contains an em dash");
+  assert.doesNotMatch(source, /^#{1,6} .+\.$/mu, "README.md has a heading with a trailing period");
+  assert.doesNotMatch(source, /repo-resident operating layer|The repository learns|hot path/i);
+});
+
+test("GUIDE.md style problems are reported, not failed", (t) => {
+  if (!fs.existsSync(absolute("GUIDE.md"))) return;
+  const source = read("GUIDE.md");
+  if (/—/u.test(source)) t.diagnostic("warning: GUIDE.md contains an em dash");
+  if (/^#{1,6} .+\.$/mu.test(source)) t.diagnostic("warning: GUIDE.md has a heading with a trailing period");
+});
+
+test("counts read naturally at one and omit empty groups", () => {
+  assert.equal(plural(1, "workflow"), "1 workflow");
+  assert.equal(plural(2, "workflow"), "2 workflows");
+  assert.equal(plural(1, "runtime boundary", "runtime boundaries"), "1 runtime boundary");
+  assert.equal(listPhrase(["1 core"]), "1 core");
+  assert.equal(listPhrase(["1 core", "2 specialist"]), "1 core and 2 specialist");
+  assert.equal(listPhrase(["7 core", "13 discipline", "14 specialist"]), "7 core, 13 discipline, and 14 specialist");
 });
 
 test("Codex inventory honors native additions and both disabled sources", () => {
@@ -187,15 +198,14 @@ test("Codex inventory honors native additions and both disabled sources", () => 
 test("facts CLI accepts absent optional settings but rejects malformed settings", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "readme-facts-optional-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  for (const relative of ["scripts/readme/facts.mjs", "scripts/readme/lib.mjs", "scripts/readme/items.json", "CLAUDE.md", ".agents/removed-skills.json"]) {
-    if (!fs.existsSync(absolute(relative))) continue;
+  for (const relative of ["scripts/readme/facts.mjs", "scripts/readme/lib.mjs", "scripts/readme/items.json", "CLAUDE.md"]) {
     const target = path.join(root, relative);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(absolute(relative), target);
   }
   fs.mkdirSync(path.join(root, ".claude/reference"), { recursive: true });
   // Only skill metadata is needed; no hooks or personal files enter the fixture.
-  for (const name of facts.canonicalNames) {
+  for (const name of facts.inventoryNames) {
     for (const runtime of [".claude", ".agents"]) {
       const target = path.join(root, runtime, "skills", name, "SKILL.md");
       fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -209,11 +219,41 @@ test("facts CLI accepts absent optional settings but rejects malformed settings"
   const collected = JSON.parse(absent.stdout);
   assert.equal(collected.skillCount, facts.skillCount);
   assert.equal(collected.codexSkillCount, facts.skillCount);
-  assert.deepEqual(collected.canonicalNames, facts.canonicalNames);
+  assert.deepEqual(collected.inventoryNames, facts.inventoryNames);
+  assert.deepEqual(collected.warnings, []);
   assert.equal(fs.existsSync(path.join(root, ".claude/settings.json")), false);
   fs.writeFileSync(path.join(root, ".claude/settings.json"), "{malformed");
   const malformed = run();
   assert.equal(malformed.status, 1, malformed.stderr);
   assert.match(malformed.stderr, /SyntaxError/);
   assert.equal(malformed.stdout, "");
+});
+
+test("a project with one skill, a hand-edited README, and an unlisted skill builds and verifies with warnings", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "readme-one-skill-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const repo = absolute(".");
+  fs.cpSync(repo, root, { recursive: true, filter: (source) => !/^(?:\.git|\.tmp|node_modules)(?:[\\/]|$)/.test(path.relative(repo, source)) });
+  const keep = facts.inventoryNames.includes("recall") ? "recall" : facts.inventoryNames[0];
+  for (const runtime of [".claude/skills", ".agents/skills"]) {
+    for (const entry of fs.readdirSync(path.join(root, runtime))) if (entry !== keep) fs.rmSync(path.join(root, runtime, entry), { recursive: true, force: true });
+  }
+  fs.mkdirSync(path.join(root, ".claude/skills/local-helper"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".claude/skills/local-helper/SKILL.md"), "---\nname: local-helper\ndescription: A project skill not yet listed in items.json.\n---\n");
+  fs.appendFileSync(path.join(root, "README.md"), "\nHand-written note.\n");
+  const verify = spawnSync(process.execPath, ["scripts/readme/verify.mjs"], { cwd: root, encoding: "utf8" });
+  assert.equal(verify.status, 0, verify.stderr);
+  assert.match(verify.stdout, /README\.md is stale; run node scripts\/readme\/build\.mjs/);
+  assert.match(verify.stdout, /local-helper: not listed in scripts\/readme\/items\.json/);
+  const rebuild = spawnSync(process.execPath, ["scripts/readme/build.mjs"], { cwd: root, encoding: "utf8" });
+  assert.equal(rebuild.status, 0, rebuild.stderr);
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  assert.match(readme, /^## 1 workflow, loaded when called$/m);
+  assert.match(readme, /^\*\*1 (?:core|discipline|specialist)\*\*$/m);
+  assert.match(readme, /Click to browse the only skill/);
+  assert.match(readme, /^<!-- removed skills: /m);
+  assert.doesNotMatch(readme, / 0 (?:core|discipline|specialist)/);
+  const after = spawnSync(process.execPath, ["scripts/readme/verify.mjs"], { cwd: root, encoding: "utf8" });
+  assert.equal(after.status, 0, after.stderr);
+  assert.match(after.stdout, /README artifacts are current/);
 });

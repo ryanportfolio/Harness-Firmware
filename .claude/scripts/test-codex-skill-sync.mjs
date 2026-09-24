@@ -18,13 +18,18 @@ function fixture() {
   return { root, write, run, modes, read: p => fs.readFileSync(path.join(root, p), 'utf8') };
 }
 
+// Adapter drift is a warning: --check exits 0 and names the pending change.
 test('legacy adapter generation remains idempotent and updates changed metadata', () => {
   const f = fixture();
-  assert.equal(f.run().status, 1);
+  let result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /adapter needs create: bro; run node \.claude\/scripts\/sync-codex-skills\.mjs --write/);
   assert.equal(f.run('--write').status, 0);
-  assert.equal(f.run().status, 0);
+  result = f.run();
+  assert.equal(result.status, 0);
+  assert.doesNotMatch(result.stdout, /adapter needs/);
   f.write('.claude/skills/bro/SKILL.md', body('bro').replace('Explain', 'Review'));
-  assert.equal(f.run().status, 1);
+  assert.match(f.run().stdout, /adapter needs update: bro/);
   assert.equal(f.run('--write').status, 0);
   assert.match(f.read('.agents/skills/bro/SKILL.md'), /Review a scoped task/);
 });
@@ -56,36 +61,54 @@ test('Claude disabled choices are preserved and never silently reenabled', () =>
 
 test('unowned and disabled native files are never overwritten or deleted', () => {
   const f = fixture(); f.write('.agents/skills/bro/SKILL.md', body('bro'));
-  assert.match(f.run('--write').stderr, /refusing to overwrite/);
+  let result = f.run('--write');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /hand-authored Codex skill left in place/);
   f.modes({ bro: 'disabled' });
-  assert.match(f.run('--write').stderr, /remains discoverable/);
+  result = f.run('--write');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /remains discoverable/);
   assert.equal(f.read('.agents/skills/bro/SKILL.md'), body('bro'));
 });
 
-test('native mode rejects missing files, generated wrappers and mismatched metadata', () => {
+test('native mode warns about missing files, generated wrappers and mismatched names', () => {
   const f = fixture(); f.modes({ bro: 'native' });
-  assert.match(f.run().stderr, /native mode requires/);
+  assert.match(f.run().stdout, /native skill is missing/);
   f.modes({}); assert.equal(f.run('--write').status, 0); f.modes({ bro: 'native' });
-  assert.match(f.run().stderr, /native mode requires/);
+  let result = f.run('--write');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /native mode expects a maintained SKILL\.md/);
+  // The generated file is left alone rather than removed.
+  assert.match(f.read('.agents/skills/bro/SKILL.md'), /Codex Adapter/);
   f.write('.agents/skills/bro/SKILL.md', body('wrong'));
-  assert.match(f.run().stderr, /native metadata/);
+  assert.match(f.run().stdout, /native metadata should declare name: bro/);
   f.write('.agents/skills/bro/SKILL.md', body('bro').replace('name: bro\n', '') + '\nname: bro\n');
-  assert.match(f.run().stderr, /native metadata/);
+  assert.match(f.run().stdout, /native metadata should declare name: bro/);
+  f.write('.agents/skills/bro/SKILL.md', '---\nname: bro\n---\n');
+  result = f.run();
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /missing description/);
 });
 
-test('broken native references fail before generated mutations happen', () => {
+test('broken native references warn and generated adapters are still written', () => {
   const f = fixture(); f.modes({ extra: 'native' });
   f.write('.agents/skills/extra/SKILL.md', body('extra') + '[Guide](references/missing.md)\n');
-  assert.match(f.run('--write').stderr, /missing reference/);
-  assert.equal(fs.existsSync(path.join(f.root, '.agents/skills/bro/SKILL.md')), false);
+  let result = f.run('--write');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /missing reference references\/missing\.md/);
+  assert.equal(fs.existsSync(path.join(f.root, '.agents/skills/bro/SKILL.md')), true);
   f.write('.agents/skills/extra/references/missing.md', 'Guide');
-  assert.equal(f.run('--write').status, 0);
+  result = f.run('--write');
+  assert.equal(result.status, 0);
+  assert.doesNotMatch(result.stdout, /missing reference/);
   f.write('.agents/skills/extra/guide with spaces.md', 'Guide');
   f.write('.agents/skills/extra/guide(v2).md', 'Guide');
   f.write('.agents/skills/extra/SKILL.md', body('extra') + '[Guide](<guide with spaces.md>)\n[Version](guide(v2).md)\n[Ref][r]\n[r]: <references/missing.md>\n');
-  assert.equal(f.run().status, 0);
+  result = f.run();
+  assert.equal(result.status, 0);
+  assert.doesNotMatch(result.stdout, /missing reference/);
   f.write('.agents/skills/extra/SKILL.md', body('extra') + '[Ref][r]\n[r]: <missing file.md>\n');
-  assert.match(f.run().stderr, /missing reference/);
+  assert.match(f.run().stdout, /missing reference/);
 });
 
 test('native references resolve through directory links; generated writes cannot escape', () => {
@@ -94,15 +117,20 @@ test('native references resolve through directory links; generated writes cannot
   fs.writeFileSync(path.join(outside, 'guide.md'), 'Guide');
   fs.mkdirSync(path.join(f.root, '.agents/skills'), { recursive: true });
   fs.symlinkSync(outside, path.join(f.root, '.agents/skills/bro'), process.platform === 'win32' ? 'junction' : 'dir');
-  f.modes({ bro: 'native' }); assert.equal(f.run().status, 0);
-  f.modes({ bro: 'disabled' }); assert.match(f.run('--write').stderr, /remains discoverable/);
+  f.modes({ bro: 'native' });
+  let result = f.run();
+  assert.equal(result.status, 0);
+  assert.doesNotMatch(result.stdout, /missing reference/);
+  f.modes({ bro: 'disabled' }); assert.match(f.run('--write').stdout, /remains discoverable/);
   f.modes({ bro: 'native' });
   f.write('.claude/settings.json', JSON.stringify({skillOverrides: {bro: 'off'}}));
-  assert.match(f.run('--write').stderr, /remains discoverable/);
+  assert.match(f.run('--write').stdout, /remains discoverable/);
   f.write('.claude/settings.json', '{}');
   fs.writeFileSync(path.join(outside, 'SKILL.md'), '<!-- Generated by .claude/scripts/sync-codex-skills.mjs. Do not edit. -->');
   f.modes({ bro: 'adapter' });
-  assert.match(f.run('--write').stderr, /outside this repository/);
+  result = f.run('--write');
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /outside this repository/);
   assert.equal(fs.readFileSync(path.join(outside, 'SKILL.md'), 'utf8'), '<!-- Generated by .claude/scripts/sync-codex-skills.mjs. Do not edit. -->');
 });
 

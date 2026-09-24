@@ -78,18 +78,20 @@ cannot prove that an agent follows them.
 Explicit registry disables and legacy `skillOverrides: off` suppress expected Codex discovery
 without erasing intended coverage from the manifest. A maintained native entrypoint must be
 moved outside discovery explicitly before disabling it; required supporting resources remain.
-The validator rejects a disabled entrypoint that reappears. An unexplained missing Claude or
-enabled Codex entrypoint still fails.
+The validator warns when a disabled entrypoint reappears, and when a Claude or enabled Codex
+entrypoint is missing without a record.
 
-A project that deletes an optional skill lists it in `.agents/removed-skills.json`; the
-validator then expects no folder for it in either runtime. The manifest's `removal` block
-names the skills that cannot be removed and the skills that need others. Removal keeps the
-manifest entry, so the catalog below still lists the skill. See
-[remove a skill](../GUIDE.md#remove-a-skill).
+Missing, unregistered, and retired skills, ownership disagreements, and a stale catalog are
+warnings; the validator exits 0. It fails only when the manifest, the modes file, the removal
+record, or settings cannot be read or have an invalid shape. A project that deletes a skill on
+purpose lists it in `.agents/removed-skills.json`, which silences the missing-skill warning.
+The manifest's `removal` block names the skills the template expects every project to keep
+and the skills that need others. Removal keeps the manifest entry, so the catalog below still
+lists the skill. See [add or remove skills](../GUIDE.md#add-or-remove-skills).
 
 Update the manifest deliberately with source changes. Run the validator with `--write` to
-refresh the catalog below, then run it without arguments to check for drift. Retired routes
-cannot retain SKILL.md in either root. A deliberate single-runtime capability requires an
+refresh the catalog below, then run it without arguments to check for drift. A retired route
+that regains a SKILL.md in either root produces a warning naming its replacement. A deliberate single-runtime capability requires an
 explicit coverage list and a nonempty exception explaining the omission.
 
 For selective updates, inspect the diff before choosing paths:

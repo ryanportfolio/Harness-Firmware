@@ -140,6 +140,7 @@ function checkSkills() {
 
   // An omitted name is legal here: the loaders default it to the folder name.
   const problems = [];
+  const mismatches = [];
   let implicitNames = 0;
   for (const directory of directories) {
     const relativePath = `.claude/skills/${directory}/SKILL.md`;
@@ -149,12 +150,16 @@ function checkSkills() {
       continue;
     }
     if (!metadata.name) implicitNames += 1;
-    else if (metadata.name !== directory) problems.push(`${directory}: name ${metadata.name} does not match folder`);
+    else if (metadata.name !== directory) mismatches.push(`${directory}: name ${metadata.name} does not match folder`);
     if (!metadata.description) problems.push(`${directory}: missing description`);
   }
 
   if (problems.length) {
     record("skills", "FAIL", `${problems.length} skill frontmatter problem(s): ${problems.join("; ")}`);
+    return;
+  }
+  if (mismatches.length) {
+    record("skills", "WARN", mismatches.join("; "));
     return;
   }
   record("skills", "PASS", `${directories.length} skills have valid frontmatter (${implicitNames} inherit the folder name)`);
@@ -176,18 +181,21 @@ function checkCodexSync() {
     return;
   }
   if (result.status === 0) {
-    record("codex-sync", "PASS", "Codex adapters are current and registered standalone skills are present");
+    // Drift and missing skills are reported as warnings with exit 0.
+    const warnings = (result.stdout ?? "").split(/\r?\n/).filter((line) => /^(?:WARN: |::warning::)/.test(line));
+    if (warnings.length) record("codex-sync", "WARN", warnings.map((line) => line.replace(/^(?:WARN: |::warning::)/, "")).join(" | "));
+    else record("codex-sync", "PASS", "Codex adapters are current and registered standalone skills are present");
     return;
   }
   const drift = `${result.stderr ?? ""}${result.stdout ?? ""}`
     .split(/\r?\n/)
     .filter((line) => line.trim())
     .join(" | ");
-  record("codex-sync", "FAIL", `adapter drift; run sync-codex-skills.mjs --write: ${drift}`);
+  record("codex-sync", "FAIL", `sync-codex-skills.mjs --check could not read the skills: ${drift}`);
 }
 
 // --- skill coverage and the removed-skills record (.agents/removed-skills.json) ---
-// A skill folder may be missing only when the record lists it; the capability check enforces that.
+// Missing or unregistered skills are warnings; a skill listed in the record is silent.
 async function checkSkillCoverage() {
   const modulePath = ".claude/scripts/check-skill-capabilities.mjs";
   if (!exists(modulePath) || !exists(".agents/skill-capabilities.json")) {
@@ -196,9 +204,10 @@ async function checkSkillCoverage() {
   }
   try {
     const { validateCapabilities } = await import(pathToFileURL(abs(modulePath)).href);
-    const { errors, removed } = validateCapabilities(root);
+    const { errors, warnings = [], removed } = validateCapabilities(root);
     const note = removed?.size ? `; deliberately removed: ${[...removed].join(", ")}` : "";
     if (errors.length) record("skill-coverage", "FAIL", `${errors.length} problem(s): ${errors.join("; ")}`);
+    else if (warnings.length) record("skill-coverage", "WARN", `${warnings.length} warning(s): ${warnings.join("; ")}${note}`);
     else record("skill-coverage", "PASS", `registered skills match their folders${note}`);
   } catch (error) {
     record("skill-coverage", "FAIL", `could not check skill coverage: ${error.message}`);
@@ -217,7 +226,7 @@ function checkReference() {
   ];
   const missing = core.filter((file) => !exists(`.claude/reference/${file}`));
   if (missing.length) {
-    record("reference", "FAIL", `.claude/reference/ missing: ${missing.join(", ")}`);
+    record("reference", "WARN", `.claude/reference/ missing: ${missing.join(", ")}`);
     return;
   }
   record("reference", "PASS", `.claude/reference/ has all ${core.length} core files`);

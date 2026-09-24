@@ -23,8 +23,23 @@ export function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
+// Generated files go to README_OUT_DIR when set, so verify.mjs and the tests can build into a
+// scratch directory without touching the committed README.
+export const OUT_ROOT = process.env.README_OUT_DIR ? path.resolve(process.env.README_OUT_DIR) : ROOT;
+
+// "1 skill", "2 skills".
+export function plural(count, word, many = `${word}s`) {
+  return `${count} ${count === 1 ? word : many}`;
+}
+
+// "a", "a and b", "a, b, and c".
+export function listPhrase(items) {
+  if (items.length < 3) return items.join(" and ");
+  return `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
+}
+
 export function writeText(relativePath, value) {
-  const target = absolute(relativePath);
+  const target = path.join(OUT_ROOT, relativePath);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, value.replaceAll("\r\n", "\n"), "utf8");
 }

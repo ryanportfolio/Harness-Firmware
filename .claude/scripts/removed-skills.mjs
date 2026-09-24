@@ -1,12 +1,15 @@
 #!/usr/bin/env node
-// Removal record: skills a project deleted on purpose.
+// Skill presence: which registered skills are on disk, and the removal record.
 //
-// .agents/removed-skills.json lists optional skills whose folders were deleted from both
-// runtimes. Every check that expects a skill folder skips the names listed here. A missing
-// folder that is not listed still fails. Which skills may be removed, and which skills need
-// others, is declared once in the "removal" block of .agents/skill-capabilities.json.
+// A registered skill that is missing from a runtime never fails a check. Projects add and
+// remove skills, and the registry may catch up later. The checks warn instead:
+// - a missing skill listed in .agents/removed-skills.json is intentional and stays silent;
+// - a missing skill that is not listed gets a warning suggesting to record or restore it;
+// - a present skill that needs a missing one (the "removal" block of
+//   .agents/skill-capabilities.json) gets a warning naming both.
+// What still fails: a record or manifest that cannot be parsed.
 //
-// Usage: node .claude/scripts/removed-skills.mjs   (prints the record and any problems)
+// Usage: node .claude/scripts/removed-skills.mjs   (prints the record and any warnings)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -33,43 +36,53 @@ export function readRemovedSkills(root) {
   return [...record.removed];
 }
 
-// Checks the record against the manifest's removal policy and the working tree.
-export function validateRemovals(root, manifest, removed = readRemovedSkills(root)) {
+// True when the skill has an entrypoint in at least one runtime.
+export function skillPresent(root, name) {
+  return RUNTIME_ROOTS.some((directory) => fs.existsSync(path.join(root, directory, name, "SKILL.md")));
+}
+
+// Reviews the record and the dependency declarations against the working tree.
+// errors: the removal block itself is malformed. warnings: everything about presence.
+export function reviewRemovals(root, manifest, removed = readRemovedSkills(root)) {
   const errors = [];
+  const warnings = [];
   const skills = manifest.skills ?? {};
   const policy = manifest.removal;
-  // Manifests from before the removal record have no policy; they are valid until something is removed.
-  if (!policy && !removed.length) return errors;
-  if (!policy ||!Array.isArray(policy.required) || !policy.dependencies || typeof policy.dependencies !== "object" || Array.isArray(policy.dependencies)) {
-    return [".agents/skill-capabilities.json: removal block needs required and dependencies"];
+  // Manifests from before the removal record have no policy; there is nothing to review.
+  if (!policy) return { errors, warnings };
+  if (!Array.isArray(policy.required) || !policy.dependencies || typeof policy.dependencies !== "object" || Array.isArray(policy.dependencies)) {
+    return { errors: [".agents/skill-capabilities.json: removal block needs required and dependencies"], warnings };
   }
-  for (const name of policy.required) if (!skills[name]) errors.push(`removal policy: required skill ${name} is not registered`);
   for (const [name, needs] of Object.entries(policy.dependencies)) {
-    if (!skills[name]) errors.push(`removal policy: dependency owner ${name} is not registered`);
-    if (!Array.isArray(needs) || !needs.length) { errors.push(`removal policy: ${name} needs a nonempty dependency list`); continue; }
-    for (const need of needs) if (!skills[need]) errors.push(`removal policy: ${name} depends on unregistered ${need}`);
+    if (!Array.isArray(needs) || !needs.length || needs.some((need) => typeof need !== "string")) {
+      errors.push(`removal policy: ${name} needs a nonempty list of skill names`);
+    }
   }
+  if (errors.length) return { errors, warnings };
 
   const sorted = [...new Set(removed)].sort();
   if (removed.length !== sorted.length || removed.some((name, index) => name !== sorted[index])) {
-    errors.push(`${RECORD_PATH}: list names once, sorted: ${JSON.stringify(sorted)}`);
+    warnings.push(`${RECORD_PATH}: list names once, sorted: ${JSON.stringify(sorted)}`);
   }
-  const gone = new Set(removed);
-  for (const name of gone) {
-    if (manifest.retired?.[name]) { errors.push(`${name}: retired skills are not removals; delete it from ${RECORD_PATH}`); continue; }
-    if (!skills[name]) { errors.push(`${name}: recorded as removed but not a registered skill`); continue; }
-    if (policy.required.includes(name)) errors.push(`${name}: required skill cannot be removed`);
-    for (const directory of RUNTIME_ROOTS) {
-      if (fs.existsSync(path.join(root, directory, name))) errors.push(`${name}: recorded as removed but ${directory}/${name}/ still exists`);
-    }
+  for (const name of new Set(removed)) {
+    if (manifest.retired?.[name]) warnings.push(`${name}: retired skills are not removals; delete it from ${RECORD_PATH}`);
+    else if (!skills[name]) warnings.push(`${name}: recorded as removed but not a registered skill`);
+    else if (skillPresent(root, name)) warnings.push(`${name}: recorded as removed but still present; delete it from ${RECORD_PATH}`);
+    else if (policy.required.includes(name)) warnings.push(`${name}: recorded as removed, but the template treats it as required`);
   }
   for (const [name, needs] of Object.entries(policy.dependencies)) {
-    if (gone.has(name) || !Array.isArray(needs)) continue;
+    if (!skills[name] || !skillPresent(root, name)) continue;
     for (const need of needs) {
-      if (gone.has(need)) errors.push(`${name} depends on ${need}, which is recorded as removed; restore ${need} or remove ${name} too`);
+      if (!skillPresent(root, need)) warnings.push(`${name} needs ${need}, which is not installed; restore ${need} or remove ${name} too`);
     }
   }
-  return errors;
+  return { errors, warnings };
+}
+
+// Prints warnings so they show up locally and as GitHub Actions annotations.
+export function printWarnings(warnings, stream = process.stdout) {
+  const prefix = process.env.GITHUB_ACTIONS === "true" ? "::warning::" : "WARN: ";
+  for (const warning of warnings) stream.write(`${prefix}${warning}\n`);
 }
 
 const ownPath = fileURLToPath(import.meta.url);
@@ -78,7 +91,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === ownPath) {
     const root = path.resolve(path.dirname(ownPath), "../..");
     const manifest = JSON.parse(fs.readFileSync(path.join(root, ".agents/skill-capabilities.json"), "utf8"));
     const removed = readRemovedSkills(root);
-    const errors = validateRemovals(root, manifest, removed);
+    const { errors, warnings } = reviewRemovals(root, manifest, removed);
+    printWarnings(warnings);
     if (errors.length) { errors.forEach((error) => console.error(`FAIL: ${error}`)); process.exitCode = 1; }
     else console.log(removed.length ? `Removed skills: ${removed.join(", ")}` : "No skills recorded as removed.");
   } catch (error) { console.error(error.message); process.exitCode = 1; }

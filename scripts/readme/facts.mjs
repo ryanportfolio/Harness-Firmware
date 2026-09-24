@@ -11,36 +11,23 @@ function directories(relativeRoot) {
     .sort();
 }
 
-function sameMembers(actual, expected, label) {
-  if (actual.length !== expected.length || actual.some((name, index) => name !== expected[index])) {
-    throw new Error(`${label} drift\nactual: ${actual.join(", ")}\nexpected: ${expected.join(", ")}`);
-  }
+// Differences between two name lists, for warnings. Empty when they match.
+function difference(label, actual, expected) {
+  const missing = expected.filter((name) => !actual.includes(name));
+  const extra = actual.filter((name) => !expected.includes(name));
+  const parts = [];
+  if (missing.length) parts.push(`missing ${missing.join(", ")}`);
+  if (extra.length) parts.push(`unlisted ${extra.join(", ")}`);
+  return parts.length ? [`${label}: ${parts.join("; ")}`] : [];
 }
 
 function normalizedBytes(text) {
   return Buffer.byteLength(text.replaceAll("\r\n", "\n"));
 }
 
-// Skills deleted on purpose, from .agents/removed-skills.json. The full validation of that
-// record lives in .claude/scripts/removed-skills.mjs; here it only narrows the inventory.
-export function removedSkills() {
-  if (!fs.existsSync(absolute(".agents/removed-skills.json"))) return [];
-  const record = readJson(".agents/removed-skills.json");
-  if (record?.version !== 1 || !Array.isArray(record.removed) || record.removed.some((name) => typeof name !== "string")) {
-    throw new Error('.agents/removed-skills.json: expected {"version": 1, "removed": [...]}');
-  }
-  return [...record.removed].sort();
-}
-
-// A README built after removals names them on its second line. A README without that line
-// was built for the full template.
+// A README built while template skills are missing names them on its second line.
 export function removedLine(names) {
   return `<!-- removed skills: ${names.join(", ")} -->`;
-}
-
-export function readmeRemovedSkills(text) {
-  const match = text.match(/^<!-- removed skills: ([a-z0-9, -]+) -->$/m);
-  return match ? match[1].split(", ") : [];
 }
 
 function countByGroup(groupIds, items) {
@@ -52,8 +39,8 @@ function countByGroup(groupIds, items) {
   return counts;
 }
 
-export function expectedCodexNames(canonicalNames, modes = {}, overrides = {}, removed = []) {
-  const enabled = name => modes[name] !== "disabled" && overrides[name] !== "off" && !removed.includes(name);
+export function expectedCodexNames(canonicalNames, modes = {}, overrides = {}) {
+  const enabled = name => modes[name] !== "disabled" && overrides[name] !== "off";
   const names = new Set(canonicalNames.filter(enabled));
   for (const [name, mode] of Object.entries(modes)) if (mode === "native" && enabled(name)) names.add(name);
   return [...names].sort();
@@ -62,15 +49,18 @@ export function expectedCodexNames(canonicalNames, modes = {}, overrides = {}, r
 export function collectFacts() {
   const inventory = readJson("scripts/readme/items.json");
   const groupIds = inventory.groups.map((group) => group.id);
-  sameMembers([...groupIds].sort(), ["core", "discipline", "specialist"], "skill groups");
+  if ([...groupIds].sort().join() !== "core,discipline,specialist") throw new Error("scripts/readme/items.json: skill groups must be core, discipline, specialist");
 
-  const removed = removedSkills();
-  const templateNames = inventory.skills.map((skill) => skill.name).sort();
-  const present = inventory.skills.filter((skill) => !removed.includes(skill.name));
+  // A template skill whose folder is missing is left out of the README; a skill folder that
+  // items.json does not list is left out with a warning. Neither fails.
   const canonicalNames = directories(".claude/skills");
   const codexNames = directories(".agents/skills");
+  const templateNames = inventory.skills.map((skill) => skill.name).sort();
+  const present = inventory.skills.filter((skill) => canonicalNames.includes(skill.name));
+  const removed = templateNames.filter((name) => !canonicalNames.includes(name));
   const inventoryNames = present.map((skill) => skill.name).sort();
-  sameMembers(inventoryNames, canonicalNames, "README skill inventory");
+  const warnings = canonicalNames.filter((name) => !templateNames.includes(name))
+    .map((name) => `.claude/skills/${name}: not listed in scripts/readme/items.json, so the README leaves it out`);
   const modes = fs.existsSync(absolute(".agents/skill-modes.json")) ? readJson(".agents/skill-modes.json").skills : {};
   let overrides = {};
   try {
@@ -78,7 +68,8 @@ export function collectFacts() {
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
-  sameMembers(codexNames, expectedCodexNames(canonicalNames, modes, overrides, removed), "Codex skill inventory");
+  const codexExpected = expectedCodexNames(canonicalNames, modes, overrides).filter((name) => canonicalNames.includes(name) || codexNames.includes(name));
+  warnings.push(...difference("Codex skill inventory", codexNames, codexExpected));
 
   const templateTierCounts = countByGroup(groupIds, inventory.skills);
   const tierCounts = countByGroup(groupIds, present);
@@ -86,7 +77,7 @@ export function collectFacts() {
     const relativePath = `.claude/skills/${item.name}/SKILL.md`;
     const text = read(relativePath);
     const metadata = frontmatter(text, relativePath);
-    if (metadata.name && metadata.name !== item.name) throw new Error(`${relativePath}: name ${metadata.name} does not match directory`);
+    if (metadata.name && metadata.name !== item.name) warnings.push(`${relativePath}: name ${metadata.name} does not match directory`);
     return {
       ...item,
       description: metadata.description,
@@ -94,7 +85,7 @@ export function collectFacts() {
     };
   });
 
-  const referenceFileCount = fs.readdirSync(absolute(".claude/reference"), { withFileTypes: true })
+  const referenceFileCount = !fs.existsSync(absolute(".claude/reference")) ? 0 : fs.readdirSync(absolute(".claude/reference"), { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
     .length;
   const kernelBytes = normalizedBytes(read("CLAUDE.md"));
@@ -109,7 +100,7 @@ export function collectFacts() {
   const runtimeNames = ["Claude Code", "Codex"];
 
   return {
-    skillCount: canonicalNames.length,
+    skillCount: present.length,
     codexSkillCount: codexNames.length,
     codexNativeCount: codexNames.filter(name => modes[name] === "native").length,
     codexAdapterCount: codexNames.filter(name => modes[name] !== "native").length,
@@ -122,6 +113,7 @@ export function collectFacts() {
     inventoryNames,
     templateNames,
     removed,
+    warnings,
     groups: inventory.groups,
     skills,
     kernelBytes,
