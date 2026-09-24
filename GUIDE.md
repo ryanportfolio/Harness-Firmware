@@ -62,7 +62,43 @@ Run:
 node .claude/scripts/doctor.mjs
 ```
 
-The doctor checks hook wiring, skill frontmatter, generated Codex adapters, the reference library, plugin manifests, leftover `FILL IN` markers, and always-loaded context weight.
+The doctor checks hook wiring, skill frontmatter, generated Codex adapters, skill coverage, the reference library, plugin manifests, leftover `FILL IN` markers, and always-loaded context weight.
+
+## add or remove skills
+
+Adding or removing a skill never fails a check. The checks warn about what they notice and exit 0, locally, in the doctor, and in CI, where warnings show up as annotations on the run. Only a file the tools cannot read fails: invalid JSON in a manifest, the removal record, or settings; a `SKILL.md` without frontmatter or a description; or a check script that crashes.
+
+What produces a warning:
+
+- A registered skill that is missing from a runtime. The warning suggests recording it or restoring it.
+- A skill that needs another one that is not installed, for example `astra-review` without `codex-review`. The warning names both.
+- A skill folder that `.agents/skill-capabilities.json` does not register yet, or a new Claude skill whose Codex adapter has not been generated. Run `node .claude/scripts/sync-codex-skills.mjs --write` for the adapter.
+- A retired skill that reappears, such as `verify-this`. The warning names the skill that replaced it; delete the folder unless you mean to bring it back.
+- A README or README image that no longer matches a fresh build, including hand edits. Run `node scripts/readme/build.mjs` to rebuild it.
+
+To remove a skill on purpose and keep the checks quiet about it:
+
+1. Delete `.claude/skills/<name>/` and `.agents/skills/<name>/`, whichever exist.
+2. Add the name to `.agents/removed-skills.json`, sorted, each name once:
+
+   ```json
+   {
+     "version": 1,
+     "removed": ["lab", "why"]
+   }
+   ```
+
+3. Run `node scripts/readme/build.mjs` so the README stops listing it, then `node .claude/scripts/doctor.mjs`.
+
+harnessfirmware.com/new does steps 1 and 2 for every skill you untick and sets each name to `"off"` under `skillOverrides` in `.claude/settings.json`. A new repository keeps the template's README until the first `node scripts/readme/build.mjs`; until then the README still links the removed skills, and the README check warns that it is stale.
+
+The record is informational. A missing skill listed in it produces no warning; a missing skill left out of it produces one. `node .claude/scripts/removed-skills.mjs` prints the record and any warnings about it, such as a listed skill whose folder is still there.
+
+The `removal` block in `.agents/skill-capabilities.json` describes the template's intent. `required` names the skills the template expects every project to keep: `init-project` and `external-review`. `dependencies` names skills that need others; for example `astra-review` reads `codex-review`. Breaking either produces a warning, not a failure.
+
+Removing `addskill` leaves `.claude/skills/writing-skills/` and `.agents/skills/writing-skills/`. They hold licensed reference files from the retired `writing-skills` skill and have no `SKILL.md`, so no runtime loads them and no check requires them. Delete them by hand if you do not want them.
+
+To bring a skill back, restore its folders from the template, for example `git checkout starter/main -- .claude/skills/<name> .agents/skills/<name>` (only the paths that exist upstream), then delete its name from the record and its `skillOverrides` entry. When you pull other template updates with `sync-starter`, skip paths under removed skills; the session-start drift notice already ignores them.
 
 ## measure the always-loaded layer
 
@@ -109,6 +145,7 @@ Generated Codex adapters delegate to `.claude/skills/`. Native entries in `.agen
 | `AGENTS.md` | Codex instruction and safety boundary. |
 | `.claude/skills/` | Canonical workflow playbooks. |
 | `.agents/skills/` | Standalone Codex workflows and generated discovery adapters. |
+| `.agents/removed-skills.json` | Skills this project deleted on purpose. Checks stay quiet about the names it lists. |
 | `.claude/reference/` | Committed project memory for architecture, commands, deployment, pitfalls, secrets, and technology choices. |
 | `.claude/hooks/session-start.sh` | Claude Code startup checks and reminders. |
 | `.claude/scripts/context-weight.sh` | Always-loaded source weight measurement. |

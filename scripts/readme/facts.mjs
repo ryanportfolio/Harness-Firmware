@@ -11,14 +11,32 @@ function directories(relativeRoot) {
     .sort();
 }
 
-function sameMembers(actual, expected, label) {
-  if (actual.length !== expected.length || actual.some((name, index) => name !== expected[index])) {
-    throw new Error(`${label} drift\nactual: ${actual.join(", ")}\nexpected: ${expected.join(", ")}`);
-  }
+// Differences between two name lists, for warnings. Empty when they match.
+function difference(label, actual, expected) {
+  const missing = expected.filter((name) => !actual.includes(name));
+  const extra = actual.filter((name) => !expected.includes(name));
+  const parts = [];
+  if (missing.length) parts.push(`missing ${missing.join(", ")}`);
+  if (extra.length) parts.push(`unlisted ${extra.join(", ")}`);
+  return parts.length ? [`${label}: ${parts.join("; ")}`] : [];
 }
 
 function normalizedBytes(text) {
   return Buffer.byteLength(text.replaceAll("\r\n", "\n"));
+}
+
+// A README built while template skills are missing names them on its second line.
+export function removedLine(names) {
+  return `<!-- removed skills: ${names.join(", ")} -->`;
+}
+
+function countByGroup(groupIds, items) {
+  const counts = Object.fromEntries(groupIds.map((group) => [group, 0]));
+  for (const item of items) {
+    if (!groupIds.includes(item.group)) throw new Error(`${item.name}: unknown group ${item.group}`);
+    counts[item.group] += 1;
+  }
+  return counts;
 }
 
 export function expectedCodexNames(canonicalNames, modes = {}, overrides = {}) {
@@ -31,12 +49,18 @@ export function expectedCodexNames(canonicalNames, modes = {}, overrides = {}) {
 export function collectFacts() {
   const inventory = readJson("scripts/readme/items.json");
   const groupIds = inventory.groups.map((group) => group.id);
-  sameMembers([...groupIds].sort(), ["core", "discipline", "specialist"], "skill groups");
+  if ([...groupIds].sort().join() !== "core,discipline,specialist") throw new Error("scripts/readme/items.json: skill groups must be core, discipline, specialist");
 
+  // A template skill whose folder is missing is left out of the README; a skill folder that
+  // items.json does not list is left out with a warning. Neither fails.
   const canonicalNames = directories(".claude/skills");
   const codexNames = directories(".agents/skills");
-  const inventoryNames = inventory.skills.map((skill) => skill.name).sort();
-  sameMembers(inventoryNames, canonicalNames, "README skill inventory");
+  const templateNames = inventory.skills.map((skill) => skill.name).sort();
+  const present = inventory.skills.filter((skill) => canonicalNames.includes(skill.name));
+  const removed = templateNames.filter((name) => !canonicalNames.includes(name));
+  const inventoryNames = present.map((skill) => skill.name).sort();
+  const warnings = canonicalNames.filter((name) => !templateNames.includes(name))
+    .map((name) => `.claude/skills/${name}: not listed in scripts/readme/items.json, so the README leaves it out`);
   const modes = fs.existsSync(absolute(".agents/skill-modes.json")) ? readJson(".agents/skill-modes.json").skills : {};
   let overrides = {};
   try {
@@ -44,16 +68,16 @@ export function collectFacts() {
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
-  sameMembers(codexNames, expectedCodexNames(canonicalNames, modes, overrides), "Codex skill inventory");
+  const codexExpected = expectedCodexNames(canonicalNames, modes, overrides).filter((name) => canonicalNames.includes(name) || codexNames.includes(name));
+  warnings.push(...difference("Codex skill inventory", codexNames, codexExpected));
 
-  const tierCounts = Object.fromEntries(groupIds.map((group) => [group, 0]));
-  const skills = inventory.skills.map((item) => {
-    if (!groupIds.includes(item.group)) throw new Error(`${item.name}: unknown group ${item.group}`);
-    tierCounts[item.group] += 1;
+  const templateTierCounts = countByGroup(groupIds, inventory.skills);
+  const tierCounts = countByGroup(groupIds, present);
+  const skills = present.map((item) => {
     const relativePath = `.claude/skills/${item.name}/SKILL.md`;
     const text = read(relativePath);
     const metadata = frontmatter(text, relativePath);
-    if (metadata.name && metadata.name !== item.name) throw new Error(`${relativePath}: name ${metadata.name} does not match directory`);
+    if (metadata.name && metadata.name !== item.name) warnings.push(`${relativePath}: name ${metadata.name} does not match directory`);
     return {
       ...item,
       description: metadata.description,
@@ -61,12 +85,7 @@ export function collectFacts() {
     };
   });
 
-  const requiredCounts = { core: 7, discipline: 13, specialist: 14 };
-  for (const [group, expected] of Object.entries(requiredCounts)) {
-    if (tierCounts[group] !== expected) throw new Error(`${group}: expected ${expected}, found ${tierCounts[group]}`);
-  }
-
-  const referenceFileCount = fs.readdirSync(absolute(".claude/reference"), { withFileTypes: true })
+  const referenceFileCount = !fs.existsSync(absolute(".claude/reference")) ? 0 : fs.readdirSync(absolute(".claude/reference"), { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
     .length;
   const kernelBytes = normalizedBytes(read("CLAUDE.md"));
@@ -81,7 +100,7 @@ export function collectFacts() {
   const runtimeNames = ["Claude Code", "Codex"];
 
   return {
-    skillCount: canonicalNames.length,
+    skillCount: present.length,
     codexSkillCount: codexNames.length,
     codexNativeCount: codexNames.filter(name => modes[name] === "native").length,
     codexAdapterCount: codexNames.filter(name => modes[name] !== "native").length,
@@ -89,8 +108,12 @@ export function collectFacts() {
     runtimeCount: runtimeNames.length,
     referenceFileCount,
     tierCounts,
+    templateTierCounts,
     canonicalNames,
     inventoryNames,
+    templateNames,
+    removed,
+    warnings,
     groups: inventory.groups,
     skills,
     kernelBytes,

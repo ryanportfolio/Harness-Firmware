@@ -20,6 +20,24 @@ condensed.
 
 ### Changed
 
+- Adding or removing a skill no longer fails a check. Codex sync, the capability and
+  contract checks, the doctor, and the README verify step and tests now warn and exit 0
+  for a missing or unregistered skill, a missing dependency, a retired skill that
+  reappears (the warning names its replacement), adapter drift, a stale capability
+  catalog, and a README that differs from a fresh build, including hand edits. CI shows
+  the warnings as annotations. A check still fails when a file cannot be read: invalid
+  JSON in a manifest, the removal record, or settings, or a `SKILL.md` without
+  frontmatter or a description. `verify.mjs` builds into a scratch directory and no
+  longer rewrites the committed README. README tests check a fresh build instead of the
+  committed files and no longer pin the template's skill counts.
+- README counts read naturally at one ("1 workflow", "browse the only skill") and leave
+  out empty groups; group counts and the narrow memory map follow the skills installed.
+  After a rebuild, the quickstart, the "what the firmware adds" table, and the feedback
+  loop text name only installed skills. The template's own README is unchanged.
+- Check failures caused by unreadable JSON print one line naming the file instead of a
+  stack trace. Codex sync generates no adapter for a retired skill, and each warning
+  appears once in CI.
+
 - General Writing now checks evidence and reader understanding before style, scopes
   clarity and style verdicts, and allows explanations to follow reader needs. Claude
   and Codex each ship a complete standalone package with local references and licenses.
@@ -63,6 +81,10 @@ condensed.
 
 ### Added
 
+- A removal record, `.agents/removed-skills.json`, for skills a project deletes on
+  purpose. A missing skill listed there produces no warning. The new `removal` block
+  in `.agents/skill-capabilities.json` names the skills the template expects every
+  project to keep (`init-project`, `external-review`) and which skills need others.
 - `external-review`, a Codex-only leaf review: one reviewer, one fresh context, one
   exact diff scope, no agents or edits. `codex-review` and `astra-review` in both
   runtimes now launch it through a custom prompt when the reviewed repository has it,

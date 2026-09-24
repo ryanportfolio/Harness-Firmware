@@ -1,5 +1,5 @@
 import { collectFacts } from "./facts.mjs";
-import { MONO, SANS, THEMES, esc, writeText } from "./lib.mjs";
+import { MONO, SANS, THEMES, esc, listPhrase, plural, writeText } from "./lib.mjs";
 
 const facts = collectFacts();
 /* Project README contract: a repository circuit, with two independently owned
@@ -112,9 +112,9 @@ function boot(themeName, narrow) {
   const height = narrow ? 600 : 430;
   const rows = [
     ["RULE KERNEL", `${fmtKiB(facts.kernelBytes)} loaded`],
-    ["SKILL INDEX", `${facts.skillCount} workflows ready`],
-    ["PROJECT MEMORY", `${facts.referenceFileCount} files mounted`],
-    ["RUNTIME BOUNDARY", `${facts.runtimeCount} targets declared`],
+    ["SKILL INDEX", `${plural(facts.skillCount, "workflow")} ready`],
+    ["PROJECT MEMORY", `${plural(facts.referenceFileCount, "file")} mounted`],
+    ["RUNTIME BOUNDARY", `${plural(facts.runtimeCount, "target")} declared`],
     ["VALIDATION", "template checks wired"],
   ];
   const startY = narrow ? 250 : 184;
@@ -136,10 +136,10 @@ function boot(themeName, narrow) {
     : `<text class="eyebrow mute" x="40" y="46">REPOSITORY FIRMWARE</text><text class="headline" x="40" y="100">Harness Firmware</text><text class="subhead mute" x="40" y="132">Instructions, project memory, and verification for Claude Code and Codex.</text>`;
   const ready = narrow
     ? `<g class="boot-ready"><rect class="tag" x="24" y="548" width="342" height="30" rx="6"/><text class="label accent" x="195" y="569" text-anchor="middle">READY · ${facts.skillCount}/${facts.skillCount}</text></g>`
-    : `<g class="boot-ready"><rect class="tag" x="660" y="174" width="180" height="174" rx="8"/><text class="small mute" x="680" y="204">BOOT STATUS</text><text class="count accent" x="680" y="252">READY</text><text class="small" x="680" y="286">${facts.skillCount} Claude skills</text><text class="small" x="680" y="312">${facts.codexSkillCount} Codex skills</text></g>`;
+    : `<g class="boot-ready"><rect class="tag" x="660" y="174" width="180" height="174" rx="8"/><text class="small mute" x="680" y="204">BOOT STATUS</text><text class="count accent" x="680" y="252">READY</text><text class="small" x="680" y="286">${plural(facts.skillCount, "Claude skill")}</text><text class="small" x="680" y="312">${plural(facts.codexSkillCount, "Codex skill")}</text></g>`;
   return svg({
     width, height, title: "Harness Firmware boot trace",
-    label: `Harness Firmware boots with ${facts.skillCount} skills, ${facts.referenceFileCount} project-memory files, and ${facts.runtimeCount} runtime boundaries ready.`,
+    label: `Harness Firmware boots with ${plural(facts.skillCount, "skill")}, ${plural(facts.referenceFileCount, "project-memory file")}, and ${plural(facts.runtimeCount, "runtime boundary", "runtime boundaries")} ready.`,
     themeName,
     extraCss: `@keyframes bootCursor{${cursorFrames}84%,100%{transform:translateY(${(rows.length - 1) * rowGap}px)}}.boot-cursor{animation:bootCursor 12s steps(1,end) infinite}`,
     body: `${grid(width, height)}${title}${rowsMarkup}<circle class="signal boot-cursor" cx="${xDot}" cy="${startY - 5}" r="7"/>${ready}`,
@@ -156,15 +156,15 @@ function runtime(themeName, narrow) {
   const body = `${grid(width,height)}
 <text class="eyebrow mute" x="${x}" y="36">TWO RUNTIMES · SHARED MEMORY</text>
 <text class="subhead" x="${x}" y="72">Two runtimes. One project.</text>
-${card(x,108,'CLAUDE CODE','CLAUDE.md + hooks',`${facts.skillCount} canonical workflows`,'.claude/skills/')}
-${card(narrow ? x : 458,narrow ? 294 : 108,'CODEX','AGENTS.md',`${facts.codexSkillCount} skills · ${facts.codexNativeCount} native${facts.codexAdapterCount ? ` · ${facts.codexAdapterCount} adapters` : ''}`,'.agents/skills/')}
+${card(x,108,'CLAUDE CODE','CLAUDE.md + hooks',`${plural(facts.skillCount, "canonical workflow")}`,'.claude/skills/')}
+${card(narrow ? x : 458,narrow ? 294 : 108,'CODEX','AGENTS.md',`${plural(facts.codexSkillCount, "skill")} · ${facts.codexNativeCount} native${facts.codexAdapterCount ? ` · ${plural(facts.codexAdapterCount, "adapter")}` : ''}`,'.agents/skills/')}
 <path class="wire active" d="${narrow ? 'M195 258V294 M195 444V488' : 'M231 258V292H649V258 M440 292V318'}"/>
 <rect class="tag" x="${x}" y="${memoryY}" width="${width-2*x}" height="90"/>
 <text class="label" x="${x+20}" y="${memoryY+28}">COMMITTED PROJECT MEMORY</text>
-<text class="copy" x="${x+20}" y="${memoryY+54}">.claude/reference/ · ${facts.referenceFileCount} topics</text>
+<text class="copy" x="${x+20}" y="${memoryY+54}">.claude/reference/ · ${plural(facts.referenceFileCount, "topic")}</text>
 <text class="copy mute" x="${x+20}" y="${memoryY+76}">Facts, decisions, commands, and pitfalls</text>`;
   return svg({width,height,title:'Harness Firmware runtime ownership',
-    label:`${facts.skillCount} Claude Code workflows and ${facts.codexSkillCount} Codex skills, including ${facts.codexNativeCount} native${facts.codexAdapterCount ? ` and ${facts.codexAdapterCount} adapters` : ''}, share committed project memory.`,themeName,body});
+    label:`${plural(facts.skillCount, "Claude Code workflow")} and ${plural(facts.codexSkillCount, "Codex skill")}, including ${facts.codexNativeCount} native${facts.codexAdapterCount ? ` and ${plural(facts.codexAdapterCount, "adapter")}` : ''}, share committed project memory.`,themeName,body});
 }
 
 function wrapLabel(label, max = 14) {
@@ -177,16 +177,15 @@ function wrapLabel(label, max = 14) {
 
 function skillsPanel(themeName, narrow) {
   const width = narrow ? 390 : 880;
-  const height = narrow ? 1560 : 700;
   const groups = facts.groups.map((group) => ({
     ...group,
     skills: facts.skills.filter((skill) => skill.group === group.id).sort((a, b) => a.name.localeCompare(b.name)),
-  }));
-  let markup = `${grid(width, height)}<text class="eyebrow mute" x="${narrow ? 24 : 40}" y="${narrow ? 36 : 42}">ON-DEMAND MEMORY MAP</text><text class="${narrow ? "subhead" : "headline"}" x="${narrow ? 24 : 40}" y="${narrow ? 72 : 92}"${narrow ? "" : " style=\"font-size:38px\""}>${facts.skillCount} workflows. Loaded when called.</text>`;
+  })).filter((group) => group.skills.length > 0);
+  let markup = `<text class="eyebrow mute" x="${narrow ? 24 : 40}" y="${narrow ? 36 : 42}">ON-DEMAND MEMORY MAP</text><text class="${narrow ? "subhead" : "headline"}" x="${narrow ? 24 : 40}" y="${narrow ? 72 : 92}"${narrow ? "" : " style=\"font-size:38px\""}>${plural(facts.skillCount, "workflow")}. Loaded when called.</text>`;
   markup += narrow
     ? `<text class="copy mute" x="24" y="104">Repository source estimate:</text><text class="small mute" x="24" y="132">${fmtKiB(facts.residentBytes)} kernel + index</text><text class="small mute" x="24" y="158">${fmtKiB(facts.onDemandBytes)} on-demand skill bodies</text>`
     : `<text class="copy mute" x="40" y="122">Repository source estimate · ${fmtKiB(facts.residentBytes)} kernel + index · ${fmtKiB(facts.onDemandBytes)} on-demand skill bodies</text>`;
-  let footerY;
+  let footerY, height;
   if (narrow) {
     let y = 188;
     for (const group of groups) {
@@ -201,6 +200,8 @@ function skillsPanel(themeName, narrow) {
       y += 88;
     }
     footerY = y + 12;
+    // The narrow canvas grows and shrinks with the skills present.
+    height = footerY + 46;
     markup += `<text class="small mute" x="24" y="${footerY}">COUNTS VERIFIED AGAINST</text><text class="small mute" x="24" y="${footerY + 26}">.claude/skills/</text>`;
   } else {
     const starts = [158, 314, 470];
@@ -218,15 +219,17 @@ function skillsPanel(themeName, narrow) {
         markup += `<g data-skill="${skill.name}" data-bottom="${cellY + 54}" transform="translate(${x} ${cellY})"><rect class="cell" width="${cellWidth}" height="54" rx="6"/><text class="small" x="10" y="${lines.length === 1 ? 31 : 23}">${esc(lines[0])}</text>${lines[1] ? `<text class="small" x="10" y="40">${esc(lines[1])}</text>` : ""}</g>`;
       });
     });
+    height = 700;
     footerY = height - 22;
     markup += `<text class="small mute" x="40" y="${footerY}">CELL AND GROUP COUNTS VERIFIED AGAINST .claude/skills/</text>`;
   }
   const scanTop = narrow ? 188 : 158;
   const scanDistance = narrow ? Math.max(0, footerY - scanTop - 60) : 430;
   markup += `<g class="scan-bar" aria-hidden="true" style="--scan-distance:${scanDistance}px"><rect class="signal" x="${narrow ? 18 : 34}" y="${scanTop}" width="4" height="32" style="animation:scanY 12s linear infinite"/></g>`;
+  markup = `${grid(width, height)}${markup}`;
   return svg({
     width, height, title: "Harness Firmware skill memory map",
-    label: `A memory map of ${facts.skillCount} on-demand workflows grouped into ${facts.tierCounts.core} core, ${facts.tierCounts.discipline} discipline, and ${facts.tierCounts.specialist} specialist skills.`,
+    label: `A memory map of ${plural(facts.skillCount, "on-demand workflow")} grouped into ${listPhrase(groups.map((group) => `${group.skills.length} ${group.id}`))} ${facts.skillCount === 1 ? "skill" : "skills"}.`,
     themeName, body: markup,
   });
 }
