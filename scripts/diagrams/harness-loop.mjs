@@ -162,7 +162,7 @@ function build(themeName) {
 <a href="${SKILL("long-horizon")}" target="_blank" rel="noopener noreferrer" aria-label="Long-horizon stagnation supervisor"><text class="label mute" x="16" y="28">SUPERVISOR · STAGNATION WATCH</text></a>
 <text class="copy ink" x="16" y="54">2 audit fails on one step → change approach</text>
 <text class="copy ink" x="16" y="76">3 rounds, no new verified progress → rewrite plan</text>
-<text class="ref accent" x="16" y="104">${linkedText([part("long-horizon (Stagnation)", SKILL("long-horizon")), part(" · "), part("codex-review (gpt-5.6-sol)", SKILL("codex-review"))])}</text>
+<text class="ref accent" x="16" y="104">${linkedText([part("long-horizon (Stagnation)", SKILL("long-horizon")), part(" · "), part("codex-review (gpt-6-sol)", SKILL("codex-review"))])}</text>
 </g>
 <path class="warnwire dash" marker-end="url(#warnarrow)" d="M880 218C830 240 800 266 786 290"/>
 <text class="tiny" fill="${warn}" x="872" y="240">conditional intervention</text>`;
