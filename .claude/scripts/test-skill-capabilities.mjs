@@ -318,3 +318,10 @@ test('retired entrypoints still fail after a removal', {skip: !scenarios[0][1]},
     fs.rmSync(path.join(root, '.claude/skills', name), {recursive: true});
   }
 });
+
+test('standalone writing packages retain matching instructions and resources', {skip: removedHere.has('writing') && 'writing is recorded as removed'}, () => {
+  for (const name of ['SKILL.md', 'patterns.md', 'NOTICE.md', 'LICENSE']) {
+    const read = runtime => fs.readFileSync(path.join(repo, runtime, 'skills/writing', name), 'utf8').replaceAll('\r\n', '\n');
+    assert.equal(read('.agents'), read('.claude'), `writing/${name} differs across runtimes`);
+  }
+});

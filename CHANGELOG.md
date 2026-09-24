@@ -20,6 +20,10 @@ condensed.
 
 ### Changed
 
+- General Writing now checks evidence and reader understanding before style, scopes
+  clarity and style verdicts, and allows explanations to follow reader needs. Claude
+  and Codex each ship a complete standalone package with local references and licenses.
+
 - Every Codex skill is now a maintained native skill. The 14 that were generated
   adapters (`adopt-repo`, `advocate`, `arena`, `astra-review`, `automate-me`,
   `babysit-ci`, `claude-review`, `codex-review`, `dare`, `forge-repo-ui-skill`, `lab`,
