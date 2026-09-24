@@ -1,18 +1,18 @@
 ---
 name: writing
-description: "Use for text that leaves the session (READMEs, docs, site and UI copy, emails, release notes, application answers) or to unslop, humanize, voice-match, or audit a draft for AI tells. Ordinary session replies use Caveman with built-in Unslop."
+description: "Write or edit audience-facing prose: docs, UI copy, emails, release notes, and application answers. Use also for voice matching, clarity review, or AI-tell cleanup. Ordinary session replies follow session conventions."
 ---
 
 # Writing
 
 For prose that lives outside this session, read by someone who was not here. Write for the reader's next decision: find the job the text has to do, do it early, cut everything that does not help. Nothing that ships reads as machine-made, and nothing distinctive gets sanded off to get there.
 
-Ordinary chat uses Caveman. Deliverables, including commit and PR prose, use normal audience-appropriate language and repository conventions. Code, identifiers, error strings, and quotations remain exact. Use specialized artifact workflows where applicable.
+Ordinary chat follows session conventions, including Caveman when configured. Deliverables, including commit and PR prose, use normal audience-appropriate language and repository conventions. Code, identifiers, error strings, and quotations remain exact. Use specialized artifact workflows where applicable.
 
 ## Precedence
 
 1. The writer's own sample voice: mirror sentence length, register, punctuation, recurring phrases. Never upgrade casual to corporate.
-2. The repo's voice file, if its CLAUDE.md indexes one.
+2. An optional project voice reference identified by repository instructions, such as CLAUDE.md or AGENTS.md. Apply it only to that project's work; no particular voice file is required.
 3. The rules below.
 
 Explicit user choices override all style defaults, including punctuation. Preserve facts, uncertainty, quotations, identifiers, and technical meaning.
@@ -23,7 +23,15 @@ Settle silently: who reads this; what they should understand, decide, or do; wha
 
 Form follows the job. Application answer: answer, one example, what it reveals. Email: purpose, context, next step. Explanation: answer, then how. Proposal: problem, recommendation, why. Memo: decision, then implications. Bio: most relevant work first. Essay: a claim, then earn it. Product copy: the user's outcome, never the product describing itself.
 
+If the piece depends on the author's experience or judgment, use supplied notes first. Ask only for missing material that could change the answer: a relevant event, observation, decision, or result. Never invent personal material. Routine or reference copy needs no interview.
+
+For substantive claims and recommendations, check the main claim, its support, and any exception that changes the advice. Reuse supplied evidence and source logs; verify material factual claims against those sources or other reliable evidence within scope. Model agreement is not verification. Narrow unsupported claims, preserve consequential uncertainty, and identify evidence still needed. A sound recommendation needs no contrarian angle.
+
+Keep these checks proportional and silent for routine drafting. A style-only request stays style-only: add no research or substantive rewrite, and imply no factual verification.
+
 ## Style defaults
+
+Avoid the following patterns unless an explicit style choice overrides them. Style choices never permit invented facts or altered technical meaning.
 
 - **Em dashes (U+2014), anywhere.** No en-dash or double-hyphen stand-ins. Period, comma, colon, semicolon, parentheses; middle dot (U+00B7) for label separators.
 - **Trailing periods on headings** and display text.
@@ -36,7 +44,7 @@ Form follows the job. Application answer: answer, one example, what it reveals. 
 
 ## Tells
 
-Mannered prose substitutes metaphor and flourish for direct statement: "a dial worth turning" for "a parameter worth varying". The phrases display the writer instead of conveying the idea, and readers can tell. Say what you mean; when a literal phrase exists, use it. The lists below name the recurring forms. Catalog with before/after examples in `patterns.md`; open it when a tell is ambiguous.
+Mannered prose substitutes metaphor and flourish for direct statement: "a dial worth turning" for "a parameter worth varying". The phrases display the writer instead of conveying the idea, and readers can tell. Say what you mean; when a literal phrase exists, use it. The lists below name the recurring forms. Catalog with before/after examples in [patterns.md](patterns.md); open it when a tell is ambiguous.
 
 - **Puffery and AI vocabulary.** pivotal, testament, landscape, groundbreaking, delve, crucial, showcase, robust, seamless, transformative, empower, streamline; leverage and utilize (use), facilitate (help). Full list: patterns 1, 4, 7.
 - **Superficial -ing tails** ("highlighting the team's commitment"), **vague attribution** (experts agree), **copula dodges and inanimate actors** (serves as, "the decision emerged"), **fake structure** (rule of three, false ranges, synonym cycling).
@@ -57,9 +65,9 @@ Words naming a real thing in the repo ("harness") are terms, not tells.
 - **Show, do not label.** Cut commentary calling a point important, surprising, or subtle.
 - **Earn every claim.** Never say passionate, innovative, hard-working, strategic, collaborative unless the sentence shows it.
 - **Plain words, active voice, direct verbs.** "The compiler validates queries"; "decided", not "made a decision". Latinate dress-ups (prohibition, subsequent, corroborated, verbatim, ancillary, myriad) lose to the everyday phrase; pattern 31 lists the swaps. Never swap an accurate technical name for a vaguer one: precision wins only when the two truly conflict.
-- **One idea per sentence.** Paragraphs run one to four sentences.
+- **Keep sentences and paragraphs focused.** Length follows the form and the reader's needs. Split when ideas become hard to follow, not to meet a fixed sentence count.
 - **State the rule, skip the flourish.** No aphorism capstones, no justifying self-evident rules.
-- **Don't tour the mechanism.** Say a thing has stages and what the end state buys; walk them only when the reader must choose. One example per claim, only if needed.
+- **Explain what the reader needs.** Include mechanisms when they help readers understand, act, troubleshoot, or assess a claim. Use enough examples to establish understanding; cut examples that add nothing.
 - **Stranger test.** A word with a domain and an everyday meaning ("fine", "weight") reads as the everyday one. Describe the observable thing, then what it means.
 - **Name the thing before framing it.** "We use a skill called caveman", then the concept, if at all.
 - **Self-contained passages.** If a paragraph only lands for someone who saw the artifact, show it or cut the passage.
@@ -68,7 +76,7 @@ Words naming a real thing in the repo ("harness") are terms, not tells.
 - **Titles are plain and specific.** Say what the reader gets, unopened.
 - **Keep a voice.** Have a view. Vary sentence and paragraph shape; identical shapes in a row read as generated. First person where genuine. Sterile clean prose is still a tell.
 - **Tell the making as it happened.** How something was built is a fact; verify it like one.
-- **Shorter and denser wins.**
+- **Cut without losing understanding.** Prefer the shortest version that preserves meaning, necessary context, and ease of reading.
 
 ## Editing someone else's draft
 
@@ -78,7 +86,15 @@ Words naming a real thing in the repo ("harness") are terms, not tells.
 - Keep edge: opinions, blunt language, profanity, self-interruptions, asides that create context or tension.
 - Keep structure unless it hurts the piece; if you reorganize, say why.
 - Keep meaning. No new claims; unsourced ones get removed or flagged, never given an invented source.
-- Asked only whether it reads as AI: per finding, the quoted line, the pattern name, a fix in a few words. No rewrite, no score, no guess at authorship; named patterns are evidence, detectors guess.
+- Asked only whether it reads as AI: per finding, the quoted line, the pattern name, a fix in a few words. Use a Style-only verdict, with no rewrite, numeric score, or guess at authorship; named patterns are evidence, detectors guess.
+
+## Reader-understanding review
+
+For a requested substantive or clarity review, first restate what the intended reader can recover from the draft alone: its main point, any next action, and essential conditions or caveats. Mark unclear or missing meaning without supplying the author's intention. Compare with any supplied intended message only after recording the reader's interpretation. A clear draft may remain unchanged.
+
+Unless the user specifies another format, begin the returned review with the review type and this restatement, before edited text or proposed replacements. Use a fresh reader only when available and authorized; give that reader the draft and audience before the intended interpretation. Call a review independent only when a fresh reader actually performed it. Reviewing your own draft or using prior author context is self-review. No separate skill is required.
+
+For substantive review, check support, recoverable meaning, essential caveats, and whether each section adds useful information or helps the reader act before polishing style. Reuse evidence already checked. Style-only reviews stay within their requested scope and need no reader restatement. Routine drafting returns the deliverable without a review preamble.
 
 ## Review sweep, in order
 
@@ -88,14 +104,14 @@ Apply only unoverridden defaults; preserve requested voice and quoted or technic
 2. Trailing periods off headings.
 3. Negation pivots, including split-sentence forms.
 4. Jargon and fancy words: glossed, owned by the reader, or replaced.
-5. Paragraphs past four sentences: split or cut.
+5. Paragraph focus and readability: split or cut where doing so improves understanding.
 6. Per paragraph: which sentence performs instead of informs? Delete it.
 7. Last line a kicker or recap? Delete; end on the last concrete point.
 8. Stranger-test captions, labels, double-reading words.
 9. Repeated abstract nouns: rewrite the leaning sentences.
 10. Title says what the reader gets?
 
-For an explicitly requested prose review, give **PASS** when no applicable, unoverridden requirement remains, otherwise **FAIL** with the concrete violations. Label notes **Requirement** or **Suggestion**. Ordinary drafting needs no verdict; a requested style is not a violation.
+For an explicitly requested prose review, give **PASS** when no applicable, unoverridden requirement remains, otherwise **FAIL** with concrete violations or missing evidence. Overall PASS covers substance and style; missing required evidence prevents it. For a review limited to clarity or style, label the verdict **Clarity-only PASS/FAIL** or **Style-only PASS/FAIL** as appropriate; assess only that scope and do not imply factual verification. A clarity-only request needs no added research. Label notes **Requirement** or **Suggestion**. Ordinary drafting needs no verdict; a requested style is not a violation.
 
 ## Anti-patterns
 

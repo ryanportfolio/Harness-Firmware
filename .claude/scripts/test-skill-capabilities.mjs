@@ -156,3 +156,10 @@ test('selective native body/resource/registry adoption preserves project customi
   assert.equal(fs.readFileSync(path.join(root,body),'utf8'),nextBody);assert.equal(fs.readFileSync(path.join(root,resource),'utf8'),'New domain metrics.\n');
   assert.equal(localModes.skills['local-choice'],'disabled');assert.equal(fs.readFileSync(path.join(root,'CLAUDE.md'),'utf8'),'Project kernel customization.\n');assert.equal(fs.readFileSync(path.join(root,'.claude/reference/project.md'),'utf8'),'Project-only facts.\n');assert.deepEqual(validateCapabilities(root).errors,[]);
 });
+
+test('standalone writing packages retain matching instructions and resources', () => {
+  for (const name of ['SKILL.md', 'patterns.md', 'NOTICE.md', 'LICENSE']) {
+    const read = runtime => fs.readFileSync(path.join(repo, runtime, 'skills/writing', name), 'utf8').replaceAll('\r\n', '\n');
+    assert.equal(read('.agents'), read('.claude'), `writing/${name} differs across runtimes`);
+  }
+});

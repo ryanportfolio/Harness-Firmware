@@ -785,7 +785,11 @@
       ],
       "resources": [
         ".claude/skills/writing/NOTICE.md",
-        ".claude/skills/writing/patterns.md"
+        ".claude/skills/writing/patterns.md",
+        ".agents/skills/writing/NOTICE.md",
+        ".agents/skills/writing/patterns.md",
+        ".claude/skills/writing/LICENSE",
+        ".agents/skills/writing/LICENSE"
       ],
       "exceptions": []
     },
