@@ -144,27 +144,6 @@
         "A Codex author and Astra reviewer share a vendor; the requested model must be verified or uncertainty disclosed."
       ]
     },
-    "automate-me": {
-      "coverage": [
-        "claude",
-        "codex"
-      ],
-      "owners": {
-        "claude": "source",
-        "codex": "native"
-      },
-      "entrypoints": [
-        "automate-me"
-      ],
-      "requiredTools": [],
-      "sharedContracts": [
-        "authorization"
-      ],
-      "resources": [],
-      "exceptions": [
-        "History paths and input tools follow the executing runtime and remain project-scoped."
-      ]
-    },
     "babysit-ci": {
       "coverage": [
         "claude",
@@ -480,6 +459,7 @@
       "resources": [
         ".claude/skills/impartial-review/strict-quality-rubric.md",
         ".claude/skills/impartial-review/references/shared-code-refactoring.md",
+        ".agents/skills/impartial-review/strict-quality-rubric.md",
         ".agents/skills/impartial-review/references/shared-code-refactoring.md"
       ],
       "exceptions": [
@@ -738,28 +718,6 @@
       "resources": [],
       "exceptions": []
     },
-    "verify-this": {
-      "coverage": [
-        "claude",
-        "codex"
-      ],
-      "owners": {
-        "claude": "source",
-        "codex": "native"
-      },
-      "entrypoints": [
-        "verify-this"
-      ],
-      "requiredTools": [],
-      "sharedContracts": [
-        "evidence"
-      ],
-      "resources": [
-        ".claude/skills/verify-this/references/evidence-report.md",
-        ".agents/skills/verify-this/references/evidence-report.md"
-      ],
-      "exceptions": []
-    },
     "why": {
       "coverage": [
         "claude",
@@ -871,6 +829,18 @@
         "addskill"
       ],
       "reason": "Authoring and evaluation live in addskill; licensed legacy resources remain outside discovery."
+    },
+    "verify-this": {
+      "replacements": [
+        "fable-mode"
+      ],
+      "reason": "Claim classes and verdict words live in fable-mode; dare hands verification to fable-mode."
+    },
+    "automate-me": {
+      "replacements": [
+        "refine"
+      ],
+      "reason": "Preference evidence rules from transcripts live in refine."
     }
   }
 }

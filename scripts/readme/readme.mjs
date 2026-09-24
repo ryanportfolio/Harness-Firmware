@@ -66,7 +66,7 @@ In the created repository, run \`node .claude/scripts/doctor.mjs\`. Success mean
 | Remember the project | \`recall\` loads relevant committed facts, decisions, and pitfalls before unfamiliar work |
 | Finish sustained work | \`long-horizon\` records progress and evidence across bounded rounds, with fresh audit context |
 | Challenge a result | Independent and cross-vendor review skills check work through available agents or authenticated CLIs |
-| Verify a claim | \`verify-this\` separates current checks, comparisons, and causal claims; \`perf-loop\` measures optimization against a baseline |
+| Verify a claim | \`fable-mode\` separates current-state, change, and causal claims and returns a verdict; \`perf-loop\` measures optimization against a baseline |
 | Maintain skills | \`addskill\` handles creating, importing, updating, and installing skills with the resources each runtime needs |
 | Improve the workflow | \`refine\` captures observed friction; \`sync-starter\` carries selected generic fixes between repositories |
 

@@ -47,20 +47,23 @@ Prevention protocol (run every time before trusting a preview):
 4. Staleness persists after 1–2 → hard reload, unregister service workers, or
    use a fresh browser profile.
 
-## Cross-cutting engineering gotchas (2026-08-18, from cursor-team-kit review)
+## Cross-cutting engineering gotchas (2026-08-18)
 
-1. **History rewrites: tree-hash check.** Before any agreed rebase/squash of a
-   pushed branch, capture `ORIGINAL_TREE=$(git rev-parse origin/<branch>^{tree})`;
-   after rewriting, compare with `git rev-parse HEAD^{tree}`. Do not push if the
-   tree changed unintentionally — the rewrite was supposed to reshape history,
-   not content.
-2. **JSON embedded in `<script>` tags.** `JSON.stringify`/`json.dumps` output is
-   not HTML-safe: a `</script>` inside a string terminates the tag early. Escape
-   `<`, `>`, `&` as `\u003c`, `\u003e`, `\u0026` before embedding.
-3. **Backgrounded dev servers: fixed port.** Background shells have no TTY, so
-   server startup messages can sit buffered and unread — with port 0
-   (auto-assign) you can never learn which port was chosen. Always pass an
-   explicit port to servers started in the background.
+1. **Rewriting pushed history: compare trees.** An agreed rebase or squash
+   should change commits and leave file contents identical. Run
+   `git fetch origin` first; a stale remote ref yields a stale tree hash. Then
+   record `ORIGINAL_TREE=$(git rev-parse origin/<branch>^{tree})`, rewrite, and
+   compare it with `git rev-parse HEAD^{tree}`. Also run
+   `git diff origin/<branch> --stat`. Any content change you did not intend
+   blocks the push.
+2. **JSON written into a `<script>` tag.** `JSON.stringify` and `json.dumps`
+   leave `<`, `>`, and `&` as-is, so a string containing `</script>` closes the
+   tag early. Replace them with `\u003c`, `\u003e`, and `\u0026` before writing
+   the JSON into HTML.
+3. **Dev servers started in the background.** Pick the port yourself and bind
+   `127.0.0.1`; on `EADDRINUSE`, increment it and relaunch. An OS-assigned
+   port (`0`) is reported only in the startup log, and stdout without a
+   terminal is block-buffered, so that line may never be flushed to you.
 
 ## Headed Chrome steals the screen unless you place it (2026-08-23)
 

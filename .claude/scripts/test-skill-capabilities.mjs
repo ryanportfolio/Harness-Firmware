@@ -24,7 +24,7 @@ function fixture(t) {
 test('repository intended coverage and resources validate',()=>assert.deepEqual(validateCapabilities(repo).errors,[]));
 
 for (const [resource, skills, codexOnly = []] of [
-  ['evidence-report.md', ['perf-loop', 'verify-this', 'wow-loop']],
+  ['evidence-report.md', ['perf-loop', 'wow-loop']],
   ['shared-code-refactoring.md', ['brainstorming', 'impartial-review', 'writing-plans'], ['external-review']],
 ]) {
   test(`repository ${resource} copies are present and byte-identical`, () => {

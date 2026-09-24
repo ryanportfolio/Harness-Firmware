@@ -45,11 +45,6 @@
       "group": "core"
     },
     {
-      "name": "automate-me",
-      "label": "Automate me",
-      "group": "core"
-    },
-    {
       "name": "brainstorming",
       "label": "Brainstorm",
       "group": "discipline"
@@ -107,11 +102,6 @@
     {
       "name": "claude-review",
       "label": "Claude review",
-      "group": "discipline"
-    },
-    {
-      "name": "verify-this",
-      "label": "Verify this",
       "group": "discipline"
     },
     {

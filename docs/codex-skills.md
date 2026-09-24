@@ -117,7 +117,6 @@ real project. It proves selective file adoption and preserved customization, not
 | arena | claude, codex | native | fresh-context-review | independence | None |
 | astra-fullreview | claude | none | authenticated-codex-cli | independence, evidence | Claude launcher for a full multi-agent Codex review on gpt-6-astra; from Codex use $impartial-review directly. |
 | astra-review | claude, codex | native | authenticated-codex-cli | evidence | A Codex author and Astra reviewer share a vendor; the requested model must be verified or uncertainty disclosed. |
-| automate-me | claude, codex | native | No additional gate | authorization | History paths and input tools follow the executing runtime and remain project-scoped. |
 | babysit-ci | claude, codex | native | No additional gate | authorization | None |
 | brainstorming | claude, codex | native | No additional gate | proportion | None |
 | bro | claude, codex | native | No additional gate | style | None |
@@ -143,7 +142,6 @@ real project. It proves selective file adoption and preserved customization, not
 | session-hub | claude, codex | native | writable-hub-location | scope | None |
 | showpiece | claude, codex | native | No additional gate | scope | None |
 | sync-starter | claude, codex | native | No additional gate | authorization | None |
-| verify-this | claude, codex | native | No additional gate | evidence | None |
 | why | claude, codex | native | fresh-context-review | independence | None |
 | wow-loop | claude, codex | native | fresh-context-review, visual-capture | independence, evidence | None |
 | writing | claude, codex | native | No additional gate | style | None |

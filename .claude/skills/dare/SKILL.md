@@ -48,13 +48,13 @@ Input: the immutable contract and solutions (or the standing conventional answer
 
 Dispatch instructions: for each solution, the smallest concrete real-world test: what to do, build, or ask, spending the least time, money, effort, and social risk the problem allows. Prefer a test that discriminates between two or more solutions over separate per-solution tests; evidence per unit cost is the metric. For each test: the result that rules the solution out, the result that keeps it alive, and what is learned about the problem either way. If every test would fail, name the building block to revisit first.
 
-Handoff: tests runnable within existing authorization execute through `verify-this` (falsifiable claim, claim-appropriate evidence, verdict). A causal or change claim needs a valid comparison; a current-state claim does not require a historical baseline. External actions or additional costs outside that authority remain proposed tests.
+Handoff: tests runnable within existing authorization execute through the `fable-mode` verification step (claim classified, evidence at its layer, VERIFIED / NOT VERIFIED / INCONCLUSIVE verdict). A causal or change claim needs a valid comparison; a current-state claim does not require a historical baseline. External actions or additional costs outside that authority remain proposed tests.
 
 ## Output
 
 The orchestrator ends with one consolidated report: the chosen problem, the audit table, the solutions with their failure points, the test plan, and the single next action. No step's subagent addresses the user directly.
 
-When the downstream goal is a build plan, the decomposition tree and audit table hand off to `writing-plans` as its inputs, the same way E's runnable tests hand off to `verify-this`: dare interrogates the map, writing-plans commits to mechanisms, order, and gates.
+When the downstream goal is a build plan, the decomposition tree and audit table hand off to `writing-plans` as its inputs, the same way E's runnable tests hand off to `fable-mode` verification: dare interrogates the map, writing-plans commits to mechanisms, order, and gates.
 
 ## Boundaries
 
