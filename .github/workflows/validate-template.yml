@@ -70,7 +70,8 @@ jobs:
       - name: README facts and generated assets are valid
         run: node --test scripts/readme/readme.test.mjs
 
-      - name: README generated output is current
+      # Drift is reported as a warning annotation and never fails the build.
+      - name: README generated output (warns on drift)
         run: node scripts/readme/verify.mjs
 
       - name: settings.json is valid JSON

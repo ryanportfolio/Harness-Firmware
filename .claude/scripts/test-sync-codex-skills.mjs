@@ -44,28 +44,76 @@ test("sync preserves standalone bytes while creating and updating ordinary adapt
   assert.match(f.read(".claude/skills/long-horizon/SKILL.md"), /Claude workflow/);
 });
 
+test("--check and --write reject unreadable standalone content before writing adapters", (t) => {
+  for (const mode of ["--check", "--write"]) {
+    const f = fixture(t);
+    f.write(".agents/skills/long-horizon/SKILL.md", "---\nname: wrong-name\ndescription: \n---\n");
+    const result = f.run(mode);
+    assert.notEqual(result.status, 0, mode);
+    assert.match(result.stderr, /long-horizon/);
+    assert.equal(fs.existsSync(path.join(f.root, ".agents/skills/ordinary/SKILL.md")), false);
+  }
+});
+
+// A missing, generated, or misnamed standalone skill warns; the file is never overwritten and
+// no adapter replaces a registered native skill.
 for (const mode of ["--check", "--write"]) {
-  for (const condition of ["missing", "generated", "invalid", "wrong-name"]) {
-    test(`${mode} rejects ${condition} standalone content before writing adapters`, (t) => {
+  for (const [condition, pattern] of [
+    ["missing", /native Codex skill is missing; restore \.agents\/skills\/long-horizon\/ or delete \.claude\/skills\/long-horizon\/ too/],
+    ["generated", /native mode expects a maintained SKILL\.md/],
+    ["wrong-name", /native metadata should declare name: long-horizon/],
+  ]) {
+    test(`${mode} warns about ${condition} standalone content and exits 0`, (t) => {
       const f = fixture(t);
       const target = ".agents/skills/long-horizon/SKILL.md";
       if (condition === "missing") fs.unlinkSync(path.join(f.root, target));
       if (condition === "generated") f.write(target, `${native}\n${marker}\n`);
-      if (condition === "invalid") f.write(target, "---\nname: wrong-name\ndescription: \n---\n");
       if (condition === "wrong-name") f.write(target, "---\nname: wrong-name\ndescription: Valid description.\n---\n");
+      const before = fs.existsSync(path.join(f.root, target)) ? f.read(target) : null;
       const result = f.run(mode);
-      assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /long-horizon/);
-      assert.equal(fs.existsSync(path.join(f.root, ".agents/skills/ordinary/SKILL.md")), false);
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, pattern);
+      assert.equal(fs.existsSync(path.join(f.root, target)) ? f.read(target) : null, before);
     });
   }
 }
 
-test("unregistered hand-authored adapters remain protected", (t) => {
+test("unregistered hand-authored Codex skills stay in place with a warning", (t) => {
   const f = fixture(t);
   f.write(".agents/skills/ordinary/SKILL.md", "Personal content\n");
   const result = f.run("--write");
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /refusing to overwrite a hand-authored Codex skill/);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /hand-authored Codex skill left in place/);
   assert.equal(f.read(".agents/skills/ordinary/SKILL.md"), "Personal content\n");
+});
+
+test("a recorded removal silences the missing-skill warning; an unrecorded one warns", (t) => {
+  const f = fixture(t);
+  for (const runtime of [".claude", ".agents"]) fs.rmSync(path.join(f.root, runtime, "skills", "long-horizon"), { recursive: true });
+  let result = f.run("--check");
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /long-horizon[\\/]SKILL\.md: native skill is missing/);
+  f.write(".agents/removed-skills.json", JSON.stringify({ version: 1, removed: ["long-horizon"] }));
+  result = f.run("--write");
+  assert.equal(result.status, 0, result.stderr);
+  result = f.run("--check");
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /long-horizon/);
+  assert.equal(fs.existsSync(path.join(f.root, ".agents/skills/long-horizon")), false);
+});
+
+test("a recorded skill whose folder remains is synchronized normally", (t) => {
+  const f = fixture(t);
+  f.write(".agents/removed-skills.json", JSON.stringify({ version: 1, removed: ["long-horizon"] }));
+  const result = f.run("--write");
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(f.read(".agents/skills/long-horizon/SKILL.md"), native);
+});
+
+test("a malformed removal record fails", (t) => {
+  const f = fixture(t);
+  f.write(".agents/removed-skills.json", '{"removed": "long-horizon"}');
+  const result = f.run("--check");
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /removed-skills\.json: expected/);
 });

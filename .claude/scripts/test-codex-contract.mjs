@@ -5,11 +5,24 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { validateCapabilities } from "./check-skill-capabilities.mjs";
+import { parseJson, printWarnings } from "./removed-skills.mjs";
+
+// Unreadable input fails with one line naming the file, not a stack trace.
+process.on("uncaughtException", (error) => {
+  console.error(`FAIL: ${error.message}`);
+  process.exit(1);
+});
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, "..", "..");
 const failures = [];
-failures.push(...validateCapabilities(root).errors);
+// Missing or unregistered skills are warnings: projects add and remove skills freely.
+const warnings = [];
+const capabilities = validateCapabilities(root);
+failures.push(...capabilities.errors);
+// Capability warnings are printed once, by check-skill-capabilities.mjs.
+// Skills deleted on purpose and listed in .agents/removed-skills.json.
+const removed = capabilities.removed;
 const maxDescriptionChars = 240;
 const maxCatalogChars = 7000;
 
@@ -54,60 +67,65 @@ function frontmatter(relativePath) {
   return { name: value("name"), description: value("description") };
 }
 
-const settings = exists(".claude/settings.json") ? JSON.parse(read(".claude/settings.json")) : {};
+const settings = exists(".claude/settings.json") ? parseJson(read(".claude/settings.json"), ".claude/settings.json") : {};
 const disabled = new Set(
   Object.entries(settings.skillOverrides ?? {})
     .filter(([, state]) => state === "off")
     .map(([name]) => name),
 );
 
-const modes = exists(".agents/skill-modes.json") ? JSON.parse(read(".agents/skill-modes.json")) : { skills: {} };
+const modes = exists(".agents/skill-modes.json") ? parseJson(read(".agents/skill-modes.json"), ".agents/skill-modes.json") : { skills: {} };
 for (const [name, mode] of Object.entries(modes.skills)) if (mode === "disabled") disabled.add(name);
-for (const name of disabled) if (exists(`.agents/skills/${name}/SKILL.md`)) failures.push(`${name}: disabled skill remains discoverable`);
+for (const name of disabled) if (exists(`.agents/skills/${name}/SKILL.md`)) warnings.push(`${name}: disabled skill remains discoverable in .agents/skills/`);
 const skillsRoot = path.join(root, ".claude", "skills");
+// A retired skill that reappears is reported by check-skill-capabilities.mjs with its replacement.
+const retired = new Set(Object.keys(capabilities.manifest.retired ?? {}));
 const canonicalEntries = fs.readdirSync(skillsRoot, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && !disabled.has(entry.name))
+  .filter((entry) => entry.isDirectory() && !disabled.has(entry.name) && !removed.has(entry.name) && !retired.has(entry.name))
   .filter((entry) => fs.existsSync(path.join(skillsRoot, entry.name, "SKILL.md")))
   .map((entry) => ({name: entry.name}));
 const activeNames = new Set(canonicalEntries.map(entry => entry.name));
-for (const [name, mode] of Object.entries(modes.skills)) if (mode === "native" && !disabled.has(name)) activeNames.add(name);
+for (const [name, mode] of Object.entries(modes.skills)) if (mode === "native" && !disabled.has(name) && exists(`.agents/skills/${name}/SKILL.md`)) activeNames.add(name);
 const skills = [...activeNames].map(name => ({name}))
   .map((entry) => {
     const canonicalPath = `.claude/skills/${entry.name}/SKILL.md`;
     const canonicalMetadata = exists(canonicalPath) ? frontmatter(canonicalPath) : {};
     if (canonicalMetadata.name && canonicalMetadata.name !== entry.name) {
-      failures.push(`${canonicalPath}: declared name ${canonicalMetadata.name} does not match directory ${entry.name}`);
+      warnings.push(`${canonicalPath}: declared name ${canonicalMetadata.name} does not match directory ${entry.name}`);
     }
     const relativePath = `.agents/skills/${entry.name}/SKILL.md`;
     if (!exists(relativePath)) {
-      failures.push(`${relativePath}: missing Codex skill`);
-      return { directory: entry.name, name: entry.name, description: "" };
+      warnings.push(modes.skills[entry.name] === "native"
+        ? `${relativePath}: native Codex skill is missing; restore .agents/skills/${entry.name}/ or delete .claude/skills/${entry.name}/ too`
+        : `${relativePath}: missing Codex adapter; run node .claude/scripts/sync-codex-skills.mjs --write`);
+      return null;
     }
     const metadata = frontmatter(relativePath);
     if (metadata.name && metadata.name !== entry.name) {
-      failures.push(`${relativePath}: declared name ${metadata.name} does not match directory ${entry.name}`);
+      warnings.push(`${relativePath}: declared name ${metadata.name} does not match directory ${entry.name}`);
     }
     return {
       directory: entry.name,
       name: metadata.name || entry.name,
       description: metadata.description,
     };
-  });
+  })
+  .filter(Boolean);
 
 let catalogChars = 0;
 for (const skill of skills) {
   if (!skill.description) failures.push(`${skill.directory}: missing description`);
   if (skill.description.length > maxDescriptionChars) {
-    failures.push(`${skill.directory}: description is ${skill.description.length} chars (max ${maxDescriptionChars})`);
+    warnings.push(`${skill.directory}: description is ${skill.description.length} chars (max ${maxDescriptionChars})`);
   }
   catalogChars += skill.name.length + skill.description.length;
 }
 const duplicateNames = skills
   .map((skill) => skill.name)
   .filter((name, index, names) => names.indexOf(name) !== index);
-for (const name of new Set(duplicateNames)) failures.push(`${name}: duplicate active skill name`);
+for (const name of new Set(duplicateNames)) warnings.push(`${name}: duplicate active skill name`);
 if (catalogChars > maxCatalogChars) {
-  failures.push(`Codex skill catalog is ${catalogChars} chars (max ${maxCatalogChars})`);
+  warnings.push(`Codex skill catalog is ${catalogChars} chars (max ${maxCatalogChars})`);
 }
 
 const compatibility = read(".agents/CODEX-SKILL-COMPATIBILITY.md");
@@ -125,30 +143,35 @@ for (const line of compatibility.split(/\r?\n/)) {
 for (const skill of skills) {
   const statuses = classifications.get(skill.directory) ?? [];
   if (statuses.length !== 1) {
-    failures.push(`${skill.directory}: expected one compatibility classification, found ${statuses.length}`);
+    warnings.push(`${skill.directory}: expected one compatibility classification in .agents/CODEX-SKILL-COMPATIBILITY.md, found ${statuses.length}`);
   }
 }
 for (const skill of classifications.keys()) {
-  if (!disabled.has(skill) && !skills.some((entry) => entry.directory === skill)) {
-    failures.push(`${skill}: compatibility classification has no active Codex skill`);
+  if (!disabled.has(skill) && !removed.has(skill) && !skills.some((entry) => entry.directory === skill)) {
+    warnings.push(`${skill}: compatibility classification has no active Codex skill; delete its entry from .agents/CODEX-SKILL-COMPATIBILITY.md or restore the skill`);
   }
 }
 
-const initProject = read(".claude/skills/init-project/SKILL.md") + read(".claude/skills/init-project/references/profiles.md");
-for (const target of [".claude-plugin/", "bootstrap/", ".github/workflows/validate-template.yml", ".github/ISSUE_TEMPLATE/", "CHANGELOG.md", "CONTRIBUTING.md"]) {
-  if (!initProject.includes(target)) failures.push(`init-project: cleanup contract omits ${target}`);
+// Content contracts for specific skills apply only while those skills are installed.
+if (exists(".claude/skills/init-project/SKILL.md") && exists(".claude/skills/init-project/references/profiles.md")) {
+  const initProject = read(".claude/skills/init-project/SKILL.md") + read(".claude/skills/init-project/references/profiles.md");
+  for (const target of [".claude-plugin/", "bootstrap/", ".github/workflows/validate-template.yml", ".github/ISSUE_TEMPLATE/", "CHANGELOG.md", "CONTRIBUTING.md"]) {
+    if (!initProject.includes(target)) warnings.push(`init-project: cleanup contract omits ${target}`);
+  }
 }
 
-const longHorizon = read(".claude/skills/long-horizon/SKILL.md");
-if (!longHorizon.includes("conversation history")) {
-  failures.push("long-horizon: canonical workflow does not explicitly isolate round contexts from manager conversation history");
-}
-const longHorizonCodex = read(".agents/skills/long-horizon/SKILL.md");
-if (!longHorizonCodex.includes('fork_turns: "none"')) {
-  failures.push('long-horizon: Codex workflow does not map a fresh round to fork_turns: "none"');
-}
-if (longHorizonCodex.includes("<!-- Generated by") || longHorizonCodex.includes(".claude/skills/long-horizon")) {
-  failures.push("long-horizon: Codex workflow must be standalone, not a generated Claude adapter");
+if (exists(".claude/skills/long-horizon/SKILL.md") && exists(".agents/skills/long-horizon/SKILL.md")) {
+  const longHorizon = read(".claude/skills/long-horizon/SKILL.md");
+  if (!longHorizon.includes("conversation history")) {
+    warnings.push("long-horizon: canonical workflow does not explicitly isolate round contexts from manager conversation history");
+  }
+  const longHorizonCodex = read(".agents/skills/long-horizon/SKILL.md");
+  if (!longHorizonCodex.includes('fork_turns: "none"')) {
+    warnings.push('long-horizon: Codex workflow does not map a fresh round to fork_turns: "none"');
+  }
+  if (longHorizonCodex.includes("<!-- Generated by") || longHorizonCodex.includes(".claude/skills/long-horizon")) {
+    warnings.push("long-horizon: Codex workflow must be standalone, not a generated Claude adapter");
+  }
 }
 
 const corePath = "bootstrap/NewProjectCore.psm1";
@@ -193,9 +216,10 @@ if (!exists(generatorSmokePath)) {
   if (!workflow.includes("Test-NewProjectGenerator.ps1")) failures.push("validate-template.yml: generator smoke test is not wired into CI");
 }
 
+printWarnings(warnings);
 if (failures.length) {
   for (const failure of failures) console.error(`FAIL: ${failure}`);
   process.exit(1);
 }
 
-console.log(`Codex contract checks passed (${skills.length} skills, ${catalogChars} catalog chars).`);
+console.log(`Codex contract checks passed (${skills.length} skills, ${catalogChars} catalog chars${warnings.length ? `, ${warnings.length} warning(s)` : ""}).`);
