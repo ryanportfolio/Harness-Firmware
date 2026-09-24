@@ -59,7 +59,7 @@ test("--check and --write reject unreadable standalone content before writing ad
 // no adapter replaces a registered native skill.
 for (const mode of ["--check", "--write"]) {
   for (const [condition, pattern] of [
-    ["missing", /native skill is missing; restore it or record it/],
+    ["missing", /native Codex skill is missing; restore \.agents\/skills\/long-horizon\/ or delete \.claude\/skills\/long-horizon\/ too/],
     ["generated", /native mode expects a maintained SKILL\.md/],
     ["wrong-name", /native metadata should declare name: long-horizon/],
   ]) {

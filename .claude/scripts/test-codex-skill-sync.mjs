@@ -73,7 +73,7 @@ test('unowned and disabled native files are never overwritten or deleted', () =>
 
 test('native mode warns about missing files, generated wrappers and mismatched names', () => {
   const f = fixture(); f.modes({ bro: 'native' });
-  assert.match(f.run().stdout, /native skill is missing/);
+  assert.match(f.run().stdout, /native Codex skill is missing; restore \.agents\/skills\/bro\//);
   f.modes({}); assert.equal(f.run('--write').status, 0); f.modes({ bro: 'native' });
   let result = f.run('--write');
   assert.equal(result.status, 0, result.stderr);

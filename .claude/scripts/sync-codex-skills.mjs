@@ -187,7 +187,11 @@ for (const name of nativeMode) {
   if (disabled.has(name)) continue;
   const skillPath = path.join(targetRoot, name, "SKILL.md");
   if (!fs.existsSync(skillPath)) {
-    if (!removed.has(name)) warnings.push(`${skillPath}: native skill is missing; restore it or record it in .agents/removed-skills.json`);
+    if (fs.existsSync(path.join(sourceRoot, name, "SKILL.md"))) {
+      warnings.push(`${skillPath}: native Codex skill is missing; restore .agents/skills/${name}/ or delete .claude/skills/${name}/ too`);
+    } else if (!removed.has(name)) {
+      warnings.push(`${skillPath}: native skill is missing; restore it or record it in .agents/removed-skills.json`);
+    }
     continue;
   }
   if (generatedAdapter(skillPath)) {
@@ -268,7 +272,14 @@ for (const action of actions) {
 }
 
 const warningPrefix = process.env.GITHUB_ACTIONS === "true" ? "::warning::" : "WARN: ";
-for (const warning of warnings) console.log(`${warningPrefix}${warning}`);
+// Show repo-relative paths so warnings read the same on every machine.
+for (const warning of warnings) {
+  const cut = warning.indexOf(": ");
+  const shown = warning.startsWith(root) && cut > 0
+    ? path.relative(root, warning.slice(0, cut)).split(path.sep).join("/") + warning.slice(cut)
+    : warning;
+  console.log(`${warningPrefix}${shown}`);
+}
 
 if (mode === "--check") {
   // Adapter drift is a warning too; --write regenerates the adapters.
