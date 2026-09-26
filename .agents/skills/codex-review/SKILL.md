@@ -63,7 +63,17 @@ Launch it as a background or detached process and poll its log and exit status. 
 
 Before launch, write run metadata: run ID, absolute workspace, requested scope, resolved base and head SHAs, CLI version, launch path (external-review or selector), command, requested model and effort, and start time. For uncommitted work, add staged and unstaged diff identities and relevant untracked path and content hashes; a HEAD SHA alone does not identify that content. For a branch or commit scope the working tree is out of scope: record the dirty path count from `git status --porcelain --untracked-files=all` and note those paths as excluded, without hashing them. Exclude task-owned report artifacts from the requested review. Use an isolated snapshot if concurrent writers cannot stop. Do not silently expand scope to unrelated changes.
 
-The two paths supply different rubrics: `external-review` on one, the CLI's built-in review rubric on the other. For a special focus the user requests, append it to the external-review prompt; on the selector path, replace the selector with a prompt-only invocation that states the exact scope. Describe which rubric was actually supplied. Preserve least privilege; do not bypass approvals or sandbox protections for the reviewer. The reviewer is a leaf: it must not dispatch a review of its own.
+The two paths supply different rubrics: `external-review` on one, the CLI's built-in review rubric on the other. For a special focus the user requests, append it to the external-review prompt; on the selector path, replace the selector with a prompt-only invocation that states the exact scope. Describe which rubric was actually supplied. Preserve least privilege; do not bypass approvals or sandbox protections for the reviewer. The one exception is auto-approving a user-approved browser MCP server (below). The reviewer is a leaf: it must not dispatch a review of its own.
+
+**Live browser, when the user asks for or approves one.** A read-only reviewer cannot launch Chrome itself: the sandbox blocks the profile write, the child process and localhost network. Keep the sandbox and hand it a browser through an MCP server instead; the server is Codex's own child process, so the reviewer drives pages through tools while its shell stays read-only. Verified on codex-cli 0.156.1:
+
+1. Launch headed Chrome on the real GPU with a CDP port, through the project's placed-window launcher where one exists (for example `launchPlacedChrome({ place: 'offscreen', args: ['--remote-debugging-port=9338'] })` from `scripts/lib/launch-chrome.mjs`), in a small script that keeps it open until the reviews finish. Check `http://127.0.0.1:<port>/json/version` answers.
+2. Run `codex exec` with a prompt, not `codex exec review`: MCP use under review mode is unverified. The prompt states the exact scope (`git diff <base> <head>`), the URLs to compare, and what to check live.
+3. Add the server per run with `-c` flags; nothing is written to `config.toml`:
+   `-c 'mcp_servers.pw.command="npx"' -c 'mcp_servers.pw.args=["@playwright/mcp@latest","--cdp-endpoint","http://127.0.0.1:9338","--output-dir","<image dir>"]' -c 'mcp_servers.pw.default_tools_approval_mode="approve"'`.
+   Exec mode's approval policy is `never`, so without `default_tools_approval_mode="approve"` every browser call fails with `MCP tool call requires approval, but approval policy is never`. The setting covers this one server only. Valid values: `auto`, `prompt`, `writes`, `approve`. `--output-dir` decides where screenshots land; point it wherever the project keeps images.
+4. Smoke-test first at low effort: navigate to one page and evaluate one expression. `run.log` shows `mcp: pw/<tool> (completed)` per call.
+5. Reviewers that share one browser run one after the other.
 
 Default effort is `high`. For a broad diff, `medium` is a planning option only when the user did not explicitly select effort. Astra keeps its own medium default. State the selected setting before launch; runtime duration is not predictable from file count alone.
 
@@ -156,4 +166,5 @@ Zero findings plus verified coverage and local checks supports a clean review of
 - Taking evidence from the parent rollout alone: in review mode the reviewer's tool calls live in the sibling rollout, and the findings array lives in `ExitedReviewMode.review_output`.
 - Do not pass findings through unchecked, treat review agreement as proof, or hide missing evidence behind exit code 0.
 - Dropping `-m` after a model rejection: the run inherits the `~/.codex/config.toml` default, a different model than requested, and the attribution then names the wrong reviewer.
+- Loosening the sandbox so a reviewer can run a browser. Give it the Playwright MCP server over CDP (Step 3) and keep `sandbox_mode` read-only.
 - Do not widen scope, retry, downgrade a requested model, repair machine-global configuration, or publish under review-only authorization.
