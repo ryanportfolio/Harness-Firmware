@@ -104,12 +104,16 @@ const stats = {
 const READ_TOOLS = new Set(["Read", "Grep", "Glob"]);
 const WRITE_TOOLS = new Set(["Edit", "Write", "NotebookEdit"]);
 
+// One key per skill in every section: "plugin:refine" and "refine" are the
+// same skill, so the namespace prefix is dropped.
+const skillKey = (raw) => String(raw).trim().split(":").pop().trim();
+
 function classify(name, input, session, timestamp) {
   const target = input?.file_path ?? input?.path ?? input?.notebook_path ?? "";
   const norm = normalize(target);
 
   if (name === "Skill" && input?.skill) {
-    const skill = String(input.skill).split(":").pop();
+    const skill = skillKey(input.skill);
     if (skill in stats.skills) stats.skills[skill] += 1;
     return;
   }
@@ -190,12 +194,86 @@ function sessionFiles(dir) {
 
 // Failure signature: tool name plus the first line of the error, with quoted
 // strings, paths, file names, hex ids and digits replaced so the same failure
-// on different inputs collapses into one line that carries no user data.
-// A Bash failure's first line is only "Exit code N", so its next line joins it.
+// on different inputs collapses into one line. Every remaining word must be
+// on a fixed list of error vocabulary; any other word becomes <w>, so free
+// text (names, tokens, prose) never reaches the output. A run of adjacent
+// placeholders collapses into one. A Bash failure's first line is only
+// "Exit code N", so its next line joins it, filtered the same way.
+const ERROR_WORDS = new Set(`
+  a an the and or but if of to in on at by for from with without into as is are was were be been
+  being has have had do does did doesn't don't didn't can can't cannot could couldn't should must
+  may might will would won't isn't aren't wasn't not no nor none any all only this that it its
+  there than then yet still already before after while when since until again first last next
+  more too many much less least most other same new old empty null undefined true false nan
+  error errors err failed failure fail fails failing fatal warning warn exception panic abort
+  aborted crash crashed not found no such file files directory directories dir folder path paths
+  permission permissions denied access allowed disallowed forbidden unauthorized authentication
+  auth authorization credentials token login logged required requires require timeout timed out
+  time exit exited code codes status signal killed terminated interrupted cancelled canceled
+  command commands cannot invalid unknown unrecognized unsupported unexpected expected refused
+  reset connection connect connected network host hostname port socket request requests
+  response server client gateway service unavailable bad internal http https url missing exists
+  exist existing already busy blocked block rejected reject limit limits exceeded exceeds exceed
+  maximum minimum max min size large long short tokens token lines line column character
+  characters bytes byte syntax parse parsing parsed module modules package import export
+  resolve resolved resolving load loading loaded read reading write writing written edit
+  editing open opened close closed create created delete deleted remove removed rename copy
+  move stat mkdir spawn run running execute executing executed process tool tools input output
+  argument arguments parameter parameters option options flag value values type types key
+  keys field property properties object array string number boolean function method call
+  called match matches matched matching occurrence occurrences unique multiple replace
+  replacement modified changed unchanged since yet user hook hooks denied sibling result
+  results content contents data format encoding json yaml content memory disk space full
+  quota rate retry retries attempt attempts reached depth recursion stack overflow
+  heap version versions branch commit repository repo remote merge conflict conflicts
+  checkout worktree git nothing working tree clean ahead behind diverged pull push fetch
+  test tests passed skipped assertion assert config configuration setting settings
+  environment variable variables defined declared supported support available install
+  installed dependency dependencies build compile compilation compiled lint check checks
+  ms seconds second minutes minute s bad many unable ok fatal usage help see did mean
+  proceed want wants doesn't rejected stopped stop continue skip skipping ignored ignore
+  denied dangerous sandbox mode plan approve approval approved below above threshold you your
+  looking saw need needs specific range offset session followed wait waiting condition started
+  shorter around returned schema validation latter use work sleep sleeps chain launch iterate
+  pass window local temp background outline pretooluse posttooluse
+`.trim().split(/\s+/));
+const ERRNO_CODES = new Set(`
+  ENOENT EACCES EPERM EEXIST EISDIR ENOTDIR ENOTEMPTY EBUSY EMFILE ENFILE ENOSPC EROFS EXDEV
+  ELOOP ENAMETOOLONG EINVAL EAGAIN EPIPE ECONNREFUSED ECONNRESET ECONNABORTED ETIMEDOUT
+  EHOSTUNREACH ENETUNREACH EADDRINUSE EADDRNOTAVAIL ENOTFOUND EAI_AGAIN ENOTSUP ENOSYS
+  ECANCELED EBADF EINTR EIO ENOMEM ECHILD ESRCH ENOEXEC EPROTO ESPIPE ETXTBSY EFBIG EDQUOT
+  ESTALE ENOTCONN ENOTSOCK EOF ERR_MODULE_NOT_FOUND ERR_REQUIRE_ESM ERR_INVALID_ARG_TYPE
+  ERR_INVALID_ARG_VALUE ERR_UNKNOWN_FILE_EXTENSION ERR_UNHANDLED_REJECTION ERR_STREAM_PREMATURE_CLOSE
+`.trim().split(/\s+/));
+const isPlaceholder = (t) => t.startsWith("<");
+
 function errorText(content) {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) return content.filter((b) => b?.type === "text").map((b) => b.text).join("\n");
   return "";
+}
+function filterWords(line) {
+  const replaced = line
+    .replace(/"[^"]*"|'[^']*'|`[^`]*`/g, " <str> ")
+    .replace(/(?:[A-Za-z]:)?(?:[\\/]?[\w.@~+-]+)?(?:[\\/][\w.@~+-]*)+/g, " <path> ")
+    .replace(/\b[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]{0,7}\b/g, " <file> ")
+    .replace(/\b0x[0-9a-f]+\b|\b(?=[\w-]*\d)(?=[\w-]*[a-z])[\w-]{8,}\b/gi, " <id> ")
+    .replace(/\d+/g, " <n> ");
+  const out = [];
+  for (const raw of replaced.match(/<(?:str|path|file|id|n)>|[A-Za-z][A-Za-z_']*|:/g) ?? []) {
+    const word = raw.replace(/'+$/, "");
+    const tok = isPlaceholder(raw) || raw === ":" || ERRNO_CODES.has(word) || ERROR_WORDS.has(word.toLowerCase())
+      ? (isPlaceholder(raw) ? raw : word)
+      : "<w>";
+    const prev = out[out.length - 1];
+    if (prev && isPlaceholder(tok) && isPlaceholder(prev)) {
+      if (prev !== tok) out[out.length - 1] = "<w>"; // mixed run: one generic placeholder
+      continue;
+    }
+    if (tok === ":" && (prev === undefined || prev === ":")) continue;
+    out.push(tok);
+  }
+  return out.join(" ").replace(/ :/g, ":");
 }
 function signature(tool, content) {
   const lines = errorText(content)
@@ -204,17 +282,10 @@ function signature(tool, content) {
     .map((l) => l.trim())
     .filter(Boolean);
   if (lines.length === 0) return null;
-  let first = lines[0];
-  if (/^Exit code \d+$/.test(first) && lines[1]) first += ` | ${lines[1]}`;
-  const norm = first
-    .replace(/"[^"]*"|'[^']*'|`[^`]*`/g, "<str>")
-    .replace(/(?:[A-Za-z]:)?(?:[\\/]?[\w.@~+-]+)?(?:[\\/][\w.@~+-]*)+/g, "<path>")
-    .replace(/\b[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]{0,7}\b/g, "<file>")
-    .replace(/\b0x[0-9a-f]+\b|\b(?=[\w-]*\d)(?=[\w-]*[a-z])[\w-]{8,}\b/gi, "<id>")
-    .replace(/\d+/g, "<n>")
-    .replace(/\s+/g, " ")
-    .slice(0, 160);
-  return `${tool}: ${norm}`;
+  const exit = lines[0].match(/^Exit code (\d+)$/);
+  let norm = exit ? `Exit code ${exit[1].length <= 3 ? exit[1] : "<n>"}` : filterWords(lines[0]);
+  if (exit && lines[1]) norm += ` | ${filterWords(lines[1])}`;
+  return `${tool}: ${norm.slice(0, 160)}`;
 }
 
 // Refine's standing-rule phrases (.claude/skills/refine/SKILL.md), matched in
@@ -278,8 +349,8 @@ function scanFile(file, session, subagent) {
         classify(block.name, block.input, session, obj.timestamp ?? null);
         if (block.id) session.toolNames.set(block.id, block.name);
         if (block.name === "Skill" && block.input?.skill) {
-          const skill = String(block.input.skill).trim();
-          session.skills.set(skill, (session.skills.get(skill) ?? 0) + 1);
+          const skill = skillKey(block.input.skill);
+          if (skill) session.skills.set(skill, (session.skills.get(skill) ?? 0) + 1);
         }
       } else if (block?.type === "tool_result" && block.is_error === true) {
         const sig = signature(session.toolNames.get(block.tool_use_id) ?? "unknown", block.content);

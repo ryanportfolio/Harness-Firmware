@@ -202,3 +202,60 @@ test("failure patterns, standing-rule sessions and deduplicated token cost", (t)
     assert.ok(!shared.includes(leak), `output leaks ${leak}`);
   }
 });
+
+test("unlisted free text in an error line never reaches output; the signature still collapses", (t) => {
+  const root = tempDir(t, "memory-audit-root-");
+  const projectDir = tempDir(t, "memory-audit-project-");
+  const words = ["secretbanana", "zebracorn", "mangoplex", "Bearer", "quuxwidget", "ELEPHANTINE"];
+  const sessions = ["s1", "s2", "s3"];
+  sessions.forEach((s, i) => {
+    write(path.join(projectDir, `${s}.jsonl`), [
+      callLine(`${s}-a`, "WebFetch", {}),
+      errorLine(`${s}-a`, `Bearer secretbanana rejected by zebracorn gateway mangoplex (request ${100 + i})`),
+      callLine(`${s}-b`, "Bash", {}),
+      errorLine(`${s}-b`, `Exit code 1\nquuxwidget ELEPHANTINE: permission denied after ${i + 2} tries\nsecond line zebracorn`),
+      callLine(`${s}-c`, "Read", {}),
+      errorLine(`${s}-c`, `EACCES: permission denied, open '/srv/mangoplex/${i}.txt'`),
+    ].join("\n"));
+  });
+
+  const out = audit(root, ["--project-dir", projectDir]);
+  const bySig = Object.fromEntries(out.patterns.signatures.map((p) => [p.signature, p.sessions]));
+  assert.deepEqual(bySig, {
+    "Bash: Exit code 1 | <w>: permission denied after <w>": 3,
+    "Read: EACCES: permission denied open <str>": 3,
+    "WebFetch: <w> rejected by <w> gateway <w> request <n>": 3,
+  });
+
+  const run = spawnSync(process.execPath, [script, "--project-dir", projectDir], { cwd: root, encoding: "utf8" });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /3 sessions {2}WebFetch: <w> rejected by <w> gateway <w> request <n>/);
+  const shared = (run.stdout + JSON.stringify({ patterns: out.patterns, cost: out.cost })).toLowerCase();
+  for (const leak of words) assert.ok(!shared.includes(leak.toLowerCase()), `output leaks ${leak}`);
+});
+
+test("a namespaced Skill call is keyed without its prefix in every section", (t) => {
+  const root = tempDir(t, "memory-audit-root-");
+  const projectDir = tempDir(t, "memory-audit-project-");
+  write(path.join(root, ".claude", "skills", "demo", "SKILL.md"), "---\nname: demo\n---\n");
+  const usage = { input_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 2 };
+  ["n1", "n2", "n3"].forEach((s, i) => {
+    write(path.join(projectDir, `${s}.jsonl`), [
+      ...(i === 0 ? [userLine("From now on, check first.")] : []),
+      callLine(`${s}-k`, "Skill", { skill: i === 2 ? "demo" : "some-plugin:demo" }),
+      callLine(`${s}-r`, "Read", {}),
+      errorLine(`${s}-r`, "ENOENT: no such file or directory"),
+      usageLine(`${s}-m`, usage),
+    ].join("\n"));
+  });
+
+  const out = audit(root, ["--project-dir", projectDir]);
+  assert.equal(out.skills.demo, 3);
+  assert.deepEqual(out.patterns.signatures, [
+    { signature: "Read: ENOENT: no such file or directory", sessions: 3, skills: ["demo"] },
+  ]);
+  assert.deepEqual(out.patterns.standingRuleSessions, { demo: 1 });
+  assert.deepEqual(Object.keys(out.cost.bySkill), ["demo"]);
+  assert.deepEqual(out.cost.bySkill.demo, { invocations: 3, sessions: 3, medianOutputTokens: 2, medianUncachedInput: 1 });
+  assert.ok(!JSON.stringify(out).includes("some-plugin"));
+});
