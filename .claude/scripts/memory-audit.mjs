@@ -4,9 +4,12 @@
 //
 // A reference entry, memory file, or skill earns its keep when sessions read
 // or invoke it. This script scans the local Claude Code session transcripts
-// (~/.claude/projects/<munged-cwd>/*.jsonl) and reports, per target, how often
-// it was written versus read, plus pruning candidates: never-read files,
-// dated reference entries older than six months, and never-invoked skills.
+// of the main checkout and its worktrees (~/.claude/projects/<munged-main>/
+// and <munged-main>--claude-worktrees-<name>/): top-level <session>.jsonl
+// files plus the subagent files under <session>/subagents/. It reports, per
+// target, how often it was written versus read, plus pruning candidates:
+// never-read files, dated reference entries older than six months, and
+// never-invoked skills.
 //
 // Counts are FLOOR estimates: transcripts rotate and compact, reads made
 // through the Bash tool (cat/grep) are not attributed, and everything is
@@ -15,8 +18,8 @@
 //
 // Usage: node .claude/scripts/memory-audit.mjs [--json] [--project-dir <path>]
 //   --project-dir  scan this transcript directory instead of deriving it from
-//                  the working directory (testing, or auditing another repo's
-//                  history from here).
+//                  the working directory's main checkout (testing, or
+//                  auditing another repo's history from here).
 //
 // Exit 0 always (2 on bad usage). Requires Node >= 18, no dependencies.
 
@@ -24,6 +27,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { spawnSync } from "node:child_process";
 
 const argv = process.argv.slice(2);
 let jsonMode = false;
@@ -43,14 +47,25 @@ const root = process.cwd();
 const projectsRoot = path.join(os.homedir(), ".claude", "projects");
 const munge = (p) => path.resolve(p).replace(/[^A-Za-z0-9]/g, "-");
 
-// The exact dir for this checkout, plus its worktrees: worktrees under the
+// History is keyed by the main checkout, not the cwd: from a worktree the cwd
+// munges to that one worktree's dir. The common git dir is "<main>/.git" in a
+// normal repo (git may print it relative to cwd); anything else (no git, not
+// a repo, bare repo, submodule) falls back to the cwd.
+function mainCheckout() {
+  const out = spawnSync("git", ["rev-parse", "--git-common-dir"], { cwd: root, encoding: "utf8" });
+  if (out.status !== 0 || !out.stdout?.trim()) return root;
+  const commonDir = path.resolve(root, out.stdout.trim());
+  return path.basename(commonDir) === ".git" ? path.dirname(commonDir) : root;
+}
+
+// The exact dir for the main checkout, plus its worktrees: worktrees under the
 // repo munge to "<repo>--claude-worktrees-<name>" and hold their own history.
 // A bare "-" prefix match would also catch sibling repos ("app-api" beside
 // "app"), crediting their reads here, so only the worktree marker qualifies.
 function transcriptDirs() {
   if (projectDirOverride) return fs.existsSync(projectDirOverride) ? [projectDirOverride] : [];
   if (!fs.existsSync(projectsRoot)) return [];
-  const prefix = munge(root);
+  const prefix = munge(mainCheckout());
   return fs
     .readdirSync(projectsRoot)
     .filter((name) => name === prefix || name.startsWith(`${prefix}--claude-worktrees-`))
@@ -142,28 +157,54 @@ function classify(name, input, session, timestamp) {
   }
 }
 
-for (const dir of transcriptDirs()) {
-  stats.dirs.push(dir);
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl"));
-  for (const file of files) {
-    stats.transcriptFiles += 1;
-    const session = { wrote: false, read: false };
-    for (const line of fs.readFileSync(path.join(dir, file), "utf8").split("\n")) {
-      if (!line.includes('"tool_use"')) continue;
-      let obj;
-      try {
-        obj = JSON.parse(line);
-      } catch {
-        continue;
-      }
-      const content = obj?.message?.content;
-      if (!Array.isArray(content)) continue;
-      for (const block of content) {
-        if (block?.type === "tool_use" && block.name) {
-          classify(block.name, block.input, session, obj.timestamp ?? null);
-        }
+// Subagent transcripts live under <session>/subagents/; workflow agents sit
+// deeper (subagents/workflows/<run>/agent-<id>.jsonl), so walk the whole tree.
+function subagentFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) return subagentFiles(full);
+    return e.name.endsWith(".jsonl") ? [full] : [];
+  });
+}
+
+// Group files by session: <uuid>.jsonl plus <uuid>/subagents/**. sessionsRead
+// and sessionsWrote count sessions, so a subagent's read marks its parent.
+function sessionFiles(dir) {
+  const sessions = new Map();
+  const add = (id, files) => sessions.set(id, [...(sessions.get(id) ?? []), ...files]);
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.isFile() && e.name.endsWith(".jsonl")) add(e.name.slice(0, -6), [path.join(dir, e.name)]);
+    else if (e.isDirectory()) add(e.name, subagentFiles(path.join(dir, e.name, "subagents")));
+  }
+  return [...sessions.values()].filter((files) => files.length > 0);
+}
+
+function scanFile(file, session) {
+  stats.transcriptFiles += 1;
+  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+    if (!line.includes('"tool_use"')) continue;
+    let obj;
+    try {
+      obj = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const content = obj?.message?.content;
+    if (!Array.isArray(content)) continue;
+    for (const block of content) {
+      if (block?.type === "tool_use" && block.name) {
+        classify(block.name, block.input, session, obj.timestamp ?? null);
       }
     }
+  }
+}
+
+for (const dir of transcriptDirs()) {
+  stats.dirs.push(dir);
+  for (const files of sessionFiles(dir)) {
+    const session = { wrote: false, read: false };
+    for (const file of files) scanFile(file, session);
     if (session.wrote) stats.sessionsWrote += 1;
     if (session.read) stats.sessionsRead += 1;
   }
