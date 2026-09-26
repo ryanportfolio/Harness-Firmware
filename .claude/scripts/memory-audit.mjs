@@ -9,7 +9,11 @@
 // files plus the subagent files under <session>/subagents/. It reports, per
 // target, how often it was written versus read, plus pruning candidates:
 // never-read files, dated reference entries older than six months, and
-// never-invoked skills.
+// never-invoked skills. It also reports recurring tool-error signatures,
+// per-skill counts of sessions where the user set a standing rule, and
+// token usage attributed at session level to the skills each session invoked.
+// Output holds counts, skill names and normalized signatures only: no user
+// text, file paths or session paths.
 //
 // Counts are FLOOR estimates: transcripts rotate and compact, reads made
 // through the Bash tool (cat/grep) are not attributed, and everything is
@@ -159,12 +163,14 @@ function classify(name, input, session, timestamp) {
 
 // Subagent transcripts live under <session>/subagents/; workflow agents sit
 // deeper (subagents/workflows/<run>/agent-<id>.jsonl), so walk the whole tree.
+// Only agent-*.jsonl files are transcripts: a workflow run also keeps a
+// journal.jsonl beside its agents.
 function subagentFiles(dir) {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const full = path.join(dir, e.name);
     if (e.isDirectory()) return subagentFiles(full);
-    return e.name.endsWith(".jsonl") ? [full] : [];
+    return e.name.startsWith("agent-") && e.name.endsWith(".jsonl") ? [full] : [];
   });
 }
 
@@ -174,27 +180,110 @@ function sessionFiles(dir) {
   const sessions = new Map();
   const add = (id, files) => sessions.set(id, [...(sessions.get(id) ?? []), ...files]);
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (e.isFile() && e.name.endsWith(".jsonl")) add(e.name.slice(0, -6), [path.join(dir, e.name)]);
-    else if (e.isDirectory()) add(e.name, subagentFiles(path.join(dir, e.name, "subagents")));
+    if (e.isFile() && e.name.endsWith(".jsonl")) add(e.name.slice(0, -6), [{ file: path.join(dir, e.name), subagent: false }]);
+    else if (e.isDirectory()) {
+      add(e.name, subagentFiles(path.join(dir, e.name, "subagents")).map((file) => ({ file, subagent: true })));
+    }
   }
   return [...sessions.values()].filter((files) => files.length > 0);
 }
 
-function scanFile(file, session) {
+// Failure signature: tool name plus the first line of the error, with quoted
+// strings, paths, file names, hex ids and digits replaced so the same failure
+// on different inputs collapses into one line that carries no user data.
+// A Bash failure's first line is only "Exit code N", so its next line joins it.
+function errorText(content) {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content.filter((b) => b?.type === "text").map((b) => b.text).join("\n");
+  return "";
+}
+function signature(tool, content) {
+  const lines = errorText(content)
+    .replace(/<\/?tool_use_error>/g, "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return null;
+  let first = lines[0];
+  if (/^Exit code \d+$/.test(first) && lines[1]) first += ` | ${lines[1]}`;
+  const norm = first
+    .replace(/"[^"]*"|'[^']*'|`[^`]*`/g, "<str>")
+    .replace(/(?:[A-Za-z]:)?(?:[\\/]?[\w.@~+-]+)?(?:[\\/][\w.@~+-]*)+/g, "<path>")
+    .replace(/\b[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]{0,7}\b/g, "<file>")
+    .replace(/\b0x[0-9a-f]+\b|\b(?=[\w-]*\d)(?=[\w-]*[a-z])[\w-]{8,}\b/gi, "<id>")
+    .replace(/\d+/g, "<n>")
+    .replace(/\s+/g, " ")
+    .slice(0, 160);
+  return `${tool}: ${norm}`;
+}
+
+// Refine's standing-rule phrases (.claude/skills/refine/SKILL.md), matched in
+// genuine user turns only: top-level transcript, not a meta injection, compact
+// summary or tool result, with harness-inserted tags stripped (a slash
+// command's arguments stay, since the user typed them).
+const STANDING_RULE = /\b(?:from now on|going forward|every time|always|never|i already told you|why do you keep)\b/i;
+const MACHINE_TAGS = /<(system-reminder|task-notification|local-command-stdout|local-command-stderr|local-command-caveat|command-name|command-message|bash-stdout|bash-stderr)>[\s\S]*?<\/\1>/g;
+function userTurnText(obj) {
+  if (obj.type !== "user" || obj.isMeta || obj.isSidechain || obj.isCompactSummary) return "";
+  const content = obj.message?.content;
+  const text = typeof content === "string"
+    ? content
+    : Array.isArray(content)
+      ? content.filter((b) => b?.type === "text").map((b) => b.text).join("\n")
+      : "";
+  return String(text ?? "").replace(MACHINE_TAGS, " ");
+}
+
+const USAGE_FIELDS = ["input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens"];
+const seenMessages = new Set(); // message ids already summed, across sessions
+const signatureSessions = new Map(); // signature -> [session record]
+const sessionRecords = [];
+
+function scanFile(file, session, subagent) {
   stats.transcriptFiles += 1;
   for (const line of fs.readFileSync(file, "utf8").split("\n")) {
-    if (!line.includes('"tool_use"')) continue;
+    if (
+      !line.includes('"tool_use"') &&
+      !line.includes('"tool_result"') &&
+      !line.includes('"usage"') &&
+      !line.includes('"type":"user"')
+    ) continue;
     let obj;
     try {
       obj = JSON.parse(line);
     } catch {
       continue;
     }
-    const content = obj?.message?.content;
+    const message = obj?.message;
+    const usage = message?.usage;
+    if (usage && typeof usage === "object") {
+      // One line per content block, each repeating the message's id and
+      // usage: keep one per id, the one with the most output (streaming).
+      const id = message.id ?? obj.requestId;
+      if (id == null) session.usage.push(usage);
+      else {
+        const prev = session.usageById.get(id);
+        if (!prev || (Number(usage.output_tokens) || 0) > (Number(prev.output_tokens) || 0)) {
+          session.usageById.set(id, usage);
+        }
+      }
+    }
+    if (!subagent && !session.standingRule && STANDING_RULE.test(userTurnText(obj))) {
+      session.standingRule = true;
+    }
+    const content = message?.content;
     if (!Array.isArray(content)) continue;
     for (const block of content) {
       if (block?.type === "tool_use" && block.name) {
         classify(block.name, block.input, session, obj.timestamp ?? null);
+        if (block.id) session.toolNames.set(block.id, block.name);
+        if (block.name === "Skill" && block.input?.skill) {
+          const skill = String(block.input.skill).trim();
+          session.skills.set(skill, (session.skills.get(skill) ?? 0) + 1);
+        }
+      } else if (block?.type === "tool_result" && block.is_error === true) {
+        const sig = signature(session.toolNames.get(block.tool_use_id) ?? "unknown", block.content);
+        if (sig) session.errors.add(sig);
       }
     }
   }
@@ -203,11 +292,87 @@ function scanFile(file, session) {
 for (const dir of transcriptDirs()) {
   stats.dirs.push(dir);
   for (const files of sessionFiles(dir)) {
-    const session = { wrote: false, read: false };
-    for (const file of files) scanFile(file, session);
+    const session = {
+      wrote: false,
+      read: false,
+      standingRule: false,
+      skills: new Map(),
+      toolNames: new Map(),
+      errors: new Set(),
+      usage: [],
+      usageById: new Map(),
+    };
+    for (const { file, subagent } of files) scanFile(file, session, subagent);
     if (session.wrote) stats.sessionsWrote += 1;
     if (session.read) stats.sessionsRead += 1;
+
+    const tokens = Object.fromEntries(USAGE_FIELDS.map((f) => [f, 0]));
+    const counted = [...session.usage];
+    for (const [id, usage] of session.usageById) {
+      if (seenMessages.has(id)) continue; // resumed sessions copy earlier lines
+      seenMessages.add(id);
+      counted.push(usage);
+    }
+    for (const usage of counted) {
+      for (const f of USAGE_FIELDS) tokens[f] += Number(usage[f]) || 0;
+    }
+    const record = { skills: session.skills, standingRule: session.standingRule, tokens };
+    sessionRecords.push(record);
+    for (const sig of session.errors) {
+      const list = signatureSessions.get(sig) ?? [];
+      list.push(record);
+      signatureSessions.set(sig, list);
+    }
   }
+}
+
+const median = (values) => {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+};
+
+const MIN_PATTERN_SESSIONS = 3;
+const patterns = {
+  signatures: [...signatureSessions]
+    .filter(([, records]) => records.length >= MIN_PATTERN_SESSIONS)
+    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+    .slice(0, 5)
+    .map(([sig, records]) => ({
+      signature: sig,
+      sessions: records.length,
+      skills: [...new Set(records.flatMap((r) => [...r.skills.keys()]))].sort(),
+    })),
+  standingRuleSessions: {},
+};
+
+const cost = {
+  attribution:
+    "session-level, approximate: each skill is credited with the full token totals of every session that invoked it; uncached input = input_tokens + cache_creation_input_tokens",
+  totals: Object.fromEntries(USAGE_FIELDS.map((f) => [f, 0])),
+  bySkill: {},
+};
+const skillSessions = new Map(); // skill -> [{invocations, record}]
+for (const record of sessionRecords) {
+  for (const f of USAGE_FIELDS) cost.totals[f] += record.tokens[f];
+  for (const [skill, invocations] of record.skills) {
+    const list = skillSessions.get(skill) ?? [];
+    list.push({ invocations, record });
+    skillSessions.set(skill, list);
+  }
+}
+for (const skill of [...skillSessions.keys()].sort()) {
+  const list = skillSessions.get(skill);
+  patterns.standingRuleSessions[skill] = list.filter((s) => s.record.standingRule).length;
+  cost.bySkill[skill] = {
+    invocations: list.reduce((n, s) => n + s.invocations, 0),
+    sessions: list.length,
+    medianOutputTokens: median(list.map((s) => s.record.tokens.output_tokens)),
+    medianUncachedInput: median(
+      list.map((s) => s.record.tokens.input_tokens + s.record.tokens.cache_creation_input_tokens),
+    ),
+  };
 }
 
 // Stale dated entries. Reference headings carry their date in parentheses,
@@ -251,7 +416,9 @@ const memoryFiles = Object.keys(stats.memory);
 const memoryNeverRead = memoryFiles.filter((f) => stats.memory[f].reads === 0);
 
 if (jsonMode) {
-  console.log(JSON.stringify({ ...stats, staleEntries, staleRetired, neverRead, neverInvoked }, null, 2));
+  console.log(
+    JSON.stringify({ ...stats, staleEntries, staleRetired, neverRead, neverInvoked, patterns, cost }, null, 2),
+  );
   process.exit(0);
 }
 
@@ -300,4 +467,33 @@ if (memoryFiles.length > 0) {
 if (neverInvoked.length > 0) {
   console.log(`\nskills never invoked on this machine: ${neverInvoked.join(", ")}`);
   console.log("(description-matched auto-invocations count too, so zero means zero here)");
+}
+
+console.log(`\nfailure patterns (tool errors in ${MIN_PATTERN_SESSIONS}+ sessions; candidates for refine, not verdicts):`);
+if (patterns.signatures.length === 0) console.log("  none");
+for (const p of patterns.signatures) {
+  console.log(`  ${p.sessions} sessions  ${p.signature}`);
+  console.log(`    skills in those sessions: ${p.skills.join(", ") || "-"}`);
+}
+const ruleSkills = Object.entries(patterns.standingRuleSessions).filter(([, n]) => n > 0);
+if (ruleSkills.length > 0) {
+  console.log("sessions where the user set a standing rule, per invoked skill:");
+  for (const [skill, n] of ruleSkills) console.log(`  ${pad(skill, 34)}${n}`);
+}
+
+const fmt = (n) => n.toLocaleString("en-US");
+console.log("\ntoken cost (attribution is session-level and approximate: a skill is credited");
+console.log("with the full totals of every session that invoked it):");
+console.log(
+  `  totals: input ${fmt(cost.totals.input_tokens)}, cache write ${fmt(cost.totals.cache_creation_input_tokens)}, ` +
+    `cache read ${fmt(cost.totals.cache_read_input_tokens)}, output ${fmt(cost.totals.output_tokens)}`,
+);
+const costSkills = Object.entries(cost.bySkill).sort((a, b) => b[1].sessions - a[1].sessions || a[0].localeCompare(b[0]));
+if (costSkills.length > 0) {
+  console.log(`  ${pad("skill", 34)}${pad("calls", 7)}${pad("sessions", 10)}${pad("median out", 12)}median uncached in`);
+  for (const [skill, c] of costSkills) {
+    console.log(
+      `  ${pad(skill, 34)}${pad(c.invocations, 7)}${pad(c.sessions, 10)}${pad(fmt(c.medianOutputTokens), 12)}${fmt(c.medianUncachedInput)}`,
+    );
+  }
 }
