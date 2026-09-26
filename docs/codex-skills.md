@@ -132,6 +132,7 @@ real project. It proves selective file adoption and preserved customization, not
 | claude-review | claude, codex | native | subscription-routed-claude-cli | evidence | Cross-vendor only when the author runtime uses a different vendor; subscription routing is proved locally. |
 | codex-fullreview | claude | none | authenticated-codex-cli | independence, evidence | Claude launcher for a full multi-agent Codex review; from Codex use $impartial-review directly. |
 | codex-review | claude, codex | native | authenticated-codex-cli | evidence | A Codex author and Codex reviewer share a vendor; fresh context does not imply cross-vendor review. |
+| compact-review | claude | none | No additional gate | style | Claude Code only: writes custom instructions for Claude Code /compact; Codex /compact takes no custom instructions. |
 | dare | claude, codex | native | fresh-context-review | independence | None |
 | enhance-prompt | claude, codex | native | No additional gate | proportion | None |
 | external-review | codex | native | No additional gate | independence, evidence | Codex-only leaf review invoked by the codex-review and astra-review launchers in both runtimes; it has no Claude counterpart. |
