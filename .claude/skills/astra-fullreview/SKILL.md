@@ -29,4 +29,4 @@ Commit and uncommitted prompts (with the Astra model and effort in place of Sol 
 
 On PowerShell use a GUID-named directory and supported stdin/output redirection as described in `codex-fullreview`. Distinct prefixes do not prevent collisions between two Astra invocations; every run must still be unique.
 
-If Astra is unavailable, report that outcome. Do not silently inherit another model or attribute a fallback to Astra. Any authorized retry uses a new directory and reports its observed model/effort, or explicitly marks model resolution unverified. Keep lifecycle fixes in `codex-fullreview` rather than forking them here.
+If Astra is unavailable, report that outcome. Do not silently inherit another model or attribute a fallback to Astra. A rejected Astra id is reported, never retried on another model; any other failure gets the one automatic retry from `codex-fullreview`. A retry uses a new directory and reports its observed model/effort, or explicitly marks model resolution unverified. Keep lifecycle fixes in `codex-fullreview` rather than forking them here.
