@@ -61,7 +61,7 @@ Before launch, write run metadata: run ID, absolute workspace, requested scope, 
 
 For a special focus the user requests, append it to the prompt. Preserve least privilege; do not bypass approvals or sandbox protections for the Manager or its sub-reviewers. Default effort is `high`; for a broad diff, `medium` is a planning option only when the user did not explicitly select effort. State the selected setting before launch. Runtime is longer than `codex-review` and not predictable from file count.
 
-Monitor the task-owned process with bounded waits. The parent `run.log` can stay silent while sub-reviewers work; their session files (Step 4) growing under `${CODEX_HOME:-~/.codex}/sessions` is progress. Record observed process status, elapsed time, and the agreed timeout; if stalled or timed out, terminate only this review process, preserve its partial output, and report the failed attempt. Do not start another usage-consuming run without existing explicit retry authorization or user agreement.
+Monitor the task-owned process with bounded waits. The parent `run.log` can stay silent while sub-reviewers work; their session files (Step 4) growing under `${CODEX_HOME:-~/.codex}/sessions` is progress. Record observed process status, elapsed time, and the agreed timeout; if stalled or timed out, terminate only this review process, preserve its partial output, and report the failed attempt. The one automatic retry described below then applies; any further run needs user agreement.
 
 ## Step 4: Collect and bind evidence
 
@@ -112,7 +112,13 @@ Check scope identity: the report's `Scope:` line must match the recorded base an
 
 Nonzero exit, missing/empty report, or changed source means the review is failed or stale, not clean. Surface the relevant error with secrets redacted. A successful process that could not inspect code or run required checks has an incomplete review: retain useful findings but disclose missing coverage. The read-only sandbox applies to the Manager and its sub-reviewers; a check that needs writes, installs, or network is unavailable, not passed. Sandbox or network failures do not by themselves establish a code defect or a passing gate.
 
-One invocation per request unless retries are already explicitly authorized. Model rejection (`model_not_found`, `unknown provider for model <id>`) is a failure, not permission to silently drop `-m`/`-c`. Without `-m` the run inherits the `model` in `~/.codex/config.toml`, which can be a different reviewer family (Astra, say) than the one requested. Instead run `codex debug models` and look for a newer Sol slug; the catalog can still list a retired id, so a listed slug is a candidate, not proof of availability. Relaunch without asking only when retries are authorized, the rejected id is this skill's default pin rather than a model the user chose, and exactly one newer Sol appears: use it in a new run directory, substituting it for every `gpt-6-sol` in the command, including the `model` the prompt passes to sub-reviewers, and tell the user the pin is stale. Otherwise ask the user which model to use before launching; an explicit user model choice stays until the user changes it. Attribute the result to the model on the `run.log` header's `model:` line, or state that resolution remains unverified.
+A failed run gets one automatic retry before you ask. Failed means a model rejection (for example `model_not_found` or `unknown provider for model <id>`), a nonzero exit, a missing or empty report, or a stall or timeout. The retry needs no further permission, runs in a new run directory, and depends on the cause:
+
+- Model rejection: never drop `-m`/`-c`. Without `-m` the run inherits the `model` in `~/.codex/config.toml`, which can be a different reviewer family (Astra, say) than the one requested. Run `codex debug models` and look for a newer Sol slug; the catalog can still list a retired id, so a listed slug is a candidate, not proof of availability. When the rejected id is this skill's default pin and exactly one newer Sol appears, retry on it, substituting it for every `gpt-6-sol` in the command, including the `model` the prompt passes to sub-reviewers, and tell the user the pin is stale. When the user chose the model, or no single newer Sol appears, skip the retry and ask which model to use; an explicit user model choice stays until the user changes it.
+- Any other failure: retry the same command unchanged.
+- Changed source: no retry. The reviewed content moved, so report the run as stale.
+
+If the retry fails too, stop, report both attempts with their errors, and ask. Attribute the result to the model on the `run.log` header's `model:` line, or state that resolution remains unverified.
 
 ## Step 5: Verify every finding (precision stage)
 
@@ -140,4 +146,4 @@ Zero findings plus verified coverage and local checks supports a clean review of
 - Calling a zero-spawn run a multi-agent review, or hiding an unverified count behind the Manager's own claim.
 - Authentication, model aliases, flags, sandbox behavior, session file format, and billing may change; inspect local evidence instead of applying a historical machine repair automatically.
 - Do not pass findings through unchecked, treat reviewer agreement as proof, or hide missing evidence behind exit code 0.
-- Do not widen scope, retry, downgrade a requested model, repair machine-global configuration, or publish under review-only authorization.
+- Do not widen scope, retry more than once, downgrade a requested model, repair machine-global configuration, or publish under review-only authorization.
