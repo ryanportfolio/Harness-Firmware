@@ -33,14 +33,14 @@ LICENSE/NOTICE files in the skill folder.
 ## Homegrown (this repo)
 
 `addskill`, `adopt-repo`, `advocate`, `astra-fullreview`, `astra-review`,
-`claude-review`, `codex-fullreview`, `codex-review`, `dare`, `enhance-prompt`,
+`claude-review`, `codex-fullreview`, `codex-review`, `compact-review`, `dare`, `enhance-prompt`,
 `external-review`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`,
 `impartial-review`, `init-project`, `lab`, `optimize-context`, `perf-loop`,
 `recall`, `session-hub`, `showpiece`, `sync-starter`, `why`, `wow-loop`.
 
 Homegrown skills are MIT, same as the repo (see the root `LICENSE`).
 
-Runtime coverage follows `.agents/skill-capabilities.json`: `astra-fullreview`,
+Runtime coverage follows `.agents/skill-capabilities.json`: `astra-fullreview`, `compact-review`,
 `codex-fullreview` and `long-horizon-workflows` are Claude-only, `external-review`
 is Codex-only, and every other active skill ships in both runtimes. `recall` and
 `why` share names with unrelated pstack skills; ours predate the pstack ports

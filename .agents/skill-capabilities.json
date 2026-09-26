@@ -308,6 +308,25 @@
         "A Codex author and Codex reviewer share a vendor; fresh context does not imply cross-vendor review."
       ]
     },
+    "compact-review": {
+      "coverage": [
+        "claude"
+      ],
+      "owners": {
+        "claude": "source"
+      },
+      "entrypoints": [
+        "compact-review"
+      ],
+      "requiredTools": [],
+      "sharedContracts": [
+        "style"
+      ],
+      "resources": [],
+      "exceptions": [
+        "Claude Code only: writes custom instructions for Claude Code /compact; Codex /compact takes no custom instructions."
+      ]
+    },
     "dare": {
       "coverage": [
         "claude",
