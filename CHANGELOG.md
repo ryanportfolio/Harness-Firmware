@@ -19,7 +19,9 @@ condensed.
   reports disagreements to the user instead of blocking on them. The per-round
   auditor stays fresh and never sees swarm output. Each peer works through a lens,
   either a swarm lens in `lenses/` (starting with `done-check`) or an existing skill's
-  criteria. Claude Code only.
+  criteria. Authors reply to critique before the host acts, any peer can execute a
+  round, and `references/codex-peer.md` holds the tested Windows copy and launch
+  recipe. Revised from a live dogfood run of the skill on itself. Claude Code only.
 
 ### Removed
 

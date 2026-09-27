@@ -155,6 +155,11 @@
       "group": "specialist"
     },
     {
+      "name": "compact-review",
+      "label": "Compact review",
+      "group": "specialist"
+    },
+    {
       "name": "writing",
       "label": "Writing",
       "group": "specialist"

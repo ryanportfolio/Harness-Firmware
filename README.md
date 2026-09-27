@@ -4,7 +4,7 @@
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/boot-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/boot-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/boot-dark.svg">
-<img alt="Harness Firmware boots with 35 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
+<img alt="Harness Firmware boots with 36 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
 </picture>
 
 A repository starter for **Claude Code and Codex**. Harness Firmware gives both agents versioned instructions, durable project memory, reusable skills, and workflows for testing and independent review.
@@ -72,19 +72,19 @@ The dotted branch is separate: after human review, `sync-starter` can move a gen
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="35 Claude Code skills and 32 Codex skills share project memory. Codex has 32 native workflows." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="36 Claude Code skills and 32 Codex skills share project memory. Codex has 32 native workflows." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
-**35 Claude Code skills · 32 Codex skills · 32 native Codex workflows**
+**36 Claude Code skills · 32 Codex skills · 32 native Codex workflows**
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
 - **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows with explicit capability and safety boundaries; a skill without a native version gets a generated adapter. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
 Both runtimes read the committed project topics under `.claude/reference/`. Shared workflows live under `.claude/skills/`; standalone Codex workflows live under `.agents/skills/`.
 
-## 35 workflows, loaded when called
+## 36 workflows, loaded when called
 
-**7 core · 14 discipline · 14 specialist**
+**7 core · 14 discipline · 15 specialist**
 
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
@@ -95,13 +95,13 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/skills-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/skills-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/skills-dark.svg">
-<img alt="A memory map of 35 on-demand workflows grouped into 7 core, 14 discipline, and 14 specialist skills." src="assets/readme/skills-light.svg" width="100%">
+<img alt="A memory map of 36 on-demand workflows grouped into 7 core, 14 discipline, and 15 specialist skills." src="assets/readme/skills-light.svg" width="100%">
 </picture>
 
 </details>
 
 <details>
-<summary><strong>Click to browse all 35 skills</strong></summary>
+<summary><strong>Click to browse all 36 skills</strong></summary>
 
 <!-- skill-list:start -->
 ### core workflows · 7
@@ -131,7 +131,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`claude-review`](.claude/skills/claude-review/SKILL.md) · Use when the user says /claude-review, asks Claude or Fable to review code written in Codex, or requests a cross-vendor review through Claude CLI.
 - [`dare`](.claude/skills/dare/SKILL.md) · Use for /dare, first principles, or questioning the problem: four fresh stages decompose, audit, recombine and test, preserving immutable goals and constraints.
 
-### specialist tools · 14
+### specialist tools · 15
 
 - [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Use for difficult multi-step work, uncertain diagnoses, repeated failures, 'did it work/is it fixed/prove it' questions, or tasks where verification and handoff need particular care. Skip routine changes.
 - [`wow-loop`](.claude/skills/wow-loop/SKILL.md) · Evidence-gated review and repair loop for one deliverable. Use on /wow-loop, requests for wow factor or dial it to 11, or substantial visual work (3D, animation, UI, rendered documents) that needs reference fidelity or repeated visual correction. Skip routine cosmetic edits and discussion of the skill itself.
@@ -142,6 +142,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`why`](.claude/skills/why/SKILL.md) · Use only when the user explicitly invokes /why to challenge the assistant's immediately prior recommendation; never trigger from ordinary why questions or paraphrases.
 - [`enhance-prompt`](.claude/skills/enhance-prompt/SKILL.md) · Use when the user asks for a rewritten, copy-ready prompt for another agent or session. Produce the prompt without executing its task.
 - [`handoff-audit`](.claude/skills/handoff-audit/SKILL.md) · Draft a self-contained audit prompt for a separate fresh session, with exact scope and falsifiable checks. Does not run the audit.
+- [`compact-review`](.claude/skills/compact-review/SKILL.md) · Use on /compact-review or right before /compact: review the session and return copy-ready custom instructions for /compact that keep what matters. Does not run /compact.
 - [`writing`](.claude/skills/writing/SKILL.md) · Write or edit audience-facing prose: docs, UI copy, emails, release notes, and application answers. Use also for voice matching, clarity review, or AI-tell cleanup. Ordinary session replies follow session conventions.
 - [`forge-repo-ui-skill`](.claude/skills/forge-repo-ui-skill/SKILL.md) · Use when the user wants a repository-specific UI or design skill synthesized from current agent skills; not for ordinary UI implementation or backend-only work.
 - [`caveman`](.claude/skills/caveman/SKILL.md) · Use for every session reply to the user: concise Caveman prose with built-in Unslop. User-facing deliverables use Writing instead.
