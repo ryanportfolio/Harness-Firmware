@@ -51,12 +51,18 @@ who to ask and when, by where a second model is likely to see something the firs
 Useful moments: attacking the decomposition and done-checks before round one, reviewing a
 round's work in progress, proposing a new approach after an audit fails. None is required.
 
-- **Code** is written in the contributor's own copy: an `isolation: "worktree"` agent, or a
-  copy under `.tmp/long-horizon/<slug>/swarm/<entry-id>/` passed to `codex exec -C <dir>`
-  with a sandbox that allows writing only there. Copies are made from the current workspace,
-  not HEAD, because rounds do not commit. The round's executor, or one fresh agent the host
-  names integrator, applies the chosen result to the workspace within Write scope. Swarm
-  copies sit outside Write scope and the auditor ignores them.
+- **Code** is written in the contributor's own copy under
+  `.tmp/long-horizon/<slug>/swarm/<entry-id>/`, made from the current workspace including
+  uncommitted and untracked changes. Never use `isolation: "worktree"` for this: a worktree
+  starts from HEAD, and rounds do not commit, so it would miss earlier rounds' verified work.
+  An Opus peer is told to write only inside its copy; a Codex peer gets `codex exec -C <dir>`
+  with a sandbox that allows writing only there. Swarm copies sit outside Write scope and the
+  auditor ignores them.
+- **Integration** stays with the round's executor, the only agent that writes the workspace
+  between Baseline and Audit. Its brief names the chosen contribution's path, and it applies
+  that result within Write scope. A second writer would make the auditor's delta
+  unattributable and the round `suspect`. Code the swarm produces after the executor has
+  finished goes into the next round.
 - **Review** passes the artifact first (diff, plan, file paths) and the author's reasoning
   only if the reviewer asks. Critique aimed at the artifact finds more than critique aimed at
   the justification.
