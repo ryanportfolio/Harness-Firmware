@@ -100,7 +100,9 @@ something the first did not.
   from the live workspace, including uncommitted and untracked changes. While a round is
   `executing` or `awaiting-audit` it comes from that round's Baseline snapshot, never the
   live tree, so no peer builds on the executor's half-finished edits. With Swarm on, Plan
-  saves that snapshot as `swarm/baseline-r<N>.tar` right after the Baseline manifest. Never
+  saves that snapshot as `swarm/baseline-r<N>.tar` right after the Baseline manifest; with
+  the Workflow engine, which takes the Baseline inside its script, right before the
+  workflow call, with no writer active in between. Never
   use `isolation: "worktree"`: a worktree starts from HEAD, and rounds do not commit, so it
   would miss earlier rounds' verified work. An Opus peer is told to write only inside its
   copy; a Codex peer gets `-C <copy>`. Swarm copies sit outside Write scope.
@@ -114,6 +116,8 @@ something the first did not.
   justification. The critique then goes back to the author, by `codex exec resume <id>` for
   a Codex author or `SendMessage` for an Opus author, who concedes or refutes it with
   evidence. The critic gets one counter. A point still split after that opens a D entry.
+  A round executor always replies read-only, from a copy, never from the workspace root: a
+  change it concedes is the next round's work, so nothing edits an audited round.
 - **Brief** each peer with the contract, dead ends, its lens, and the artifact paths it
   needs. A Codex peer shares no memory with this session, so the brief is all it knows. A
   copy has no `.git`; a peer that needs a diff gets it as a file named in the brief.

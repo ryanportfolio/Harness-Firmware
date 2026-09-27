@@ -25,7 +25,8 @@ when you launch.
 ## Baseline snapshot
 
 With Swarm on, Plan takes this right after the Baseline manifest, before the executor is
-dispatched:
+dispatched. With the Workflow engine, whose script takes the Baseline and dispatches the
+executor in one call, take it right before the workflow call, with no writer active:
 
 ```bash
 mkdir -p <root>/.tmp/long-horizon/<slug>/swarm && tar -C <root> --exclude='./.git' --exclude='./.tmp/long-horizon/*/swarm' -cf <root>/.tmp/long-horizon/<slug>/swarm/baseline-r<N>.tar .
@@ -69,7 +70,7 @@ Model: the Sol id pinned in `.claude/skills/codex-review/SKILL.md` at `high`, or
 `-s workspace-write` for code. Both run with `-C` set to the copy.
 
 ```bash
-E=<root>/.tmp/long-horizon/<slug>/swarm/S<n>; ( codex exec -C "$E/ws" --skip-git-repo-check -s workspace-write -m <sol id> -c model_reasoning_effort=high -o "$E/report.md" - < "$E/brief.md" > "$E/run.log" 2>&1; printf '%s\n' "$?" > "$E/exit.code" ) < /dev/null > /dev/null 2>&1 & printf '%s\n' "$!" > "$E/pid"; cat "/proc/$!/winpid" > "$E/winpid"
+E=<root>/.tmp/long-horizon/<slug>/swarm/S<n>; ( codex exec -C "$E/ws" --skip-git-repo-check -s <read-only|workspace-write> -m <sol id> -c model_reasoning_effort=high -o "$E/report.md" - < "$E/brief.md" > "$E/run.log" 2>&1; printf '%s\n' "$?" > "$E/exit.code" ) < /dev/null > /dev/null 2>&1 & printf '%s\n' "$!" > "$E/pid"; cat "/proc/$!/winpid" > "$E/winpid"
 ```
 
 An Opus peer runs through the `Agent` tool without `isolation`; its brief names the copy as
@@ -105,8 +106,10 @@ the critique and the ask (concede, or refute with evidence) in `reply-<k>-in.md`
 E=<root>/.tmp/long-horizon/<slug>/swarm/S<n>; ( cd "$E/ws" && codex exec resume --skip-git-repo-check -c 'sandbox_mode="read-only"' -m <model> -c model_reasoning_effort=<effort> -o "$E/reply-<k>.md" <session id> - < "$E/reply-<k>-in.md" > "$E/reply-<k>.log" 2>&1; printf '%s\n' "$?" > "$E/reply-<k>.exit" ) < /dev/null > /dev/null 2>&1 & printf '%s\n' "$!" > "$E/reply-<k>.pid"; cat "/proc/$!/winpid" > "$E/reply-<k>.winpid"
 ```
 
-Use the author's original sandbox mode (`workspace-write` for a code author that may revise
-its copy). Check the `workdir:` and `sandbox:` lines in the reply log header; if either
+A code peer may keep `workspace-write`, since `ws/` is its own copy. A round executor always
+replies with `sandbox_mode="read-only"`: first make a live-workspace copy in
+`executor-r<N>/ws/` (see Copy) and resume from there, never from the workspace root. What it
+concedes becomes the next round's work. Check the `workdir:` and `sandbox:` lines in the reply log header; if either
 differs from the original run, stop it and brief a fresh peer with the artifact and the
 critique instead. Log the resume as its own S entry of kind `reply`.
 
