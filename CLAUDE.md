@@ -29,7 +29,7 @@ Defaults until configured:
 - Never claim visual/UI verification you didn't actually perform.
 - Can't run the authoritative check → flag the risk plainly, don't claim it passes.
 - Visual/UI checks: headed Chrome on the real GPU, launched through `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`). Never headless (WebGL falls back to the CPU), never minimized (rAF drops to 1 fps). Pass this rule into every subagent prompt that does browser work.
-- Parallel or subagent browser work: each agent opens its own browser through `mcp__playwright-iso__*` (`--isolated`, any number at once) or `launchPlacedChrome()`. Never the shared playwright plugin or the app's Browser pane, which hold one browser and deadlock a second user. Detail: `.claude/reference/pitfalls.md`.
+- Parallel or subagent browser work: each agent opens its own browser through `mcp__playwright-iso__*` (`--isolated`, any number at once) or `launchPlacedChrome()`. Never the shared playwright plugin or the app's Browser pane, which hold one browser and deadlock a second user.
 
 ## Core principles
 
