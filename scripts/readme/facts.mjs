@@ -51,16 +51,15 @@ export function collectFacts() {
   const groupIds = inventory.groups.map((group) => group.id);
   if ([...groupIds].sort().join() !== "core,discipline,specialist") throw new Error("scripts/readme/items.json: skill groups must be core, discipline, specialist");
 
-  // A template skill whose folder is missing is left out of the README; a skill folder that
-  // items.json does not list is left out with a warning. Neither fails.
+  // A template skill whose folder is missing is left out of the README, and so is a skill
+  // folder that items.json does not list. Neither warns or fails.
   const canonicalNames = directories(".claude/skills");
   const codexNames = directories(".agents/skills");
   const templateNames = inventory.skills.map((skill) => skill.name).sort();
   const present = inventory.skills.filter((skill) => canonicalNames.includes(skill.name));
   const removed = templateNames.filter((name) => !canonicalNames.includes(name));
   const inventoryNames = present.map((skill) => skill.name).sort();
-  const warnings = canonicalNames.filter((name) => !templateNames.includes(name))
-    .map((name) => `.claude/skills/${name}: not listed in scripts/readme/items.json, so the README leaves it out`);
+  const warnings = [];
   const modes = fs.existsSync(absolute(".agents/skill-modes.json")) ? readJson(".agents/skill-modes.json").skills : {};
   let overrides = {};
   try {
