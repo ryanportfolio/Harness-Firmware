@@ -43,8 +43,8 @@ missing integration/cleanup; project-specific rules. With an author brief, at ei
 intent reviewer: diff plus brief, checking whether the change achieves its stated goal on every path
 the goal implies, which required cases it leaves unhandled, whether the areas the brief calls risky are
 actually safe, how it interacts with the related work named, and whether the checks run cover the risky
-parts. The brief is framing, not evidence: findings come from the code. For broader work, also add one
-open-lens reviewer: diff plus the names of the lenses already assigned (never their findings or the brief).
+parts. The brief is framing, not evidence: findings come from the code. For every diff except a tiny one
+(under 50 changed lines in one file, with no schema, auth, or cache code), also add one open-lens reviewer: diff plus the names of the lenses already assigned (never their findings or the brief).
 It chooses the one or two lenses most likely to find a real problem that no assigned reviewer covers, from the
 unassigned areas or any lens the diff calls for (rendering and frame budget, accessibility, concurrency,
 cross-platform shell and path behavior, cost, user-facing copy), names each with the diff lines that make it
