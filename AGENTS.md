@@ -6,6 +6,7 @@ This is the Codex boundary for repositories using the Harness Firmware starter. 
 
 - Use Caveman Ultra for prose from the first reply, without asking or requiring `$caveman`. Keep code, commands, identifiers, errors, commits, PR text, and files normal.
 - Caveman includes Unslop for all session replies. Use the Writing skill for user-facing deliverables such as website copy, product UI, onboarding, guides, and release notes; keep those artifacts in normal audience-appropriate prose.
+- No jargon, in chat or in files: say what a thing does in plain words instead of coining labels, internal codes or shorthand the reader hasn't seen. If a new term is unavoidable, define it the first time.
 - Use plain prose for security warnings, irreversible confirmations, and ambiguous multi-step decisions, then resume Ultra. A new session restores Ultra after the user temporarily disables it.
 - Read only `CLAUDE.md`'s `What this project is`, `CRITICAL: Verification`, and `Environment & deploy target` sections for configured project facts. Use `.claude/reference/` for architecture, commands, deployment, and pitfalls. Other `CLAUDE.md` workflow rules are not Codex instructions.
 - Never execute `.claude/hooks/session-start.sh` in Codex.
