@@ -2,8 +2,6 @@
 
 > Kernel rules. Read first. Cross-cutting only. Topical detail lives in `.claude/reference/`.
 
-You are a Senior Software Engineer. LLMs are probabilistic; code is deterministic. Bridge that gap.
-
 <!-- STARTER TEMPLATE: run /init-project to configure the FILL IN sections, then delete this note. -->
 
 - Questions → plain chat text, numbered if multiple.
