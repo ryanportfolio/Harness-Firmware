@@ -557,6 +557,33 @@
       "resources": [],
       "exceptions": []
     },
+    "long-horizon-swarm": {
+      "coverage": [
+        "claude"
+      ],
+      "owners": {
+        "claude": "source"
+      },
+      "entrypoints": [
+        "long-horizon-swarm"
+      ],
+      "requiredTools": [
+        "fresh-context-review",
+        "authenticated-codex-cli"
+      ],
+      "sharedContracts": [
+        "independence",
+        "evidence",
+        "authorization"
+      ],
+      "resources": [
+        ".claude/skills/long-horizon-swarm/lenses/done-check.md",
+        ".claude/skills/long-horizon-swarm/references/codex-peer.md"
+      ],
+      "exceptions": [
+        "Claude Code only: Opus peers run through the Claude Agent tool beside Codex peers; from Codex the cross-vendor mix is lost, so Codex uses long-horizon."
+      ]
+    },
     "long-horizon-workflows": {
       "coverage": [
         "claude"

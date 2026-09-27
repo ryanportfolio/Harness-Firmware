@@ -11,6 +11,18 @@ condensed.
 
 ## [Unreleased]
 
+### Added
+
+- `long-horizon-swarm` skill: the `long-horizon` contract with Opus, Sol and Astra
+  as peers who contribute ideas, critique and code throughout a run. It attaches to
+  an existing run's state file, logs contributions and Codex spend in `swarm.md`, and
+  reports disagreements to the user instead of blocking on them. The per-round
+  auditor stays fresh and never sees swarm output. Each peer works through a lens,
+  either a swarm lens in `lenses/` (starting with `done-check`) or an existing skill's
+  criteria. Authors reply to critique before the host acts, any peer can execute a
+  round, and `references/codex-peer.md` holds the tested Windows copy and launch
+  recipe. Revised from a live dogfood run of the skill on itself. Claude Code only.
+
 ### Removed
 
 - The `merge` skill leaves the template. Session-wide auto-merge is a personal

@@ -75,6 +75,11 @@
       "group": "discipline"
     },
     {
+      "name": "long-horizon-swarm",
+      "label": "Long horizon swarm",
+      "group": "discipline"
+    },
+    {
       "name": "babysit-ci",
       "label": "Babysit CI",
       "group": "discipline"
@@ -147,6 +152,11 @@
     {
       "name": "handoff-audit",
       "label": "Handoff audit",
+      "group": "specialist"
+    },
+    {
+      "name": "compact-review",
+      "label": "Compact review",
       "group": "specialist"
     },
     {
