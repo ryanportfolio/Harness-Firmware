@@ -1,20 +1,20 @@
 # Codex Instructions
 
-This is the Codex boundary for repositories using the AI Operating System starter. Claude Code keeps using `CLAUDE.md` and `.claude/` unchanged.
+This is the Codex boundary for repositories using the Harness Firmware starter. Claude Code keeps using `CLAUDE.md` and `.claude/` unchanged.
 
 ## Defaults
 
 - Use Caveman Ultra for prose from the first reply, without asking or requiring `$caveman`. Keep code, commands, identifiers, errors, commits, PR text, and files normal.
 - Caveman includes Unslop for all session replies. Use the Writing skill for user-facing deliverables such as website copy, product UI, onboarding, guides, and release notes; keep those artifacts in normal audience-appropriate prose.
+- No jargon, in chat or in files: say what a thing does in plain words instead of coining labels, internal codes or shorthand the reader hasn't seen. If a new term is unavoidable, define it the first time.
 - Use plain prose for security warnings, irreversible confirmations, and ambiguous multi-step decisions, then resume Ultra. A new session restores Ultra after the user temporarily disables it.
-- When creating copy for a site, UI, or anything else: less is more. Simplicity is powerful. Complexity does not need to be complicated.
-- Read only `CLAUDE.md`'s What this project is, Verification, and Environment & Deploy Target sections for configured project facts. Use `.claude/reference/` for architecture, commands, deployment, and pitfalls. Other `CLAUDE.md` workflow rules are not Codex instructions.
+- Read only `CLAUDE.md`'s `What this project is`, `CRITICAL: Verification`, and `Environment & deploy target` sections for configured project facts. Use `.claude/reference/` for architecture, commands, deployment, and pitfalls. Other `CLAUDE.md` workflow rules are not Codex instructions.
 - Never execute `.claude/hooks/session-start.sh` in Codex.
 
 ## Capabilities
 
 - Inspect tools exposed in the current session before using subagents, browser control, connectors, or interactive input. Config flags alone are not proof.
-- Browser per session, never shared. The official playwright plugin holds one persistent profile; a second connection fails with "Browser is already in use ... use --isolated" and deadlocks. Parallel or subagent browser work uses the `playwright-iso` MCP server from `.mcp.json` (`@playwright/mcp --isolated`, in-memory profile) or `scripts/lib/launch-chrome.mjs`.
+- Parallel or subagent browser work: each agent opens its own browser through the `playwright-iso` MCP server from `.mcp.json` (`@playwright/mcp --isolated`, in-memory profile, any number at once) or `scripts/lib/launch-chrome.mjs`. Never the official playwright plugin: it holds one persistent profile, and a second connection fails with "Browser is already in use ... use --isolated" and deadlocks.
 - Spawn subagents with fresh context (`fork_turns: "none"`) and a self-contained brief by default. Inherit conversation history only when the task specifically benefits from it. Independent reviewers always start fresh; report a capability gap if the exposed runtime cannot provide this.
 - Serial fallback is valid only when independence is not part of the deliverable. `impartial-review`, `advocate`, and `why` require fresh independent context; if unavailable, report the gap.
 - Claude `Workflow` programs are not Codex programs. Recreate their intent with exposed Codex agents or flag them blocked.
@@ -30,15 +30,16 @@ This is the Codex boundary for repositories using the AI Operating System starte
 ## Safety
 
 - Caveman Ultra is a communication default, not side-effect authorization. Auto-merge and other persistent side-effect modes require explicit current-session intent.
+- Project memory is `.claude/reference/`, read and written through the `recall` skill. Do not use or enable Codex's built-in `memories` feature for project knowledge.
 - Standing exception: a confirmed project quirk that cost a retry, a backed-out change, or a user correction may be saved to `.claude/reference/pitfalls.md` without asking (see the recall skill). No other reference or memory write inherits this.
 - Stage explicit paths, preserve unrelated changes, and verify before claiming completion.
 - If a skill causes a permission request, pause, or unfinished authorized work, link the exact `SKILL.md`, quote the blocking instruction, and explain why existing authorization does not cover the action. Distinguish an explicit requirement from an interpretation; user instructions take precedence over skill guidelines within system and developer constraints.
 
 ## Shared Assets
 
-- `.claude/skills/` remains Claude’s library. Codex uses maintained native skills and generated adapters under `.agents/skills/`, selected by `.agents/skill-modes.json`. Read native files directly and resolve resources there; adapters resolve resources from their canonical Claude skill. Treat `$ARGUMENTS` in adapters as invocation input.
+- `.claude/skills/` remains Claude’s library. Codex uses standalone native skills under `.agents/skills/`, registered in `.agents/skill-modes.json` as `native` or `disabled` (Claude-only). Read them directly and resolve resources from their Codex skill directory.
 - Read relevant `.claude/reference/` material before unfamiliar work and `.agents/CODEX-SKILL-COMPATIBILITY.md` before adapted, gated, or dangerous skills.
-- After skill, ownership-mode, or legacy override changes run `node .claude/scripts/sync-codex-skills.mjs --write`. Sync preserves native files; do not hand-edit marked generated adapters. Use `addskill` for create/import/update/install; it uses built-in `skill-creator` for Codex authoring. Update `.agents/skill-capabilities.json` and run `node .claude/scripts/check-skill-capabilities.mjs` for coverage, resources and retired routes.
+- Adding or editing a skill updates its standalone Codex version in the same change and registers it `native` (or `disabled`) in `.agents/skill-modes.json`; never ship a generated adapter. Then run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` and `--check`; CI fails on drift or a missing registration. Use `addskill` for create/import/update/install; it uses built-in `skill-creator` for Codex authoring. Update `.agents/skill-capabilities.json` and run `node .claude/scripts/check-skill-capabilities.mjs` for coverage, resources and retired routes.
 - For Codex setup, skills, or runtime troubleshooting, inspect local configuration, exposed tools, and relevant installed sources first. Consult official documentation when local evidence is insufficient or current product behavior needs verification.
 - Tool mapping: `.agents/codex-tools.md`.
 

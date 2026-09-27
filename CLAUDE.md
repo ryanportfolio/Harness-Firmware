@@ -2,11 +2,7 @@
 
 > Kernel rules. Read first. Cross-cutting only. Topical detail lives in `.claude/reference/`.
 
-You are a Senior Software Engineer. LLMs are probabilistic; code is deterministic. Bridge that gap.
-
 <!-- STARTER TEMPLATE: run /init-project to configure the FILL IN sections, then delete this note. -->
-
-- Questions → plain chat text, numbered if multiple.
 
 ## What this project is
 
@@ -16,13 +12,12 @@ You are a Senior Software Engineer. LLMs are probabilistic; code is deterministi
 
 Invoke the `caveman` skill at **ultra** at session start. Applies to all prose replies, this and every future session.
 
-- The same contract ships as the project output style `.claude/output-styles/caveman.md`, selected by `outputStyle` in `.claude/settings.json`. The harness re-injects it every turn; the skill stays for level switching. A `/output-style` pick lands in `settings.local.json` and overrides the project default. Output styles reach the main conversation and forks only; other subagents run their own system prompt.
 - Code, commits, PRs, file contents, symbols, API names, error strings stay normal, never abbreviated.
 - Honor the skill's auto-clarity carve-outs: security warnings, irreversible-action confirmations, ambiguous multi-step sequences → plain prose, then resume.
 
 ## Always-on cleanup
 
-Caveman includes automatic Unslop for session replies. Use `writing` for outward-facing prose and explicit cleanup, keeping deliverables in normal prose. Preserve facts, caveats, exact quotations, code and identifiers. Explicit user voice takes precedence over style defaults. Detailed editorial rules live in those skills.
+Caveman covers chat replies only. Anything written to a file or for another reader (docs, READMEs, UI copy, emails, commit messages, PR text) uses the `writing` skill in normal prose. Preserve facts, caveats, exact quotations, code and identifiers. No jargon, in chat or in files: say what a thing does in plain words instead of coining labels, internal codes or shorthand the reader hasn't seen. If a new term is unavoidable, define it the first time.
 
 ## CRITICAL: Verification
 
@@ -33,35 +28,31 @@ Defaults until configured:
 - Inspect logs / run scripts / read code yourself before claiming anything works.
 - Never claim visual/UI verification you didn't actually perform.
 - Can't run the authoritative check → flag the risk plainly, don't claim it passes.
-- When verification must happen elsewhere (CI, deploy, user's machine) → say so and stop.
-- Visual/UI checks: headed Chrome on the real GPU (`chromium.launch({ headless: false, channel: 'chrome' })`; fall back to `headless: false` without channel, never to headless). Headless renders WebGL through SwiftShader on the CPU, which burns the machine the session runs on and makes frame timings meaningless. Launch through `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`) so the window lands on a display the operator is not using and the keyboard goes straight back; never minimize the window instead, a minimized window drops to 1 fps. Pass this rule into every subagent prompt that does browser work.
-- Browser per session, never shared. The desktop app's Browser pane (`mcp__Claude_Browser__*`, `preview_start`) is one Chrome per app: a second session or subagent gets "Another task's Chrome owns browser slot". The official playwright plugin is one persistent profile: the second connection gets "Browser is already in use ... use --isolated" and deadlocks. Parallel or subagent browser work uses `mcp__playwright-iso__*` (`.mcp.json`, `@playwright/mcp --isolated`, in-memory profile) or `launchPlacedChrome()`. Detail: `.claude/reference/pitfalls.md`.
+- Visual/UI checks: headed Chrome on the real GPU, launched through `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`). Never headless (WebGL falls back to the CPU), never minimized (rAF drops to 1 fps). Pass this rule into every subagent prompt that does browser work.
+- Parallel or subagent browser work: each agent opens its own browser through `mcp__playwright-iso__*` (`--isolated`, any number at once) or `launchPlacedChrome()`. Never the shared playwright plugin or the app's Browser pane, which hold one browser and deadlock a second user. Detail: `.claude/reference/pitfalls.md`.
 
 ## Core principles
 
 - Plan before acting. Break large refactors into atomic steps.
 - Reproduce bugs before fixing them.
-- Scope discipline: No unrequested refactors, features, abstractions, or extra coding. Minimum complexity for the task at hand; optimize performance.
+- Scope discipline: No unrequested refactors, features, abstractions, or extra coding. Minimum complexity for the task at hand; don't regress performance.
 - Solve generally. Never hard-code to pass specific tests. If a test or requirement is wrong, say so rather than work around it.
 - Scratch work → `.tmp/` (gitignored). Promote to `scripts/` if reusable; otherwise delete.
-- Durable project knowledge → `.claude/reference/` via `/recall save` (committed, travels to every machine and sandbox). Standing truths only: moments (PR numbers, branch names, task status, tool-version snapshots) rot and don't get saved. Prefer the built-in generate-memory feature off; where per-machine memory files exist anyway, the same gate applies and keepers migrate into the reference.
-- Welcome correction. Confident-sounding mistakes happen; don't defend wrong answers. /why
-- Restraint is a feature. New kernel rules, skills, and reference entries must earn their place. Prefer pruning stale content over accreting. More ≠ better. Complex ≠ complexity.
-- Don't restate what the harness already injects every turn (the available-skills list, the environment block, tool-doc behavior). It reloads for free; repeating it in the kernel is pure waste. Keep only the project's value-add. Always-loaded files (this kernel, indexes) = thin hooks; full detail lives in `.claude/reference/` subfiles, loaded on demand. See `/optimize-context`.
+- Durable project knowledge → `.claude/reference/` via `/recall save` (committed, travels to every machine and sandbox). Standing truths only: moments (PR numbers, branch names, task status, tool-version snapshots) rot and don't get saved. `/recall` and `.claude/reference/` replace Claude Code's built-in auto memory, which stays off (`"autoMemoryEnabled": false` in `.claude/settings.json`).
+- Welcome correction. Confident-sounding mistakes happen; don't defend wrong answers. The user can challenge a recommendation with `/why`.
+- Restraint is a feature. New kernel rules, skills, and reference entries must earn their place; prefer pruning stale content over accreting. More ≠ better; complex ≠ complicated. This file loads every turn: keep cross-cutting safety and process rules here, move area-specific detail to `.claude/reference/`, and never restate what the harness already injects (skills list, environment block, tool docs). See `/optimize-context`.
 
-## Subagents: direct-by-default, never Sonnet or Haiku
+## Subagents
 
-- Model floor: Opus, the latest Fable, or a newer, higher tier only. NEVER pass `model: 'sonnet'` or `model: 'haiku'`. Omitting `model` (inherit session) is fine when the session model meets the floor; bulk/mechanical work runs the floor model at low effort.
+- Omit `model` on subagent calls unless the user names one. The default is `CLAUDE_CODE_SUBAGENT_MODEL` when set, else the session model.
 
 ## Git: push on completion
 
+- "Complete" = the requested change finished and verified to this environment's limits. On Complete: commit, push, and open or update the PR. Mid-task or exploratory work is NOT a commit trigger.
 - Stage intentionally. Never blanket-commit unrelated changes.
-
-* One open PR per unit of work; update it, never open a second. Before opening a PR, check for an existing open one (gh pr list --head <branch>) and push to that instead. 
-
+- Before opening a PR, check for an existing one (`gh pr list --head <branch>`) and push to that instead.
 - Merge PRs with **squash** by default (`gh pr merge --squash`); merge-commit or rebase only when the user explicitly asks.
 - Never force-push or run destructive git operations without an explicit request.
-- "Complete" = the requested change finished and verified to this environment's limits. Mid-task or exploratory work is NOT a commit trigger.
 - End commit messages with the standard `Co-Authored-By:` trailer.
 - PowerShell quoting trap: embedded `"` inside a here-string argument gets mangled en route to native exes (git/gh) and splits the argument. For multiline commit messages / PR bodies, write the text to a `.tmp/` file and use `git commit -F <file>` / `gh pr create --body-file <file>`, or keep the message free of double quotes.
 
@@ -86,11 +77,6 @@ Topical reference lives in `.claude/reference/`. Consult BEFORE non-trivial work
 
 New quirk bites → save it to `.claude/reference/pitfalls.md` before the task ends, without asking, when it cost a retry, a backed-out change, or a user correction and its cause is confirmed. Amend an existing entry over adding one. Other reference edits stay behind `/recall save`.
 
-Stays in this file: cross-cutting safety/process rules. Moves out: anything area-specific. Don't bloat the kernel.
 ## Codex compatibility
 
-Claude Code remains the primary runtime and `.claude/skills/` remains canonical.
-After adding, removing, or editing a skill or `skillOverrides`, run
-`node .claude/scripts/sync-codex-skills.mjs --write` and include the generated
-`.agents/skills/` changes. Do not hand-edit generated adapters; `AGENTS.md` owns
-Codex-specific runtime safety and tool translation.
+Every skill in `.claude/skills/` has a standalone Codex version in `.agents/skills/`, registered `native` in `.agents/skill-modes.json`, or is registered `disabled` when it needs Claude-only tools. Adding or editing a skill updates its Codex version in the same change, with tools translated per `.agents/codex-tools.md`; never ship a generated adapter. Then run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` to record the reviewed Claude source, and `node .claude/scripts/sync-codex-skills.mjs --check` (CI fails on drift or a missing registration). `AGENTS.md` owns Codex runtime safety.

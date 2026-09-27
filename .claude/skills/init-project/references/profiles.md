@@ -17,10 +17,12 @@ customizations. Show the concrete selection before applying it unless already ap
 Prefer reversible discovery settings over deleting skill folders. A request for minimal
 configuration does not by itself authorize deleting custom resources.
 
-In this starter, inspect the current generator and ownership registry before applying
+In this starter, inspect the Codex sync check and ownership registry before applying
 settings: Claude legacy skillOverrides and Codex .agents/skill-modes.json have distinct
-roles. Preserve explicit native ownership and intentional disables. Regeneration updates
-adapter-owned files; it does not overwrite or restore maintained native bodies/resources.
+roles. Preserve explicit native ownership and intentional disables. Each Claude skill is
+registered `native`, with a maintained port in `.agents/skills/<name>/`, or `disabled`;
+`node .claude/scripts/sync-codex-skills.mjs --check` enforces this and never generates or
+restores Codex bodies/resources.
 Use the runtime's supported setting only after verifying it in installed sources. Record
 what should disappear from discovery and verify after reload; source edits alone do not
 prove the running client loaded them.
