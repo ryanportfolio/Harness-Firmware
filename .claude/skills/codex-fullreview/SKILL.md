@@ -81,7 +81,8 @@ This format was confirmed on codex-cli 0.156.0: spawn calls and spawned children
 SID=$(sed -n 's/^session id: //p' "$RUN/run.log" | head -n 1)
 node -e '
 const fs = require("fs"), path = require("path");
-const [sid, root, marker] = process.argv.slice(1);
+const [sid, root, rawMarker] = process.argv.slice(1);
+const marker = (rawMarker ?? "").trim();
 const files = [];
 const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (/^rollout-.*\.jsonl$/.test(e.name)) files.push(p); } };
 walk(root);
