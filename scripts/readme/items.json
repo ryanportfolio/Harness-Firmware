@@ -75,6 +75,11 @@
       "group": "discipline"
     },
     {
+      "name": "long-horizon-swarm",
+      "label": "Long horizon swarm",
+      "group": "discipline"
+    },
+    {
       "name": "babysit-ci",
       "label": "Babysit CI",
       "group": "discipline"

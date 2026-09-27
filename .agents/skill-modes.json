@@ -25,6 +25,7 @@
     "init-project": "native",
     "lab": "native",
     "long-horizon": "native",
+    "long-horizon-swarm": "disabled",
     "long-horizon-workflows": "disabled",
     "optimize-context": "native",
     "perf-loop": "native",
