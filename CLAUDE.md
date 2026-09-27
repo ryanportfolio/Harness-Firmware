@@ -17,7 +17,7 @@ Invoke the `caveman` skill at **ultra** at session start. Applies to all prose r
 
 ## Always-on cleanup
 
-Use `writing` for outward-facing prose and explicit cleanup, keeping deliverables in normal prose. Preserve facts, caveats, exact quotations, code and identifiers. Explicit user voice takes precedence over style defaults. Detailed editorial rules live in those skills.
+Caveman covers chat replies only. Anything written to a file or for another reader (docs, READMEs, UI copy, emails, commit messages, PR text) uses the `writing` skill in normal prose. Preserve facts, caveats, exact quotations, code and identifiers.
 
 ## CRITICAL: Verification
 
@@ -28,7 +28,6 @@ Defaults until configured:
 - Inspect logs / run scripts / read code yourself before claiming anything works.
 - Never claim visual/UI verification you didn't actually perform.
 - Can't run the authoritative check → flag the risk plainly, don't claim it passes.
-- When verification must happen elsewhere (CI, deploy, user's machine) → say so and stop.
 - Visual/UI checks: headed Chrome on the real GPU, launched through `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`). Never headless (WebGL falls back to the CPU), never minimized (rAF drops to 1 fps). Pass this rule into every subagent prompt that does browser work.
 - Parallel or subagent browser work: each agent opens its own browser through `mcp__playwright-iso__*` (`--isolated`, any number at once) or `launchPlacedChrome()`. Never the shared playwright plugin or the app's Browser pane, which hold one browser and deadlock a second user. Detail: `.claude/reference/pitfalls.md`.
 
