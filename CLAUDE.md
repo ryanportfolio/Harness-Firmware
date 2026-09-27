@@ -12,13 +12,12 @@
 
 Invoke the `caveman` skill at **ultra** at session start. Applies to all prose replies, this and every future session.
 
-- The same contract ships as the project output style `.claude/output-styles/caveman.md`, selected by `outputStyle` in `.claude/settings.json`. The harness re-injects it every turn; the skill stays for level switching. A `/output-style` pick lands in `settings.local.json` and overrides the project default. Output styles reach the main conversation and forks only; other subagents run their own system prompt.
 - Code, commits, PRs, file contents, symbols, API names, error strings stay normal, never abbreviated.
 - Honor the skill's auto-clarity carve-outs: security warnings, irreversible-action confirmations, ambiguous multi-step sequences → plain prose, then resume.
 
 ## Always-on cleanup
 
-Caveman includes automatic Unslop for session replies. Use `writing` for outward-facing prose and explicit cleanup, keeping deliverables in normal prose. Preserve facts, caveats, exact quotations, code and identifiers. Explicit user voice takes precedence over style defaults. Detailed editorial rules live in those skills.
+Use `writing` for outward-facing prose and explicit cleanup, keeping deliverables in normal prose. Preserve facts, caveats, exact quotations, code and identifiers. Explicit user voice takes precedence over style defaults. Detailed editorial rules live in those skills.
 
 ## CRITICAL: Verification
 
@@ -31,7 +30,7 @@ Defaults until configured:
 - Can't run the authoritative check → flag the risk plainly, don't claim it passes.
 - When verification must happen elsewhere (CI, deploy, user's machine) → say so and stop.
 - Visual/UI checks: headed Chrome on the real GPU, launched through `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`). Never headless (WebGL falls back to the CPU), never minimized (rAF drops to 1 fps). Pass this rule into every subagent prompt that does browser work.
-- One browser per session. Parallel or subagent browser work uses `mcp__playwright-iso__*` or `launchPlacedChrome()`, never the shared playwright plugin or the app's Browser pane. Detail: `.claude/reference/pitfalls.md`.
+- Parallel or subagent browser work: each agent opens its own browser through `mcp__playwright-iso__*` (`--isolated`, any number at once) or `launchPlacedChrome()`. Never the shared playwright plugin or the app's Browser pane, which hold one browser and deadlock a second user. Detail: `.claude/reference/pitfalls.md`.
 
 ## Core principles
 
@@ -40,19 +39,19 @@ Defaults until configured:
 - Scope discipline: No unrequested refactors, features, abstractions, or extra coding. Minimum complexity for the task at hand; don't regress performance.
 - Solve generally. Never hard-code to pass specific tests. If a test or requirement is wrong, say so rather than work around it.
 - Scratch work → `.tmp/` (gitignored). Promote to `scripts/` if reusable; otherwise delete.
-- Durable project knowledge → `.claude/reference/` via `/recall save` (committed, travels to every machine and sandbox). Standing truths only: moments (PR numbers, branch names, task status, tool-version snapshots) rot and don't get saved. `/recall` and `.claude/reference/` replace Claude Code's built-in auto memory, which stays off (`"autoMemoryEnabled": false` in `.claude/settings.json`). Leftover per-machine memory files get the same gate; keepers migrate into the reference.
+- Durable project knowledge → `.claude/reference/` via `/recall save` (committed, travels to every machine and sandbox). Standing truths only: moments (PR numbers, branch names, task status, tool-version snapshots) rot and don't get saved. `/recall` and `.claude/reference/` replace Claude Code's built-in auto memory, which stays off (`"autoMemoryEnabled": false` in `.claude/settings.json`).
 - Welcome correction. Confident-sounding mistakes happen; don't defend wrong answers. The user can challenge a recommendation with `/why`.
 - Restraint is a feature. New kernel rules, skills, and reference entries must earn their place; prefer pruning stale content over accreting. More ≠ better; complex ≠ complicated. This file loads every turn: keep cross-cutting safety and process rules here, move area-specific detail to `.claude/reference/`, and never restate what the harness already injects (skills list, environment block, tool docs). See `/optimize-context`.
 
-## Subagents: model floor
+## Subagents
 
-- Opus, the latest Fable, or a newer, higher tier only. NEVER pass `model: 'sonnet'` or `model: 'haiku'`. Omitting `model` (inherit session) is fine when the session model meets the floor. Bulk/mechanical work runs the floor model at low effort; effort comes from the agent definition's `effort` frontmatter (`.claude/agents/*.md`), not the Agent call.
+- Subagents inherit the session model: omit `model` unless the user names one.
 
 ## Git: push on completion
 
 - "Complete" = the requested change finished and verified to this environment's limits. On Complete: commit, push, and open or update the PR. Mid-task or exploratory work is NOT a commit trigger.
 - Stage intentionally. Never blanket-commit unrelated changes.
-- One open PR per unit of work; update it, never open a second. Before opening a PR, check for an existing one (`gh pr list --head <branch>`) and push to that instead.
+- Before opening a PR, check for an existing one (`gh pr list --head <branch>`) and push to that instead.
 - Merge PRs with **squash** by default (`gh pr merge --squash`); merge-commit or rebase only when the user explicitly asks.
 - Never force-push or run destructive git operations without an explicit request.
 - End commit messages with the standard `Co-Authored-By:` trailer.
@@ -81,4 +80,4 @@ New quirk bites → save it to `.claude/reference/pitfalls.md` before the task e
 
 ## Codex compatibility
 
-Claude Code remains the primary runtime and `.claude/skills/` remains canonical. After adding, removing, or editing a skill or `skillOverrides`, run `node .claude/scripts/sync-codex-skills.mjs --write` and include the generated `.agents/skills/` changes. Do not hand-edit generated adapters; `AGENTS.md` owns Codex-specific runtime safety and tool translation.
+Every skill in `.claude/skills/` has a standalone Codex version in `.agents/skills/`, registered `native` in `.agents/skill-modes.json`, or is registered `disabled` when it needs Claude-only tools. Adding or editing a skill updates its Codex version in the same change, with tools translated per `.agents/codex-tools.md`; never ship a generated adapter. Then run `node .claude/scripts/sync-codex-skills.mjs --write` and `node .claude/scripts/check-skill-capabilities.mjs`. `AGENTS.md` owns Codex runtime safety.
