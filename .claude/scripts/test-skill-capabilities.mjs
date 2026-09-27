@@ -309,7 +309,7 @@ test('a newly added unregistered skill warns and exits 0', t => {
   assertGreen(results);
   assert.match(results.capabilities.output, /local-helper: claude skill is not registered in \.agents\/skill-capabilities\.json/);
   assert.match(results.sync.output, /adapter needs create: local-helper/);
-  assert.match(results.readmeVerify.output, /local-helper: not listed in scripts\/readme\/items\.json/);
+  assert.doesNotMatch(results.readmeVerify.output, /not listed in scripts\/readme\/items\.json/);
 });
 
 test('a hand-edited README warns and exits 0', t => {
