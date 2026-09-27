@@ -73,7 +73,7 @@ When the user authorized propagation of a generic skill fix, new skill, or hook 
    - CI gates both `push` and `pull_request`, so direct-to-main is still checked, but only after the change is live to everyone spawning a project. That is why PR is the default.
    - The dual trigger means a PR shows two check runs and sits at `mergeStateStatus: UNSTABLE` until the second finishes. Wait for it (`gh run watch <id> --exit-status`); do not merge on the first green.
    - The template allows squash only: `gh pr merge <n> --squash`, when merging is authorized.
-   - If the change touched a skill, update its Claude version in `.claude/skills/` to match when it has one, then run `node .claude/scripts/sync-codex-skills.mjs --check`. It exits 0 and CI shows drift only as a warning annotation, so read its output; a Claude skill with no native Codex version yet needs `--write` to generate its fallback adapter.
+   - If the change touched a skill, update its Claude version in `.claude/skills/` to match when it has one, then run `node .claude/scripts/sync-codex-skills.mjs --check` and read its output. There are no generated adapters; every skill needs a native Codex version or a `disabled` entry.
 4. **Bump the plugin version** when the change touches the shared surface (`.claude/skills`, `.claude/hooks`, `.claude/output-styles`, `.claude/settings.json`): edit `version` in the template's `.claude-plugin/plugin.json`, patch for fixes, minor for new skills. Plugin installs only receive updates when this number changes; spawned projects get changes through Direction A regardless.
 5. Mention that other spawned projects pick it up through Direction A.
 

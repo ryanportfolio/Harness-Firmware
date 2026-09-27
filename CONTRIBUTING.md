@@ -6,16 +6,17 @@ judged on what they cost to keep loaded, not just on whether they work.
 ## dev loop
 
 Each runtime gets its own maintained skill: Claude's in `.claude/skills/`, Codex's in
-`.agents/skills/`, registered as `native` in `.agents/skill-modes.json`. Sync preserves
-native files and generates an adapter only for a Claude skill with no native Codex version
-yet. See [Codex skill maintenance](docs/codex-skills.md).
+`.agents/skills/`, registered as `native` in `.agents/skill-modes.json`, or `disabled` when
+it needs Claude-only tools. There are no generated adapters: a Claude skill change needs a
+Codex port update or a re-baseline, or the drift check fails. See
+[Codex skill maintenance](docs/codex-skills.md).
 
 ```sh
 # 1. edit the skill in each runtime that ships it
 $EDITOR .claude/skills/<skill>/SKILL.md
 $EDITOR .agents/skills/<skill>/SKILL.md
 
-# 2. sync: validates native Codex skills, generates any fallback adapters
+# 2. sync: validates native Codex skills
 node .claude/scripts/sync-codex-skills.mjs --write
 
 # 3. check the Codex skills still satisfy the contract
@@ -70,8 +71,8 @@ A good skill PR contains:
   from a third party, plus that upstream's LICENSE or NOTICE file kept inside
   the skill folder. Record what you changed.
 - A native Codex version registered in `.agents/skill-modes.json` with its capability
-  classification, or a generated adapter as the fallback until one exists. Include sync
-  and contract verification.
+  classification, or a `disabled` entry when the skill needs Claude-only tools. Include
+  sync and contract verification.
 - The context-weight number before and after, when the skill is large.
 
 Skills earn their place. Prefer improving an existing one over adding a
