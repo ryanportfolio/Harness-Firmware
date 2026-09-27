@@ -230,7 +230,7 @@ test("facts CLI accepts absent optional settings but rejects malformed settings"
   assert.equal(malformed.stdout, "");
 });
 
-test("a project with one skill, a hand-edited README, and an unlisted skill builds and verifies with warnings", (t) => {
+test("a project with one skill, a hand-edited README, and an unlisted skill builds and verifies without an unlisted-skill warning", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "readme-one-skill-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const repo = absolute(".");
@@ -245,7 +245,7 @@ test("a project with one skill, a hand-edited README, and an unlisted skill buil
   const verify = spawnSync(process.execPath, ["scripts/readme/verify.mjs"], { cwd: root, encoding: "utf8" });
   assert.equal(verify.status, 0, verify.stderr);
   assert.match(verify.stdout, /README artifacts are stale \([^)]*README\.md[^)]*\); run node scripts\/readme\/build\.mjs/);
-  assert.match(verify.stdout, /local-helper: not listed in scripts\/readme\/items\.json/);
+  assert.doesNotMatch(verify.stdout, /not listed in scripts\/readme\/items\.json/);
   const rebuild = spawnSync(process.execPath, ["scripts/readme/build.mjs"], { cwd: root, encoding: "utf8" });
   assert.equal(rebuild.status, 0, rebuild.stderr);
   const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
