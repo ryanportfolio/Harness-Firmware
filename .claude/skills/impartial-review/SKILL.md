@@ -32,6 +32,7 @@ Record the run ID, absolute workspace, exact base/head SHAs, staged/unstaged dif
 
 - **Tiny diff (< 50 changed lines, single file, no schema/auth/cache code):** use one fresh leaf reviewer covering all relevant buckets, including project rules.
 - **Everything else:** cover all five buckets with fresh reviewers, one per bucket, in bounded batches (see Step 3).
+- **Open lens (everything but a tiny diff):** add one Bucket G reviewer. The five buckets are shaped for application code; an animation, a build script, or a UI change can carry its main risk in a lens none of them names. Bucket G picks that lens itself.
 - **With an author brief:** add one Bucket F reviewer at either size. Buckets A–E stay diff-only, so the review keeps a layer that never sees the author's framing.
 
 Preserve independent context at every size. If risk is unclear, use the broader coverage.
@@ -72,7 +73,7 @@ Each prompt must include:
 5. The per-finding output format from Step 6.
 6. An instruction to **only** report findings in their bucket — the main session deduplicates and merges.
 
-Never put the author brief in a Bucket A–E prompt, including the tiny-diff reviewer's; it goes to Bucket F only.
+Never put the author brief in a Bucket A–E or G prompt, including the tiny-diff reviewer's; it goes to Bucket F only.
 
 For a full review, Bucket E (project-aware) gets an **extended** prompt; the other four use the standard template. For a tiny diff, combine the relevant instructions into one prompt and remove statements that assume other reviewers exist.
 
@@ -152,6 +153,18 @@ Buckets A–E judge what the code does. None of them knows what it was meant to 
 - The checks the brief says were run: do they actually exercise the risky parts, or is something important untested?
 
 The brief is the author's framing, not evidence. Findings come from the code; the brief only says where to aim.
+
+**Bucket G: Open lens** (everything but a tiny diff)
+
+The other buckets are fixed lenses. Bucket G gets the diff and the names of the lenses already assigned in this run (never their findings, and never the author brief), then chooses the one or two lenses most likely to find a real problem in this diff that no assigned reviewer covers. It may pick a standard bucket that was not assigned, or any other lens the diff calls for, for example:
+
+- Rendering and frame budget, reduced-motion and accessibility, visual regressions (UI and animation)
+- Concurrency and ordering, resource cleanup (async code, workers)
+- Cross-platform behavior: shells, line endings, paths (scripts and tooling)
+- Cost and rate limits, prompt size (LLM calls)
+- Copy, i18n, and user-facing wording
+
+It names each lens it chose and ties the choice to specific lines of the diff before reviewing through it. A lens with no reason tied to this diff counts as a failed review, not a finding.
 
 ### Subagent prompt template (Buckets A–D)
 
@@ -337,6 +350,10 @@ the merge step filters.
 
 Use the Buckets A–D template with these changes: the role line says "You are the intent reviewer: you get the author's brief and check the change against its stated purpose"; add an `## Author brief` section with the brief pasted verbatim, labeled "the author's framing, not evidence: verify every claim in it against the code"; replace the bucket section with the Bucket F bullets; replace "The main session merges with the other reviewers" with "Other reviewers, who never see the brief, cover correctness, data flow, performance, missed changes, and project rules."
 
+### Subagent prompt template (Bucket G only)
+
+Use the Buckets A–D template with these changes: the role line says "You are the open-lens reviewer: other reviewers cover fixed lenses; you choose the lens they miss"; add a `## Lenses already assigned` section listing the bucket names in this run (names only); replace the bucket section with the Bucket G paragraph and examples; require the output to open with `Lenses chosen:` and, for each, one line naming the diff lines that make it relevant; replace "The main session merges with the other reviewers" with "Do not repeat a lens already assigned." Never include the author brief.
+
 ## Step 4: Verification rule
 
 For every potential issue, run a real check before asserting. `grep` for call sites. `Read` the file. Open the consumer and look. Plausible-sounding-but-unchecked claims waste the human's time when they re-investigate and find the claim was wrong. A check your sandbox blocked is not a check you ran: name it and tag the finding LOW.
@@ -358,7 +375,7 @@ When the selected reviewers return — **this is the precision stage.** The suba
 1. **Deduplicate — and read agreement as signal.** Two agents may flag the same issue from different angles — merge into one finding, keep the higher severity. Bucket E findings often overlap with A/B/C/D (e.g., a cover-identity leak is also a correctness issue) — merge but preserve E's rule citation so the human sees *why* it's a violation. The same issue surfaced independently by two or more subagents is high-confidence signal: note the agreement on the merged finding ("flagged independently by A and D") and weight it accordingly when you verify. A lone-agent finding is still worth verifying, just with lower prior.
 2. **Verify every finding you intend to surface — across all severities, not just 🔴.** The finding stage deliberately over-reported, including LOW-confidence items; turning that into precision is your job. For each finding, run a real `grep`/`Read` to confirm before passing it to the human (for Bucket E, open the cited rule file and confirm the rule actually says what the agent claimed — paraphrased rules are the most common Bucket E failure mode). Treat the 🔴s adversarially: a fresh-context subagent in a hurry is exactly the kind of reviewer that produces plausible-but-wrong blockers, so try to *refute* each one before you accept it.
    - **Own the confidence filter — but drop only on evidence.** A finding tagged LOW-confidence gets *confirmed* (verify, then promote and re-tag), *refuted* (drop it from the findings list and record it under "Dismissed" with the reason), or *kept as LOW* with a one-line note on the residual uncertainty. Drop a finding **only because you checked and it isn't real** — never because it "seems minor" or "seems unlikely." Filtering on vibes here re-introduces exactly the recall loss the coverage-first finding stage was built to prevent.
-3. **Tag each finding's source** when Bucket F ran: *blind* (A–E only), *intent* (F only), or *both*. Intent-only findings are what the brief made visible. A blind-only finding that sits in an area the brief called risky or covered means the brief may have steered F away from it; say so in the report.
+3. **Tag each finding's source** when Bucket F ran: *blind* (A–E or G, the reviewers that never see the brief), *intent* (F only), or *both*. Intent-only findings are what the brief made visible. A blind-only finding that sits in an area the brief called risky or covered means the brief may have steered F away from it; say so in the report.
 4. **Severity-order globally.** All 🔴 first across all buckets, then all 🟡, then 🟢 — not bucket-by-bucket and not in the order agents returned.
 5. **Present in this format:**
 
@@ -391,7 +408,9 @@ After the findings, include:
 Be concrete about merge readiness.]
 ```
 
-If every reviewer returned zero findings and your verification confirms, report the actual reviewer count, covered buckets (including whether Bucket F ran), and any unavailable checks. A clean result is valid; do not infer missed defects from the finding count alone.
+If every reviewer returned zero findings and your verification confirms, report the actual reviewer count, covered buckets (including whether Bucket F ran), and any unavailable checks.
+
+In every report, list any standard bucket (A–E) that had no reviewer, each with a one-line reason tied to the diff ("C: animation-only change, no input or data handling"), and the lenses Bucket G chose with its stated reasons. A skipped bucket is a stated decision, never a silent one. A clean result is valid; do not infer missed defects from the finding count alone.
 
 ## Anti-patterns to avoid
 
