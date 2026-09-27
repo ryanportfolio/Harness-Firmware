@@ -47,6 +47,7 @@ Residue: <paths a failed earlier round left changed, and whether they were rever
 
 Only audit-passed results enter **Verified progress**. Resume from the existing state file
 and reconcile it with the actual workspace and latest user instructions.
+A state file marked `Swarm: on` also follows the `long-horizon-swarm` skill.
 
 Preserve the original contract. Explicit user changes become versioned amendments; reassess
 affected steps and invalidate affected claims before using them as prerequisites. Never weaken
