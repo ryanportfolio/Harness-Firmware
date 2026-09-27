@@ -28,6 +28,7 @@
     "long-horizon-swarm": "disabled",
     "long-horizon-workflows": "disabled",
     "optimize-context": "native",
+    "opus-fullreview": "native",
     "perf-loop": "native",
     "recall": "native",
     "refine": "native",

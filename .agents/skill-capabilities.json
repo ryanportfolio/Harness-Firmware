@@ -628,6 +628,28 @@
         "Measure the executing runtime catalog/kernel and verify retrieval after relocation; Claude hook measurements are not Codex measurements."
       ]
     },
+    "opus-fullreview": {
+      "coverage": [
+        "codex"
+      ],
+      "owners": {
+        "codex": "native"
+      },
+      "entrypoints": [
+        "opus-fullreview"
+      ],
+      "requiredTools": [
+        "subscription-routed-claude-cli"
+      ],
+      "sharedContracts": [
+        "independence",
+        "evidence"
+      ],
+      "resources": [],
+      "exceptions": [
+        "Codex-only launcher: Claude CLI runs the Claude impartial-review skill as Manager with Opus sub-reviewers. Claude sessions use impartial-review directly."
+      ]
+    },
     "perf-loop": {
       "coverage": [
         "claude",
