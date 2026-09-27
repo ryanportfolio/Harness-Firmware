@@ -20,6 +20,8 @@ condensed.
 
 ### Changed
 
+- A skill folder that `scripts/readme/items.json` does not list no longer produces a
+  README warning. The README still leaves it out until it is listed.
 - Adding or removing a skill no longer fails a check. Codex sync, the capability and
   contract checks, the doctor, and the README verify step and tests now warn and exit 0
   for a missing or unregistered skill, a missing dependency, a retired skill that
