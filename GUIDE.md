@@ -62,7 +62,7 @@ Run:
 node .claude/scripts/doctor.mjs
 ```
 
-The doctor checks hook wiring, skill frontmatter, generated Codex adapters, skill coverage, the reference library, plugin manifests, leftover `FILL IN` markers, and always-loaded context weight.
+The doctor checks hook wiring, skill frontmatter, that every Claude skill has a registered native or disabled Codex version and that native ports are in sync with their Claude source, skill coverage, the reference library, plugin manifests, leftover `FILL IN` markers, and always-loaded context weight.
 
 ## add or remove skills
 
