@@ -53,7 +53,7 @@ jobs:
           shellcheck bootstrap/new-claude-project.sh
           bash bootstrap/new-claude-project.sh --help > /dev/null
 
-      - name: Codex skill adapters are current
+      - name: Codex skills registered and in sync with their Claude source
         run: node .claude/scripts/sync-codex-skills.mjs --check
 
       - name: Codex starter contract is valid
