@@ -30,7 +30,8 @@ test("README facts match the installed skills", () => {
   for (const [group, count] of Object.entries(facts.tierCounts)) {
     assert.equal(count, facts.skills.filter((skill) => skill.group === group).length, group);
   }
-  assert.equal(facts.codexNativeCount + facts.codexAdapterCount, facts.codexSkillCount);
+  assert.equal(facts.codexNativeCount, facts.codexSkillCount);
+  assert.equal("codexAdapterCount" in facts, false);
   assert.ok(Number.isInteger(facts.referenceFileCount) && facts.referenceFileCount >= 0);
   assert.deepEqual(facts.runtimeNames, ["Claude Code", "Codex"]);
   assert.equal(facts.runtimeCount, facts.runtimeNames.length);
@@ -191,8 +192,8 @@ test("counts read naturally at one and omit empty groups", () => {
 });
 
 test("Codex inventory honors native additions and both disabled sources", () => {
-  const names = ['adapter', 'native', 'disabled', 'legacy'];
-  assert.deepEqual(expectedCodexNames(names, {native: 'native', extra: 'native', disabled: 'disabled', legacy: 'native'}, {legacy: 'off'}), ['adapter', 'extra', 'native']);
+  const names = ['unregistered', 'native', 'disabled', 'legacy'];
+  assert.deepEqual(expectedCodexNames(names, {native: 'native', extra: 'native', disabled: 'disabled', legacy: 'native'}, {legacy: 'off'}), ['extra', 'native', 'unregistered']);
   assert.deepEqual(expectedCodexNames(['old', 'ordinary']), ['old', 'ordinary']);
 });
 

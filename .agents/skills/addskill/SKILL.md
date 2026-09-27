@@ -22,8 +22,11 @@ For this repository:
 1. A standalone Codex workflow lives in `.agents/skills/<name>/SKILL.md`. Register its name
    as `native` in `.agents/skill-modes.json`. Preserve explicit disabled choices and legacy
    overrides. Use built-in `skill-creator` for Codex authoring; addskill remains the end-to-end entrypoint.
-2. A shared Claude workflow keeps its source in `.claude/skills/<name>/SKILL.md` and uses a
-   generated Codex adapter. Edit that source only when changing Claude behavior is authorized.
+2. A shared Claude workflow keeps its source in `.claude/skills/<name>/SKILL.md` and needs a
+   maintained Codex port in `.agents/skills/<name>/` registered `native`, or a `disabled` entry.
+   Edit that source only when changing Claude behavior is authorized. After a Claude skill change,
+   update its Codex port to match, then run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>`;
+   `--check` fails until both are done.
 3. Classify every active Codex skill once in `.agents/CODEX-SKILL-COMPATIBILITY.md`. Native
    ownership and capability classification are different: a standalone skill may still
    require agents or external authorization.

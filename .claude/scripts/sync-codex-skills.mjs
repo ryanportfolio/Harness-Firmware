@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -13,7 +14,9 @@ const targetRoot = path.join(root, ".agents", "skills");
 const settingsPath = path.join(root, ".claude", "settings.json");
 const modesPath = path.join(root, ".agents", "skill-modes.json");
 const removedPath = path.join(root, ".agents", "removed-skills.json");
+const sourcesPath = path.join(root, ".agents", "skill-sources.json");
 const mode = process.argv[2] ?? "--check";
+const baselineNames = process.argv.slice(3);
 
 // Unreadable input fails with one line naming the file, not a stack trace.
 process.on("uncaughtException", (error) => {
@@ -26,8 +29,8 @@ function parseJson(text, file) {
   try { return JSON.parse(text); } catch (error) { throw new SyntaxError(`${file}: ${error.message}`); }
 }
 
-if (!new Set(["--check", "--write"]).has(mode)) {
-  console.error("Usage: node .claude/scripts/sync-codex-skills.mjs [--check|--write]");
+if (!new Set(["--check", "--write", "--baseline"]).has(mode) || (mode === "--baseline") !== (baselineNames.length > 0)) {
+  console.error("Usage: node .claude/scripts/sync-codex-skills.mjs [--check|--write]\n       node .claude/scripts/sync-codex-skills.mjs --baseline <skill> [<skill>...]");
   process.exit(2);
 }
 
@@ -143,27 +146,52 @@ function removedSkills() {
   return new Set(record.removed);
 }
 
-function codexDescription(description) {
-  return description.replace(
-    /(^|[\s("'\x60])\/([a-z][a-z0-9-]*)(?=$|[\s,.:;)"'\x60])/g,
-    "$1$$$2",
-  );
-}
-
-function adapterText(skillDir, metadata) {
-  const canonical = `../../../.claude/skills/${skillDir}/SKILL.md`;
-  return `---\nname: ${JSON.stringify(metadata.name)}\ndescription: ${JSON.stringify(metadata.description)}\n---\n\n${MARKER}\n\n# Codex Adapter\n\nRead \`${canonical}\` completely and follow it as the canonical workflow for this skill.\n\n- Resolve every relative script, reference, asset, and template path from the canonical skill directory under \`.claude/skills/${skillDir}/\`.\n- Read \`../../../.agents/CODEX-SKILL-COMPATIBILITY.md\` and apply the status and exceptions for this skill.\n- Translate Claude Code tool names to the available Codex equivalent as described by the repository \`AGENTS.md\`.\n- Before any Claude \`Task\`, \`Agent\`, or \`Workflow\` step, confirm that the current Codex session exposes the required multi-agent tools. Do not replace independent review with self-review.\n- Skill invocation alone does not authorize commit, push, PR, merge, deploy, migration, dependency installation, or another outward action unless that action is the user's explicit request.\n- Follow Codex system, developer, sandbox, approval, and tool instructions when they differ from the canonical workflow.\n- Keep the canonical Claude skill unchanged unless the user explicitly asks to edit the workflow itself.\n`;
-}
-
 function generatedAdapter(filePath) {
   return fs.existsSync(filePath) && fs.readFileSync(filePath, "utf8").includes(MARKER);
 }
 
+// SHA-256 over every file under .claude/skills/<name>/, in sorted relative POSIX path order.
+// Each file contributes "<path>\0<byte length>\0<content>". Files without a NUL byte are text
+// and have CRLF folded to LF, so a line-ending-only change keeps the hash.
+function sourceHash(name) {
+  const base = path.join(sourceRoot, name);
+  const files = [];
+  (function walk(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const full = path.join(directory, entry.name);
+      if (fs.statSync(full).isDirectory()) walk(full);
+      else files.push(path.relative(base, full).split(path.sep).join("/"));
+    }
+  })(base);
+  const hash = crypto.createHash("sha256");
+  for (const relative of files.sort()) {
+    let content = fs.readFileSync(path.join(base, relative));
+    if (!content.includes(0)) content = Buffer.from(content.toString("latin1").replaceAll("\r\n", "\n"), "latin1");
+    hash.update(`${relative}\0${content.length}\0`);
+    hash.update(content);
+  }
+  return hash.digest("hex");
+}
+
+// Reviewed Claude source hash per native Codex port; a missing file records none.
+function readSources() {
+  if (!fs.existsSync(sourcesPath)) return {};
+  const record = parseJson(fs.readFileSync(sourcesPath, "utf8"), ".agents/skill-sources.json");
+  if (record?.version !== 1 || !record.skills || typeof record.skills !== "object" || Array.isArray(record.skills)
+    || Object.values(record.skills).some((value) => typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value))) {
+    throw new Error(`.agents/skill-sources.json: expected {"version": 1, "skills": {"<name>": "<sha256 hex>"}}`);
+  }
+  return record.skills;
+}
+
 const disabled = disabledSkills();
 const removed = removedSkills();
-// Missing, unregistered, or mismatched skills are warnings: projects add and remove skills
-// freely. Only unreadable files and writes that would escape the repository fail.
+// Missing or mismatched skills are warnings: projects add and remove skills freely. A Claude
+// skill with no Codex registration, a generated adapter, or the adapter mode is an error.
+// Unreadable files and writes that would escape the repository fail.
 const warnings = [];
+const errors = [];
+const port = (name) => `write a native port under .agents/skills/${name}/ and register it "native", or register ${name} "disabled" in .agents/skill-modes.json`;
 const modes = fs.existsSync(modesPath) ? parseJson(fs.readFileSync(modesPath, "utf8"), ".agents/skill-modes.json") : { version: 1, skills: {} };
 if (modes.version !== 1 || !modes.skills || typeof modes.skills !== "object" || Array.isArray(modes.skills)) {
   throw new Error(`${modesPath}: expected version 1 and a skills object`);
@@ -172,15 +200,31 @@ for (const [name, ownership] of Object.entries(modes.skills)) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || !["native", "adapter", "disabled"].includes(ownership)) {
     throw new Error(`${modesPath}: invalid skill name or mode: ${name}`);
   }
+  if (ownership === "adapter") errors.push(`.agents/skill-modes.json: ${name} uses mode "adapter"; generated adapters are no longer supported, so ${port(name)}`);
   if (ownership === "disabled") disabled.add(name);
 }
-// Retired skills never receive an adapter; check-skill-capabilities.mjs names their replacement.
 const capabilitiesPath = path.join(root, ".agents", "skill-capabilities.json");
 const retired = new Set(fs.existsSync(capabilitiesPath) ? Object.keys(parseJson(fs.readFileSync(capabilitiesPath, "utf8"), ".agents/skill-capabilities.json").retired ?? {}) : []);
-const desired = new Map();
 const native = new Set();
-// Registered native skills never receive a generated adapter, even while their file is missing.
 const nativeMode = new Set(Object.entries(modes.skills).filter(([, ownership]) => ownership === "native").map(([name]) => name));
+// Covered: a native Codex port with a Claude source. Its source hash is recorded at review time.
+const covered = [...nativeMode].filter((name) => fs.existsSync(path.join(sourceRoot, name, "SKILL.md"))).sort();
+const sources = readSources();
+
+// --baseline records the current Claude source hash for exactly the named skills.
+if (mode === "--baseline") {
+  const uncovered = baselineNames.filter((name) => !covered.includes(name));
+  if (uncovered.length) {
+    for (const name of uncovered) console.error(`ERROR: ${name} is not a native Codex skill with a .claude/skills/${name}/SKILL.md source; nothing recorded`);
+    process.exit(1);
+  }
+  const next = { ...sources };
+  for (const name of baselineNames) next[name] = sourceHash(name);
+  const skills = Object.fromEntries(Object.keys(next).sort().map((name) => [name, next[name]]));
+  fs.writeFileSync(sourcesPath, `${JSON.stringify({ version: 1, skills }, null, 2)}\n`);
+  for (const name of [...new Set(baselineNames)]) console.log(`baseline: ${name} ${skills[name]}`);
+  process.exit(0);
+}
 
 // Native skills are maintained directly. Sync validates, but never writes them.
 for (const name of nativeMode) {
@@ -194,10 +238,8 @@ for (const name of nativeMode) {
     }
     continue;
   }
-  if (generatedAdapter(skillPath)) {
-    warnings.push(`${skillPath}: native mode expects a maintained SKILL.md, not a generated adapter`);
-    continue;
-  }
+  // A generated file here is reported by the adapter scan below and left in place.
+  if (generatedAdapter(skillPath)) continue;
   const text = fs.readFileSync(skillPath, "utf8");
   const metadata = readMetadata(name, skillPath);
   if (typeof metadata.description !== "string") throw new Error(`${skillPath}: native metadata needs a description`);
@@ -214,54 +256,74 @@ for (const name of nativeMode) {
   native.add(name);
 }
 
+// Every Claude skill needs a Codex registration. Folders without SKILL.md are resource-only.
 if (fs.existsSync(sourceRoot)) {
   for (const entry of fs.readdirSync(sourceRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory() || disabled.has(entry.name) || nativeMode.has(entry.name)) continue;
+    if (!entry.isDirectory() || disabled.has(entry.name) || Object.hasOwn(modes.skills, entry.name)) continue;
     const skillPath = path.join(sourceRoot, entry.name, "SKILL.md");
     if (!fs.existsSync(skillPath)) continue;
     if (retired.has(entry.name)) {
-      warnings.push(`${skillPath}: ${entry.name} is retired, so no adapter is generated; see its retirement note in .agents/skill-capabilities.json and delete the folder unless you mean to bring it back`);
-      continue;
+      warnings.push(`${skillPath}: ${entry.name} is retired; see its retirement note in .agents/skill-capabilities.json and delete the folder unless you mean to bring it back`);
+    } else if (removed.has(entry.name)) {
+      warnings.push(`${skillPath}: ${entry.name} is recorded in .agents/removed-skills.json but its Claude folder remains; delete the folder or register it in .agents/skill-modes.json`);
+    } else {
+      errors.push(`${skillPath}: ${entry.name} has no entry in .agents/skill-modes.json; ${port(entry.name)}`);
     }
-    const metadata = readMetadata(entry.name, skillPath);
-    metadata.description = codexDescription(metadata.description);
-    desired.set(entry.name, adapterText(entry.name, metadata));
   }
 }
 
+// A Claude skill that changed since its Codex port was last reviewed fails until the port is reviewed.
+const baseline = (name) => `node .claude/scripts/sync-codex-skills.mjs --baseline ${name}`;
+for (const name of covered) {
+  if (!Object.hasOwn(sources, name)) {
+    errors.push(`.agents/skill-sources.json: ${name} has no reviewed Claude source hash; review .agents/skills/${name}/ against .claude/skills/${name}/, then run ${baseline(name)}`);
+  } else if (sources[name] !== sourceHash(name)) {
+    errors.push(`.agents/skill-sources.json: ${name}: the Claude skill changed since its Codex port was last reviewed; update .agents/skills/${name}/ to match, then run ${baseline(name)}`);
+  }
+}
+// An entry for a deleted Claude skill only warns; one for a Claude skill that lost its port fails.
+for (const name of Object.keys(sources)) {
+  if (covered.includes(name)) continue;
+  if (!fs.existsSync(path.join(sourceRoot, name))) warnings.push(`.agents/skill-sources.json: ${name} has no .claude/skills/${name}/ folder; its entry can be removed`);
+  else errors.push(`.agents/skill-sources.json: ${name} is stale; it is not a native Codex skill with a Claude source, so remove its entry`);
+}
+
+// --write deletes generated adapters, except under an enabled native skill.
 const actions = [];
-for (const [skillDir, expected] of desired) {
-  const adapterPath = path.join(targetRoot, skillDir, "SKILL.md");
-  if (!fs.existsSync(adapterPath)) {
-    actions.push({ type: "create", skillDir, adapterPath, expected });
-    continue;
-  }
-  const actual = fs.readFileSync(adapterPath, "utf8").replaceAll("\r\n", "\n");
-  if (actual === expected) continue;
-  if (!generatedAdapter(adapterPath)) {
-    // A hand-authored Codex skill is never overwritten; register it as native to silence this.
-    warnings.push(`${adapterPath}: hand-authored Codex skill left in place; register it as native in .agents/skill-modes.json`);
-    continue;
-  }
-  actions.push({ type: "update", skillDir, adapterPath, expected });
-}
-
 if (fs.existsSync(targetRoot)) {
   for (const entry of fs.readdirSync(targetRoot, { withFileTypes: true })) {
-    if ((!entry.isDirectory() && !entry.isSymbolicLink()) || desired.has(entry.name) || native.has(entry.name)) continue;
-    // An enabled native skill is never removed, even when its file carries the generated marker.
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
     if (nativeMode.has(entry.name) && !disabled.has(entry.name)) continue;
     const adapterPath = path.join(targetRoot, entry.name, "SKILL.md");
     if (disabled.has(entry.name) && fs.existsSync(adapterPath) && !generatedAdapter(adapterPath)) {
       warnings.push(`${adapterPath}: disabled native skill remains discoverable; move it outside .agents/skills explicitly`);
     }
-    if (generatedAdapter(adapterPath)) {
-      actions.push({ type: "remove", skillDir: entry.name, adapterPath });
-    }
+    if (generatedAdapter(adapterPath)) actions.push({ type: "remove", skillDir: entry.name, adapterPath });
   }
 }
 
-// A generated target must not point outside this checkout through a directory link.
+// Any generated SKILL.md under .agents/skills is an error, at any depth and through links.
+const pending = new Set(actions.map((action) => action.adapterPath));
+const visited = new Set();
+function scanAdapters(directory) {
+  const real = fs.realpathSync(directory);
+  if (visited.has(real)) return;
+  visited.add(real);
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const full = path.join(directory, entry.name);
+    if (!fs.existsSync(full)) continue;
+    if (fs.statSync(full).isDirectory()) scanAdapters(full);
+    else if (entry.name === "SKILL.md" && generatedAdapter(full)) {
+      if (mode === "--write" && pending.has(full)) continue;
+      const name = path.relative(targetRoot, full).split(path.sep)[0];
+      const fix = pending.has(full) ? "--write deletes it" : "delete it";
+      errors.push(`${full}: generated Codex adapter for ${name}; adapters are no longer supported, so ${fix}, then ${port(name)}`);
+    }
+  }
+}
+if (fs.existsSync(targetRoot)) scanAdapters(targetRoot);
+
+// A deletion must not reach outside this checkout through a directory link.
 for (const action of actions) {
   let ancestor = action.adapterPath;
   while (!fs.existsSync(ancestor)) ancestor = path.dirname(ancestor);
@@ -271,35 +333,30 @@ for (const action of actions) {
   }
 }
 
-const warningPrefix = process.env.GITHUB_ACTIONS === "true" ? "::warning::" : "WARN: ";
-// Show repo-relative paths so warnings read the same on every machine.
-for (const warning of warnings) {
-  const cut = warning.indexOf(": ");
-  const shown = warning.startsWith(root) && cut > 0
-    ? path.relative(root, warning.slice(0, cut)).split(path.sep).join("/") + warning.slice(cut)
-    : warning;
-  console.log(`${warningPrefix}${shown}`);
+const ci = process.env.GITHUB_ACTIONS === "true";
+// Show repo-relative paths so messages read the same on every machine.
+function shown(message) {
+  const cut = message.indexOf(": ");
+  return message.startsWith(root) && cut > 0
+    ? path.relative(root, message.slice(0, cut)).split(path.sep).join("/") + message.slice(cut)
+    : message;
 }
+for (const warning of warnings) console.log(`${ci ? "::warning::" : "WARN: "}${shown(warning)}`);
+for (const error of errors) console.error(`${ci ? "::error::" : "ERROR: "}${shown(error)}`);
 
-if (mode === "--check") {
-  // Adapter drift is a warning too; --write regenerates the adapters.
-  for (const action of actions) console.log(`${warningPrefix}adapter needs ${action.type}: ${action.skillDir}; run node .claude/scripts/sync-codex-skills.mjs --write`);
-  console.log(actions.length
-    ? `Codex adapters out of date (${actions.length} change(s) pending; ${native.size} native, ${desired.size} adapters).`
-    : `Codex skills current (${native.size} native, ${desired.size} adapters${warnings.length ? `, ${warnings.length} warning(s)` : ""}).`);
-  process.exit(0);
-}
-
-for (const action of actions) {
-  if (action.type === "remove") {
+if (mode === "--write") {
+  for (const action of actions) {
     fs.unlinkSync(action.adapterPath);
     const directory = path.dirname(action.adapterPath);
     if (fs.readdirSync(directory).length === 0) fs.rmdirSync(directory);
-  } else {
-    fs.mkdirSync(path.dirname(action.adapterPath), { recursive: true });
-    fs.writeFileSync(action.adapterPath, action.expected, "utf8");
+    console.log(`${action.type}: ${action.skillDir}`);
   }
-  console.log(`${action.type}: ${action.skillDir}`);
 }
 
-console.log(`Codex skills synchronized (${native.size} native, ${desired.size} adapters).`);
+if (errors.length) {
+  console.error(`Codex skills invalid (${errors.length} error(s); ${native.size} native).`);
+  process.exit(1);
+}
+console.log(mode === "--write"
+  ? `Codex skills synchronized (${native.size} native).`
+  : `Codex skills current (${native.size} native${warnings.length ? `, ${warnings.length} warning(s)` : ""}).`);

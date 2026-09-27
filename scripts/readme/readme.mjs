@@ -134,12 +134,12 @@ ${syncLine} Keeping the lesson local remains the default.
 
 ## two runtimes, explicit ownership
 
-${picture("runtime", `${plural(facts.skillCount, "Claude Code skill")} and ${plural(facts.codexSkillCount, "Codex skill")} share project memory. Codex has ${plural(facts.codexNativeCount, "native workflow")}${facts.codexAdapterCount ? ` and ${plural(facts.codexAdapterCount, "generated adapter")}` : ''}.`)}
+${picture("runtime", `${plural(facts.skillCount, "Claude Code skill")} and ${plural(facts.codexSkillCount, "Codex skill")} share project memory. Codex has ${plural(facts.codexNativeCount, "native workflow")}.`)}
 
-**${plural(facts.skillCount, "Claude Code skill")} · ${plural(facts.codexSkillCount, "Codex skill")} · ${plural(facts.codexNativeCount, "native Codex workflow")}${facts.codexAdapterCount ? ` · ${plural(facts.codexAdapterCount, "adapter")}` : ''}**
+**${plural(facts.skillCount, "Claude Code skill")} · ${plural(facts.codexSkillCount, "Codex skill")} · ${plural(facts.codexNativeCount, "native Codex workflow")}**
 
 - **Claude Code:** reads \`CLAUDE.md\`, \`.claude/skills/\`, and hooks for canonical playbooks and Claude-specific startup behavior.
-- **Codex:** reads \`AGENTS.md\` and \`.agents/skills/\` for standalone Codex workflows with explicit capability and safety boundaries; a skill without a native version gets a generated adapter. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
+- **Codex:** reads \`AGENTS.md\` and \`.agents/skills/\` for standalone Codex workflows with explicit capability and safety boundaries; every Claude skill has a maintained native Codex version or is disabled for Codex. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
 Both runtimes read the committed project topics under \`.claude/reference/\`. Shared workflows live under \`.claude/skills/\`; standalone Codex workflows live under \`.agents/skills/\`.
 
@@ -165,7 +165,7 @@ ${skillLists()}
 
 ## checked on every change
 
-The validation workflow checks shell and PowerShell entry points, generated adapters, native skill propagation, required resources, intended runtime coverage, retired entrypoints, the Windows project generator, and this README's generated facts and assets. [Inspect the CI runs](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml).
+The validation workflow checks shell and PowerShell entry points, Codex skill registration and drift from the Claude source, native skill propagation, required resources, intended runtime coverage, retired entrypoints, the Windows project generator, and this README's generated facts and assets. [Inspect the CI runs](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml).
 
 The [capability manifest](.agents/skill-capabilities.json) records ownership and intended coverage independently of discovery. [Maintenance guidance](docs/codex-skills.md) covers native updates, disabled skills, and personal copies.
 

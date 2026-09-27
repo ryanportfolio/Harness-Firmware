@@ -29,7 +29,7 @@ fetch_with_retry() {
   local max_attempts=4
   local delay=2
   while [ "$attempt" -le "$max_attempts" ]; do
-    if git fetch "$@" 2>&1; then
+    if git fetch "$@" >&2; then
       return 0
     fi
     if [ "$attempt" -lt "$max_attempts" ]; then
@@ -87,21 +87,22 @@ UNSLOP
 # Print the fixed "universal skills" reminder block.
 # Cross-cutting skills that apply to most sessions regardless of task; project-
 # specific skills are not listed. Claude discovers those from the
-# available-skills list.
+# available-skills list. STDOUT, like the directives above: stderr at exit 0
+# reaches neither Claude nor the user.
 print_skill_reminders() {
-  cat >&2 <<'SKILLS'
+  cat <<'SKILLS'
 [SessionStart] Universal skills. Invoke proactively when the trigger fires:
 SKILLS
   # >>> caveman:reminder:begin (managed by /init-project; delete the whole block,
   # markers included, when prose mode is "normal") >>>
-  cat >&2 <<'SKILLS'
+  cat <<'SKILLS'
   - caveman                       → FIRST, at session start: /caveman ultra (default prose mode)
 SKILLS
   # <<< caveman:reminder:end <<<
-  cat >&2 <<'SKILLS'
-  - recall                        → BEFORE work in unfamiliar areas; /recall save <text> after gotchas
+  cat <<'SKILLS'
+  - recall                        → BEFORE work in unfamiliar areas; save confirmed gotchas to pitfalls.md
   - brainstorming                 → BEFORE designing new features or behavior changes
-  - impartial-review              → AFTER substantive changes, before merging
+  - codex-review                  → AFTER substantive changes, before merging (impartial-review without Codex)
 SKILLS
 }
 
@@ -237,14 +238,14 @@ if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
   fi
 
   echo "[SessionStart] Rebasing $CURRENT_BRANCH onto origin/main..." >&2
-  if git rebase origin/main 2>&1; then
+  if git rebase origin/main >&2; then
     echo "[SessionStart] ✓ Successfully rebased onto origin/main" >&2
   else
     echo "[SessionStart] Rebase failed, aborting..." >&2
     git rebase --abort 2>/dev/null || true
 
     echo "[SessionStart] Attempting merge with origin/main..." >&2
-    if git merge origin/main --no-edit 2>&1; then
+    if git merge origin/main --no-edit >&2; then
       echo "[SessionStart] ✓ Successfully merged origin/main" >&2
     else
       echo "[SessionStart] Warning: Merge failed, you may need to resolve conflicts manually" >&2
