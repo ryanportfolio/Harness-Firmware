@@ -22,7 +22,7 @@ Create only files that earn their context and maintenance cost. Do not add a REA
 Determine location from repository instructions and tooling:
 
 - use the declared canonical library; if the repository generates runtime copies elsewhere, never hand-edit them;
-- in Harness Firmware repositories, register the skill in `.agents/skill-modes.json` as `native`, with a maintained port under `.agents/skills/<name>/`, or `disabled`; after a Claude skill change, update its Codex port and run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>`;
+- in Harness Firmware repositories, register the skill in `.agents/skill-modes.json` as `native`, with a maintained port under `.agents/skills/<name>/`, or `disabled`; after a change to a `native` skill's Claude source, update its Codex port and run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>`;
 - run required sync/generation commands after canonical edits;
 - if no convention exists, prefer the runtime's repository-local skill directory and document the choice.
 
