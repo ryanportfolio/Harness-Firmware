@@ -26,10 +26,13 @@ State the scope you're reviewing in your first sentence so the user can redirect
 
 Record the run ID, absolute workspace, exact base/head SHAs, staged/unstaged diff and relevant untracked path/content hashes. Exclude task-owned report artifacts. Bind findings to that manifest; source changes during review make affected findings stale and require renewed review.
 
+**Author brief (optional).** When the caller supplies one, or when you are reviewing work this session wrote, write a short brief of facts: the goal in one or two sentences, the files or behaviors most likely to break, related work in flight (other PRs, merge order), and the checks already run with their results. No verdicts or opinions ("I believe this is correct", "this part is fine"): the brief says what the change is for, never whether it succeeded. Only the Bucket F reviewer sees it (Step 2). With no brief, skip Bucket F.
+
 ## Step 2: Pick review mode
 
 - **Tiny diff (< 50 changed lines, single file, no schema/auth/cache code):** use one fresh leaf reviewer covering all relevant buckets, including project rules.
 - **Everything else:** cover all five buckets with fresh reviewers, one per bucket, in bounded batches (see Step 3).
+- **With an author brief:** add one Bucket F reviewer at either size. Buckets A–E stay diff-only, so the review keeps a layer that never sees the author's framing.
 
 Preserve independent context at every size. If risk is unclear, use the broader coverage.
 
@@ -68,6 +71,8 @@ Each prompt must include:
 4. The severity scheme from Step 5.
 5. The per-finding output format from Step 6.
 6. An instruction to **only** report findings in their bucket — the main session deduplicates and merges.
+
+Never put the author brief in a Bucket A–E prompt, including the tiny-diff reviewer's; it goes to Bucket F only.
 
 For a full review, Bucket E (project-aware) gets an **extended** prompt; the other four use the standard template. For a tiny diff, combine the relevant instructions into one prompt and remove statements that assume other reviewers exist.
 
@@ -114,7 +119,7 @@ For this bucket specifically: greppability beats cleverness. The agent should `g
 
 **Bucket E — Project-aware violations** (the structural blind spot of fresh-context review)
 
-The other four reviewers are deliberately context-free — that's the source of their impartiality, and also why they can't catch violations of *this codebase's specific rules*. Bucket E exists to close that gap. The agent reads project reference material first, then reviews the diff against it.
+Buckets A–D are deliberately context-free — that's the source of their impartiality, and also why they can't catch violations of *this codebase's specific rules*. Bucket E exists to close that gap. The agent reads project reference material first, then reviews the diff against it.
 
 The reviewer is told to read these files before looking at the diff:
 
@@ -135,6 +140,18 @@ The reviewer's job is to find places where the diff violates rules encoded in th
 - Anything else flagged in `pitfalls.md`.
 
 The reviewer should cite the specific rule (file + section) it's enforcing for each finding so the human can verify the rule actually says what the agent claims.
+
+**Bucket F: Intent and gaps** (only with an author brief)
+
+Buckets A–E judge what the code does. None of them knows what it was meant to do, so none can say it missed its goal. Bucket F gets the diff plus the author brief and checks the change against its stated purpose:
+
+- Does the diff achieve the stated goal on every path the goal implies, or only the one the author tested?
+- Cases the goal requires that the diff doesn't handle (other callers, other runtimes, existing data, removal and rollback).
+- The files or behaviors the brief names as risky: are they actually safe? Verify; don't take the brief's word.
+- Related work in flight: will this change conflict with, or depend on, the other PRs or merge order the brief names?
+- The checks the brief says were run: do they actually exercise the risky parts, or is something important untested?
+
+The brief is the author's framing, not evidence. Findings come from the code; the brief only says where to aim.
 
 ### Subagent prompt template (Buckets A–D)
 
@@ -158,7 +175,7 @@ invent issues to pad the list — fabrication is the only thing to omit.)
 Review ONLY these categories:
 [paste the bucket's bullets]
 
-Do NOT report findings outside your bucket. The main session merges with four
+Do NOT report findings outside your bucket. The main session merges with the
 other reviewers covering the rest.
 
 ## Verification rule
@@ -220,7 +237,7 @@ low-severity/low-confidence findings and tag them honestly; the merge step filte
 You are an impartial code reviewer with project context. Fresh context — you
 did not write this code. Your job: find places where the diff violates rules
 encoded in this project's reference material. You are the ONLY reviewer
-seeing project-specific rules; the other four are deliberately context-free.
+seeing project-specific rules; Buckets A–D see only the diff.
 
 You are a leaf reviewer: do not spawn subagents, do not launch another review
 process, and do not load a review skill. Review the diff yourself and report.
@@ -316,6 +333,10 @@ look productive — but report real low-severity/low-confidence ones and tag the
 the merge step filters.
 ```
 
+### Subagent prompt template (Bucket F only)
+
+Use the Buckets A–D template with these changes: the role line says "You are the intent reviewer: you get the author's brief and check the change against its stated purpose"; add an `## Author brief` section with the brief pasted verbatim, labeled "the author's framing, not evidence: verify every claim in it against the code"; replace the bucket section with the Bucket F bullets; replace "The main session merges with the other reviewers" with "Other reviewers, who never see the brief, cover correctness, data flow, performance, missed changes, and project rules."
+
 ## Step 4: Verification rule
 
 For every potential issue, run a real check before asserting. `grep` for call sites. `Read` the file. Open the consumer and look. Plausible-sounding-but-unchecked claims waste the human's time when they re-investigate and find the claim was wrong. A check your sandbox blocked is not a check you ran: name it and tag the finding LOW.
@@ -337,8 +358,9 @@ When the selected reviewers return — **this is the precision stage.** The suba
 1. **Deduplicate — and read agreement as signal.** Two agents may flag the same issue from different angles — merge into one finding, keep the higher severity. Bucket E findings often overlap with A/B/C/D (e.g., a cover-identity leak is also a correctness issue) — merge but preserve E's rule citation so the human sees *why* it's a violation. The same issue surfaced independently by two or more subagents is high-confidence signal: note the agreement on the merged finding ("flagged independently by A and D") and weight it accordingly when you verify. A lone-agent finding is still worth verifying, just with lower prior.
 2. **Verify every finding you intend to surface — across all severities, not just 🔴.** The finding stage deliberately over-reported, including LOW-confidence items; turning that into precision is your job. For each finding, run a real `grep`/`Read` to confirm before passing it to the human (for Bucket E, open the cited rule file and confirm the rule actually says what the agent claimed — paraphrased rules are the most common Bucket E failure mode). Treat the 🔴s adversarially: a fresh-context subagent in a hurry is exactly the kind of reviewer that produces plausible-but-wrong blockers, so try to *refute* each one before you accept it.
    - **Own the confidence filter — but drop only on evidence.** A finding tagged LOW-confidence gets *confirmed* (verify, then promote and re-tag), *refuted* (drop it from the findings list and record it under "Dismissed" with the reason), or *kept as LOW* with a one-line note on the residual uncertainty. Drop a finding **only because you checked and it isn't real** — never because it "seems minor" or "seems unlikely." Filtering on vibes here re-introduces exactly the recall loss the coverage-first finding stage was built to prevent.
-3. **Severity-order globally.** All 🔴 first across all buckets, then all 🟡, then 🟢 — not bucket-by-bucket and not in the order agents returned.
-4. **Present in this format:**
+3. **Tag each finding's source** when Bucket F ran: *blind* (A–E only), *intent* (F only), or *both*. Intent-only findings are what the brief made visible. A blind-only finding that sits in an area the brief called risky or covered means the brief may have steered F away from it; say so in the report.
+4. **Severity-order globally.** All 🔴 first across all buckets, then all 🟡, then 🟢 — not bucket-by-bucket and not in the order agents returned.
+5. **Present in this format:**
 
 ```
 ## 🔴 Short title of the issue
@@ -369,7 +391,7 @@ After the findings, include:
 Be concrete about merge readiness.]
 ```
 
-If every reviewer returned zero findings and your verification confirms, report the actual reviewer count, covered buckets, and any unavailable checks. A clean result is valid; do not infer missed defects from the finding count alone.
+If every reviewer returned zero findings and your verification confirms, report the actual reviewer count, covered buckets (including whether Bucket F ran), and any unavailable checks. A clean result is valid; do not infer missed defects from the finding count alone.
 
 ## Anti-patterns to avoid
 
