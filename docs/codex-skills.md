@@ -20,8 +20,8 @@ preserve the other runtime unless its behavior is also in scope. Register new st
 names and classify each active Codex skill in `.agents/CODEX-SKILL-COMPATIBILITY.md`.
 Keep descriptions below 240 characters and the initial catalog within its checked budget.
 `.agents/skill-sources.json` records a hash of each covered Claude skill folder. After a
-Claude skill change, update its Codex port to match, then run
-`node .claude/scripts/sync-codex-skills.mjs --baseline <name>`; `--check` fails until you do.
+change to a `native` skill's Claude source, update its Codex port to match, then run
+`node .claude/scripts/sync-codex-skills.mjs --baseline <name>`; `--check` fails until you do. `disabled` skills have no port and no entry; run `--check` only.
 
 Run:
 
