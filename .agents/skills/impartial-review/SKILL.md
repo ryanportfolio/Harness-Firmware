@@ -43,7 +43,12 @@ missing integration/cleanup; project-specific rules. With an author brief, at ei
 intent reviewer: diff plus brief, checking whether the change achieves its stated goal on every path
 the goal implies, which required cases it leaves unhandled, whether the areas the brief calls risky are
 actually safe, how it interacts with the related work named, and whether the checks run cover the risky
-parts. The brief is framing, not evidence: findings come from the code. Count Manager and other active agents
+parts. The brief is framing, not evidence: findings come from the code. For broader work, also add one
+open-lens reviewer: diff plus the names of the lenses already assigned (never their findings or the brief).
+It chooses the one or two lenses most likely to find a real problem that no assigned reviewer covers, from the
+unassigned areas or any lens the diff calls for (rendering and frame budget, accessibility, concurrency,
+cross-platform shell and path behavior, cost, user-facing copy), names each with the diff lines that make it
+relevant, then reviews through it. A lens without a reason tied to this diff is a failed review. Count Manager and other active agents
 against capacity; state worker and retry bounds. Wait and release completed agents when supported before starting a new
 batch. Preserve independent context even when execution is sequential.
 
@@ -80,6 +85,8 @@ Manager deduplicates and tries to refute findings against the actual source. Con
 dismiss with evidence, or retain explicit uncertainty. When the intent reviewer ran, tag each
 finding blind (diff-only reviewers), intent, or both; flag a blind-only finding in an area the
 brief called risky or covered. Rank globally by impact. Report
-actionable findings, material unavailable checks, reviewed scope, whether the intent reviewer ran, and recommendation.
+actionable findings, material unavailable checks, reviewed scope, whether the intent reviewer ran, each standard
+area that had no reviewer with a one-line reason tied to the diff, the lenses the open-lens reviewer chose with
+its reasons, and recommendation.
 Keep speculative concerns separate from verified defects. Fix only when requested or
 already authorized, then independently recheck affected claims.
