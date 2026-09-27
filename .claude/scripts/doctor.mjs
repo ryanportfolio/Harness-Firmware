@@ -3,8 +3,8 @@
 // doctor.mjs: cross-platform install health check for this harness firmware repo.
 //
 // Verifies the wiring a session depends on: settings + SessionStart hook, skill
-// frontmatter, Codex adapter sync, skill coverage and the removed-skills record, the
-// reference library, leftover template markers, and plugin manifests. Reports an approximate always-loaded context
+// frontmatter, Codex skill registration and source drift, skill coverage and the
+// removed-skills record, the reference library, leftover template markers, and plugin manifests. Reports an approximate always-loaded context
 // weight as an INFO line.
 //
 // Usage: node .claude/scripts/doctor.mjs [--json]
@@ -165,11 +165,11 @@ function checkSkills() {
   record("skills", "PASS", `${directories.length} skills have valid frontmatter (${implicitNames} inherit the folder name)`);
 }
 
-// --- Codex adapter sync ---
+// --- Codex skill registration and source drift ---
 function checkCodexSync() {
   const syncScript = ".claude/scripts/sync-codex-skills.mjs";
   if (!exists(syncScript)) {
-    record("codex-sync", "WARN", `${syncScript} is absent; skipping adapter drift check`);
+    record("codex-sync", "WARN", `${syncScript} is absent; skipping the Codex skill check`);
     return;
   }
   const result = spawnSync(process.execPath, [abs(syncScript), "--check"], {
@@ -181,17 +181,16 @@ function checkCodexSync() {
     return;
   }
   if (result.status === 0) {
-    // Drift and missing skills are reported as warnings with exit 0.
+    // Missing or mismatched native skills are warnings with exit 0.
     const warnings = (result.stdout ?? "").split(/\r?\n/).filter((line) => /^(?:WARN: |::warning::)/.test(line));
     if (warnings.length) record("codex-sync", "WARN", warnings.map((line) => line.replace(/^(?:WARN: |::warning::)/, "")).join(" | "));
-    else record("codex-sync", "PASS", "Codex adapters are current and registered standalone skills are present");
+    else record("codex-sync", "PASS", "Codex skills registered and in sync with their Claude source");
     return;
   }
-  const drift = `${result.stderr ?? ""}${result.stdout ?? ""}`
-    .split(/\r?\n/)
-    .filter((line) => line.trim())
-    .join(" | ");
-  record("codex-sync", "FAIL", `sync-codex-skills.mjs --check could not read the skills: ${drift}`);
+  // Report the script's own ERROR lines; an unreadable file prints one unprefixed line instead.
+  const lines = `${result.stderr ?? ""}${result.stdout ?? ""}`.split(/\r?\n/).filter((line) => line.trim());
+  const errors = lines.filter((line) => /^(?:ERROR: |::error::)/.test(line)).map((line) => line.replace(/^(?:ERROR: |::error::)/, ""));
+  record("codex-sync", "FAIL", `sync-codex-skills.mjs --check: ${(errors.length ? errors : lines).join(" | ")}`);
 }
 
 // --- skill coverage and the removed-skills record (.agents/removed-skills.json) ---

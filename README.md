@@ -78,7 +78,7 @@ The dotted branch is separate: after human review, `sync-starter` can move a gen
 **36 Claude Code skills · 32 Codex skills · 32 native Codex workflows**
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
-- **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows with explicit capability and safety boundaries; a skill without a native version gets a generated adapter. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
+- **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows with explicit capability and safety boundaries; every Claude skill has a maintained native Codex version or is disabled for Codex. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
 Both runtimes read the committed project topics under `.claude/reference/`. Shared workflows live under `.claude/skills/`; standalone Codex workflows live under `.agents/skills/`.
 
@@ -154,7 +154,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 
 ## checked on every change
 
-The validation workflow checks shell and PowerShell entry points, generated adapters, native skill propagation, required resources, intended runtime coverage, retired entrypoints, the Windows project generator, and this README's generated facts and assets. [Inspect the CI runs](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml).
+The validation workflow checks shell and PowerShell entry points, Codex skill registration and drift from the Claude source, native skill propagation, required resources, intended runtime coverage, retired entrypoints, the Windows project generator, and this README's generated facts and assets. [Inspect the CI runs](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml).
 
 The [capability manifest](.agents/skill-capabilities.json) records ownership and intended coverage independently of discovery. [Maintenance guidance](docs/codex-skills.md) covers native updates, disabled skills, and personal copies.
 

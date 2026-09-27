@@ -1,9 +1,11 @@
 # Maintaining Codex skills
 
 The `native` entries in `.agents/skill-modes.json` declare workflows maintained directly
-in `.agents/skills/<name>/`. These own their Codex instructions. The registry also supports
-`adapter` and `disabled`; omitted names retain generated adapter behavior. A skill's source
-ownership is separate from whether it requires agents or explicit authorization.
+in `.agents/skills/<name>/`. These own their Codex instructions. Every Claude skill in
+`.claude/skills/` must be registered either `native`, with a maintained port, or `disabled`;
+sync generates nothing, and `--check` fails on an unregistered name or mode `adapter`.
+A skill's source ownership is separate from whether it requires agents or explicit
+authorization.
 
 Native entries do not require a Claude counterpart. Existing `skillOverrides: off` settings
 remain respected for compatibility. Move a maintained skill outside discovery explicitly
@@ -17,6 +19,9 @@ Read the existing skill and its references. Edit the source for the intended run
 preserve the other runtime unless its behavior is also in scope. Register new standalone
 names and classify each active Codex skill in `.agents/CODEX-SKILL-COMPATIBILITY.md`.
 Keep descriptions below 240 characters and the initial catalog within its checked budget.
+`.agents/skill-sources.json` records a hash of each covered Claude skill folder. After a
+Claude skill change, update its Codex port to match, then run
+`node .claude/scripts/sync-codex-skills.mjs --baseline <name>`; `--check` fails until you do.
 
 Run:
 
@@ -104,12 +109,13 @@ git checkout starter/main -- .agents/skills/<name>/SKILL.md .agents/skills/<name
 Merge selected registry entries from `git show starter/main:.agents/skill-modes.json` and
 the capability manifest; preserve unrelated entries and explicit disabled choices. Never
 replace a customized kernel or `.claude/reference/` as a side effect. Reconcile changed
-resources with their native body before regenerating adapters and running the checks above.
+resources with their native body, re-baseline any Claude skill whose port you updated,
+and run the checks above.
 An inherited `"writing-skills": "disabled"` entry may remain as an inert migration
-record; retired names cannot use native/adapter ownership or regain a SKILL.md entrypoint.
+record; retired names cannot be registered `native` or regain a SKILL.md entrypoint.
 For this migration, explicitly remove `.agents/skills/unslop/SKILL.md` and
 `.claude/skills/writing-skills/SKILL.md`, plus any retired counterpart left by a
-partial sync, and drop the `unslop` ownership entry before regeneration. Checkout
+partial sync, and drop the `unslop` ownership entry before running sync. Checkout
 does not remove paths absent upstream. Inspect and back up customizations first,
 preserving useful behavior in replacements or outside discovery; keep resources
 and licenses. Validate that neither retired name has a SKILL.md in either root.
