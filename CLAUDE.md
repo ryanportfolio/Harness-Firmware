@@ -45,7 +45,7 @@ Defaults until configured:
 
 ## Subagents
 
-- Subagents inherit the session model: omit `model` unless the user names one.
+- Omit `model` on subagent calls unless the user names one. The default is `CLAUDE_CODE_SUBAGENT_MODEL` when set, else the session model.
 
 ## Git: push on completion
 
