@@ -73,7 +73,7 @@ When the user authorized propagation of a generic skill fix / new skill / hook i
    - CI gates **both** `push` and `pull_request`, so direct-to-main is still checked — just after the change is live to everyone spawning a project, which is why PR is the default.
    - That dual trigger means a PR shows two check runs and sits at `mergeStateStatus: UNSTABLE` until the second finishes. Wait for it (`gh run watch <id> --exit-status`); don't merge on the first green.
    - The template allows squash only: `gh pr merge <n> --squash`.
-   - If the change touched a skill, run `node .claude/scripts/sync-codex-skills.mjs --check` and include any regenerated adapters — CI fails on stale ones.
+   - If the change touched a skill, update its native Codex version in `.agents/skills/` to match, then run `node .claude/scripts/sync-codex-skills.mjs --check`. It exits 0 and CI shows drift only as a warning annotation, so read its output; a Claude skill with no native Codex version yet needs `--write` to generate its fallback adapter.
 4. **Bump the plugin version** when the change touches the shared surface (`.claude/skills`, `.claude/hooks`, `.claude/output-styles`, `.claude/settings.json`): edit `version` in the template's `.claude-plugin/plugin.json` — patch for fixes, minor for new skills. Plugin installs only receive updates when this number changes; spawned projects get changes via Direction A regardless.
 5. Mention that other spawned projects pick it up via Direction A.
 
@@ -83,6 +83,6 @@ When the user authorized propagation of a generic skill fix / new skill / hook i
 - Don't overwrite `settings.json` — union the permission lists.
 - Don't push project-flavored content back to the template — genericize or leave it.
 - Don't treat a CLAUDE.md diff as pullable — kernel changes are always a hand-merge.
-- Don't hand-edit generated `.agents/skills/` adapters — update the canonical
-  Claude skill and regenerate.
+- Don't hand-edit generated `.agents/skills/` adapters; update the canonical
+  Claude skill and regenerate. Edit maintained native skills directly in `.agents/skills/<name>/`.
 - Don't sync on every session. This is occasional maintenance, user-triggered.

@@ -1,6 +1,6 @@
 # Codex Skill Compatibility
 
-`.claude/skills/` remains Claude's source. An adapter exposes a workflow; it does not prove every runtime capability exists.
+`.claude/skills/` is Claude's source; `.agents/skills/` holds Codex's own maintained versions, with generated adapters only as a fallback. A Codex skill exposes a workflow; it does not prove every runtime capability exists.
 
 `.agents/skill-modes.json` declares `native`, `adapter`, or `disabled`; omitted names
 retain adapter behavior. Maintain native skills directly in `.agents/skills/<name>/`;

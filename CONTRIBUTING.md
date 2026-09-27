@@ -5,19 +5,20 @@ judged on what they cost to keep loaded, not just on whether they work.
 
 ## dev loop
 
-Shared workflows are authored in `.claude/skills/` and exposed through generated Codex
-adapters. Native entries in `.agents/skill-modes.json` are authored directly in
-`.agents/skills/`; sync preserves them. See [Codex skill maintenance](docs/codex-skills.md).
+Each runtime gets its own maintained skill: Claude's in `.claude/skills/`, Codex's in
+`.agents/skills/`, registered as `native` in `.agents/skill-modes.json`. Sync preserves
+native files and generates an adapter only for a Claude skill with no native Codex version
+yet. See [Codex skill maintenance](docs/codex-skills.md).
 
 ```sh
-# 1. edit the source for the intended runtime
-# Use .agents/skills/<skill>/SKILL.md for a registered standalone Codex skill.
+# 1. edit the skill in each runtime that ships it
 $EDITOR .claude/skills/<skill>/SKILL.md
+$EDITOR .agents/skills/<skill>/SKILL.md
 
-# 2. regenerate the Codex adapters
+# 2. sync: validates native Codex skills, generates any fallback adapters
 node .claude/scripts/sync-codex-skills.mjs --write
 
-# 3. check the adapters still satisfy the contract
+# 3. check the Codex skills still satisfy the contract
 node .claude/scripts/test-codex-contract.mjs
 
 # 4. check the token tax
@@ -68,8 +69,9 @@ A good skill PR contains:
 - A row in `.claude/skills/PROVENANCE.md` if the skill is forked or adapted
   from a third party, plus that upstream's LICENSE or NOTICE file kept inside
   the skill folder. Record what you changed.
-- Regenerated adapters alongside shared sources, or a registered standalone Codex entry
-  with its capability classification. Include sync and contract verification.
+- A native Codex version registered in `.agents/skill-modes.json` with its capability
+  classification, or a generated adapter as the fallback until one exists. Include sync
+  and contract verification.
 - The context-weight number before and after, when the skill is large.
 
 Skills earn their place. Prefer improving an existing one over adding a

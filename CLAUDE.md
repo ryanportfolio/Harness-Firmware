@@ -89,8 +89,10 @@ New quirk bites → save it to `.claude/reference/pitfalls.md` before the task e
 Stays in this file: cross-cutting safety/process rules. Moves out: anything area-specific. Don't bloat the kernel.
 ## Codex compatibility
 
-Claude Code remains the primary runtime and `.claude/skills/` remains canonical.
-After adding, removing, or editing a skill or `skillOverrides`, run
-`node .claude/scripts/sync-codex-skills.mjs --write` and include the generated
-`.agents/skills/` changes. Do not hand-edit generated adapters; `AGENTS.md` owns
-Codex-specific runtime safety and tool translation.
+Claude Code remains the primary runtime. Each runtime keeps its own maintained
+skills: `.claude/skills/` for Claude, `.agents/skills/` for Codex, with modes in
+`.agents/skill-modes.json`. After adding, removing, or editing a skill or
+`skillOverrides`, run `node .claude/scripts/sync-codex-skills.mjs --write`; it
+generates an adapter only for a Claude skill with no native Codex version yet.
+Do not hand-edit generated adapters; `AGENTS.md` owns Codex-specific runtime
+safety and tool translation.
