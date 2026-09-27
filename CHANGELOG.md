@@ -32,6 +32,11 @@ condensed.
 
 ### Changed
 
+- `.claude/reference/pitfalls.md` ships empty, like the other reference files. Its
+  entries were the template's own accumulated gotchas: its tooling and README panels, its
+  maintainer's machine, and general lessons such as escaping JSON inside `<script>`, stale
+  preview servers and background server ports. Each one was copied into every repository
+  created from the template. The kernel's browser rule no longer points at it for detail.
 - A skill folder that `scripts/readme/items.json` does not list no longer produces a
   README warning. The README still leaves it out until it is listed.
 - Adding or removing a skill no longer fails a check. Codex sync, the capability and
