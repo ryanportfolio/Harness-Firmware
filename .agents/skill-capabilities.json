@@ -576,7 +576,9 @@
         "evidence",
         "authorization"
       ],
-      "resources": [],
+      "resources": [
+        ".claude/skills/long-horizon-swarm/lenses/done-check.md"
+      ],
       "exceptions": [
         "Claude Code only: Opus peers run through the Claude Agent tool beside Codex peers; from Codex the cross-vendor mix is lost, so Codex uses long-horizon."
       ]

@@ -77,6 +77,33 @@ A contribution cycle ends when a pass adds nothing new: no new finding, idea or 
 There is no fixed cap. If peers start agreeing without citing new evidence, run one more
 pass with a fresh peer on the bare artifact; if that adds nothing, stop.
 
+## Lenses
+
+Copies of one model given one brief return near-identical answers. Give every peer a lens: a
+single question it answers about the artifact. Vary model and lens together (Sol on
+performance, Astra on the decomposition, Opus on quality), pick only lenses that fit the
+task, and rotate them across rounds so each lens meets different models. The number of
+peers in a pass equals the number of lenses chosen, not a per-model count.
+
+A lens is one of:
+
+- **A swarm lens** in `lenses/` beside this file, written for this workflow. Each file states
+  the question, what to inspect, what counts as a finding, and the return format.
+  [done-check.md](lenses/done-check.md) is the first; add one when a run shows an angle the
+  pool lacks.
+- **An existing skill's criteria**, such as `wow-loop` (quality bar), `perf-loop` (measured
+  cost), `dare` (problem and decomposition), `impartial-review` (defects) or
+  `security-review` (trust boundaries). The peer reads that skill's standard and applies it
+  in one pass. It does not run the skill's loop: those need fresh critics and repeated
+  rounds a peer may not be able to spawn, and a loop nested in every peer multiplies cost.
+
+When a lens finds something that needs the full loop (performance far off target, visual
+work well below the bar), the host makes that loop a round step, the way long-horizon runs
+`arena` inside a round.
+
+Brief each peer with its lens file or skill path; a Codex peer reads it from the absolute
+path.
+
 ## The audit stays cold
 
 The auditor brief is written at Plan, before any swarm work on the round, and dispatched
@@ -91,7 +118,7 @@ goes into a later round's Plan.
 
 ```markdown
 # Contributions
-- S<n> round <N> | <peer> <model>/<effort> | <agent id or codex session id> | idea / critique / code / alternative
+- S<n> round <N> | <peer> <model>/<effort> | lens: <name> | <agent id or codex session id> | idea / critique / code / alternative
   target: <plan, step, file or entry id>   artifact: <path>
   outcome: taken / partly taken / left, with the reason
 

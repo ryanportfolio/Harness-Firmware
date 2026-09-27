@@ -17,7 +17,9 @@ condensed.
   as peers who contribute ideas, critique and code throughout a run. It attaches to
   an existing run's state file, logs contributions and Codex spend in `swarm.md`, and
   reports disagreements to the user instead of blocking on them. The per-round
-  auditor stays fresh and never sees swarm output. Claude Code only.
+  auditor stays fresh and never sees swarm output. Each peer works through a lens,
+  either a swarm lens in `lenses/` (starting with `done-check`) or an existing skill's
+  criteria. Claude Code only.
 
 ### Removed
 
