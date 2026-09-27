@@ -1,5 +1,6 @@
 {
   "outputStyle": "caveman",
+  "autoMemoryEnabled": false,
   "hooks": {
     "SessionStart": [
       {

@@ -4,8 +4,6 @@
 
 <!-- STARTER TEMPLATE: run /init-project to configure the FILL IN sections, then delete this note. -->
 
-- Questions → plain chat text, numbered if multiple.
-
 ## What this project is
 
 <!-- FILL IN (via /init-project): two or three sentences — what this is and who it serves; a short "won't compromise on" list; optional glossary of terms the team uses. Cap ~10 lines: this file loads every turn, and direction earns its weight only while it stays short. A model that knows what the product refuses to compromise on tests for it without being told. -->
@@ -32,34 +30,31 @@ Defaults until configured:
 - Never claim visual/UI verification you didn't actually perform.
 - Can't run the authoritative check → flag the risk plainly, don't claim it passes.
 - When verification must happen elsewhere (CI, deploy, user's machine) → say so and stop.
-- Visual/UI checks: headed Chrome on the real GPU (`chromium.launch({ headless: false, channel: 'chrome' })`; fall back to `headless: false` without channel, never to headless). Headless renders WebGL through SwiftShader on the CPU, which burns the machine the session runs on and makes frame timings meaningless. Launch through `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`) so the window lands on a display the operator is not using and the keyboard goes straight back; never minimize the window instead, a minimized window drops to 1 fps. Pass this rule into every subagent prompt that does browser work.
-- Browser per session, never shared. The desktop app's Browser pane (`mcp__Claude_Browser__*`, `preview_start`) is one Chrome per app: a second session or subagent gets "Another task's Chrome owns browser slot". The official playwright plugin is one persistent profile: the second connection gets "Browser is already in use ... use --isolated" and deadlocks. Parallel or subagent browser work uses `mcp__playwright-iso__*` (`.mcp.json`, `@playwright/mcp --isolated`, in-memory profile) or `launchPlacedChrome()`. Detail: `.claude/reference/pitfalls.md`.
+- Visual/UI checks: headed Chrome on the real GPU, launched through `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`). Never headless (WebGL falls back to the CPU), never minimized (rAF drops to 1 fps). Pass this rule into every subagent prompt that does browser work.
+- One browser per session. Parallel or subagent browser work uses `mcp__playwright-iso__*` or `launchPlacedChrome()`, never the shared playwright plugin or the app's Browser pane. Detail: `.claude/reference/pitfalls.md`.
 
 ## Core principles
 
 - Plan before acting. Break large refactors into atomic steps.
 - Reproduce bugs before fixing them.
-- Scope discipline: No unrequested refactors, features, abstractions, or extra coding. Minimum complexity for the task at hand; optimize performance.
+- Scope discipline: No unrequested refactors, features, abstractions, or extra coding. Minimum complexity for the task at hand; don't regress performance.
 - Solve generally. Never hard-code to pass specific tests. If a test or requirement is wrong, say so rather than work around it.
 - Scratch work → `.tmp/` (gitignored). Promote to `scripts/` if reusable; otherwise delete.
-- Durable project knowledge → `.claude/reference/` via `/recall save` (committed, travels to every machine and sandbox). Standing truths only: moments (PR numbers, branch names, task status, tool-version snapshots) rot and don't get saved. Prefer the built-in generate-memory feature off; where per-machine memory files exist anyway, the same gate applies and keepers migrate into the reference.
-- Welcome correction. Confident-sounding mistakes happen; don't defend wrong answers. /why
-- Restraint is a feature. New kernel rules, skills, and reference entries must earn their place. Prefer pruning stale content over accreting. More ≠ better. Complex ≠ complexity.
-- Don't restate what the harness already injects every turn (the available-skills list, the environment block, tool-doc behavior). It reloads for free; repeating it in the kernel is pure waste. Keep only the project's value-add. Always-loaded files (this kernel, indexes) = thin hooks; full detail lives in `.claude/reference/` subfiles, loaded on demand. See `/optimize-context`.
+- Durable project knowledge → `.claude/reference/` via `/recall save` (committed, travels to every machine and sandbox). Standing truths only: moments (PR numbers, branch names, task status, tool-version snapshots) rot and don't get saved. Claude Code's auto memory stays off (`"autoMemoryEnabled": false` in `.claude/settings.json`); where per-machine memory files exist anyway, the same gate applies and keepers migrate into the reference.
+- Welcome correction. Confident-sounding mistakes happen; don't defend wrong answers. The user can challenge a recommendation with `/why`.
+- Restraint is a feature. New kernel rules, skills, and reference entries must earn their place; prefer pruning stale content over accreting. More ≠ better; complex ≠ complicated. This file loads every turn: keep cross-cutting safety and process rules here, move area-specific detail to `.claude/reference/`, and never restate what the harness already injects (skills list, environment block, tool docs). See `/optimize-context`.
 
-## Subagents: direct-by-default, never Sonnet or Haiku
+## Subagents: model floor
 
-- Model floor: Opus, the latest Fable, or a newer, higher tier only. NEVER pass `model: 'sonnet'` or `model: 'haiku'`. Omitting `model` (inherit session) is fine when the session model meets the floor; bulk/mechanical work runs the floor model at low effort.
+- Opus, the latest Fable, or a newer, higher tier only. NEVER pass `model: 'sonnet'` or `model: 'haiku'`. Omitting `model` (inherit session) is fine when the session model meets the floor. Bulk/mechanical work runs the floor model at low effort; effort comes from the agent definition's `effort` frontmatter (`.claude/agents/*.md`), not the Agent call.
 
 ## Git: push on completion
 
+- "Complete" = the requested change finished and verified to this environment's limits. On Complete: commit, push, and open or update the PR. Mid-task or exploratory work is NOT a commit trigger.
 - Stage intentionally. Never blanket-commit unrelated changes.
-
-* One open PR per unit of work; update it, never open a second. Before opening a PR, check for an existing open one (gh pr list --head <branch>) and push to that instead. 
-
+- One open PR per unit of work; update it, never open a second. Before opening a PR, check for an existing one (`gh pr list --head <branch>`) and push to that instead.
 - Merge PRs with **squash** by default (`gh pr merge --squash`); merge-commit or rebase only when the user explicitly asks.
 - Never force-push or run destructive git operations without an explicit request.
-- "Complete" = the requested change finished and verified to this environment's limits. Mid-task or exploratory work is NOT a commit trigger.
 - End commit messages with the standard `Co-Authored-By:` trailer.
 - PowerShell quoting trap: embedded `"` inside a here-string argument gets mangled en route to native exes (git/gh) and splits the argument. For multiline commit messages / PR bodies, write the text to a `.tmp/` file and use `git commit -F <file>` / `gh pr create --body-file <file>`, or keep the message free of double quotes.
 
@@ -84,11 +79,6 @@ Topical reference lives in `.claude/reference/`. Consult BEFORE non-trivial work
 
 New quirk bites → save it to `.claude/reference/pitfalls.md` before the task ends, without asking, when it cost a retry, a backed-out change, or a user correction and its cause is confirmed. Amend an existing entry over adding one. Other reference edits stay behind `/recall save`.
 
-Stays in this file: cross-cutting safety/process rules. Moves out: anything area-specific. Don't bloat the kernel.
 ## Codex compatibility
 
-Claude Code remains the primary runtime and `.claude/skills/` remains canonical.
-After adding, removing, or editing a skill or `skillOverrides`, run
-`node .claude/scripts/sync-codex-skills.mjs --write` and include the generated
-`.agents/skills/` changes. Do not hand-edit generated adapters; `AGENTS.md` owns
-Codex-specific runtime safety and tool translation.
+Claude Code remains the primary runtime and `.claude/skills/` remains canonical. After adding, removing, or editing a skill or `skillOverrides`, run `node .claude/scripts/sync-codex-skills.mjs --write` and include the generated `.agents/skills/` changes. Do not hand-edit generated adapters; `AGENTS.md` owns Codex-specific runtime safety and tool translation.

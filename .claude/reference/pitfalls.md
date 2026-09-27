@@ -65,9 +65,12 @@ Prevention protocol (run every time before trusting a preview):
    port (`0`) is reported only in the startup log, and stdout without a
    terminal is block-buffered, so that line may never be flushed to you.
 
-## Headed Chrome steals the screen unless you place it (2026-08-23)
+## Headed Chrome steals the screen unless you place it (2026-08-23, amended 2026-09-27)
 
-Visual verification runs headed on the real GPU, and a plain
+Visual verification runs headed on the real GPU. Headless renders WebGL through
+SwiftShader on the CPU, which loads the machine the session runs on and makes
+frame timings meaningless. When `channel: "chrome"` is unavailable, fall back to
+`headless: false` without a channel, never to headless. A plain
 `chromium.launch({ headless: false, channel: "chrome" })` drops that window on
 top of whatever the operator is doing and takes the keyboard with it.
 
@@ -84,6 +87,13 @@ foreground back to the window that had it. `CHROME_PLACE` picks the mode:
 `other-monitor` (default), `offscreen` (parked at -2400,-2400, rendered but
 never visible, and the fallback when only one display is attached), or `here`.
 Both placed modes held 100.5 fps on a 100 Hz panel, same as an unplaced window.
+
+On this operator's machine use `CHROME_PLACE=offscreen`: `other-monitor` put
+the window on a display the operator was watching (2026-09-22, twice). Set it
+in every subagent brief that does browser work. A run that cannot take the env
+var mid-run can be parked by a watcher: find `chrome.exe` browser processes
+whose command line has `--remote-debugging-pipe` (automation only; the
+operator's own Chrome never has it) and `SetWindowPos` them to -2400,-2400.
 
 Notes: `--window-position` applies to the first window of a launch, so one
 launch per run. Placement is Windows-only and degrades to a plain headed launch

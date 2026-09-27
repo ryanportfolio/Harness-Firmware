@@ -1,14 +1,13 @@
 # Codex Instructions
 
-This is the Codex boundary for repositories using the AI Operating System starter. Claude Code keeps using `CLAUDE.md` and `.claude/` unchanged.
+This is the Codex boundary for repositories using the Harness Firmware starter. Claude Code keeps using `CLAUDE.md` and `.claude/` unchanged.
 
 ## Defaults
 
 - Use Caveman Ultra for prose from the first reply, without asking or requiring `$caveman`. Keep code, commands, identifiers, errors, commits, PR text, and files normal.
 - Caveman includes Unslop for all session replies. Use the Writing skill for user-facing deliverables such as website copy, product UI, onboarding, guides, and release notes; keep those artifacts in normal audience-appropriate prose.
 - Use plain prose for security warnings, irreversible confirmations, and ambiguous multi-step decisions, then resume Ultra. A new session restores Ultra after the user temporarily disables it.
-- When creating copy for a site, UI, or anything else: less is more. Simplicity is powerful. Complexity does not need to be complicated.
-- Read only `CLAUDE.md`'s What this project is, Verification, and Environment & Deploy Target sections for configured project facts. Use `.claude/reference/` for architecture, commands, deployment, and pitfalls. Other `CLAUDE.md` workflow rules are not Codex instructions.
+- Read only `CLAUDE.md`'s `What this project is`, `CRITICAL: Verification`, and `Environment & deploy target` sections for configured project facts. Use `.claude/reference/` for architecture, commands, deployment, and pitfalls. Other `CLAUDE.md` workflow rules are not Codex instructions.
 - Never execute `.claude/hooks/session-start.sh` in Codex.
 
 ## Capabilities
