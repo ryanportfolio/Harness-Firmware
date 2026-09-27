@@ -36,14 +36,14 @@ Prompt, for a branch diff (adapt the scope sentence for a commit or uncommitted 
 
 `Read .claude/skills/impartial-review/SKILL.md completely with the Read tool and act as its Manager on the branch diff: base <base>, head <head>. Read the diff with git diff <base> <head>. Dispatch every reviewer with the Agent tool, subagent_type general-purpose, model opus, in fresh context, as the skill directs; each is a leaf reviewer that spawns no agents and loads no skills. Author brief: <path to brief.md>; give it only to the Bucket F intent reviewer, as the skill directs; every other reviewer gets the diff without it. No file edits, no Git writes, no publication. Verify the reviewers' findings and write the final verified report. First line: Scope: base <base>, head <head>. Second line: Sub-reviewers: <number spawned>.`
 
-Drop the author-brief sentence for a fully blind review. Run from the repository root:
+Drop the author-brief sentence for a fully blind review. Write the prompt to `$RUN/prompt.txt` and pass it on stdin, never as a positional argument: options that take a list of values, such as `--tools` or `--add-dir`, consume a prompt that follows them, and the run exits before any reviewer starts. Run from the repository root:
 
 ```bash
 claude -p --model opus --effort high --session-id "$SESSION" \
   --permission-mode plan --permission-prompts none --restricted \
   --tools "Read,Glob,Grep,Bash,Agent" --disable-slash-commands --strict-mcp-config \
   --no-chrome --output-format json \
-  "<prompt>" > "$RUN/result.json" 2> "$RUN/run.log"
+  < "$RUN/prompt.txt" > "$RUN/result.json" 2> "$RUN/run.log"
 ```
 
 On native Windows, replace `Bash` in `--tools` with `PowerShell`. `--disable-slash-commands` keeps the child from invoking skills, including a Claude review skill that would recurse; the Manager loads `impartial-review` by reading the file. Do not pass `--no-session-persistence`: Step 4 reads the saved transcripts. `--restricted` ignores user and project settings files, so a `CLAUDE_CODE_SUBAGENT_MODEL` set there does not apply; the prompt names the sub-reviewer model instead.
@@ -80,4 +80,5 @@ Order confirmed findings as BLOCKING, SHOULD-FIX, then NITPICK, each with `path:
 | `--no-session-persistence` or `--bare` | Evidence or subscription auth is lost; do not use them |
 | Invoking impartial-review as a skill | Skills are disabled on purpose; the Manager reads the file |
 | Counting Agent calls in the Manager transcript as reviewers | Count sub-reviewer transcripts with `spawnDepth` 1 |
+| Prompt passed as a trailing argument | A list-valued option such as `--add-dir` swallows it; pass the prompt on stdin |
 | Failed or stalled run | Report once; ask before retrying |
