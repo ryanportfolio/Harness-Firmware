@@ -28,7 +28,7 @@ Git writes still follow the active runtime's safety rules and the user's authori
 1. Open the repository in Codex.
 2. Let Codex read `AGENTS.md` as its instruction boundary.
 3. Use `.claude/reference/` for shared project knowledge.
-4. Let Codex discover standalone workflows and generated adapters under `.agents/skills/`.
+4. Let Codex discover its native skills under `.agents/skills/`.
 5. Do not run Claude hooks or inherit Claude automatic Git behavior unless the user explicitly asks in the current Codex session.
 
 For a new project, ask Codex to initialize the starter or select its native `init-project` skill. It uses the Codex instruction boundary and shared project facts.
@@ -62,17 +62,17 @@ Run:
 node .claude/scripts/doctor.mjs
 ```
 
-The doctor checks hook wiring, skill frontmatter, generated Codex adapters, skill coverage, the reference library, plugin manifests, leftover `FILL IN` markers, and always-loaded context weight.
+The doctor checks hook wiring, skill frontmatter, that every Claude skill has a registered native or disabled Codex version and that native ports are in sync with their Claude source, skill coverage, the reference library, plugin manifests, leftover `FILL IN` markers, and always-loaded context weight.
 
 ## add or remove skills
 
-Adding or removing a skill never fails a check. The checks warn about what they notice and exit 0, locally, in the doctor, and in CI, where warnings show up as annotations on the run. Only a file the tools cannot read fails: invalid JSON in a manifest, the removal record, or settings; a `SKILL.md` without frontmatter or a description; or a check script that crashes.
+Removing a skill never fails a check. Adding or changing a Claude skill fails `node .claude/scripts/sync-codex-skills.mjs --check`, locally and in CI, until its Codex side is settled: a new skill needs a `native` or `disabled` entry in `.agents/skill-modes.json`, and a changed skill needs its Codex port updated and `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` run. Otherwise the checks warn about what they notice and exit 0, locally, in the doctor, and in CI, where warnings show up as annotations on the run. Beyond that, only a file the tools cannot read fails: invalid JSON in a manifest, the removal record, or settings; a `SKILL.md` without frontmatter or a description; or a check script that crashes.
 
 What produces a warning:
 
 - A registered skill that is missing from a runtime. The warning suggests recording it or restoring it.
 - A skill that needs another one that is not installed, for example `astra-review` without `codex-review`. The warning names both.
-- A skill folder that `.agents/skill-capabilities.json` does not register yet, or a new Claude skill whose Codex adapter has not been generated. Run `node .claude/scripts/sync-codex-skills.mjs --write` for the adapter.
+- A skill folder that `.agents/skill-capabilities.json` does not register yet.
 - A retired skill that reappears, such as `verify-this`. The warning names the skill that replaced it; delete the folder unless you mean to bring it back.
 - A README or README image that no longer matches a fresh build, including hand edits. Run `node scripts/readme/build.mjs` to rebuild it.
 
@@ -133,9 +133,9 @@ For material workflow changes, `refine` records a baseline, fixed criteria, targ
 | Runtime | Entry point | Responsibility |
 |---|---|---|
 | Claude Code | `CLAUDE.md`, `.claude/settings.json`, `.claude/hooks/`, `.claude/skills/` | Kernel rules, slash skills, project memory, session hook, plugin path, and Claude-specific workflow rules. |
-| Codex | `AGENTS.md`, `.agents/skills/` | Explicit safety boundary, standalone workflows, and generated adapters to shared playbooks. |
+| Codex | `AGENTS.md`, `.agents/skills/` | Explicit safety boundary and maintained native Codex skills. |
 
-Generated Codex adapters delegate to `.claude/skills/`. Native entries in `.agents/skill-modes.json` are maintained directly under `.agents/skills/` and preserved by sync. See [skill maintenance](docs/codex-skills.md) for ownership and personal-copy reconciliation. `AGENTS.md` defines the Codex safety boundary. Codex does not run Claude SessionStart hooks. Workflows that need unavailable tools remain capability-gated.
+Every skill has a native Codex version maintained directly under `.agents/skills/` and registered in `.agents/skill-modes.json`, or is registered `disabled` when it needs Claude-only tools. There are no generated adapters. See [skill maintenance](docs/codex-skills.md) for ownership and personal-copy reconciliation. `AGENTS.md` defines the Codex safety boundary. Codex does not run Claude SessionStart hooks. Workflows that need unavailable tools remain capability-gated.
 
 ## repository map
 
@@ -143,8 +143,8 @@ Generated Codex adapters delegate to `.claude/skills/`. Native entries in `.agen
 |---|---|
 | `CLAUDE.md` | Claude Code kernel loaded every turn. Spawned projects fill its verification and deployment sections. |
 | `AGENTS.md` | Codex instruction and safety boundary. |
-| `.claude/skills/` | Canonical workflow playbooks. |
-| `.agents/skills/` | Standalone Codex workflows and generated discovery adapters. |
+| `.claude/skills/` | Claude Code workflow playbooks. |
+| `.agents/skills/` | Maintained native Codex skills. |
 | `.agents/removed-skills.json` | Skills this project deleted on purpose. Checks stay quiet about the names it lists. |
 | `.claude/reference/` | Committed project memory for architecture, commands, deployment, pitfalls, secrets, and technology choices. |
 | `.claude/hooks/session-start.sh` | Claude Code startup checks and reminders. |
@@ -179,7 +179,7 @@ The script copies missing files. `-Force` overwrites. `-DryRun` previews.
 
 - Claude Code for the plugin workflow. The full template supports Claude Code or Codex.
 - Codex reads `AGENTS.md` and `.agents/skills/`; it does not run Claude SessionStart hooks.
-- Node for the doctor, README generator, and Codex adapter synchronization.
+- Node for the doctor, README generator, and Codex skill synchronization.
 - `gh` CLI is optional for project creators.
 - PowerShell bootstrap runs on Windows.
 - POSIX bootstrap runs on macOS and Linux.
