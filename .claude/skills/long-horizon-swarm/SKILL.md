@@ -14,6 +14,10 @@ contributes and how their work flows in. Discussing or editing this skill does n
 
 Look for `.tmp/long-horizon/*/state.md` in this checkout before anything else.
 
+- Before attaching, check whether another session still manages the run. If this session did
+  not run it, and the state file changed in the last 30 minutes or its `Workers:` line lists
+  a worker still running, ask the user: take over (they stop the other session first) or
+  stay out. Two managers writing one state file corrupt it.
 - One run matches the task: attach to it. Add `Swarm: on` under its Contract, create
   `swarm.md` beside it, and continue from its current phase. Never start a second state file
   for the same task.
