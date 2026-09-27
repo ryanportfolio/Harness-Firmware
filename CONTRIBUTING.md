@@ -16,10 +16,11 @@ Codex port update or a re-baseline, or the drift check fails. See
 $EDITOR .claude/skills/<skill>/SKILL.md
 $EDITOR .agents/skills/<skill>/SKILL.md
 
-# 2. sync: validates native Codex skills
-node .claude/scripts/sync-codex-skills.mjs --write
+# 2. record that the Codex port matches the changed Claude skill
+node .claude/scripts/sync-codex-skills.mjs --baseline <skill>
 
-# 3. check the Codex skills still satisfy the contract
+# 3. check registration and drift, then the Codex contract
+node .claude/scripts/sync-codex-skills.mjs --check
 node .claude/scripts/test-codex-contract.mjs
 
 # 4. check the token tax

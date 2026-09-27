@@ -66,13 +66,13 @@ The doctor checks hook wiring, skill frontmatter, generated Codex adapters, skil
 
 ## add or remove skills
 
-Adding or removing a skill never fails a check. The checks warn about what they notice and exit 0, locally, in the doctor, and in CI, where warnings show up as annotations on the run. Only a file the tools cannot read fails: invalid JSON in a manifest, the removal record, or settings; a `SKILL.md` without frontmatter or a description; or a check script that crashes.
+Removing a skill never fails a check. Adding or changing a Claude skill fails `node .claude/scripts/sync-codex-skills.mjs --check`, locally and in CI, until its Codex side is settled: a new skill needs a `native` or `disabled` entry in `.agents/skill-modes.json`, and a changed skill needs its Codex port updated and `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` run. Otherwise the checks warn about what they notice and exit 0, locally, in the doctor, and in CI, where warnings show up as annotations on the run. Beyond that, only a file the tools cannot read fails: invalid JSON in a manifest, the removal record, or settings; a `SKILL.md` without frontmatter or a description; or a check script that crashes.
 
 What produces a warning:
 
 - A registered skill that is missing from a runtime. The warning suggests recording it or restoring it.
 - A skill that needs another one that is not installed, for example `astra-review` without `codex-review`. The warning names both.
-- A skill folder that `.agents/skill-capabilities.json` does not register yet, or a new Claude skill whose Codex adapter has not been generated. Run `node .claude/scripts/sync-codex-skills.mjs --write` for the adapter.
+- A skill folder that `.agents/skill-capabilities.json` does not register yet.
 - A retired skill that reappears, such as `verify-this`. The warning names the skill that replaced it; delete the folder unless you mean to bring it back.
 - A README or README image that no longer matches a fresh build, including hand edits. Run `node scripts/readme/build.mjs` to rebuild it.
 
