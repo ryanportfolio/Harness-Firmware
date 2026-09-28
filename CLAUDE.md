@@ -44,6 +44,7 @@ Defaults until configured:
 
 ## Subagents
 
+- Run independent work in parallel: when parts don't depend on each other's results or edit the same files (research across areas, separate reviews, changes to separate modules), start their subagents in one message instead of one after another. Keep dependent or overlapping work sequential, and give parallel writers separate files or worktrees.
 - Omit `model` on subagent calls unless the user names one. The default is `CLAUDE_CODE_SUBAGENT_MODEL` when set, else the session model.
 
 ## Git: push on completion
