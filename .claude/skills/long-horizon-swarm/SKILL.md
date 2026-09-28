@@ -50,9 +50,9 @@ unless the user points at it or a `session-hub` hub records it.
 | Sol | `codex exec`, one new process per contribution | the Sol id pinned in `.claude/skills/codex-review/SKILL.md`, `high` effort |
 | Astra | `codex exec`, one new process per contribution | `gpt-6-astra`, `medium` effort |
 
-Preflight once: `codex login status` must report a ChatGPT (subscription) login, and flags
-come from local `codex exec --help`. Logged out, API-key login, or unclear billing: tell the
-user, run with Opus peers only, and label the run as single-vendor. Never switch Codex to an
+Preflight once: Codex needs an accepted route (a ChatGPT login or a `model_provider` gateway,
+as the `codex-review` preflight defines), and flags come from local `codex exec --help`. No
+accepted route: tell the user, run with Opus peers only, and label the run as single-vendor. Never switch Codex to an
 API key or paid credits, and never bypass its approvals or sandbox. Honor explicit user
 model choices. A login check does not prove a model is available: when Codex rejects a
 model, mark that entry failed and tell the user. Never drop `-m` or substitute another model.
