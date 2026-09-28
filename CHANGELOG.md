@@ -32,6 +32,11 @@ condensed.
 
 ### Changed
 
+- `init-project` now fills CLAUDE.md's `What this project is` section: what the project
+  is and who it serves, a short "won't compromise on" list, and an optional glossary, in
+  10 lines or fewer. AGENTS.md already points Codex at that section, so both runtimes get
+  the same project context from one place. Configured repos that lack the section get it
+  as a narrow backfill.
 - Codex has two accepted routes: a ChatGPT login, or a `model_provider` gateway set in
   `config.toml` in `$CODEX_HOME` (default `~/.codex`), for example a CLIProxyAPI gateway
   over subscription accounts. `codex-review` and `codex-fullreview` accept either without

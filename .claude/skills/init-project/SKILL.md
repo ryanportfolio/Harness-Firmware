@@ -16,6 +16,10 @@ Read ownership settings before changing discovery, including maintained Codex na
 
 Validate affected JSON, scripts, skill synchronization and links. Configuration changes can break behavior, so never recommend immediate merge merely because they are not app code. Report remaining unknowns. Setup does not imply dependency installation, commit, push, PR or deployment.
 
+## Project context for both runtimes
+
+Fill CLAUDE.md's `What this project is` section, 10 lines or fewer: what the project is and who it serves, a short "won't compromise on" list, and an optional glossary. Draft it from the README, manifests and existing reference files; ask only for purpose or audience facts the repo doesn't state, and show the draft before writing it. AGENTS.md tells Codex to read this section, so it is the one source of project context for both runtimes: don't copy it into AGENTS.md, and confirm the AGENTS.md Defaults bullet still names the section by its exact heading. On an already-configured repo that lacks the section, backfill it as a narrow update. Report any FILL IN marker left in either file as an unknown.
+
 ## Pitfall: branch placement
 
 When the repo has an `origin` remote, setup commits land on a branch from freshly fetched `origin/main` (or the default branch); a local-only project with no remote yet keeps its current branch. Never switch the session's own worktree to another branch. If the app code lives only on an unmerged branch, read it without checking it out (`git show <ref>:<path>`, `git ls-tree -r <ref>`), then ask the user where the setup PR should land before writing anything. Switching the checked-out branch reloads skills and hooks from that branch, and a PR based on a feature branch carries its unmerged commits.
