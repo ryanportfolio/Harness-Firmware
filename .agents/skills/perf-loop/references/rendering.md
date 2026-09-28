@@ -1,24 +1,24 @@
 # Rendering and interaction
 
-## Choose measurements
+## Measurements
 
-Tie the scenario to representative scene complexity, input, viewport, device pixel ratio, quality settings, and duration. Include startup effects, steady state, transitions, and the heavy scene relevant to the complaint.
+Tie scenario to representative scene complexity, input, viewport, device pixel ratio, quality settings, duration. Include startup effects, steady state, transitions, heavy scene relevant to complaint.
 
-- Record frame times in milliseconds, a distribution with supported percentiles, and hitch counts against a declared threshold. Average FPS alone can hide stutters. If using a low-FPS statistic, record the tool's definition.
-- Derive the frame-time budget from the requested refresh target: `1000 / target FPS`. VSync and frame caps can hide headroom, so inspect frame cost as well as presented FPS.
-- Measure input-to-visible-response separately from rendering throughput. A faster loop can still defer input handling.
-- Split CPU and GPU work with available profilers. Record main-thread tasks, draw calls, shader compilation, uploads, allocations, and garbage collection only where they explain the observed bottleneck.
+- Frame times in ms: distribution w/ supported percentiles + hitch count vs declared threshold. Avg FPS alone hides stutter. Low-FPS stat → record tool's definition.
+- Frame-time budget from requested refresh target: `1000 / target FPS`. VSync + frame caps can hide headroom → inspect frame cost as well as presented FPS.
+- Measure input-to-visible-response separately from render throughput. Faster loop can still defer input handling.
+- Split CPU vs GPU work w/ available profilers. Record main-thread tasks, draw calls, shader compilation, uploads, allocations, GC only where they explain observed bottleneck.
 
-## Avoid misleading runs
+## Misleading runs
 
-Confirm rendering stays active: background tabs, occluded or minimized windows, headless execution, software rendering, refresh caps, and power modes can change the result. Record the actual rendering environment; do not claim device GPU performance from an unmatched environment.
+Confirm rendering stays active: background tabs, occluded/minimized windows, headless execution, software rendering, refresh caps, power modes all change result. Record actual rendering env; never claim device GPU perf from unmatched env.
 
-Use repeatable gameplay or interaction sequences, with realistic stress and a fixed seed where appropriate. Keep warmup and shader compilation treatment explicit. Do not remove real first-use stalls from a startup metric by warming them away.
+Repeatable gameplay/interaction sequences, realistic stress, fixed seed where apt. Warmup + shader-compilation treatment explicit. Never warm away real first-use stalls from a startup metric.
 
-Traces, video capture, screenshots, and overlays may add overhead. Use matching instrumentation for comparisons and separate quality captures from clean timing runs when needed. A frozen frame supports visual comparison but cannot prove live pacing.
+Traces, video capture, screenshots, overlays may add overhead. Matching instrumentation for comparisons; separate quality captures from clean timing runs when needed. Frozen frame supports visual comparison, can't prove live pacing.
 
-## Preserve the experience
+## Preserve experience
 
-Compare equivalent scenes and states with actual captures, then run the natural interaction. Check effects, lighting, text, responsive layout, reduced motion, keyboard behavior, and hit targets where affected. Validate timing-dependent simulation and animation at different frame rates after changing scheduling or timestep logic.
+Compare equivalent scenes + states w/ actual captures, then run natural interaction. Check effects, lighting, text, responsive layout, reduced motion, keyboard behavior, hit targets where affected. Changed scheduling/timestep logic → validate timing-dependent sim + animation at different frame rates.
 
-Investigate batching, culling, redundant renders, allocation churn, asset uploads, and scheduling only when profiles point there. Lowering resolution, entity count, animation rate, or visual effects is a quality change; obtain agreement before accepting it as the solution.
+Investigate batching, culling, redundant renders, allocation churn, asset uploads, scheduling only when profiles point there. Lower resolution, entity count, animation rate, visual effects = quality change → get agreement before accepting as solution.
