@@ -33,11 +33,13 @@ condensed.
 ### Changed
 
 - Codex has two accepted routes: a ChatGPT login, or a `model_provider` gateway set in
-  `~/.codex/config.toml` (for example a CLIProxyAPI gateway over subscription accounts).
-  `codex-review` and `codex-fullreview` accept either without a caveat, record which one ran,
-  and stop only when neither holds. When a gateway is set it carries the requests, whatever
-  `codex login status` says. `arena`, `long-horizon-swarm`, `long-horizon` and
-  `long-horizon-workflows` use the same two routes to decide whether Codex joins.
+  `config.toml` in `$CODEX_HOME` (default `~/.codex`), for example a CLIProxyAPI gateway
+  over subscription accounts. `codex-review` and `codex-fullreview` accept either without
+  a caveat, record which one ran, and stop only when neither holds. The agent never adds,
+  changes or switches a provider or key itself. When a gateway is set it carries the
+  requests, whatever `codex login status` says. `arena`, `long-horizon-swarm`,
+  `long-horizon` and `long-horizon-workflows` use the same two routes to decide whether
+  Codex joins.
 - `perf-loop` starts with a triage pass when the request names no target. It measures
   every applicable dimension (loading, delivery size, rendering, input response, memory,
   service latency, CPU and disk), compares each with a budget or labeled reference,

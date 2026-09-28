@@ -197,7 +197,7 @@ session:
 codex login status
 ```
 
-Logged in, or a `model_provider` gateway set in `~/.codex/config.toml` → one `codex exec` run (custom prompt, no scope selector) carrying the contract, the
+Logged in, or a `model_provider` gateway set in `config.toml` in `$CODEX_HOME` (default `~/.codex`) → one `codex exec` run (custom prompt, no scope selector) carrying the contract, the
 audit log, and Dead ends, asking for a plateau diagnosis and a different strategy. See the
 `codex-review` skill for current local preflight, CLI mechanics, and run identity. Its answer is
 an opinion: check the proposal against the current contract version and acceptance checks
