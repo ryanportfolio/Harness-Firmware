@@ -72,10 +72,10 @@ The dotted branch is separate: after human review, `sync-starter` can move a gen
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="36 Claude Code skills and 32 Codex skills share project memory. Codex has 32 native workflows." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="36 Claude Code skills and 33 Codex skills share project memory. Codex has 33 native workflows." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
-**36 Claude Code skills · 32 Codex skills · 32 native Codex workflows**
+**36 Claude Code skills · 33 Codex skills · 33 native Codex workflows**
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
 - **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows with explicit capability and safety boundaries; every Claude skill has a maintained native Codex version or is disabled for Codex. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
