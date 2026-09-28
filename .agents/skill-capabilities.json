@@ -677,6 +677,8 @@
         ".agents/skills/perf-loop/references/loading.md",
         ".agents/skills/perf-loop/references/rendering.md",
         ".agents/skills/perf-loop/references/services.md",
+        ".claude/skills/perf-loop/references/triage.md",
+        ".agents/skills/perf-loop/references/triage.md",
         ".claude/skills/perf-loop/references/evidence-report.md",
         ".agents/skills/perf-loop/references/evidence-report.md"
       ],

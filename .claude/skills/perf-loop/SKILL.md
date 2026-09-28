@@ -1,11 +1,11 @@
 ---
 name: perf-loop
-description: "Run measured optimization rounds with independent review for FPS, loading, latency, throughput, and resource use. Use for /perf-loop or broad performance improvement requests; skip routine isolated fixes."
+description: "Run measured optimization rounds with independent review for FPS, loading, latency, throughput, and resource use; with no named target, triage every dimension first. Use for /perf-loop or broad performance requests; skip isolated fixes."
 ---
 
 # Performance loop
 
-Improve the performance users experience through reproducible experiments and independent review. Preserve behavior and quality. Take the target, constraints, and authorization from the request; broad optimization means broad discovery within that target, followed by focused changes.
+Improve the performance users experience through reproducible experiments and independent review. Preserve behavior and quality. Take the target, constraints, and authorization from the request. A request without a named target starts with a triage pass across every applicable performance dimension; the user picks the focus from its table before any round begins.
 
 ## Establish the scope and measurement path
 
@@ -23,6 +23,14 @@ For experiment evidence and before/after presentation, read the packaged
 [evidence report](references/evidence-report.md); retain the measurement and review gates below.
 
 Use existing project tools first. This workflow does not grant permission to install tools, run disruptive production load, publish changes, or alter unrelated infrastructure.
+
+## Triage when the target is open
+
+Run triage first when the request names no specific metric or scenario, for example the skill invoked alone, "make it faster", or "optimize everything". Follow [triage](references/triage.md): measure each applicable dimension against a reference, profile far enough to name its top contributor, and present the ranked table. Make no code changes during triage.
+
+Then stop and wait for the user to pick the focus. Do not choose it on their behalf; an unattended run ends with the table as its report. An audit request can end at the table as well.
+
+When the user already names a target, skip triage, mention that it is available, and continue with the baseline below. Triage numbers are diagnostic: the chosen target always gets its own full baseline.
 
 ## Record a repeatable baseline
 

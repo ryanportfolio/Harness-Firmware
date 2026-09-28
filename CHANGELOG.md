@@ -32,6 +32,12 @@ condensed.
 
 ### Changed
 
+- `perf-loop` starts with a triage pass when the request names no target. It measures
+  every applicable dimension (loading, delivery size, rendering, input response, memory,
+  service latency, CPU and disk), compares each with a budget or labeled reference,
+  names the top contributor, and presents a ranked table. The skill then stops until the
+  user picks the focus. A request that names a target skips triage. Triage numbers never
+  serve as the acceptance baseline. The method lives in `references/triage.md`.
 - `.claude/reference/pitfalls.md` ships empty, like the other reference files. Its
   entries were the template's own accumulated gotchas: its tooling and README panels, its
   maintainer's machine, and general lessons such as escaping JSON inside `<script>`, stale
