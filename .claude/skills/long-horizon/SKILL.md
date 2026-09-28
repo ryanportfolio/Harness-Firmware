@@ -197,11 +197,11 @@ session:
 codex login status
 ```
 
-Logged in → one `codex exec` run (custom prompt, no scope selector) carrying the contract, the
+Logged in, or a `model_provider` gateway set in `~/.codex/config.toml` → one `codex exec` run (custom prompt, no scope selector) carrying the contract, the
 audit log, and Dead ends, asking for a plateau diagnosis and a different strategy. See the
 `codex-review` skill for current local preflight, CLI mechanics, and run identity. Its answer is
 an opinion: check the proposal against the current contract version and acceptance checks
-before it rewrites Remaining, and drop anything that drifts. Not logged in or the run fails → skip it, the rewrite
+before it rewrites Remaining, and drop anything that drifts. Neither, or the run fails → skip it, the rewrite
 rules above stand on their own.
 
 One consult per trigger. Each run bills the user's Codex subscription, which is why this hangs
