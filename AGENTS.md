@@ -15,6 +15,7 @@ This is the Codex boundary for repositories using the Harness Firmware starter. 
 
 - Inspect tools exposed in the current session before using subagents, browser control, connectors, or interactive input. Config flags alone are not proof.
 - Parallel or subagent browser work: each agent opens its own browser through the `playwright-iso` MCP server from `.mcp.json` (`@playwright/mcp --isolated`, in-memory profile, any number at once) or `scripts/lib/launch-chrome.mjs`. Never the official playwright plugin: it holds one persistent profile, and a second connection fails with "Browser is already in use ... use --isolated" and deadlocks.
+- Run independent subagent work in parallel when the parts don't depend on each other's results or edit the same files; keep dependent or overlapping work sequential, and give parallel writers separate files or worktrees.
 - Spawn subagents with fresh context (`fork_turns: "none"`) and a self-contained brief by default. Inherit conversation history only when the task specifically benefits from it. Independent reviewers always start fresh; report a capability gap if the exposed runtime cannot provide this.
 - Serial fallback is valid only when independence is not part of the deliverable. `impartial-review`, `advocate`, and `why` require fresh independent context; if unavailable, report the gap.
 - Claude `Workflow` programs are not Codex programs. Recreate their intent with exposed Codex agents or flag them blocked.
