@@ -21,12 +21,11 @@ Cut duplication, stale facts, and filler. Preserve current explicit user prefere
 
 For skill visibility or connectors, inspect the actual runtime's supported controls, scope, and reload behavior first. Distinguish project, personal, plugin, and account-owned sources. Disabling a capability can affect other projects; describe that scope and use only authorized controls. Do not assume a file edit controls an account connector or plugin. Prefer changing precise discovery descriptions over hiding useful skills merely to lower a count.
 
-For Claude legacy visibility values or plugin commands, verify current schema/help and installation rather than relying on remembered enum values or scope claims. For Codex, edit maintained native skills directly in `.agents/skills/<name>/`, keep every Claude skill registered `native` or `disabled`, and reconcile any `.agents/skill-modes.json` or `.agents/skill-capabilities.json` change with its files. After a change to a `native` skill's Claude source, update its Codex port to match and run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>`. Then run from the repository root:
+For Claude legacy visibility values or plugin commands, verify current schema/help and installation rather than relying on remembered enum values or scope claims. For Codex, edit maintained native skills directly in `.agents/skills/<name>/`, keep every Claude skill registered `native` or `disabled`, and reconcile any `.agents/skill-modes.json` change with its files. After a change to a `native` skill's Claude source, update its Codex port to match and run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>`. Then run from the repository root:
 
 ```
 node .claude/scripts/sync-codex-skills.mjs --check
 node .claude/scripts/test-codex-contract.mjs
-node .claude/scripts/check-skill-capabilities.mjs
 ```
 
 `--check` fails on an unregistered skill or a Claude skill changed since its Codex port was last baselined. `test-codex-contract.mjs` checks that Codex routing metadata stays within its context budget. Include the `.agents/skills/` and `.agents/skill-sources.json` changes with the edit.

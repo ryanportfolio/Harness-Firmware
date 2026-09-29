@@ -194,19 +194,20 @@ function checkCodexSync() {
 }
 
 // --- skill coverage and the removed-skills record (.agents/removed-skills.json) ---
-// Missing or unregistered skills are warnings; a skill listed in the record is silent.
+// Registered skills come from .agents/skill-modes.json. Missing skills are warnings; a skill
+// listed in the record is silent.
 async function checkSkillCoverage() {
-  const modulePath = ".claude/scripts/check-skill-capabilities.mjs";
-  if (!exists(modulePath) || !exists(".agents/skill-capabilities.json")) {
-    record("skill-coverage", "WARN", "capability manifest or checker is absent; skipping the coverage check");
+  const modulePath = ".claude/scripts/removed-skills.mjs";
+  if (!exists(modulePath)) {
+    record("skill-coverage", "WARN", `${modulePath} is absent; skipping the coverage check`);
     return;
   }
   try {
-    const { validateCapabilities } = await import(pathToFileURL(abs(modulePath)).href);
-    const { errors, warnings = [], removed } = validateCapabilities(root);
-    const note = removed?.size ? `; deliberately removed: ${[...removed].join(", ")}` : "";
-    if (errors.length) record("skill-coverage", "FAIL", `${errors.length} problem(s): ${errors.join("; ")}`);
-    else if (warnings.length) record("skill-coverage", "WARN", `${warnings.length} warning(s): ${warnings.join("; ")}${note}`);
+    const { readRegisteredSkills, readRemovedSkills, reviewRemovals } = await import(pathToFileURL(abs(modulePath)).href);
+    const removed = readRemovedSkills(root);
+    const warnings = reviewRemovals(root, readRegisteredSkills(root), removed);
+    const note = removed.length ? `; deliberately removed: ${removed.join(", ")}` : "";
+    if (warnings.length) record("skill-coverage", "WARN", `${warnings.length} warning(s): ${warnings.join("; ")}${note}`);
     else record("skill-coverage", "PASS", `registered skills match their folders${note}`);
   } catch (error) {
     record("skill-coverage", "FAIL", `could not check skill coverage: ${error.message}`);

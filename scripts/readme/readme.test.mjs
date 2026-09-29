@@ -231,7 +231,46 @@ test("facts CLI accepts absent optional settings but rejects malformed settings"
   assert.equal(malformed.stdout, "");
 });
 
-test("a project with one skill, a hand-edited README, and an unlisted skill builds and verifies without an unlisted-skill warning", (t) => {
+test("skill folders decide the list: an unlisted folder joins the default group, a stale items.json entry is left out", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "readme-facts-folders-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  for (const relative of ["scripts/readme/facts.mjs", "scripts/readme/lib.mjs", "CLAUDE.md"]) {
+    const target = path.join(root, relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(absolute(relative), target);
+  }
+  const inventory = JSON.parse(read("scripts/readme/items.json"));
+  const listed = inventory.skills[0];
+  inventory.skills.push({ name: "stale-entry", label: "Stale entry", group: "core" });
+  fs.writeFileSync(path.join(root, "scripts/readme/items.json"), JSON.stringify(inventory));
+  const skill = (name, description) => {
+    const target = path.join(root, ".claude/skills", name, "SKILL.md");
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, `---
+name: ${name}
+description: ${description}
+---
+`);
+  };
+  skill(listed.name, "A listed skill.");
+  skill("unlisted-helper", "A project skill that items.json does not list.");
+  fs.mkdirSync(path.join(root, ".claude/skills/resources-only"), { recursive: true });
+  fs.mkdirSync(path.join(root, ".agents/skills"), { recursive: true });
+  const run = spawnSync(process.execPath, [path.join(root, "scripts/readme/facts.mjs")], { encoding: "utf8" });
+  assert.equal(run.status, 0, run.stderr);
+  const collected = JSON.parse(run.stdout);
+  assert.deepEqual(collected.skills.map((item) => item.name), [listed.name, "unlisted-helper"]);
+  const unlisted = collected.skills.find((item) => item.name === "unlisted-helper");
+  assert.equal(unlisted.group, "specialist");
+  assert.equal(unlisted.label, "unlisted-helper");
+  assert.equal(unlisted.description, "A project skill that items.json does not list.");
+  assert.equal(collected.skills[0].group, listed.group);
+  assert.ok(!collected.inventoryNames.includes("stale-entry"));
+  assert.ok(collected.removed.includes("stale-entry"));
+  assert.ok(!collected.warnings.some((warning) => /stale-entry|items\.json/.test(warning)), collected.warnings.join("\n"));
+});
+
+test("a project with one listed skill, a hand-edited README, and an unlisted skill builds, places the unlisted skill, and verifies without a warning", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "readme-one-skill-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const repo = absolute(".");
@@ -250,9 +289,9 @@ test("a project with one skill, a hand-edited README, and an unlisted skill buil
   const rebuild = spawnSync(process.execPath, ["scripts/readme/build.mjs"], { cwd: root, encoding: "utf8" });
   assert.equal(rebuild.status, 0, rebuild.stderr);
   const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
-  assert.match(readme, /^## 1 workflow, loaded when called$/m);
-  assert.match(readme, /^\*\*1 (?:core|discipline|specialist)\*\*$/m);
-  assert.match(readme, /Click to browse the only skill/);
+  assert.match(readme, /^## 2 workflows, loaded when called$/m);
+  assert.match(readme, /^### specialist tools · \d+\r?\n\r?\n(?:- .*\r?\n)*- \[`local-helper`\]\(\.claude\/skills\/local-helper\/SKILL\.md\) · A project skill not yet listed in items\.json\.$/m);
+  assert.match(readme, /Click to browse all 2 skills/);
   assert.match(readme, /^<!-- removed skills: /m);
   assert.doesNotMatch(readme, / 0 (?:core|discipline|specialist)/);
   // Outside the header line, the README names no template skill that is not installed.

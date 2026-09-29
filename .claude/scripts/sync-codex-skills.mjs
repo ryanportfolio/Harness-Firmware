@@ -203,8 +203,14 @@ for (const [name, ownership] of Object.entries(modes.skills)) {
   if (ownership === "adapter") errors.push(`.agents/skill-modes.json: ${name} uses mode "adapter"; generated adapters are no longer supported, so ${port(name)}`);
   if (ownership === "disabled") disabled.add(name);
 }
-const capabilitiesPath = path.join(root, ".agents", "skill-capabilities.json");
-const retired = new Set(fs.existsSync(capabilitiesPath) ? Object.keys(parseJson(fs.readFileSync(capabilitiesPath, "utf8"), ".agents/skill-capabilities.json").retired ?? {}) : []);
+// Retired skills and the skills that took over their behavior. A copy that reappears from an
+// old sync only warns.
+const retired = {
+  "automate-me": "refine",
+  "unslop": "caveman and writing",
+  "verify-this": "fable-mode",
+  "writing-skills": "addskill",
+};
 const native = new Set();
 const nativeMode = new Set(Object.entries(modes.skills).filter(([, ownership]) => ownership === "native").map(([name]) => name));
 // Covered: a native Codex port with a Claude source. Its source hash is recorded at review time.
@@ -262,8 +268,8 @@ if (fs.existsSync(sourceRoot)) {
     if (!entry.isDirectory() || disabled.has(entry.name) || Object.hasOwn(modes.skills, entry.name)) continue;
     const skillPath = path.join(sourceRoot, entry.name, "SKILL.md");
     if (!fs.existsSync(skillPath)) continue;
-    if (retired.has(entry.name)) {
-      warnings.push(`${skillPath}: ${entry.name} is retired; see its retirement note in .agents/skill-capabilities.json and delete the folder unless you mean to bring it back`);
+    if (Object.hasOwn(retired, entry.name)) {
+      warnings.push(`${skillPath}: ${entry.name} is retired and its behavior now lives in ${retired[entry.name]}; delete the folder unless you mean to bring it back`);
     } else if (removed.has(entry.name)) {
       warnings.push(`${skillPath}: ${entry.name} is recorded in .agents/removed-skills.json but its Claude folder remains; delete the folder or register it in .agents/skill-modes.json`);
     } else {

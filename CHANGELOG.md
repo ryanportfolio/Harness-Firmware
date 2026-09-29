@@ -29,8 +29,20 @@ condensed.
   authorization policy, not a repository one, so it now lives as a global skill in
   `~/.claude/skills/merge`. The kernel's squash-by-default and one-PR-per-unit rules
   are unchanged.
+- The skill capability manifest `.agents/skill-capabilities.json`, its checker
+  `check-skill-capabilities.mjs`, its tests, its CI step and the generated catalog
+  in `docs/codex-skills.md`. Copies of the template kept failing when the manifest
+  drifted from the skill folders. `.agents/skill-modes.json` is now the only record
+  of which Codex copies are native or disabled. The removal policy (required skills
+  and dependencies) moved into `removed-skills.mjs`, and the list of retired skills
+  moved into `sync-codex-skills.mjs`, which still warns when one reappears.
 
 ### Changed
+
+- The README skill list comes from the skill folders. `scripts/readme/items.json`
+  only adds labels, groups and order: a folder without an entry now joins the
+  specialist group under its folder name instead of being left out, and an entry
+  without a folder is still left out.
 
 - Codex has two accepted routes: a ChatGPT login, or a `model_provider` gateway set in
   `config.toml` in `$CODEX_HOME` (default `~/.codex`), for example a CLIProxyAPI gateway

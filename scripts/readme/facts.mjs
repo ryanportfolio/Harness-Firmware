@@ -46,17 +46,26 @@ export function expectedCodexNames(canonicalNames, modes = {}, overrides = {}) {
   return [...names].sort();
 }
 
+// Skills that items.json does not place, or places in an unknown group, land here.
+const DEFAULT_GROUP = "specialist";
+
 export function collectFacts() {
   const inventory = readJson("scripts/readme/items.json");
   const groupIds = inventory.groups.map((group) => group.id);
   if ([...groupIds].sort().join() !== "core,discipline,specialist") throw new Error("scripts/readme/items.json: skill groups must be core, discipline, specialist");
 
-  // A template skill whose folder is missing is left out of the README, and so is a skill
-  // folder that items.json does not list. Neither warns or fails.
+  // The skill folders decide which skills the README lists; items.json only adds a label,
+  // a group and an order. A folder that items.json does not list joins the default group
+  // under its folder name, after the listed skills. An items.json entry without a folder is
+  // left out. Neither warns or fails.
   const canonicalNames = directories(".claude/skills");
   const codexNames = directories(".agents/skills");
   const templateNames = inventory.skills.map((skill) => skill.name).sort();
-  const present = inventory.skills.filter((skill) => canonicalNames.includes(skill.name));
+  const placed = (item) => ({ ...item, label: item.label || item.name, group: groupIds.includes(item.group) ? item.group : DEFAULT_GROUP });
+  const present = [
+    ...inventory.skills.filter((skill) => canonicalNames.includes(skill.name)).map(placed),
+    ...canonicalNames.filter((name) => !templateNames.includes(name)).map((name) => placed({ name })),
+  ];
   const removed = templateNames.filter((name) => !canonicalNames.includes(name));
   const inventoryNames = present.map((skill) => skill.name).sort();
   const warnings = [];
@@ -70,7 +79,7 @@ export function collectFacts() {
   const codexExpected = expectedCodexNames(canonicalNames, modes, overrides).filter((name) => canonicalNames.includes(name) || codexNames.includes(name));
   warnings.push(...difference("Codex skill inventory", codexNames, codexExpected));
 
-  const templateTierCounts = countByGroup(groupIds, inventory.skills);
+  const templateTierCounts = countByGroup(groupIds, inventory.skills.map(placed));
   const tierCounts = countByGroup(groupIds, present);
   const skills = present.map((item) => {
     const relativePath = `.claude/skills/${item.name}/SKILL.md`;
