@@ -1,5 +1,6 @@
 ---
 description: 'Long-horizon rounds run through the Workflow tool: fresh executor, inspector, and judges per round with schema verdicts and a run journal. Use on /long-horizon-workflows or to run a big task in Workflow-audited rounds. Claude Code only.'
+disable-model-invocation: true
 ---
 
 # long-horizon-workflows: audited rounds on the Workflow engine
