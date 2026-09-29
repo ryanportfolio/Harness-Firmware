@@ -1,0 +1,5 @@
+interface:
+  display_name: "Why"
+  short_description: "Challenge the previous recommendation with a fresh reviewer"
+policy:
+  allow_implicit_invocation: false
