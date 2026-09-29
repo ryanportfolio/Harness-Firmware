@@ -301,6 +301,9 @@ if (fs.existsSync(targetRoot)) {
     if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
     if (nativeMode.has(entry.name) && !disabled.has(entry.name)) continue;
     const adapterPath = path.join(targetRoot, entry.name, "SKILL.md");
+    if (Object.hasOwn(retired, entry.name) && !Object.hasOwn(modes.skills, entry.name) && fs.existsSync(adapterPath)) {
+      warnings.push(`${adapterPath}: ${entry.name} is retired and its behavior now lives in ${retired[entry.name]}; delete the folder unless you mean to bring it back`);
+    }
     if (disabled.has(entry.name) && fs.existsSync(adapterPath) && !generatedAdapter(adapterPath)) {
       warnings.push(`${adapterPath}: disabled native skill remains discoverable; move it outside .agents/skills explicitly`);
     }

@@ -204,9 +204,10 @@ function skillsPanel(themeName, narrow) {
     height = footerY + 46;
     markup += `<text class="small mute" x="24" y="${footerY}">COUNTS VERIFIED AGAINST</text><text class="small mute" x="24" y="${footerY + 26}">.claude/skills/</text>`;
   } else {
-    const starts = [158, 314, 470];
-    groups.forEach((group, groupIndex) => {
-      const y = starts[groupIndex];
+    // Groups stack by row count, so skills that items.json does not list still fit.
+    let y = 158;
+    let lastBottom = 0;
+    groups.forEach((group) => {
       const columns = group.id === "specialist" ? 7 : 8;
       const cellWidth = group.id === "specialist" ? 108 : 96;
       markup += `<text class="label mute" x="40" y="${y}" data-group-count="${group.skills.length}">${group.label.toUpperCase()} · ${group.skills.length}</text>`;
@@ -218,13 +219,18 @@ function skillsPanel(themeName, narrow) {
         const lines = wrapLabel(skill.label, group.id === "specialist" ? 14 : 12);
         markup += `<g data-skill="${skill.name}" data-bottom="${cellY + 54}" transform="translate(${x} ${cellY})"><rect class="cell" width="${cellWidth}" height="54" rx="6"/><text class="small" x="10" y="${lines.length === 1 ? 31 : 23}">${esc(lines[0])}</text>${lines[1] ? `<text class="small" x="10" y="40">${esc(lines[1])}</text>` : ""}</g>`;
       });
+      const rows = Math.ceil(group.skills.length / columns);
+      lastBottom = y + 18 + (rows - 1) * 66 + 54;
+      // Each group keeps at least the original two-row slot.
+      y += 18 + Math.max(2, rows) * 66 + 6;
     });
-    height = 700;
-    footerY = height - 22;
+    // 678 is the original fixed footer; the canvas only grows past 700 when the cells need it.
+    footerY = Math.max(678, lastBottom + 4);
+    height = footerY + 22;
     markup += `<text class="small mute" x="40" y="${footerY}">CELL AND GROUP COUNTS VERIFIED AGAINST .claude/skills/</text>`;
   }
   const scanTop = narrow ? 188 : 158;
-  const scanDistance = narrow ? Math.max(0, footerY - scanTop - 60) : 430;
+  const scanDistance = Math.max(0, footerY - scanTop - (narrow ? 60 : 90));
   markup += `<g class="scan-bar" aria-hidden="true" style="--scan-distance:${scanDistance}px"><rect class="signal" x="${narrow ? 18 : 34}" y="${scanTop}" width="4" height="32" style="animation:scanY 12s linear infinite"/></g>`;
   markup = `${grid(width, height)}${markup}`;
   return svg({
