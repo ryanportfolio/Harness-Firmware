@@ -55,7 +55,7 @@ publication, deployments, migrations, installation, or external messages.
 1. **Plan one step.** Define allowed paths/actions, dependencies, local done-checks, and
    relevant task constraints. Capture a pre-round baseline, including dirty and untracked
    files, sufficient to distinguish this round's changes from existing work. Save a
-   versioned auditor brief now, before spawning the executor, from the contract, scope,
+   versioned auditor brief now (pre-register it), before spawning the executor, from the contract, scope,
    checks, baseline identity and raw artifact paths. Record its path and content hash.
 2. **Execute.** Spawn a fresh agent with `fork_turns: "none"` when that parameter is exposed.
    Supply a standalone brief: step, scope, checks, necessary verified facts, relevant dead
