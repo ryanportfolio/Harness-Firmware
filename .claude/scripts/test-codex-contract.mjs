@@ -4,8 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { validateCapabilities } from "./check-skill-capabilities.mjs";
-import { parseJson, printWarnings } from "./removed-skills.mjs";
+import { parseJson, printWarnings, readRemovedSkills } from "./removed-skills.mjs";
 
 // Unreadable input fails with one line naming the file, not a stack trace.
 process.on("uncaughtException", (error) => {
@@ -18,11 +17,8 @@ const root = path.resolve(scriptDir, "..", "..");
 const failures = [];
 // Missing or unregistered skills are warnings: projects add and remove skills freely.
 const warnings = [];
-const capabilities = validateCapabilities(root);
-failures.push(...capabilities.errors);
-// Capability warnings are printed once, by check-skill-capabilities.mjs.
 // Skills deleted on purpose and listed in .agents/removed-skills.json.
-const removed = capabilities.removed;
+const removed = new Set(readRemovedSkills(root));
 const maxDescriptionChars = 240;
 const maxCatalogChars = 7000;
 
@@ -78,10 +74,8 @@ const modes = exists(".agents/skill-modes.json") ? parseJson(read(".agents/skill
 for (const [name, mode] of Object.entries(modes.skills)) if (mode === "disabled") disabled.add(name);
 for (const name of disabled) if (exists(`.agents/skills/${name}/SKILL.md`)) warnings.push(`${name}: disabled skill remains discoverable in .agents/skills/`);
 const skillsRoot = path.join(root, ".claude", "skills");
-// A retired skill that reappears is reported by check-skill-capabilities.mjs with its replacement.
-const retired = new Set(Object.keys(capabilities.manifest.retired ?? {}));
 const canonicalEntries = fs.readdirSync(skillsRoot, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && !disabled.has(entry.name) && !removed.has(entry.name) && !retired.has(entry.name))
+  .filter((entry) => entry.isDirectory() && !disabled.has(entry.name) && !removed.has(entry.name))
   .filter((entry) => fs.existsSync(path.join(skillsRoot, entry.name, "SKILL.md")))
   .map((entry) => ({name: entry.name}));
 const activeNames = new Set(canonicalEntries.map(entry => entry.name));

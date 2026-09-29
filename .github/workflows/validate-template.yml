@@ -62,10 +62,9 @@ jobs:
       - name: Codex skill sync preserves standalone workflows
         run: node --test .claude/scripts/test-sync-codex-skills.mjs .claude/scripts/test-codex-skill-sync.mjs .claude/scripts/test-codex-skill-copies.mjs
 
-      - name: Skill capability coverage and selective propagation
-        run: |
-          node .claude/scripts/check-skill-capabilities.mjs
-          node --test .claude/scripts/test-skill-capabilities.mjs
+      # Missing skills and the removal record only warn.
+      - name: Skill presence and removal record
+        run: node .claude/scripts/removed-skills.mjs
 
       - name: README facts and generated assets are valid
         run: node --test scripts/readme/readme.test.mjs

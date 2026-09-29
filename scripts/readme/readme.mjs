@@ -165,9 +165,9 @@ ${skillLists()}
 
 ## checked on every change
 
-The validation workflow checks shell and PowerShell entry points, Codex skill registration and drift from the Claude source, native skill propagation, required resources, intended runtime coverage, retired entrypoints, the Windows project generator, and this README's generated facts and assets. [Inspect the CI runs](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml).
+The validation workflow checks shell and PowerShell entry points, Codex skill registration and drift from the Claude source, native skill propagation, linked skill resources, retired entrypoints, the Windows project generator, and this README's generated facts and assets. [Inspect the CI runs](https://github.com/ryanportfolio/Harness-Firmware/actions/workflows/validate-template.yml).
 
-The [capability manifest](.agents/skill-capabilities.json) records ownership and intended coverage independently of discovery. [Maintenance guidance](docs/codex-skills.md) covers native updates, disabled skills, and personal copies.
+[\`.agents/skill-modes.json\`](.agents/skill-modes.json) records which skills have a native Codex version and which are disabled for Codex. [Maintenance guidance](docs/codex-skills.md) covers native updates, disabled skills, and personal copies.
 
 Run the local health check:
 

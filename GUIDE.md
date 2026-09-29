@@ -66,13 +66,12 @@ The doctor checks hook wiring, skill frontmatter, that every Claude skill has a 
 
 ## add or remove skills
 
-Removing a skill never fails a check. Adding or changing a Claude skill fails `node .claude/scripts/sync-codex-skills.mjs --check`, locally and in CI, until its Codex side is settled: a new skill needs a `native` or `disabled` entry in `.agents/skill-modes.json`, and a changed skill needs its Codex port updated and `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` run. Otherwise the checks warn about what they notice and exit 0, locally, in the doctor, and in CI, where warnings show up as annotations on the run. Beyond that, only a file the tools cannot read fails: invalid JSON in a manifest, the removal record, or settings; a `SKILL.md` without frontmatter or a description; or a check script that crashes.
+Removing a skill never fails a check. Adding or changing a Claude skill fails `node .claude/scripts/sync-codex-skills.mjs --check`, locally and in CI, until its Codex side is settled: a new skill needs a `native` or `disabled` entry in `.agents/skill-modes.json`, and a changed skill needs its Codex port updated and `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` run. Otherwise the checks warn about what they notice and exit 0, locally, in the doctor, and in CI, where warnings show up as annotations on the run. Beyond that, only a file the tools cannot read fails: invalid JSON in `.agents/skill-modes.json`, the removal record, or settings; a `SKILL.md` without frontmatter or a description; or a check script that crashes.
 
 What produces a warning:
 
 - A registered skill that is missing from a runtime. The warning suggests recording it or restoring it.
 - A skill that needs another one that is not installed, for example `astra-review` without `codex-review`. The warning names both.
-- A skill folder that `.agents/skill-capabilities.json` does not register yet.
 - A retired skill that reappears, such as `verify-this`. The warning names the skill that replaced it; delete the folder unless you mean to bring it back.
 - A README or README image that no longer matches a fresh build, including hand edits. Run `node scripts/readme/build.mjs` to rebuild it.
 
@@ -94,7 +93,7 @@ harnessfirmware.com/new does steps 1 and 2 for every skill you untick and sets e
 
 The record is informational. A missing skill listed in it produces no warning; a missing skill left out of it produces one. `node .claude/scripts/removed-skills.mjs` prints the record and any warnings about it, such as a listed skill whose folder is still there.
 
-The `removal` block in `.agents/skill-capabilities.json` describes the template's intent. `required` names the skills the template expects every project to keep: `init-project` and `external-review`. `dependencies` names skills that need others; for example `astra-review` reads `codex-review`. Breaking either produces a warning, not a failure.
+`.claude/scripts/removed-skills.mjs` describes the template's intent. `REQUIRED` names the skills the template expects every project to keep: `init-project` and `external-review`. `DEPENDENCIES` names skills that need others; for example `astra-review` reads `codex-review`. Breaking either produces a warning, not a failure.
 
 Removing `addskill` leaves `.claude/skills/writing-skills/` and `.agents/skills/writing-skills/`. They hold licensed reference files from the retired `writing-skills` skill and have no `SKILL.md`, so no runtime loads them and no check requires them. Delete them by hand if you do not want them.
 

@@ -40,7 +40,7 @@ LICENSE/NOTICE files in the skill folder.
 
 Homegrown skills are MIT, same as the repo (see the root `LICENSE`).
 
-Runtime coverage follows `.agents/skill-capabilities.json`: `astra-fullreview`, `compact-review`,
+Runtime coverage follows `.agents/skill-modes.json` and the skill folders: `astra-fullreview`, `compact-review`,
 `codex-fullreview`, `long-horizon-swarm` and `long-horizon-workflows` are Claude-only, `external-review`
 is Codex-only, and every other active skill ships in both runtimes. `recall` and
 `why` share names with unrelated pstack skills; ours predate the pstack ports

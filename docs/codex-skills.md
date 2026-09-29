@@ -29,8 +29,6 @@ Run:
 node .claude/scripts/sync-codex-skills.mjs --write
 node .claude/scripts/sync-codex-skills.mjs --check
 node .claude/scripts/test-codex-contract.mjs
-node .claude/scripts/check-skill-capabilities.mjs
-node --test .claude/scripts/test-skill-capabilities.mjs
 node --test .claude/scripts/test-sync-codex-skills.mjs .claude/scripts/test-codex-skill-sync.mjs .claude/scripts/test-codex-skill-copies.mjs
 ```
 
@@ -70,44 +68,24 @@ recorded backup after verifying the exact destination and intervening changes.
 Repository edits, personal installation, and Git publication are separate scopes. An
 authorization can cover several, but completing one does not implicitly authorize the rest.
 
-## Coverage and selective propagation
+## Missing skills and selective propagation
 
-`.agents/skill-capabilities.json` declares intended coverage, owners, entrypoints, required
-tools/resources, shared acceptance contracts and justified runtime exceptions. The validator
-checks coverage independently of what the generator happens to discover. Tools are runtime
-requirements to inspect at execution time; this file does not grant them or prove availability.
-Its resource list retains packaged optional references and licenses, and local Markdown links
-are checked separately. Shared contract labels record intended semantics; structural checks
-cannot prove that an agent follows them.
-
-Explicit registry disables and legacy `skillOverrides: off` suppress expected Codex discovery
-without erasing intended coverage from the manifest. A maintained native entrypoint must be
-moved outside discovery explicitly before disabling it; required supporting resources remain.
-The validator warns when a disabled entrypoint reappears, and when a Claude or enabled Codex
-entrypoint is missing without a record.
-
-Missing, unregistered, and retired skills, ownership disagreements, and a stale catalog are
-warnings; the validator exits 0. It fails only when the manifest, the modes file, the removal
-record, or settings cannot be read or have an invalid shape. A project that deletes a skill on
+Missing and retired skills are warnings; the checks exit 0. A project that deletes a skill on
 purpose lists it in `.agents/removed-skills.json`, which silences the missing-skill warning.
-The manifest's `removal` block names the skills the template expects every project to keep
-and the skills that need others. Removal keeps the manifest entry, so the catalog below still
-lists the skill. See [add or remove skills](../GUIDE.md#add-or-remove-skills).
-
-Update the manifest deliberately with source changes. Run the validator with `--write` to
-refresh the catalog below, then run it without arguments to check for drift. A retired route
-that regains a SKILL.md in either root produces a warning naming its replacement. A deliberate single-runtime capability requires an
-explicit coverage list and a nonempty exception explaining the omission.
+`.claude/scripts/removed-skills.mjs` names the skills the template expects every project to
+keep and the skills that need others. See [add or remove skills](../GUIDE.md#add-or-remove-skills).
+A retired name that regains a SKILL.md in `.claude/skills/` produces a sync warning naming its
+replacement.
 
 For selective updates, inspect the diff before choosing paths:
 
 ```text
-git diff HEAD starter/main -- .agents/skills/<name> .agents/skill-modes.json .agents/skill-capabilities.json
+git diff HEAD starter/main -- .agents/skills/<name> .agents/skill-modes.json
 git checkout starter/main -- .agents/skills/<name>/SKILL.md .agents/skills/<name>/references/<resource>
 ```
 
-Merge selected registry entries from `git show starter/main:.agents/skill-modes.json` and
-the capability manifest; preserve unrelated entries and explicit disabled choices. Never
+Merge selected registry entries from `git show starter/main:.agents/skill-modes.json`;
+preserve unrelated entries and explicit disabled choices. Never
 replace a customized kernel or `.claude/reference/` as a side effect. Reconcile changed
 resources with their native body, re-baseline any Claude skill whose port you updated,
 and run the checks above.
@@ -119,48 +97,3 @@ partial sync, and drop the `unslop` ownership entry before running sync. Checkou
 does not remove paths absent upstream. Inspect and back up customizations first,
 preserving useful behavior in replacements or outside discovery; keep resources
 and licenses. Validate that neither retired name has a SKILL.md in either root.
-The isolated Git fixture exercises this sequence without fetching a remote or changing a
-real project. It proves selective file adoption and preserved customization, not publication.
-
-<!-- skill-capability-catalog:start -->
-| Skill | Coverage | Codex owner | Required capabilities | Shared contracts | Runtime exceptions |
-|---|---|---|---|---|---|
-| addskill | claude, codex | native | No additional gate | authorization, proportion | Codex authors through built-in skill-creator; Claude uses packaged authoring guidance. Both use addskill for the full lifecycle. |
-| adopt-repo | claude, codex | native | No additional gate | authorization | None |
-| advocate | claude, codex | native | fresh-context-review | independence | None |
-| arena | claude, codex | native | fresh-context-review | independence | None |
-| astra-fullreview | claude | none | authenticated-codex-cli | independence, evidence | Claude launcher for a full multi-agent Codex review on gpt-6-astra; from Codex use $impartial-review directly. |
-| astra-review | claude, codex | native | authenticated-codex-cli | evidence | A Codex author and Astra reviewer share a vendor; the requested model must be verified or uncertainty disclosed. |
-| babysit-ci | claude, codex | native | No additional gate | authorization | None |
-| brainstorming | claude, codex | native | No additional gate | proportion | None |
-| bro | claude, codex | native | No additional gate | style | None |
-| caveman | claude, codex | native | No additional gate | style | None |
-| claude-review | claude, codex | native | subscription-routed-claude-cli | evidence | Cross-vendor only when the author runtime uses a different vendor; subscription routing is proved locally. |
-| codex-fullreview | claude | none | authenticated-codex-cli | independence, evidence | Claude launcher for a full multi-agent Codex review; from Codex use $impartial-review directly. |
-| codex-review | claude, codex | native | authenticated-codex-cli | evidence | A Codex author and Codex reviewer share a vendor; fresh context does not imply cross-vendor review. |
-| compact-review | claude | none | No additional gate | style | Claude Code only: writes custom instructions for Claude Code /compact; Codex /compact takes no custom instructions. |
-| dare | claude, codex | native | fresh-context-review | independence | None |
-| enhance-prompt | claude, codex | native | No additional gate | proportion | None |
-| external-review | codex | native | No additional gate | independence, evidence | Codex-only leaf review invoked by the codex-review and astra-review launchers in both runtimes; it has no Claude counterpart. |
-| fable-mode | claude, codex | native | No additional gate | proportion | None |
-| forge-repo-ui-skill | claude, codex | native | No additional gate | authorization | None |
-| handoff-audit | claude, codex | native | No additional gate | evidence | None |
-| impartial-review | claude, codex | native | fresh-context-review | independence, evidence | Codex may use authenticated leaf CLI processes when exposed agents are absent; fresh context remains required. |
-| init-project | claude, codex | native | No additional gate | authorization | Claude hook management remains Claude-specific; Codex does not execute Claude hooks. |
-| lab | claude, codex | native | files, preview-server, browser | scope | None |
-| long-horizon | claude, codex | native | fresh-context-review | independence, evidence | None |
-| long-horizon-swarm | claude | none | fresh-context-review, authenticated-codex-cli | independence, evidence, authorization | Claude Code only: Opus peers run through the Claude Agent tool beside Codex peers; from Codex the cross-vendor mix is lost, so Codex uses long-horizon. |
-| long-horizon-workflows | claude | none | fresh-context-review, workflow-tool | independence, evidence | Claude Code only: rounds run through the Claude Code Workflow tool, which Codex does not expose; Codex uses long-horizon. |
-| optimize-context | claude, codex | native | No additional gate | scope | Measure the executing runtime catalog/kernel and verify retrieval after relocation; Claude hook measurements are not Codex measurements. |
-| opus-fullreview | codex | native | subscription-routed-claude-cli | independence, evidence | Codex-only launcher: Claude CLI runs the Claude impartial-review skill as Manager with Opus sub-reviewers. Claude sessions use impartial-review directly. |
-| perf-loop | claude, codex | native | fresh-context-review, repeatable-measurement | independence, evidence | None |
-| recall | claude, codex | native | No additional gate | authorization | None |
-| refine | claude, codex | native | No additional gate | authorization, proportion | None |
-| session-hub | claude, codex | native | writable-hub-location | scope | None |
-| showpiece | claude, codex | native | No additional gate | scope | None |
-| sync-starter | claude, codex | native | No additional gate | authorization | None |
-| why | claude, codex | native | fresh-context-review | independence | None |
-| wow-loop | claude, codex | native | fresh-context-review, visual-capture | independence, evidence | None |
-| writing | claude, codex | native | No additional gate | style | None |
-| writing-plans | claude, codex | native | No additional gate | proportion | None |
-<!-- skill-capability-catalog:end -->

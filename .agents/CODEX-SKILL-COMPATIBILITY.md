@@ -36,5 +36,5 @@ for comparison, backup, reconciliation, and discovery checks.
 
 `unslop` and `writing-skills` are retired from both discovery catalogs. Route cleanup to
 Caveman/Writing and authoring to addskill. Legacy licensed writing-skills resources remain.
-Run `node .claude/scripts/check-skill-capabilities.mjs` to check intended runtime coverage,
-ownership, resource closure and retirement. The generated catalog is in `docs/codex-skills.md`.
+`node .claude/scripts/sync-codex-skills.mjs --check` warns when a retired name regains a
+`SKILL.md`.

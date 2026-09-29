@@ -146,7 +146,7 @@ check_starter_drift() {
   local changed
   changed=$(git diff --name-only HEAD "$ref" -- \
     .claude/skills .claude/hooks .claude/scripts .claude/output-styles .claude/settings.json \
-    .agents/skills .agents/skill-modes.json .agents/skill-capabilities.json 2>/dev/null) || return 0
+    .agents/skills .agents/skill-modes.json 2>/dev/null) || return 0
   # Skills recorded in .agents/removed-skills.json were deleted on purpose; their
   # template files are not drift.
   local removed name
