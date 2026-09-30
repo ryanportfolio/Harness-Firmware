@@ -5,7 +5,9 @@
 // remove skills, and the registry may catch up later. The checks warn instead:
 // - a missing skill listed in .agents/removed-skills.json is intentional and stays silent;
 // - a missing skill that is not listed gets a warning suggesting to record or restore it;
-// - a present skill that needs a missing one (DEPENDENCIES below) gets a warning naming both.
+// - a present skill that needs a missing one (DEPENDENCIES below) gets a warning naming both;
+//   a needed skill turned "off" in .claude/settings.json skillOverrides counts as missing,
+//   because the Codex sync then treats it as disabled and ships no copy.
 // Registered skills are the names in .agents/skill-modes.json.
 // What still fails: a record or modes file that cannot be parsed.
 //
@@ -17,6 +19,7 @@ import { fileURLToPath } from "node:url";
 
 export const RECORD_PATH = ".agents/removed-skills.json";
 const MODES_PATH = ".agents/skill-modes.json";
+const SETTINGS_PATH = ".claude/settings.json";
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RUNTIME_ROOTS = [".claude/skills", ".agents/skills"];
 
@@ -63,6 +66,14 @@ export function readRegisteredSkills(root) {
   return new Set(Object.keys(modes.skills));
 }
 
+// Returns the skill names .claude/settings.json turns "off" in skillOverrides. An absent file turns off none.
+export function readDisabledSkills(root) {
+  const file = path.join(root, SETTINGS_PATH);
+  if (!fs.existsSync(file)) return new Set();
+  const overrides = parseJson(fs.readFileSync(file, "utf8"), SETTINGS_PATH)?.skillOverrides ?? {};
+  return new Set(Object.entries(overrides).filter(([, value]) => value === "off").map(([name]) => name));
+}
+
 // True when the skill has an entrypoint in at least one runtime.
 export function skillPresent(root, name) {
   return RUNTIME_ROOTS.some((directory) => fs.existsSync(path.join(root, directory, name, "SKILL.md")));
@@ -70,7 +81,7 @@ export function skillPresent(root, name) {
 
 // Reviews the record and the dependency declarations against the working tree.
 // Returns warnings only; nothing about presence fails a check.
-export function reviewRemovals(root, registered = readRegisteredSkills(root), removed = readRemovedSkills(root)) {
+export function reviewRemovals(root, registered = readRegisteredSkills(root), removed = readRemovedSkills(root), disabled = readDisabledSkills(root)) {
   const warnings = [];
   const sorted = [...new Set(removed)].sort();
   if (removed.length !== sorted.length || removed.some((name, index) => name !== sorted[index])) {
@@ -85,9 +96,10 @@ export function reviewRemovals(root, registered = readRegisteredSkills(root), re
     if (!removed.includes(name) && !skillPresent(root, name)) warnings.push(`${name}: not installed in any runtime; record it in ${RECORD_PATH} or restore it`);
   }
   for (const [name, needs] of Object.entries(DEPENDENCIES)) {
-    if (!registered.has(name) || !skillPresent(root, name)) continue;
+    if (!registered.has(name) || !skillPresent(root, name) || disabled.has(name)) continue;
     for (const need of needs) {
       if (!skillPresent(root, need)) warnings.push(`${name} needs ${need}, which is not installed; restore ${need} or remove ${name} too`);
+      else if (disabled.has(need)) warnings.push(`${name} needs ${need}, which ${SETTINGS_PATH} turns off in skillOverrides; remove that override or turn ${name} off too`);
     }
   }
   return warnings;

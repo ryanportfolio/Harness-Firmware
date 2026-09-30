@@ -204,3 +204,22 @@ test("a source entry for a deleted Claude skill warns and exits 0", (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /skill-sources\.json: gone has no \.claude\/skills\/gone\/ folder; its entry can be removed/);
 });
+
+test("a needed skill turned off in skillOverrides warns like a missing one", async (t) => {
+  const { reviewRemovals } = await import("./removed-skills.mjs");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "skill-deps-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  for (const name of ["codex-fullreview", "impartial-review"]) {
+    fs.mkdirSync(path.join(root, ".claude/skills", name), { recursive: true });
+    fs.writeFileSync(path.join(root, ".claude/skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
+  }
+  const registered = new Set(["codex-fullreview", "impartial-review"]);
+  assert.deepEqual(reviewRemovals(root, registered, [], new Set()), []);
+  const warnings = reviewRemovals(root, registered, [], new Set(["impartial-review"]));
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /codex-fullreview needs impartial-review, which \.claude\/settings\.json turns off in skillOverrides/);
+  assert.deepEqual(reviewRemovals(root, registered, [], new Set(["codex-fullreview", "impartial-review"])), []);
+  fs.mkdirSync(path.join(root, ".claude"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".claude/settings.json"), JSON.stringify({ skillOverrides: { "impartial-review": "off" } }));
+  assert.equal(reviewRemovals(root, registered, []).length, 1);
+});
