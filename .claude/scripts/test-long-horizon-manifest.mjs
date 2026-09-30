@@ -24,7 +24,7 @@ function repo(t) {
     fs.writeFileSync(path.resolve(root, p), s);
   };
   git("init", "-q");
-  for (const f of ["a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "same.txt"]) write(f, `${f} v1\n`);
+  for (const f of ["a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "same.txt", "mv.txt"]) write(f, `${f} v1\n`);
   write(".gitignore", "out/\n");
   git("add", "-A");
   git("commit", "-qm", "init");
@@ -59,6 +59,8 @@ test("diff reports exactly the executor's changes, including reverts and commits
   write("same.txt", "same.txt v2\n");
   git("commit", "-qm", "change then restore", "--", "same.txt");
   write("same.txt", "same.txt v1\n"); // dirty against HEAD, equal to the baseline
+  git("mv", "mv.txt", "moved.txt");
+  git("commit", "-qm", "committed rename"); // rename detection would hide the source
   fs.unlinkSync(path.join(root, "c.txt"));
   write("n.txt", "new\n");
   write("out/r.json", "{\"x\":1}\n");
@@ -67,9 +69,10 @@ test("diff reports exactly the executor's changes, including reverts and commits
 
   const current = path.join(dir, "current.json");
   const d = JSON.parse(run("--diff", baseline, current));
-  assert.deepEqual(d.added, ["n.txt"]);
+  assert.deepEqual(d.added, ["moved.txt", "n.txt"]);
   assert.deepEqual(d.modified, ["a.txt", "b.txt", outside.replaceAll("\\", "/"), "out/r.json"].sort());
-  assert.deepEqual(d.deleted, ["c.txt", "u.txt"]);
+  assert.deepEqual(d.deleted, ["c.txt", "mv.txt", "u.txt"]);
+  assert.deepEqual(d.uncovered, []);
   assert.notEqual(d.headNow, d.headAtBaseline);
   assert.ok(fs.existsSync(current));
 });
@@ -81,14 +84,56 @@ test("clean workspace diffs empty; links are recorded, not followed", (t) => {
   fs.writeFileSync(path.join(shared, "big.js"), "x");
   write("out/keep.txt", "k\n");
   fs.symlinkSync(shared, path.join(root, "out", "node_link"), process.platform === "win32" ? "junction" : "dir");
-  const baseline = path.join(dir, "baseline.json");
+  const baseline = path.join(root, "lh-baseline.json"); // inside the workspace, untracked
   run(root, baseline, "out");
   const base = JSON.parse(fs.readFileSync(baseline, "utf8"));
   assert.equal(base.snapshot, base.head);
+  assert.equal(base.files["lh-baseline.json"], undefined);
   assert.match(base.files["out/node_link"], /^link:/);
   assert.equal(Object.keys(base.files).some((k) => k.includes("big.js")), false);
   const d = JSON.parse(run("--diff", baseline));
   assert.deepEqual([d.added, d.modified, d.deleted], [[], [], []]);
+});
+
+test("an unreadable snapshot is reported as uncovered, not as a clean result", (t) => {
+  const { dir, root, git, write } = repo(t);
+  const baseline = path.join(dir, "baseline.json");
+  run(root, baseline);
+  write("b.txt", "b.txt v2\n");
+  git("commit", "-qam", "executor commit");
+  const base = JSON.parse(fs.readFileSync(baseline, "utf8"));
+  fs.writeFileSync(baseline, JSON.stringify({ ...base, snapshot: "0".repeat(40) }));
+  const d = JSON.parse(run("--diff", baseline));
+  assert.match(d.uncovered.join("\n"), /snapshot 0{40} unavailable/);
+});
+
+const posix = process.platform !== "win32";
+test("POSIX: executable bit, restored symlink target, unreadable path", { skip: !posix && "POSIX file modes" }, (t) => {
+  const { dir, root, git, write } = repo(t);
+  write("x.sh", "#!/bin/sh\n");
+  fs.chmodSync(path.join(root, "x.sh"), 0o755);
+  fs.symlinkSync("a.txt", path.join(root, "l"));
+  write("locked/f.txt", "f\n");
+  git("add", "-A");
+  git("commit", "-qm", "modes");
+  const baseline = path.join(dir, "baseline.json");
+  run(root, baseline, "locked");
+  fs.chmodSync(path.join(root, "x.sh"), 0o644); // same bytes, not executable
+  fs.unlinkSync(path.join(root, "l"));
+  fs.symlinkSync("b.txt", path.join(root, "l"));
+  git("commit", "-qam", "retarget link");
+  fs.unlinkSync(path.join(root, "l"));
+  fs.symlinkSync("a.txt", path.join(root, "l")); // restored, dirty against HEAD
+  fs.chmodSync(path.join(root, "locked"), 0o000);
+  let d;
+  try {
+    d = JSON.parse(run("--diff", baseline));
+  } finally {
+    fs.chmodSync(path.join(root, "locked"), 0o755);
+  }
+  assert.deepEqual(d.modified, ["x.sh"]);
+  assert.deepEqual(d.deleted, []);
+  if (process.getuid?.() !== 0) assert.match(d.uncovered.join("\n"), /locked/);
 });
 
 test("a directory outside git is walked whole and flagged", (t) => {

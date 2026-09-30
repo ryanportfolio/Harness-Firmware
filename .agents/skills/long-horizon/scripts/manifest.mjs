@@ -11,16 +11,20 @@
 //     Rebuilds the manifest now over the baseline's coverage plus every path changed since its
 //     snapshot (commits included), optionally saves it, and prints added, modified, deleted.
 //
-// Links and junctions are recorded by target and never followed. Nested node_modules and .git
-// folders are skipped unless passed as an extra path themselves.
+// Links and junctions are recorded by target and never followed; on POSIX an executable file's
+// entry ends in +x. Nested node_modules and .git folders are skipped unless passed as an extra
+// path themselves. Anything that could not be inspected is listed under `uncovered`, never
+// reported as clean or deleted.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
 const DELETED = "DELETED";
+const POSIX = process.platform !== "win32";
 const slash = (p) => p.replaceAll("\\", "/");
 
+// Output on success, null on any git failure.
 function git(root, args) {
   try {
     return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
@@ -35,20 +39,20 @@ const keyOf = (root, abs) => {
 };
 const absOf = (root, key) => (path.isAbsolute(key) ? key : path.resolve(root, key));
 
-function walk(root, abs, files) {
-  let st;
+function walk(root, abs, files, uncovered) {
+  const key = keyOf(root, abs);
   try {
-    st = fs.lstatSync(abs);
-  } catch {
-    files[keyOf(root, abs)] = DELETED;
-    return;
-  }
-  if (st.isSymbolicLink()) files[keyOf(root, abs)] = `link:${slash(fs.readlinkSync(abs))}`;
-  else if (st.isFile()) files[keyOf(root, abs)] = createHash("sha256").update(fs.readFileSync(abs)).digest("hex");
-  else if (st.isDirectory()) {
-    for (const e of fs.readdirSync(abs)) {
-      if (e === ".git" || e === "node_modules") continue;
-      walk(root, path.join(abs, e), files);
+    const st = fs.lstatSync(abs);
+    if (st.isSymbolicLink()) files[key] = `link:${slash(fs.readlinkSync(abs))}`;
+    else if (st.isFile()) files[key] = createHash("sha256").update(fs.readFileSync(abs)).digest("hex") + (POSIX && st.mode & 0o100 ? "+x" : "");
+    else if (st.isDirectory()) {
+      for (const e of fs.readdirSync(abs)) if (e !== ".git" && e !== "node_modules") walk(root, path.join(abs, e), files, uncovered);
+    }
+  } catch (e) {
+    if (e.code === "ENOENT" || e.code === "ENOTDIR") files[key] = DELETED;
+    else {
+      delete files[key];
+      uncovered.push(`unreadable: ${key} (${e.code ?? e.message})`);
     }
   }
 }
@@ -66,48 +70,79 @@ function statusPaths(root) {
   return paths;
 }
 
-function build(rootArg, out, { ref = null, extras = [], cover = [] } = {}) {
-  const root = path.resolve(rootArg);
+function build(rootArg, out, { ref = null, extras: given = [], cover = [], exclude = [] } = {}) {
+  let root = path.resolve(rootArg);
   const files = {};
   const uncovered = [];
-  const status = statusPaths(root);
-  if (status === null) {
+  const top = git(root, ["rev-parse", "--show-toplevel"]);
+  const at = root;
+  if (top) root = path.resolve(top.trim()); // porcelain paths are relative to the top level
+  const extras = given.map((x) => keyOf(root, path.resolve(at, x)));
+  const status = top ? statusPaths(root) : null;
+  if (top && status === null) throw new Error("git status failed");
+  if (!top) {
     uncovered.push("not a git workspace: whole root walked, no snapshot");
-    walk(root, root, files);
+    walk(root, root, files, uncovered);
   } else {
-    for (const p of status) walk(root, path.resolve(root, p), files);
+    for (const p of status) walk(root, path.resolve(root, p), files, uncovered);
   }
-  for (const x of extras) walk(root, path.resolve(root, x), files);
-  for (const k of cover) walk(root, absOf(root, k), files);
-  if (out) delete files[keyOf(root, path.resolve(out))];
-  const head = status === null ? null : (git(root, ["rev-parse", "--verify", "--quiet", "HEAD"]) ?? "").trim() || null;
-  let snapshot = head;
-  if (status !== null) {
-    const stash = (git(root, ["-c", "user.name=long-horizon", "-c", "user.email=long-horizon@localhost", "stash", "create"]) ?? "").trim();
-    snapshot = stash || head;
-    if (ref && snapshot && git(root, ["update-ref", ref, snapshot]) === null) throw new Error(`git update-ref ${ref} failed`);
-    if (!snapshot) uncovered.push("no commit yet: no snapshot");
+  for (const x of extras) walk(root, absOf(root, x), files, uncovered);
+  for (const k of cover) walk(root, absOf(root, k), files, uncovered);
+  for (const f of [out, ...exclude]) if (f) delete files[keyOf(root, path.resolve(f))];
+  let head = null;
+  let snapshot = null;
+  if (top) {
+    head = (git(root, ["rev-parse", "--verify", "--quiet", "HEAD"]) ?? "").trim() || null;
+    if (head) {
+      const stash = git(root, ["-c", "user.name=long-horizon", "-c", "user.email=long-horizon@localhost", "stash", "create"]);
+      if (stash === null) throw new Error("git stash create failed");
+      snapshot = stash.trim() || head;
+      if (ref && git(root, ["update-ref", ref, snapshot]) === null) throw new Error(`git update-ref ${ref} failed`);
+    } else uncovered.push("no commit yet: no snapshot");
   }
   const manifest = { root: slash(root), head, snapshot, ref, taken: new Date().toISOString(), extras, uncovered, files };
   if (out) fs.writeFileSync(out, JSON.stringify(manifest, null, 1));
   return manifest;
 }
 
+// What a path not covered at baseline held then: its snapshot entry as a manifest value,
+// DELETED when the snapshot lacks it, or null when the snapshot cannot be read.
+function snapshotValue(root, snapshot, key, now) {
+  if (!snapshot || path.isAbsolute(key)) return DELETED;
+  const out = git(root, ["ls-tree", "-z", snapshot, "--", key]);
+  if (out === null) return null;
+  const m = /^(\d+) blob ([0-9a-f]+)\t/.exec(out);
+  if (!m) return DELETED;
+  const [, mode, blob] = m;
+  if (mode === "120000") return `link:${git(root, ["cat-file", "blob", blob])}`;
+  if (now === DELETED || now.startsWith("link:")) return "tracked";
+  const same = (git(root, ["hash-object", "--", key]) ?? "").trim() === blob;
+  const exec = POSIX && mode === "100755";
+  return same && exec === now.endsWith("+x") ? now : "tracked";
+}
+
 function diff(baselineFile, out) {
   const base = JSON.parse(fs.readFileSync(baselineFile, "utf8"));
   const root = base.root;
-  const since = base.snapshot ? (git(root, ["diff", "--name-only", "-z", base.snapshot]) ?? "").split("\0").filter(Boolean) : [];
-  const cur = build(root, out, { extras: base.extras, cover: [...Object.keys(base.files), ...since] });
+  const uncoveredSince = [];
+  let since = [];
+  if (base.snapshot) {
+    const listed = git(root, ["diff", "--no-renames", "--name-only", "-z", base.snapshot]);
+    if (listed === null) uncoveredSince.push(`snapshot ${base.snapshot} unavailable: paths committed since the baseline are not covered`);
+    else since = listed.split("\0").filter(Boolean);
+  }
+  const cur = build(root, out, { extras: base.extras, cover: [...Object.keys(base.files), ...since], exclude: [baselineFile] });
+  const uncovered = [...uncoveredSince, ...cur.uncovered];
+  const unreadable = new Set(cur.uncovered.filter((u) => u.startsWith("unreadable: ")).map((u) => u.slice(12).replace(/ \([^)]*\)$/, "")));
   const result = { added: [], modified: [], deleted: [] };
   for (const k of new Set([...Object.keys(base.files), ...Object.keys(cur.files)])) {
+    if (unreadable.has(k)) continue;
     const now = cur.files[k] ?? DELETED;
     let was = base.files[k];
-    if (was === undefined) {
-      // Not covered at baseline: the path was either clean in the snapshot or absent.
-      const blob = base.snapshot && !path.isAbsolute(k) ? (git(root, ["rev-parse", "--verify", "--quiet", `${base.snapshot}:${k}`]) ?? "").trim() : "";
-      if (!blob) was = DELETED;
-      else if (now === DELETED || now.startsWith("link:")) was = "tracked";
-      else was = (git(root, ["hash-object", "--", k]) ?? "").trim() === blob ? now : "tracked";
+    if (was === undefined) was = snapshotValue(root, base.snapshot, k, now);
+    if (was === null) {
+      uncovered.push(`snapshot entry unreadable: ${k}`);
+      continue;
     }
     if (was === now) continue;
     if (was === DELETED) result.added.push(k);
@@ -115,25 +150,30 @@ function diff(baselineFile, out) {
     else result.modified.push(k);
   }
   for (const list of Object.values(result)) list.sort();
-  return { baseline: slash(path.resolve(baselineFile)), root, headAtBaseline: base.head, headNow: cur.head, uncovered: cur.uncovered, ...result };
+  return { baseline: slash(path.resolve(baselineFile)), root, headAtBaseline: base.head, headNow: cur.head, uncovered, ...result };
 }
 
 const argv = process.argv.slice(2);
 const usage = "usage: node manifest.mjs <root> <out.json> [--ref <ref>] [path ...]\n       node manifest.mjs --diff <baseline.json> [<current.json>]";
-if (argv[0] === "--diff" && argv[1]) {
-  console.log(JSON.stringify(diff(argv[1], argv[2] ?? null), null, 1));
-} else if (argv.length >= 2 && !argv[0].startsWith("--")) {
-  const [root, out, ...rest] = argv;
-  const i = rest.indexOf("--ref");
-  const ref = i >= 0 ? rest[i + 1] : null;
-  if (i >= 0 && !ref) {
+try {
+  if (argv[0] === "--diff" && argv[1]) {
+    console.log(JSON.stringify(diff(argv[1], argv[2] ?? null), null, 1));
+  } else if (argv.length >= 2 && !argv[0].startsWith("--")) {
+    const [root, out, ...rest] = argv;
+    const i = rest.indexOf("--ref");
+    const ref = i >= 0 ? rest[i + 1] : null;
+    if (i >= 0 && !ref) {
+      console.error(usage);
+      process.exit(2);
+    }
+    const extras = i >= 0 ? rest.filter((_, j) => j !== i && j !== i + 1) : rest;
+    const m = build(root, out, { ref, extras });
+    console.log(`files ${Object.keys(m.files).length}, snapshot ${m.snapshot ?? "none"}${m.uncovered.length ? `, uncovered: ${m.uncovered.join("; ")}` : ""}`);
+  } else {
     console.error(usage);
     process.exit(2);
   }
-  const extras = i >= 0 ? rest.filter((_, j) => j !== i && j !== i + 1) : rest;
-  const m = build(root, out, { ref, extras });
-  console.log(`files ${Object.keys(m.files).length}, snapshot ${m.snapshot ?? "none"}${m.uncovered.length ? `, uncovered: ${m.uncovered.join("; ")}` : ""}`);
-} else {
-  console.error(usage);
-  process.exit(2);
+} catch (e) {
+  console.error(`manifest.mjs: ${e.message}`);
+  process.exit(1);
 }
