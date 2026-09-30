@@ -29,7 +29,7 @@ dispatched. With the Workflow engine, whose script takes the Baseline and dispat
 executor in one call, take it right before the workflow call, with no writer active:
 
 ```bash
-mkdir -p <root>/.tmp/long-horizon/<slug>/swarm && tar -C <root> --exclude='./.git' --exclude='./.tmp/long-horizon/*/swarm' -cf <root>/.tmp/long-horizon/<slug>/swarm/baseline-r<N>.tar .
+mkdir -p <root>/.tmp/long-horizon/<slug>/swarm && tar -C <root> --exclude='./.git' --exclude='./.tmp/long-horizon/*/swarm' --exclude='node_modules' -cf <root>/.tmp/long-horizon/<slug>/swarm/baseline-r<N>.tar .
 ```
 
 ## Copy
@@ -43,11 +43,17 @@ mkdir -p <root>/.tmp/long-horizon/<slug>/swarm/S<n>/ws && tar -C <root>/.tmp/lon
 In any other phase, copy the live workspace, including untracked and ignored inputs:
 
 ```bash
-set -o pipefail; mkdir -p <root>/.tmp/long-horizon/<slug>/swarm/S<n>/ws && tar -C <root> --exclude='./.git' --exclude='./.tmp/long-horizon/*/swarm' -cf - . | tar -C <root>/.tmp/long-horizon/<slug>/swarm/S<n>/ws -xf -
+set -o pipefail; mkdir -p <root>/.tmp/long-horizon/<slug>/swarm/S<n>/ws && tar -C <root> --exclude='./.git' --exclude='./.tmp/long-horizon/*/swarm' --exclude='node_modules' -cf - . | tar -C <root>/.tmp/long-horizon/<slug>/swarm/S<n>/ws -xf -
 ```
 
 Both omit Git metadata and earlier swarm entries. A worktree's `.git` is a pointer file back
 to the original repository, so it must stay out of the copy.
+
+Both omit every `node_modules` too. It may be a junction to a folder other checkouts share:
+tar would copy the target or recreate the link, and a peer's cleanup could then empty the
+shared folder. A peer that needs dependencies gets a junction the host creates in its copy
+from a `.ps1` file run with `powershell -File` (a `$` passed inline through bash expands
+before PowerShell sees it), and its brief forbids removing that junction.
 
 The copy has no `.git`: `codex exec` needs `--skip-git-repo-check`, and the peer cannot run
 `git diff`. When its lens needs a diff, the host writes one into the entry directory and
@@ -65,9 +71,9 @@ workspace as a write target.
 
 ## Launch a Codex peer
 
-Model: the Sol id pinned in `.claude/skills/codex-review/SKILL.md` at `high`, or
-`gpt-6-astra` at `medium`. Sandbox: `-s read-only` for ideas and critique,
-`-s workspace-write` for code. Both run with `-C` set to the copy.
+Model and effort: from the Peers table in `../SKILL.md`. Sandbox: `-s read-only` for ideas
+and critique, `-s workspace-write` for code. Both run with `-C` set to the copy; a read-only
+critique may use the workspace root instead when no round is `executing`.
 
 ```bash
 E=<root>/.tmp/long-horizon/<slug>/swarm/S<n>; ( codex exec -C "$E/ws" --skip-git-repo-check -s <read-only|workspace-write> -m <sol id> -c model_reasoning_effort=high -o "$E/report.md" - < "$E/brief.md" > "$E/run.log" 2>&1; printf '%s\n' "$?" > "$E/exit.code" ) < /dev/null > /dev/null 2>&1 & printf '%s\n' "$!" > "$E/pid"; cat "/proc/$!/winpid" > "$E/winpid"
