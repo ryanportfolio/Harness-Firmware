@@ -122,7 +122,9 @@ between Baseline and Audit make attribution impossible; the auditor reports inte
    across sessions. An equivalent immutable snapshot plus content manifest is valid when
    these Git operations are unavailable. Include relevant ignored generated artifacts
    explicitly; name unavailable coverage rather than calling it clean. Record deleted paths
-   too. Sizes and mtimes are not a baseline; hashes are.
+   too. Sizes and mtimes are not a baseline; hashes are. `scripts/manifest.mjs` beside this
+   file builds it (`<root> <out.json> --ref <ref> [Write scope and ignored paths]`) and diffs
+   it for the audit (`--diff <out.json>`).
 2. **Execute** — set phase `executing`, spawn a fresh subagent with the brief alone and no
    Manager conversation history. Record its agent/process ID as soon as dispatch returns.
    It does the step and reports what changed and how to check it. Confirm it has stopped

@@ -324,7 +324,9 @@ output.
    across sessions. An equivalent immutable snapshot plus content manifest is valid when
    these Git operations are unavailable. Include relevant ignored generated artifacts
    explicitly; name unavailable coverage rather than calling it clean. Record deleted paths
-   too. Sizes and mtimes are not a baseline; hashes are. Under the workflow engine the
+   too. Sizes and mtimes are not a baseline; hashes are. `.claude/skills/long-horizon/scripts/manifest.mjs`
+   builds it (`<root> <out.json> --ref <ref> [Write scope and ignored paths]`) and diffs it
+   (`--diff <out.json>`). Under the workflow engine the
    baseline agent takes it as the script's first stage, at the manifest path and ref name the
    Current round block already records; under the agent engine, take it inline before
    spawning the executor.

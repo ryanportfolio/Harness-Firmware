@@ -62,6 +62,9 @@ jobs:
       - name: Codex skill sync preserves standalone workflows
         run: node --test .claude/scripts/test-sync-codex-skills.mjs .claude/scripts/test-codex-skill-sync.mjs .claude/scripts/test-codex-skill-copies.mjs
 
+      - name: long-horizon Baseline manifest detects each kind of change
+        run: node --test .claude/scripts/test-long-horizon-manifest.mjs
+
       # Missing skills and the removal record only warn.
       - name: Skill presence and removal record
         run: node .claude/scripts/removed-skills.mjs
