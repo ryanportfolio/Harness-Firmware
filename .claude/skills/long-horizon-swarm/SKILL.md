@@ -76,17 +76,24 @@ The host asks the swarm at three default points in each round:
    Plan says, and treat its Step and Done-check as a draft. Peers review the draft; the
    `done-check` lens fits. The host revises the block, then takes the Baseline and writes
    both briefs. From there the step and done-check are frozen, and a later finding goes to
-   the next round's Plan.
+   the next round's Plan. The next round's draft may be written to its own file and reviewed
+   while this round executes, with peers kept out of this round's workspace; check it
+   against this round's audit before it becomes the Current round block.
 2. **Post-audit cross-model review.** After Audit, a peer from a different model family than
-   the auditor reviews the round's delta. Its findings go to the next Plan; they never change
-   the audit verdict.
+   the auditor asks what the round's delta will cost later rounds; the audit has already
+   judged whether it is correct. Its findings go to the next Plan; they never change the
+   audit verdict. A round that builds a tool later done-checks rely on also gets one
+   cross-vendor code review of the whole tool before its first use.
 3. **Alternatives after a failed audit.** Peers propose different approaches before the next
    brief. At a long-horizon stagnation trigger this pass replaces the one cross-vendor
    consult; Spend limits it, not the one-consult rule. Check each proposal against the
    current contract before it rewrites Remaining, as long-horizon requires.
 
 The host may skip a touchpoint and logs the reason under Skipped touchpoints. Peers may
-contribute at any other phase too.
+contribute at any other phase too, except with a resource a round holds: a round that needs
+one to itself (a GPU for timing, a fixed port) records `Exclusive: <resource>` in the
+Current round block from Execute through Audit, and while it holds, every peer brief forbids
+that resource (for a GPU: no browser, server or measurement).
 
 ## Contributing
 
@@ -99,13 +106,18 @@ something the first did not.
   `.tmp/long-horizon/<slug>/swarm/<entry-id>/ws/`. Outside a round's execution the copy comes
   from the live workspace, including uncommitted and untracked changes. While a round is
   `executing` or `awaiting-audit` it comes from that round's Baseline snapshot, never the
-  live tree, so no peer builds on the executor's half-finished edits. With Swarm on, Plan
+  live tree, so no peer builds on the executor's half-finished edits. Once the executor has
+  returned, a code peer that needs its edits may copy the live tree instead; its S entry
+  records `base: unaudited r<N>`, and if that audit fails, the integrating round re-checks
+  the contribution against the audited state. With Swarm on, Plan
   saves that snapshot as `swarm/baseline-r<N>.tar` right after the Baseline manifest; with
   the Workflow engine, which takes the Baseline inside its script, right before the
   workflow call, with no writer active in between. Never
   use `isolation: "worktree"`: a worktree starts from HEAD, and rounds do not commit, so it
   would miss earlier rounds' verified work. An Opus peer is told to write only inside its
-  copy; a Codex peer gets `-C <copy>`. Swarm copies sit outside Write scope.
+  copy; a Codex peer gets `-C <copy>`. Swarm copies sit outside Write scope. A Codex
+  critique peer run `-s read-only` may take the workspace root instead of a copy when no
+  round is `executing`.
 - **Integration** stays with the round's executor, the only agent that writes the workspace
   between Baseline and Audit. Its brief names the chosen contribution's path, and it applies
   that result within Write scope. A second writer would make the auditor's delta
@@ -123,8 +135,11 @@ something the first did not.
   copy has no `.git`; a peer that needs a diff gets it as a file named in the brief.
 
 A pass is one dispatch per chosen lens. The cycle continues only while a pass returns a
-finding that would change the artifact, or new code; anything else ends it. There is no
-fixed cap. If peers start agreeing without citing new evidence, run one more pass with a
+finding that would change the artifact, or new code; anything else ends it. On a draft
+review the bar is higher, because each fix adds detail for the next peer to find fault
+with: only a finding that would make a correct executor fail or let a wrong result pass
+continues it, and lesser findings go into the executor brief as notes. There is no fixed
+cap. If peers start agreeing without citing new evidence, run one more pass with a
 fresh peer on the bare artifact; if that adds nothing, stop.
 
 ## Lenses
@@ -139,8 +154,8 @@ A lens is one of:
 
 - **A swarm lens** in `lenses/` beside this file, written for this workflow. Each file states
   the question, what to inspect, what counts as a finding, and the return format.
-  [done-check.md](lenses/done-check.md) is the first; add one when a run shows an angle the
-  pool lacks.
+  [done-check.md](lenses/done-check.md) is the first. A lens a run needs and the pool lacks
+  goes in `.tmp/long-horizon/<slug>/lenses/`, and the handover proposes promoting it here.
 - **An existing skill's criteria**, such as `wow-loop` (quality bar), `perf-loop` (measured
   cost), `dare` (problem and decomposition) or `impartial-review` (defects). The peer reads
   that skill's standard from its `SKILL.md` and applies it in one pass. It does not run the

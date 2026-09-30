@@ -30,6 +30,7 @@ Version: <current contract version>
 # Current round  (scope and checks fixed at Plan, except for explicit user amendments)
 Round: <N>   Phase: planned | executing | awaiting-audit | audited
 Contract version: <version used for this round>
+Workspace: <absolute root the executor writes; any other workspace the round reads, marked read-only>
 Workers: <agent/process IDs, role, last observed status; update as workers start or stop>
 Step: <the one Remaining step this round works>
 Done-check: <commands, cwd, and the expected result; the auditor runs them itself>
@@ -40,6 +41,9 @@ Residue: <paths a failed earlier round left changed, and whether they were rever
 
 # Dead ends  (approaches that failed audit; do not retry without new evidence)
 - <approach>: <why it failed, one line>
+
+# Method notes  (rules later rounds must follow, such as how to measure)
+- <rule>: source round <N>; unconfirmed / confirmed in round <M> / dropped
 
 # Audit log
 - round N: <step> — <status>/<integrity>/<contract>, <one-line evidence>
@@ -71,7 +75,9 @@ workspace anyway; it is the executor's narrative ("works, checked X, Y was out o
 which the Manager has read by the time it would write the auditor brief and can paraphrase
 without noticing. So the auditor brief is not written then. It is pre-registered: written at Plan, before the
 executor exists, from the current contract version's acceptance checks, the Current round
-block and the workspace root, saved to the path recorded in the block, and dispatched unchanged. A Manager
+block and the workspace root, saved to the path recorded in the block, and dispatched unchanged.
+Dispatching it by path counts as unchanged when its sha256 is recorded at Plan and the agent
+checks the hash before reading on. A Manager
 that wants to add something after Execute has found a defect in the Plan, not in the brief;
 it goes into the next round, except for an explicit user amendment handled as above.
 Provenance is checkable; "do not paraphrase" is not.
@@ -92,8 +98,18 @@ between Baseline and Audit make attribution impossible; the auditor reports inte
    into the state file, phase `planned`, before anything is spawned. Then take the Baseline,
    write the auditor brief to its recorded path, and write the executor brief: contract
    excerpt, the Current round block, only the verified facts that step needs, and every dead
-   end that touches this step. The done-check is frozen from this point; one that turns out
-   wrong is fixed in the next round's Plan, never after reading the executor's report.
+   end that touches this step, plus the Method notes. The done-check is frozen from this
+   point; one that turns out wrong is fixed in the next round's Plan, never after reading the
+   executor's report.
+
+   Write and edit the state file and briefs with the file-edit tool; shell and script string
+   layers drop backslashes and backticks. Re-read each saved brief before dispatch. Every
+   brief asks its worker to append each long-lived process it starts (pid, port, command) to
+   `processes.log` in the task directory. A brief for hours-long jobs has the executor check
+   between batches that its workspaces are still whole (`git worktree list`, a sentinel
+   file) and stop and report a mismatch instead of rebuilding. Evidence taken on another
+   revision (line numbers, a patch map) names that revision, and the executor finds cited
+   code by anchor text, not line number.
 
    The Baseline is what the workspace looked like before this executor ran. Rounds do not
    commit between themselves, so HEAD is the wrong reference: it would attribute every
@@ -137,7 +153,9 @@ between Baseline and Audit make attribution impossible; the auditor reports inte
    The executor's report is a claim; the auditor's inspection is the evidence. Only
    complete + clean + aligned enters Verified progress. Set phase `audited`.
 4. **Integrate** — pass: move the step into Verified progress with the auditor's evidence and
-   the round's brief path and baseline ref, so the round can be re-examined later. Fail:
+   the round's brief path and baseline ref, so the round can be re-examined later, and copy
+   cited result files that live outside the task directory into its `evidence/round-<N>/`,
+   since a workspace can vanish. Fail:
    Preserve unaffected Verified progress and mark affected claims stale; append the audit
    findings, record the delta's paths under Residue with a decision to revert or keep each,
    and schedule the next round by the auditor's `repairable` verdict. `yes`: one recovery
@@ -147,13 +165,20 @@ between Baseline and Audit make attribution impossible; the auditor reports inte
    recovery per step: a failed recovery is the step's second failure, and Stagnation then
    forces a new approach whatever the second diagnostic says. Either way, archive the
    Current round block into the Audit log and clear it; a stale one would feed the next
-   auditor the wrong done-check.
+   auditor the wrong done-check. Rules for later rounds that the executor's report states go
+   into Method notes, unconfirmed until a later done-check covers them.
 
 Update the state file every round. Three rounds without a state-file write means drift: stop
 and rebuild the file from the real workspace.
 
+When the user asked for one PR per phase, a phase ends after its last audited round: commit,
+open the PR, run the review the repo requires, and record `Waiting: merge of <PR>` in the
+state file. The next phase plans its first round in a fresh workspace from the merged
+default branch and takes its Baseline there.
+
 After compaction or restart, read state, reconcile the workspace and latest user instructions,
-and inspect recorded workers before touching the round. Confirm old writers have finished or
+and inspect recorded workers before touching the round. Stop processes in `processes.log`
+whose worker no longer runs. Confirm old writers have finished or
 stopped before auditing or replacing them. Missing IDs or lost handles do not prove completion;
 if writer status cannot be established, pause affected work and record the recovery needed.
 

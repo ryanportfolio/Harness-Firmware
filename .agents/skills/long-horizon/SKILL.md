@@ -28,11 +28,12 @@ diffs it for the audit (`--diff <out.json>`).
 |---|---|
 | Contract | Goal, authorized scope, constraints, numbered final acceptance checks |
 | Amendments | Version, explicit user instruction, changed checks, affected steps |
-| Workspace | Absolute root, branch/revision if Git, existing edits, baseline artifact paths |
+| Workspace | Absolute root, branch/revision if Git, existing edits, baseline artifact paths, other workspaces the round reads (read-only) |
 | Round | Step ID, phase, agent/process IDs, allowed edits, local checks, dependencies |
 | Verified progress | Claim, contract version, inspected revision or file fingerprints, evidence path |
 | Remaining | Bounded steps, dependencies, pending final checks, invalidated claims |
 | Dead ends | Failed approach, observed cause, evidence needed before retrying |
+| Method notes | Rules later rounds must follow (such as how to measure), source round, unconfirmed / confirmed / dropped |
 | Audit log | Round verdicts, evidence, decisions, blockers, recovery actions |
 
 Phases: `planned`, `executing`, `awaiting-audit`, `accepted`, `needs-rework`, `blocked`.
@@ -43,8 +44,9 @@ On resume, reconcile state with the actual workspace and latest user instruction
 Check root, revision, dirty files, artifacts, and recorded workers/processes. HEAD alone
 does not identify uncommitted content. Keep old evidence as history; mark affected claims
 stale and recheck before dependent work. Recover partial edits instead of blindly repeating
-execution. Confirm old writers have finished or stopped before replacing them. Missing
-process IDs after restart do not prove execution completed.
+execution. Confirm old writers have finished or stopped before replacing them, and stop
+processes in `processes.log` whose worker no longer runs. Missing process IDs after restart
+do not prove execution completed.
 
 Preserve the original contract. Explicit user changes become amendments; reassess affected
 steps and evidence against the new version. Manager must not weaken acceptance to make
@@ -59,9 +61,17 @@ publication, deployments, migrations, installation, or external messages.
    files, sufficient to distinguish this round's changes from existing work. Save a
    versioned auditor brief now (pre-register it), before spawning the executor, from the contract, scope,
    checks, baseline identity and raw artifact paths. Record its path and content hash.
+   Write and edit state and briefs with the file-edit tool; shell and script string layers
+   drop backslashes and backticks. Re-read each saved brief before dispatch. Every brief
+   asks its worker to append each long-lived process it starts (pid, port, command) to
+   `processes.log` in the task directory. A brief for hours-long jobs has the executor check
+   between batches that its workspaces are still whole (`git worktree list`, a sentinel
+   file) and stop and report a mismatch instead of rebuilding. Evidence taken on another
+   revision (line numbers, a patch map) names that revision, and the executor finds cited
+   code by anchor text, not line number.
 2. **Execute.** Spawn a fresh agent with `fork_turns: "none"` when that parameter is exposed.
    Supply a standalone brief: step, scope, checks, necessary verified facts, relevant dead
-   ends, absolute workspace/artifact paths, current permissions and style instructions.
+   ends, Method notes, absolute workspace/artifact paths, current permissions and style instructions.
    Keep the brief sufficient without Manager conversation history. Use the exposed runtime's
    equivalent if names differ. If only inherited context is possible, record the limitation;
    do not claim a fresh independent audit. Honor explicit user model choices; otherwise
@@ -69,7 +79,8 @@ publication, deployments, migrations, installation, or external messages.
    than silently substituting. Executor implements and verifies only its step, then returns changed paths,
    commands/results, and blockers. It cannot edit Manager state or dispatch more agents.
 3. **Audit after execution stops.** Spawn a separate fresh agent with the prewritten
-   auditor brief byte for byte. Do not rewrite it after reading executor output. A Plan
+   auditor brief byte for byte, or by path when the agent first checks it against the
+   recorded hash. Do not rewrite it after reading executor output. A Plan
    defect belongs in the next round. An explicit user amendment requires reconciling
    workers, retaining old briefs/baseline, and freezing a new version from the amended
    contract and raw artifacts without executor assessments. Exclude
@@ -84,7 +95,15 @@ publication, deployments, migrations, installation, or external messages.
    same approach with the auditor's diagnostic in its brief, counted as the step's second
    attempt; `no` sends the approach to Dead ends and the next brief changes approach. One
    recovery per step: a failed recovery is the second failure and Stagnation applies.
-   Preserve unrelated verified claims. Persist state before the next round.
+   Preserve unrelated verified claims. On acceptance, copy cited result files that live
+   outside the task directory into its `evidence/round-<N>/`, since a workspace can vanish.
+   Rules for later rounds that the executor's report states go into Method notes,
+   unconfirmed until a later done-check covers them. Persist state before the next round.
+
+When the user asked for one PR per phase, a phase ends after its last accepted round: commit,
+open the PR, run the review the repo requires, and record `Waiting: merge of <PR>` in state.
+The next phase plans its first round in a fresh workspace from the merged default branch and
+takes its baseline there.
 
 Use native subagents for rounds; creating sidebar tasks is not a substitute. Wait for
 results with exposed wait tools and bounded waits. Inspect live status before retrying
