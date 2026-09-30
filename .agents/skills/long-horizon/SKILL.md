@@ -20,7 +20,9 @@ Create `.tmp/long-horizon/<task-slug>/state.md` before execution. Manager alone 
 Store bulky output and per-round briefs alongside it, outside the active summary.
 Baseline identity must include path/content hashes for relevant dirty, staged, untracked,
 and ignored generated artifacts; record deletions and unavailable coverage. A Git revision
-alone cannot identify the actual working state.
+alone cannot identify the actual working state. `scripts/manifest.mjs` in this skill's
+directory builds it (`<root> <out.json> --ref <ref> [Write scope and ignored paths]`) and
+diffs it for the audit (`--diff <out.json>`).
 
 | Field | Required content |
 |---|---|
