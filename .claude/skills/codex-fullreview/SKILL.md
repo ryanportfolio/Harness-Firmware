@@ -7,8 +7,6 @@ description: "Full multi-agent Codex review: codex exec runs $impartial-review a
 
 Run one Codex CLI process in which Codex runs the repository's `impartial-review` skill as Manager: it spawns fresh-context sub-reviewers over an exact scope, verifies their findings, and writes one report. Then verify every finding locally. From Claude this supplies a cross-vendor review; from Codex it supplies fresh context, not vendor independence. `codex-review` is the single-context alternative; keep the two entrypoints separate. This one defaults to Sol/high, and `astra-fullreview` supplies Astra/medium. Honor explicit user model and effort choices rather than silently replacing them.
 
-Expect higher usage than `codex-review`: a Manager plus up to seven sub-reviewers, each reading the scope at the chosen model and effort, then Manager verification. Say so before launch.
-
 The requested review does not authorize fixes, publication, machine configuration changes, or paid credit purchases.
 
 ## Step 1: Preflight
