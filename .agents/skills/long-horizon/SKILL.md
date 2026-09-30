@@ -48,6 +48,11 @@ execution. Confirm old writers have finished or stopped before replacing them, a
 processes in `processes.log` whose worker no longer runs. Missing process IDs after restart
 do not prove execution completed.
 
+Before resuming a run this session did not start, check whether another session still
+manages it: if the state file changed in the last 30 minutes or it lists a worker still
+running, ask the user whether to take over (they stop the other session first) or stay out.
+Two Managers writing one state file corrupt it.
+
 Preserve the original contract. Explicit user changes become amendments; reassess affected
 steps and evidence against the new version. Manager must not weaken acceptance to make
 work pass. Carry existing authorization forward within its scope; ask only for missing
@@ -69,6 +74,23 @@ publication, deployments, migrations, installation, or external messages.
    file) and stop and report a mismatch instead of rebuilding. Evidence taken on another
    revision (line numbers, a patch map) names that revision, and the executor finds cited
    code by anchor text, not line number.
+
+   A round whose execution or done-check costs hours (browser work, GPU timing, long
+   batches) gets a draft review after its scope and checks are drafted and before the
+   baseline and auditor brief freeze them. One fresh read-only peer, preferably another
+   vendor (a custom-prompt Claude CLI run with the `claude-review` skill's authentication
+   and launch checks; else a fresh agent with `fork_turns: "none"`, which gives fresh context
+   but not vendor independence), reads the draft step and done-checks and the code the
+   checks exercise, and answers one question: can this check pass while the work is wrong,
+   fail while it is right, or not run as written? It returns concrete findings only: a wrong
+   implementation that passes (a stub returning the expected value, a test that never
+   reaches the changed path, a check that reads a file the executor can write), a correct
+   result that fails the check read literally, or the command that fails as written, with its
+   cwd and output. "Could be stronger" is not a finding. Manager fixes the draft, asks for at
+   most one follow-up review of the changed wording, then freezes. The peer sees only the
+   draft and the code, never an executor report; the auditor brief carries only the frozen
+   checks, never the peer's critique. Cheap rounds skip this; an auditor verdict of
+   `blocked` for a broken check covers them.
 2. **Execute.** Spawn a fresh agent with `fork_turns: "none"` when that parameter is exposed.
    Supply a standalone brief: step, scope, checks, necessary verified facts, relevant dead
    ends, Method notes, absolute workspace/artifact paths, current permissions and style instructions.
@@ -100,8 +122,19 @@ publication, deployments, migrations, installation, or external messages.
    Rules for later rounds that the executor's report states go into Method notes,
    unconfirmed until a later done-check covers them. Persist state before the next round.
 
-When the user asked for one PR per phase, a phase ends after its last accepted round: commit,
-open the PR, run the review the repo requires, and record `Waiting: merge of <PR>` in state.
+A round that builds or changes a verification tool (a harness, probe, diff or measurement
+script) that later rounds will use as evidence gets one cross-vendor code review of that
+tool after it is accepted, before any later done-check depends on it: `claude-review`, or
+`opus-fullreview` for a large tool, run between rounds on the uncommitted work that holds
+it. The audit judged the round's step; it did not ask whether the tool measures correctly.
+Confirmed findings in the tool become the next round's step; others go to Remaining.
+
+At the end of each phase (a contract milestone, or the unit the user asked to ship as one
+PR), run `opus-fullreview` on the phase's diff, or `claude-review` when the diff is small.
+Surviving findings are fixed in an accepted round before merge, never patched by Manager
+directly. Any other review the repo requires before merge still runs. When the user asked
+for one PR per phase, a phase ends after its last accepted round: commit, open the PR, run
+these reviews, and record `Waiting: merge of <PR>` in state.
 The next phase plans its first round in a fresh workspace from the merged default branch and
 takes its baseline there.
 

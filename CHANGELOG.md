@@ -36,8 +36,29 @@ condensed.
   of which Codex copies are native or disabled. The removal policy (required skills
   and dependencies) moved into `removed-skills.mjs`, and the list of retired skills
   moved into `sync-codex-skills.mjs`, which still warns when one reappears.
+- The `long-horizon-swarm` skill is retired, with its `done-check` lens and
+  `references/codex-peer.md`. On an 11-round study-engine run its draft reviews
+  caught dozens of flawed done-checks before costly rounds ran, but it cost 21
+  Codex runs and about 12 extra Opus passes, and its rule of continuing while any
+  pass found something produced review chains that mostly polished wording. A
+  review of the finished branch then found 3 real defects in a verification tool
+  that eleven rounds of peer review had never looked at. The parts that paid off
+  moved into `long-horizon` and `long-horizon-workflows` (see Changed).
+  `sync-codex-skills.mjs` warns if a copy reappears from an old sync.
 
 ### Changed
+
+- `long-horizon` and `long-horizon-workflows` take over the useful parts of the
+  retired `long-horizon-swarm`. A round whose execution or done-check costs hours
+  gets one fresh read-only draft review of its step and done-check, preferably
+  from another model family, before they freeze; the reviewer answers whether the
+  check can pass on wrong work, fail on right work, or not run as written. A round
+  that builds a verification tool later rounds rely on gets one cross-vendor code
+  review of that tool first. Each phase ends with `codex-fullreview` (or
+  `codex-review` for a small diff), with surviving findings fixed in an audited
+  round before merge. Before resuming a run another session may still manage, the
+  Manager asks the user whether to take over. The Codex `long-horizon` port uses
+  `claude-review` and `opus-fullreview` for the same reviews.
 
 - The README skill list comes from the skill folders. `scripts/readme/items.json`
   only adds labels, groups and order: a folder without an entry now joins the
