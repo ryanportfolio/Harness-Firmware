@@ -7,7 +7,7 @@ description: "Full multi-reviewer Claude review from Codex: Claude CLI runs impa
 
 Run one Claude CLI process in which Claude runs the repository's Claude `impartial-review` skill as Manager: it spawns fresh-context Opus sub-reviewers (the standard review areas, an open-lens reviewer, and an intent reviewer when a brief is supplied), verifies their findings, and writes one report. Then verify every finding in this Codex session. From Codex this is a cross-vendor review; say so in the result. `claude-review` is the single-reviewer alternative; keep the two entrypoints separate.
 
-Expect higher Claude usage than `claude-review`: a Manager plus up to seven sub-reviewers at the chosen model and effort. Say so before launch. The requested review does not authorize fixes, commits, pushes, PRs, merges, posting, publication, or paid usage.
+The requested review does not authorize fixes, commits, pushes, PRs, merges, posting, publication, or paid usage.
 
 ## 1. Fail-closed preflight
 
