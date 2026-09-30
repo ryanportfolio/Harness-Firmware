@@ -62,7 +62,10 @@ Residue: <paths a failed earlier round left changed, and whether they were rever
 
 Only audit-passed results enter **Verified progress**. Resume from the existing state file
 and reconcile it with the actual workspace and latest user instructions.
-A state file marked `Swarm: on` also follows the `long-horizon-swarm` skill.
+Before resuming a run this session did not start, check whether another session still
+manages it: if the state file changed in the last 30 minutes or `Workers:` lists a worker
+or workflow run still running, ask the user whether to take over (they stop the other
+session first) or stay out. Two Managers writing one state file corrupt it.
 
 Preserve the original contract. Explicit user changes become versioned amendments; reassess
 affected steps and invalidate affected claims before using them as prerequisites. Never weaken
@@ -304,6 +307,22 @@ output.
    point; one that turns out wrong is fixed in the next round's Plan, never after reading the
    executor's report.
 
+   A round whose execution or done-check costs hours (browser work, GPU timing, long
+   batches) gets a draft review after its Current round block is written and before the
+   briefs freeze it. One fresh read-only peer, preferably another model family (a
+   custom-prompt `codex exec -s read-only` run, with preflight and CLI mechanics per the
+   `codex-review` skill; else a fresh Claude subagent outside the round script), reads the
+   draft Step and Done-check and the code the check exercises, and answers one question: can
+   this check pass while the work is wrong, fail while it is right, or not run as written? It
+   returns concrete findings only: a wrong implementation that passes (a stub returning the
+   expected value, a test that never reaches the changed path, a check that reads a file the
+   executor can write), a correct result that fails the check read literally, or the command
+   that fails as written, with its cwd and output. "Could be stronger" is not a finding. The
+   Manager fixes the draft, asks for at most one follow-up review of the changed wording, then
+   freezes. The peer sees only the draft and the code, never an executor report; the auditor
+   brief carries only the frozen block, never the peer's critique. Cheap rounds skip this;
+   the inspector's `blocked: invalid check` covers them.
+
    Write and edit the state file and briefs with the file-edit tool; shell and script string
    layers drop backslashes and backticks. Re-read each saved brief before dispatch. Every
    brief asks its worker to append each long-lived process it starts (pid, port, command) to
@@ -380,9 +399,19 @@ output.
 Update the state file every round. Three rounds without a state-file write means drift: stop
 and rebuild the file from the real workspace.
 
-When the user asked for one PR per phase, a phase ends after its last audited round: commit,
-open the PR, run the review the repo requires, and record `Waiting: merge of <PR>` in the
-state file. The next phase plans its first round in a fresh workspace from the merged
+A round that builds or changes a verification tool (a harness, probe, diff or measurement
+script) that later rounds will use as evidence gets one cross-vendor code review of that
+tool after it passes audit, before any later done-check depends on it: `codex-review`, or
+`codex-fullreview` for a large tool, run between rounds on the uncommitted work that holds
+it. The audit judged the round's step; it did not ask whether the tool measures correctly.
+Confirmed findings in the tool become the next round's step; others go to Remaining.
+
+At the end of each phase (a contract milestone, or the unit the user asked to ship as one
+PR), run `codex-fullreview` on the phase's diff, or `codex-review` when the diff is small.
+Surviving findings are fixed in an audited round before merge, never patched by the Manager
+directly. Any other review the repo requires before merge still runs. When the user asked
+for one PR per phase, a phase ends after its last audited round: commit, open the PR, run
+these reviews, and record `Waiting: merge of <PR>` in the state file. The next phase plans its first round in a fresh workspace from the merged
 default branch and takes its Baseline there.
 
 After compaction or restart, read state, reconcile the workspace and latest user instructions,

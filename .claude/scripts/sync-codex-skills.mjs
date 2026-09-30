@@ -207,6 +207,7 @@ for (const [name, ownership] of Object.entries(modes.skills)) {
 // old sync only warns.
 const retired = {
   "automate-me": "refine",
+  "long-horizon-swarm": "long-horizon and long-horizon-workflows",
   "unslop": "caveman and writing",
   "verify-this": "fable-mode",
   "writing-skills": "addskill",
