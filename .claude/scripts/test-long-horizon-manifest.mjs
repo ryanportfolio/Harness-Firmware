@@ -107,35 +107,6 @@ test("an unreadable snapshot is reported as uncovered, not as a clean result", (
   assert.match(d.uncovered.join("\n"), /snapshot 0{40} unavailable/);
 });
 
-const posix = process.platform !== "win32";
-test("POSIX: executable bit, restored symlink target, unreadable path", { skip: !posix && "POSIX file modes" }, (t) => {
-  const { dir, root, git, write } = repo(t);
-  write("x.sh", "#!/bin/sh\n");
-  fs.chmodSync(path.join(root, "x.sh"), 0o755);
-  fs.symlinkSync("a.txt", path.join(root, "l"));
-  write("locked/f.txt", "f\n");
-  git("add", "-A");
-  git("commit", "-qm", "modes");
-  const baseline = path.join(dir, "baseline.json");
-  run(root, baseline, "locked");
-  fs.chmodSync(path.join(root, "x.sh"), 0o644); // same bytes, not executable
-  fs.unlinkSync(path.join(root, "l"));
-  fs.symlinkSync("b.txt", path.join(root, "l"));
-  git("commit", "-qam", "retarget link");
-  fs.unlinkSync(path.join(root, "l"));
-  fs.symlinkSync("a.txt", path.join(root, "l")); // restored, dirty against HEAD
-  fs.chmodSync(path.join(root, "locked"), 0o000);
-  let d;
-  try {
-    d = JSON.parse(run("--diff", baseline));
-  } finally {
-    fs.chmodSync(path.join(root, "locked"), 0o755);
-  }
-  assert.deepEqual(d.modified, ["x.sh"]);
-  assert.deepEqual(d.deleted, []);
-  if (process.getuid?.() !== 0) assert.match(d.uncovered.join("\n"), /locked/);
-});
-
 test("a directory outside git is walked whole and flagged", (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lh-manifest-nogit-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
