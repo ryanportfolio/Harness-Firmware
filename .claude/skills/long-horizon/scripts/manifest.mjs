@@ -22,7 +22,7 @@ import path from "node:path";
 
 const DELETED = "DELETED";
 const POSIX = process.platform !== "win32";
-const slash = (p) => p.replaceAll("\\", "/");
+const slash = (p) => (POSIX ? p : p.replaceAll("\\", "/")); // a POSIX name may contain \
 
 // Output on success, null on any git failure.
 function git(root, args) {
@@ -35,9 +35,20 @@ function git(root, args) {
 
 const keyOf = (root, abs) => {
   const rel = path.relative(root, abs);
-  return rel.startsWith("..") || path.isAbsolute(rel) ? slash(abs) : slash(rel);
+  return rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel) ? slash(abs) : slash(rel);
 };
-const absOf = (root, key) => (path.isAbsolute(key) ? key : path.resolve(root, key));
+const absOf = (root, key) => path.resolve(root, key); // also normalizes an absolute key's separators
+const within = (key, prefix) => key === prefix || key.startsWith(`${prefix}/`);
+
+// The nearest folder between `stop` (exclusive) and `abs` that is now a link or junction.
+function linkedAncestor(stop, abs) {
+  for (let dir = path.dirname(abs); dir !== stop && dir.startsWith(stop + path.sep); dir = path.dirname(dir)) {
+    try {
+      if (fs.lstatSync(dir).isSymbolicLink()) return dir;
+    } catch {}
+  }
+  return null;
+}
 
 function walk(root, abs, files, uncovered) {
   const key = keyOf(root, abs);
@@ -47,7 +58,7 @@ function walk(root, abs, files, uncovered) {
     else if (st.isFile()) files[key] = createHash("sha256").update(fs.readFileSync(abs)).digest("hex") + (POSIX && st.mode & 0o100 ? "+x" : "");
     else if (st.isDirectory()) {
       for (const e of fs.readdirSync(abs)) if (e !== ".git" && e !== "node_modules") walk(root, path.join(abs, e), files, uncovered);
-    }
+    } else files[key] = "special"; // socket, FIFO or device
   } catch (e) {
     if (e.code === "ENOENT" || e.code === "ENOTDIR") files[key] = DELETED;
     else {
@@ -72,7 +83,7 @@ function statusPaths(root) {
 
 function build(rootArg, out, { ref = null, extras: given = [], cover = [], exclude = [] } = {}) {
   let root = path.resolve(rootArg);
-  const files = {};
+  const files = Object.create(null); // a file may be named __proto__ or constructor
   const uncovered = [];
   const top = git(root, ["rev-parse", "--show-toplevel"]);
   const at = root;
@@ -87,7 +98,18 @@ function build(rootArg, out, { ref = null, extras: given = [], cover = [], exclu
     for (const p of status) walk(root, path.resolve(root, p), files, uncovered);
   }
   for (const x of extras) walk(root, absOf(root, x), files, uncovered);
-  for (const k of cover) walk(root, absOf(root, k), files, uncovered);
+  // A covered path whose folder became a link is gone from the tree; record the link instead
+  // of reading through it.
+  const extraRoots = extras.map((x) => absOf(root, x));
+  for (const k of cover) {
+    const abs = absOf(root, k);
+    const stop = path.isAbsolute(k) ? extraRoots.find((x) => abs.startsWith(x + path.sep)) : root;
+    const link = stop && linkedAncestor(stop, abs);
+    if (link) {
+      files[keyOf(root, abs)] = DELETED;
+      walk(root, link, files, uncovered);
+    } else walk(root, abs, files, uncovered);
+  }
   for (const f of [out, ...exclude]) if (f) delete files[keyOf(root, path.resolve(f))];
   let head = null;
   let snapshot = null;
@@ -114,11 +136,15 @@ function snapshotValue(root, snapshot, key, now) {
   const m = /^(\d+) blob ([0-9a-f]+)\t/.exec(out);
   if (!m) return DELETED;
   const [, mode, blob] = m;
-  if (mode === "120000") return `link:${git(root, ["cat-file", "blob", blob])}`;
-  if (now === DELETED || now.startsWith("link:")) return "tracked";
-  const same = (git(root, ["hash-object", "--", key]) ?? "").trim() === blob;
+  if (mode === "120000") {
+    const target = git(root, ["cat-file", "blob", blob]);
+    return target === null ? null : `link:${slash(target)}`;
+  }
+  if (now === DELETED || now.startsWith("link:") || now === "special") return "tracked";
+  const current = git(root, ["hash-object", "--", key]);
+  if (current === null) return null;
   const exec = POSIX && mode === "100755";
-  return same && exec === now.endsWith("+x") ? now : "tracked";
+  return current.trim() === blob && exec === now.endsWith("+x") ? now : "tracked";
 }
 
 function diff(baselineFile, out) {
@@ -132,13 +158,16 @@ function diff(baselineFile, out) {
     else since = listed.split("\0").filter(Boolean);
   }
   const cur = build(root, out, { extras: base.extras, cover: [...Object.keys(base.files), ...since], exclude: [baselineFile] });
-  const uncovered = [...uncoveredSince, ...cur.uncovered];
-  const unreadable = new Set(cur.uncovered.filter((u) => u.startsWith("unreadable: ")).map((u) => u.slice(12).replace(/ \([^)]*\)$/, "")));
+  const unreadableIn = (list) => list.filter((u) => u.startsWith("unreadable: ")).map((u) => u.slice(12).replace(/ \([^)]*\)$/, ""));
+  const before = unreadableIn(base.uncovered ?? []);
+  // Content unknown at baseline or now cannot be classified; it stays under uncovered.
+  const unknown = [...before, ...unreadableIn(cur.uncovered)];
+  const uncovered = [...uncoveredSince, ...before.map((k) => `unreadable at baseline: ${k}`), ...cur.uncovered];
   const result = { added: [], modified: [], deleted: [] };
   for (const k of new Set([...Object.keys(base.files), ...Object.keys(cur.files)])) {
-    if (unreadable.has(k)) continue;
+    if (unknown.some((u) => within(k, u))) continue;
     const now = cur.files[k] ?? DELETED;
-    let was = base.files[k];
+    let was = Object.hasOwn(base.files, k) ? base.files[k] : undefined;
     if (was === undefined) was = snapshotValue(root, base.snapshot, k, now);
     if (was === null) {
       uncovered.push(`snapshot entry unreadable: ${k}`);

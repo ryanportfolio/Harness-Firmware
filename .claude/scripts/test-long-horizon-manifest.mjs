@@ -107,6 +107,37 @@ test("an unreadable snapshot is reported as uncovered, not as a clean result", (
   assert.match(d.uncovered.join("\n"), /snapshot 0{40} unavailable/);
 });
 
+test("odd names, a folder replaced by a junction, and a path unreadable at baseline", (t) => {
+  const { dir, root, git, write } = repo(t);
+  write("..config", "v1\n");
+  git("add", "-A");
+  git("commit", "-qm", "dotdot");
+  write("out/a.txt", "a\n");
+  write("logs/secret.txt", "s\n");
+  const baseline = path.join(dir, "baseline.json");
+  run(root, baseline, "out", "logs");
+  // Simulate a path the baseline could not read.
+  const base = JSON.parse(fs.readFileSync(baseline, "utf8"));
+  delete base.files["logs/secret.txt"];
+  base.uncovered.push("unreadable: logs/secret.txt (EACCES)");
+  fs.writeFileSync(baseline, JSON.stringify(base));
+
+  write("..config", "v2\n");
+  write("__proto__", "p\n");
+  write("constructor", "c\n");
+  const shared = path.join(dir, "shared");
+  fs.mkdirSync(shared);
+  fs.writeFileSync(path.join(shared, "a.txt"), "outside content\n");
+  fs.rmSync(path.join(root, "out"), { recursive: true });
+  fs.symlinkSync(shared, path.join(root, "out"), process.platform === "win32" ? "junction" : "dir");
+
+  const d = JSON.parse(run("--diff", baseline));
+  assert.deepEqual(d.added, ["__proto__", "constructor", "out"]);
+  assert.deepEqual(d.modified, ["..config"]);
+  assert.deepEqual(d.deleted, ["out/a.txt"]);
+  assert.match(d.uncovered.join("\n"), /unreadable at baseline: logs\/secret\.txt/);
+});
+
 test("a directory outside git is walked whole and flagged", (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lh-manifest-nogit-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
