@@ -1,11 +1,14 @@
 ---
 name: merge-ready
-description: "Review loop that brings an open PR to merge-ready: /codex-fullreview and /codex-review in parallel, fix confirmed findings, then rerun /codex-review until clean (3 reruns max). Use on /merge-ready or when /merge calls it. Does not merge."
+description: "Review loop that brings an open PR to merge-ready: /codex-fullreview and /codex-review in parallel, fix confirmed findings, then rerun /codex-review until clean (3 reruns max). Runs only when the user types /merge-ready, or when /merge reads this file. Does not merge."
+disable-model-invocation: true
 ---
 
 # Merge-ready review loop
 
 Bring one open PR to merge-ready through cross-vendor review. This skill reviews, fixes, commits, and pushes to the PR branch. It never merges, never enables auto-merge, and grants no merge authority; the caller (the user, or a personal `/merge` skill) decides that.
+
+Only the user starts this loop: by typing `/merge-ready`, or by typing `/merge`, which reads this file and follows it. Never start it on your own initiative, even when a PR looks ready.
 
 ## Authorization
 
