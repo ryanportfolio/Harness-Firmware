@@ -26,6 +26,7 @@
     "lab": "native",
     "long-horizon": "native",
     "long-horizon-workflows": "disabled",
+    "merge-ready": "disabled",
     "optimize-context": "native",
     "opus-fullreview": "native",
     "perf-loop": "native",
