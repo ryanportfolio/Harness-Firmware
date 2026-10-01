@@ -33,6 +33,8 @@ A run that exits cleanly can still be incomplete, and an incomplete run does not
 
 ## Triage
 
+Edit nothing while any review in the round is still running. Reviewers read the working tree as well as the diff, so a fix made mid-review changes what a still-running reviewer sees and breaks its scope. Verify findings as each run finishes, but hold every fix until the last run in the round has finished; then the round's fixes go in one commit and one rerun.
+
 Merge the two verified finding lists and drop duplicates (same location, same defect). Then:
 
 - Confirmed 🔴 or 🟡: fix.
