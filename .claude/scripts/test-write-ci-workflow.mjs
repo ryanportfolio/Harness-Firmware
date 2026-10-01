@@ -91,6 +91,35 @@ test("TypeScript without a typecheck script runs tsc --noEmit", (t) => {
   assert.doesNotMatch(yamlFor(project(t, { "package.json": { scripts: { build: "x" } }, "tsconfig.json": "{}" })), /Typecheck/);
 });
 
+test("TypeScript project references typecheck in build mode", (t) => {
+  // Root tsconfig in the Vite style: no files of its own, with comments and trailing commas.
+  const refs = `{
+  // Checks nothing itself; the referenced projects hold the sources.
+  "files": [],
+  /* "references": [] */
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }, // tools
+  ],
+}
+`;
+  const ts = (typescript, extra = {}) =>
+    yamlFor(project(t, { "package.json": { devDependencies: { typescript }, scripts: { build: "vite build" } }, "tsconfig.json": refs, "package-lock.json": "{}", ...extra }));
+  // tsc accepts --noEmit with --build from 5.6.
+  assert.match(ts("^5.9.3"), /- name: Typecheck\n {8}run: npx tsc -b --noEmit\n/);
+  assert.match(ts("~7.0.2"), /run: npx tsc -b --noEmit\n/);
+  // Older or unpinned minor versions reject the pair (TS5094), so plain build mode.
+  for (const v of ["^5", "~5.5.4", "4.9.5", "latest"]) assert.match(ts(v), /run: npx tsc -b\n/, v);
+  assert.match(ts("^5.6.0", { "pnpm-lock.yaml": "" }), /run: pnpm exec tsc -b --noEmit\n/);
+
+  // An empty list, or references only inside a comment or string, keeps tsc --noEmit.
+  const noRefs = (tsconfig) =>
+    yamlFor(project(t, { "package.json": { devDependencies: { typescript: "^5.9" } }, "tsconfig.json": tsconfig, "package-lock.json": "{}" }));
+  assert.match(noRefs('{ "references": [], }'), /run: npx tsc --noEmit\n/);
+  assert.match(noRefs('{\n  // "references": [{ "path": "a" }]\n  "include": ["src"],\n}'), /run: npx tsc --noEmit\n/);
+  assert.match(noRefs('{ "compilerOptions": { "outDir": "// \\"references\\": [{" } }'), /run: npx tsc --noEmit\n/);
+});
+
 test("Python with uv uses setup-uv and uv run", (t) => {
   const root = project(t, {
     "pyproject.toml": '[project]\nname = "x"\nrequires-python = ">=3.11"\ndependencies = []\n\n[dependency-groups]\ndev = ["pytest>=8"]\n\n[tool.mypy]\nstrict = true\n',
@@ -182,6 +211,26 @@ test("Python tools count as installed only from what the install step installs",
   assert.match(yamlFor(project(t, { "requirements.txt": "requests  # pytest later\n", ...testFile })), / {10}pip install pytest\n/);
 });
 
+test("TOML section headers with a trailing comment or inner spaces read like plain ones", (t) => {
+  const testFile = { "tests/test_a.py": "def test_a():\n    pass\n" };
+  const extras = (header) =>
+    `[project]\nname = "x"\nversion = "0"\ndependencies = []\n\n${header}\ntest = ["pytest", "pytest-asyncio"]\n\n[build-system]\nrequires = ["setuptools"]\n`;
+  const plain = yamlFor(project(t, { "pyproject.toml": extras("[project.optional-dependencies]"), ...testFile }));
+  assert.ok(plain.includes(`          pip install -e ".[test]"\n`));
+  for (const header of ["[project.optional-dependencies] # testing tools", "[ project.optional-dependencies ]", "  [project.optional-dependencies]#x"]) {
+    assert.equal(yamlFor(project(t, { "pyproject.toml": extras(header), ...testFile })), plain, header);
+  }
+  // [project] with a comment still supplies the dependencies, so pytest is not installed again.
+  const meta = (header) => yamlFor(project(t, { "pyproject.toml": `${header}\nname = "x"\ndependencies = ["pytest"]\n`, ...testFile }));
+  for (const header of ["[project] # meta", "[ project ]"]) {
+    const y = meta(header);
+    assert.match(y, / {10}pip install -e \.\n {6}- name: Test\n/, header);
+    assert.doesNotMatch(y, /pip install pytest/, header);
+  }
+  // A longer name that starts the same is a different section.
+  assert.match(meta("[project-extra]"), /pip install pytest\n/);
+});
+
 test("a tests folder without Python test files adds no Python test step", (t) => {
   const root = project(t, {
     "package.json": { name: "x", scripts: { test: "node --test tests" } },
@@ -233,6 +282,20 @@ test("one job per detected stack, plus shared workflow settings", (t) => {
   assert.match(y, /^ {2}cancel-in-progress: true$/m);
   assert.match(y, /^permissions:\n {2}contents: read$/m);
   assert.doesNotMatch(y, /\r/);
+});
+
+test("a branch name with YAML flow characters stays one quoted branch", () => {
+  const branches = (branch) => render({ stacks: [], firmware: false, branch }).split("\n").find((l) => l.includes("branches:"));
+  assert.equal(branches("release,stable"), "    branches: ['release,stable']");
+  assert.equal(branches("it's"), "    branches: ['it''s']");
+  assert.equal(branches("feature/x-1.2"), "    branches: [feature/x-1.2]");
+});
+
+test("branch names with flow characters parse as one branch", { skip: python ? false : "no Python with PyYAML on this machine" }, () => {
+  for (const branch of ["release,stable", "a]b", "it's", "x{y}"]) {
+    const doc = parseYaml(render({ stacks: [], firmware: false, branch }));
+    assert.deepEqual((doc.on ?? doc.true).push.branches, [branch]);
+  }
 });
 
 test("generated YAML parses", { skip: python ? false : "no Python with PyYAML on this machine" }, (t) => {

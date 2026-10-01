@@ -13,7 +13,7 @@ A new project has no CI of its own: the template's `validate-template.yml` is re
 
 Only files at the repo root count. Each detected stack gets its own job:
 
-- Node (`package.json`): the package manager comes from the lockfile and the Node version from `.nvmrc`, `.node-version` or `engines.node`. Only scripts that exist become steps: a typecheck script, `test` (not npm's default placeholder) and `build`. Without a typecheck script, a `tsconfig.json` plus a `typescript` dependency adds `tsc --noEmit`.
+- Node (`package.json`): the package manager comes from the lockfile and the Node version from `.nvmrc`, `.node-version` or `engines.node`. Only scripts that exist become steps: a typecheck script, `test` (not npm's default placeholder) and `build`. Without a typecheck script, a `tsconfig.json` plus a `typescript` dependency adds `tsc --noEmit`; when that `tsconfig.json` lists project references it adds `tsc -b` instead, with `--noEmit` when the declared TypeScript is 5.6 or later (older versions reject the pair).
 - Python (`pyproject.toml`, `requirements*.txt` or `setup.py`): uv when `uv.lock` exists, otherwise pip. pytest runs when tests exist; mypy or pyright runs only when configured.
 - Rust (`Cargo.toml`): `cargo build`, with `--locked` when `Cargo.lock` exists, then `cargo test`.
 - Go (`go.mod`): `go vet`, `go build` and `go test`.

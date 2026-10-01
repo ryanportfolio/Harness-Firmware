@@ -88,8 +88,15 @@ function detectNode(root) {
   }
 
   const run = { npm: "npm run", pnpm: "pnpm run", yarn: "yarn run", bun: "bun run" }[pm];
-  const tscCommand = { npm: "npx tsc --noEmit", pnpm: "pnpm exec tsc --noEmit", yarn: "yarn tsc --noEmit", bun: "bunx tsc --noEmit" }[pm];
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  // A root tsconfig with project references (often `files: []`) checks nothing under plain
+  // `tsc --noEmit`; build mode checks every referenced project. tsc accepts --noEmit with
+  // --build from TypeScript 5.6 and rejects the pair before that (TS5094), so an older or
+  // unknown declared version gets plain `tsc -b`, which emits per each project's config.
+  const [, tsMajor, tsMinor = "0"] = String(deps.typescript ?? "").match(/(\d+)(?:\.(\d+))?/) ?? [];
+  const buildNoEmit = Number(tsMajor) > 5 || (Number(tsMajor) === 5 && Number(tsMinor) >= 6);
+  const tscArgs = !hasReferences(read(root, "tsconfig.json")) ? "--noEmit" : buildNoEmit ? "-b --noEmit" : "-b";
+  const tscCommand = `${{ npm: "npx tsc", pnpm: "pnpm exec tsc", yarn: "yarn tsc", bun: "bunx tsc" }[pm]} ${tscArgs}`;
 
   const commands = [];
   const typecheckScript = TYPECHECK_SCRIPTS.find((s) => typeof scripts[s] === "string");
@@ -105,6 +112,50 @@ function detectNode(root) {
   else install = "bun install --frozen-lockfile";
 
   return { stack: "node", pm, lockfile, packageManager, yarnBerry, version, versionFile, install, commands };
+}
+
+// tsconfig.json is JSON with comments and trailing commas. Drops both outside strings:
+// comments on the first pass, then commas followed only by whitespace and a closing bracket.
+function stripJsonc(text) {
+  const pass = (src, other) => {
+    let out = "";
+    let quote = false;
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i];
+      if (quote) {
+        out += c;
+        if (c === "\\") out += src[++i] ?? "";
+        else if (c === '"') quote = false;
+      } else if (c === '"') {
+        quote = true;
+        out += c;
+      } else {
+        const skip = other(src, i);
+        if (skip === null) out += c;
+        else i = skip;
+      }
+    }
+    return out;
+  };
+  // Each handler returns null to keep the character, or the index of the last character dropped.
+  const comments = (s, i) => {
+    if (s[i] !== "/" || (s[i + 1] !== "/" && s[i + 1] !== "*")) return null;
+    const close = s[i + 1] === "/" ? s.indexOf("\n", i) : s.indexOf("*/", i + 2);
+    if (close < 0) return s.length;
+    return s[i + 1] === "/" ? close - 1 : close + 1;
+  };
+  const trailingCommas = (s, i) => (s[i] === "," && /^\s*[}\]]/.test(s.slice(i + 1)) ? i : null);
+  return pass(pass(text, comments), trailingCommas);
+}
+// True when a tsconfig lists at least one project reference.
+function hasReferences(tsconfig) {
+  const text = stripJsonc(tsconfig);
+  try {
+    const refs = JSON.parse(text).references;
+    return Array.isArray(refs) && refs.length > 0;
+  } catch {
+    return /"references"\s*:\s*\[\s*\{/.test(text);
+  }
 }
 
 // Finds test_*.py or *_test.py within a few levels, skipping hidden and build folders.
@@ -188,10 +239,10 @@ function detectPython(root) {
       ? ["requirements.txt", ...requirements.filter((f) => /^requirements[-_](dev|test|tests)\.txt$/.test(f))]
       : requirements;
     for (const f of main) install.push(`pip install -r ${f}`);
-    const installable = hasSetupPy || /^\s*\[(project|build-system)\]/m.test(pyproject);
+    const fromPyproject = sectionRange(pyproject, "project").start >= 0;
+    const installable = hasSetupPy || fromPyproject || sectionRange(pyproject, "build-system").start >= 0;
     // Package metadata comes from [project] when present, else from setup.cfg. setup.py is
     // Python code and is not parsed, so its dependencies never count as installed.
-    const fromPyproject = /^\s*\[project\]/m.test(pyproject);
     const depsOf = fromPyproject ? projectDeps : iniValue(sectionOf(setupCfg, "options"), "install_requires");
     const extraOf = (x) =>
       fromPyproject ? tomlArray(sectionOf(pyproject, "project.optional-dependencies"), x) : iniValue(sectionOf(setupCfg, "options.extras_require"), x);
@@ -211,10 +262,12 @@ function detectPython(root) {
   return { stack: "python", uv, version, versionFile, install, commands, typechecker, hasTests };
 }
 
-// Line range of one [section] in a TOML file: its header up to the next header.
+// Line range of one [section] in a TOML or INI file: its header up to the next header.
+// The header may have spaces inside the brackets and a trailing comment.
 function sectionRange(toml, name) {
   const lines = toml.split(/\r?\n/);
-  const start = lines.findIndex((l) => l.trim() === `[${name}]`);
+  const header = new RegExp(`^\\s*\\[\\s*${escapeRegExp(name)}\\s*\\]\\s*([#;].*)?$`);
+  const start = lines.findIndex((l) => header.test(l));
   const end = start < 0 ? -1 : lines.findIndex((l, i) => i > start && /^\s*\[/.test(l));
   return { lines, start, end: end < 0 ? lines.length : end };
 }
@@ -301,10 +354,11 @@ export function detect(root) {
   return { stacks, firmware: exists(root, FIRMWARE_CHECK), branch: defaultBranch(root) };
 }
 
-// YAML scalar: plain when unambiguous, otherwise single-quoted.
+// YAML scalar: plain when unambiguous, otherwise single-quoted. No flow indicators ([]{},)
+// stay plain, so a value is also safe inside a flow sequence such as `branches: [...]`.
 function q(value) {
   const s = String(value);
-  if (/^[A-Za-z0-9_./][A-Za-z0-9_./ =,-]*$/.test(s) && !/\s$/.test(s) && !/^(true|false|yes|no|on|off|null|~|[0-9.]+)$/i.test(s)) return s;
+  if (/^[A-Za-z0-9_./][A-Za-z0-9_./ =-]*$/.test(s) && !/\s$/.test(s) && !/^(true|false|yes|no|on|off|null|~|[0-9.]+)$/i.test(s)) return s;
   return `'${s.replaceAll("'", "''")}'`;
 }
 

@@ -19,10 +19,12 @@ condensed.
   `.github/workflows/ci.yml` with one job per stack, running only the typecheck, test
   and build commands the project has, plus a `firmware` job for the Codex skill sync
   check. With nothing detected, the workflow posts a notice instead of a test that
-  checks nothing. Python runs pytest only when `test_*.py` or `*_test.py` files exist,
-  and installs pytest, mypy or pyright itself unless a dependency list the install step
-  installs already names it (extras and dependency groups it skips do not count). It
-  prints by default; `--write` writes the file and refuses to replace an existing one
+  checks nothing. Without a typecheck script, a TypeScript project gets `tsc --noEmit`,
+  or `tsc -b` when the root `tsconfig.json` lists project references (with `--noEmit`
+  when the declared TypeScript is 5.6 or later). Python runs pytest only when
+  `test_*.py` or `*_test.py` files exist, and installs pytest, mypy or pyright itself
+  unless a dependency list the install step installs already names it (extras and
+  dependency groups it skips do not count). It prints by default; `--write` writes the file and refuses to replace an existing one
   without `--force`. `init-project` (Claude and Codex) shows the result and writes it
   after approval. Subfolder projects are not detected.
 - `.agents/template-manifest.json`: one list, shipped into every new project, of
