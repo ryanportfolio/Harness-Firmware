@@ -29,6 +29,8 @@ Launch `/codex-fullreview` and `/codex-review` on that scope at the same time. E
 
 If either run still fails after its retry, stop and ask. The gate does not pass on the other run alone.
 
+A run that exits cleanly can still be incomplete, and an incomplete run does not count toward the gate. Each round's run needs verified scope identity, as its skill defines it. `/codex-fullreview` also needs at least one spawned sub-reviewer: zero means the Manager reviewed alone, which is a single-context review, not the full one. Treat an incomplete run like a failed one: keep its verified findings, then stop and ask.
+
 ## Triage
 
 Merge the two verified finding lists and drop duplicates (same location, same defect). Then:
@@ -47,9 +49,9 @@ The PR is merge-ready when the latest review round, run on the current head, con
 
 Any commit this loop pushes, including a caveat fix, moves the head and needs another round. After pushing the fixes, run `/codex-review` alone on the full PR diff at the new head, not only the fix delta. Triage, fix, push, and repeat.
 
-- Cap: 3 reruns after round 1. If the 3rd rerun still confirms a 🔴 or 🟡, stop before fixing it and report the open findings. The user can fix by hand, waive, or authorize more reruns.
+- Cap: 3 reruns after round 1. Check the remaining budget before any fix or review. Once the 3rd rerun has run, push no more commits and start no more reviews; if anything still calls for a fix (🔴, 🟡, or a caveat with real risk) or the head has moved, report `blocked` with the open items. The user can fix by hand, waive, or authorize more reruns.
 - Commits this loop did not make (another session, a teammate) are reviewed by the next round, which counts toward the cap.
-- If the head moves after a clean round, the verdict no longer holds; run another `/codex-review` round.
+- If the head moves after a clean round, the verdict no longer holds; run another `/codex-review` round if the budget allows, otherwise report `blocked`.
 
 ## Report
 
