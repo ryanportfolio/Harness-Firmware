@@ -52,6 +52,22 @@ jobs:
           bash -n bootstrap/new-claude-project.sh
           shellcheck bootstrap/new-claude-project.sh
           bash bootstrap/new-claude-project.sh --help > /dev/null
+          bash -n bootstrap/tests/smoke-new-claude-project.sh
+          shellcheck bootstrap/tests/smoke-new-claude-project.sh
+
+      # .agents/template-manifest.json decides what every project creator strips.
+      # Every repository file must sit under exactly one projectPaths or
+      # templateOnly entry, and every skill folder in exactly one group.
+      - name: Template manifest matches the repository
+        run: node bootstrap/tests/check-template-manifest.mjs
+
+      - name: Template manifest check catches each kind of error
+        run: node --test bootstrap/tests/check-template-manifest.test.mjs
+
+      # Clone path only, from a local copy of this commit, with gh blocked: the
+      # smoke never contacts GitHub.
+      - name: POSIX creator builds a project from the manifest
+        run: bash bootstrap/tests/smoke-new-claude-project.sh
 
       - name: Codex skills registered and in sync with their Claude source
         run: node .claude/scripts/sync-codex-skills.mjs --check

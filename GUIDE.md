@@ -73,7 +73,7 @@ What produces a warning:
 - A registered skill that is missing from a runtime. The warning suggests recording it or restoring it.
 - A skill that needs another one that is not installed, for example `astra-review` without `codex-review`. The warning names both.
 - A retired skill that reappears, such as `verify-this`. The warning names the skill that replaced it; delete the folder unless you mean to bring it back.
-- A README or README image that no longer matches a fresh build, including hand edits. Run `node scripts/readme/build.mjs` to rebuild it.
+- In the template repository only: a README or README image that no longer matches a fresh build, including hand edits. Run `node scripts/readme/build.mjs` there to rebuild it. New projects get a one-line README and none of the README build scripts.
 
 To remove a skill on purpose and keep the checks quiet about it:
 
@@ -87,13 +87,13 @@ To remove a skill on purpose and keep the checks quiet about it:
    }
    ```
 
-3. Run `node scripts/readme/build.mjs` so the README stops listing it, then `node .claude/scripts/doctor.mjs`.
+3. Run `node .claude/scripts/doctor.mjs`. In the template repository, first run `node scripts/readme/build.mjs` so the README stops listing the skill.
 
-harnessfirmware.com/new does steps 1 and 2 for every skill you untick and sets each name to `"off"` under `skillOverrides` in `.claude/settings.json`. A new repository keeps the template's README until the first `node scripts/readme/build.mjs`; until then the README still links the removed skills, and the README check warns that it is stale.
+harnessfirmware.com/new does steps 1 and 2 for every skill you untick and sets each name to `"off"` under `skillOverrides` in `.claude/settings.json`. A new repository gets a one-line README in place of the template's, so no README lists the removed skills.
 
 The record is informational. A missing skill listed in it produces no warning; a missing skill left out of it produces one. `node .claude/scripts/removed-skills.mjs` prints the record and any warnings about it, such as a listed skill whose folder is still there.
 
-`.claude/scripts/removed-skills.mjs` describes the template's intent. `REQUIRED` names the skills the template expects every project to keep: `init-project` and `external-review`. `DEPENDENCIES` names skills that need others; for example `astra-review` reads `codex-review`. Breaking either produces a warning, not a failure.
+`.agents/template-manifest.json` describes the template's intent. `skills.required` names the skills the template expects every project to keep: `init-project` and `external-review`. `skills.dependencies` names skills that need others; for example `astra-review` reads `codex-review`. `.claude/scripts/removed-skills.mjs` warns when a project breaks either; it never fails. A project created before the manifest existed has no such file, and then neither rule applies.
 
 Removing `addskill` leaves `.claude/skills/writing-skills/` and `.agents/skills/writing-skills/`. They hold licensed reference files from the retired `writing-skills` skill and have no `SKILL.md`, so no runtime loads them and no check requires them. Delete them by hand if you do not want them.
 
@@ -145,6 +145,7 @@ Every skill has a native Codex version maintained directly under `.agents/skills
 | `.claude/skills/` | Claude Code workflow playbooks. |
 | `.agents/skills/` | Maintained native Codex skills. |
 | `.agents/removed-skills.json` | Skills this project deleted on purpose. Checks stay quiet about the names it lists. |
+| `.agents/template-manifest.json` | Which paths ship into new projects and which stay in the template, the files a new project must have, and the skill groups, required skills and dependencies. Every project creator reads it; `node bootstrap/tests/check-template-manifest.mjs` checks it against the template. |
 | `.claude/reference/` | Committed project memory for architecture, commands, deployment, pitfalls, secrets, and technology choices. |
 | `.claude/hooks/session-start.sh` | Claude Code startup checks and reminders. |
 | `.claude/scripts/context-weight.sh` | Always-loaded source weight measurement. |
@@ -178,7 +179,7 @@ The script copies missing files. `-Force` overwrites. `-DryRun` previews.
 
 - Claude Code for the plugin workflow. The full template supports Claude Code or Codex.
 - Codex reads `AGENTS.md` and `.agents/skills/`; it does not run Claude SessionStart hooks.
-- Node for the doctor, README generator, and Codex skill synchronization.
+- Node for the doctor, README generator, Codex skill synchronization, and the macOS and Linux project creator, which reads the template manifest with it.
 - `gh` CLI is optional for project creators.
 - PowerShell bootstrap runs on Windows.
 - POSIX bootstrap runs on macOS and Linux.

@@ -72,8 +72,9 @@ authorization can cover several, but completing one does not implicitly authoriz
 
 Missing and retired skills are warnings; the checks exit 0. A project that deletes a skill on
 purpose lists it in `.agents/removed-skills.json`, which silences the missing-skill warning.
-`.claude/scripts/removed-skills.mjs` names the skills the template expects every project to
-keep and the skills that need others. See [add or remove skills](../GUIDE.md#add-or-remove-skills).
+`.agents/template-manifest.json` names the skills the template expects every project to keep
+(`skills.required`) and the skills that need others (`skills.dependencies`);
+`.claude/scripts/removed-skills.mjs` warns when a project breaks either. See [add or remove skills](https://github.com/ryanportfolio/Harness-Firmware/blob/main/GUIDE.md#add-or-remove-skills).
 A retired name that regains a SKILL.md in `.claude/skills/` produces a sync warning naming its
 replacement.
 
