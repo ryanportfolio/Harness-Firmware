@@ -46,29 +46,23 @@ try {
     Assert-True $? 'Console generator reported a failure.'
     $null = $consoleOutput
 
-    foreach ($required in @(
-        'AGENTS.md',
-        '.agents\skills\init-project\SKILL.md',
-        '.claude\skills\init-project\SKILL.md',
-        '.claude\scripts\sync-codex-skills.mjs',
-        'README.md'
-    )) {
+    # Both lists come from the template manifest; README.md is template-only but
+    # rewritten from the stub, so it is required in the project.
+    $manifest = [IO.File]::ReadAllText((Join-Path $root '.agents\template-manifest.json')) | ConvertFrom-Json
+    $templateOnly = @($manifest.templateOnly)
+    Assert-True ($templateOnly.Count -gt 0) 'Template manifest lists no templateOnly paths.'
+    Assert-True ($templateOnly -contains 'README.md') 'Template manifest no longer lists README.md as template-only.'
+
+    foreach ($required in @($manifest.requiredFiles) + @('README.md')) {
         Assert-True (Test-Path -LiteralPath (Join-Path $target $required) -PathType Leaf) "Generated project is missing $required"
     }
-    foreach ($forbidden in @(
-        'bootstrap',
-        '.claude-plugin',
-        '.github\workflows\validate-template.yml',
-        '.github\ISSUE_TEMPLATE',
-        'CHANGELOG.md',
-        'CONTRIBUTING.md',
-        '.tmp-video-7m'
-    )) {
+    foreach ($forbidden in @($templateOnly | Where-Object { $_ -ne 'README.md' }) + @('.tmp-video-7m')) {
         Assert-True (-not (Test-Path -LiteralPath (Join-Path $target $forbidden))) "Generated project retained $forbidden"
     }
 
+    $expectedReadme = ([string]$manifest.readmeStub).Replace('{name}', $projectName).Replace("`r`n", "`n").Replace("`n", "`r`n")
     $readme = [IO.File]::ReadAllText((Join-Path $target 'README.md'), [Text.Encoding]::ASCII)
-    Assert-True ($readme -eq "# $projectName`r`n") 'Generated README content or encoding contract changed.'
+    Assert-True ($readme -eq $expectedReadme) 'Generated README content or encoding contract changed.'
 
     $status = @(& git -C $target status --porcelain)
     Assert-True ($LASTEXITCODE -eq 0) 'Could not inspect the generated repository.'
@@ -96,6 +90,10 @@ try {
         }
         Assert-True (-not ($entries | Where-Object { $_ -eq 'template/.git' -or $_ -like 'template/.git/*' })) 'Release ZIP contains source Git metadata.'
         Assert-True (-not ($entries | Where-Object { $_ -like 'template/.tmp*' })) 'Release ZIP contains template scratch files.'
+        foreach ($forbidden in $templateOnly) {
+            $prefix = "template/$forbidden"
+            Assert-True (-not ($entries | Where-Object { $_ -eq $prefix -or $_.StartsWith("$prefix/") })) "Release ZIP contains template-only $forbidden"
+        }
     }
     finally {
         $archive.Dispose()

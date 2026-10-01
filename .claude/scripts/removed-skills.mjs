@@ -5,11 +5,15 @@
 // remove skills, and the registry may catch up later. The checks warn instead:
 // - a missing skill listed in .agents/removed-skills.json is intentional and stays silent;
 // - a missing skill that is not listed gets a warning suggesting to record or restore it;
-// - a present skill that needs a missing one (DEPENDENCIES below) gets a warning naming both;
-//   a needed skill turned "off" in .claude/settings.json skillOverrides counts as missing,
-//   because the Codex sync then treats it as disabled and ships no copy.
+// - a present skill that needs a missing one (skills.dependencies in the template manifest)
+//   gets a warning naming both; a needed skill turned "off" in .claude/settings.json
+//   skillOverrides counts as missing, because the Codex sync then treats it as disabled and
+//   ships no copy.
 // Registered skills are the names in .agents/skill-modes.json.
-// What still fails: a record or modes file that cannot be parsed.
+// The required and dependency rules come from .agents/template-manifest.json. A project created
+// before the manifest existed has no such file, and then no required or dependency rule applies.
+// What still fails: a record, modes file, or manifest that cannot be parsed, and a manifest
+// with a version other than 1 or an unknown top-level key.
 //
 // Usage: node .claude/scripts/removed-skills.mjs   (prints the record and any warnings)
 
@@ -18,26 +22,56 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const RECORD_PATH = ".agents/removed-skills.json";
+export const MANIFEST_PATH = ".agents/template-manifest.json";
+export const MANIFEST_KEYS = ["version", "template", "requiredFiles", "projectPaths", "templateOnly", "readmeStub", "skills"];
 const MODES_PATH = ".agents/skill-modes.json";
 const SETTINGS_PATH = ".claude/settings.json";
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RUNTIME_ROOTS = [".claude/skills", ".agents/skills"];
 
-// The template's removal intent. REQUIRED names the skills every project is expected to keep.
-// DEPENDENCIES names skills that need others to work.
-export const REQUIRED = ["external-review", "init-project"];
-export const DEPENDENCIES = {
-  "astra-fullreview": ["codex-fullreview", "impartial-review"],
-  "astra-review": ["codex-review", "external-review"],
-  "codex-fullreview": ["impartial-review"],
-  "codex-review": ["external-review"],
-  "merge-ready": ["codex-fullreview", "codex-review"],
-};
-
 // Parses JSON and names the file when it cannot be read.
 export function parseJson(text, file) {
   try { return JSON.parse(text); } catch (error) { throw new SyntaxError(`${file}: ${error.message}`); }
 }
+
+// Returns the parsed template manifest, or null when the file is absent. Checks the version and
+// the top-level keys only; the template repository runs bootstrap/tests/check-template-manifest.mjs
+// for the full rules.
+export function readTemplateManifest(root) {
+  const file = path.join(root, MANIFEST_PATH);
+  if (!fs.existsSync(file)) return null;
+  const manifest = parseJson(fs.readFileSync(file, "utf8"), MANIFEST_PATH);
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) throw new Error(`${MANIFEST_PATH}: expected a JSON object`);
+  if (manifest.version !== 1) throw new Error(`${MANIFEST_PATH}: version ${JSON.stringify(manifest.version)} is not supported; expected 1`);
+  const unknown = Object.keys(manifest).filter((key) => !MANIFEST_KEYS.includes(key));
+  if (unknown.length) throw new Error(`${MANIFEST_PATH}: unknown top-level key ${unknown.join(", ")}`);
+  return manifest;
+}
+
+// The template's removal intent, from the manifest under root. required names the skills every
+// project is expected to keep; dependencies names skills that need others to work. An absent
+// manifest gives no rules.
+export function readSkillRules(root) {
+  const skills = readTemplateManifest(root)?.skills ?? {};
+  const required = Array.isArray(skills.required) ? skills.required.filter((name) => typeof name === "string") : [];
+  const dependencies = {};
+  if (skills.dependencies && typeof skills.dependencies === "object" && !Array.isArray(skills.dependencies)) {
+    for (const [name, needs] of Object.entries(skills.dependencies)) {
+      dependencies[name] = Array.isArray(needs) ? needs.filter((need) => typeof need === "string") : [];
+    }
+  }
+  return { required, dependencies };
+}
+
+// The rules of the repository this script lives in, kept as named exports for importers. An
+// unusable manifest leaves them empty here so importing never throws; reviewRemovals reads the
+// manifest again and reports the error.
+const ownRules = (() => {
+  try { return readSkillRules(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")); }
+  catch { return { required: [], dependencies: {} }; }
+})();
+export const REQUIRED = ownRules.required;
+export const DEPENDENCIES = ownRules.dependencies;
 
 // Returns the recorded names in file order. An absent record means nothing was removed.
 // A malformed record throws: a check must never guess which skills were meant.
@@ -82,7 +116,7 @@ export function skillPresent(root, name) {
 
 // Reviews the record and the dependency declarations against the working tree.
 // Returns warnings only; nothing about presence fails a check.
-export function reviewRemovals(root, registered = readRegisteredSkills(root), removed = readRemovedSkills(root), disabled = readDisabledSkills(root)) {
+export function reviewRemovals(root, registered = readRegisteredSkills(root), removed = readRemovedSkills(root), disabled = readDisabledSkills(root), rules = readSkillRules(root)) {
   const warnings = [];
   const sorted = [...new Set(removed)].sort();
   if (removed.length !== sorted.length || removed.some((name, index) => name !== sorted[index])) {
@@ -91,12 +125,12 @@ export function reviewRemovals(root, registered = readRegisteredSkills(root), re
   for (const name of new Set(removed)) {
     if (!registered.has(name)) warnings.push(`${name}: recorded as removed but not a registered skill`);
     else if (skillPresent(root, name)) warnings.push(`${name}: recorded as removed but still present; delete it from ${RECORD_PATH}`);
-    else if (REQUIRED.includes(name)) warnings.push(`${name}: recorded as removed, but the template treats it as required`);
+    else if (rules.required.includes(name)) warnings.push(`${name}: recorded as removed, but the template treats it as required`);
   }
   for (const name of registered) {
     if (!removed.includes(name) && !skillPresent(root, name)) warnings.push(`${name}: not installed in any runtime; record it in ${RECORD_PATH} or restore it`);
   }
-  for (const [name, needs] of Object.entries(DEPENDENCIES)) {
+  for (const [name, needs] of Object.entries(rules.dependencies)) {
     if (!registered.has(name) || !skillPresent(root, name) || disabled.has(name)) continue;
     for (const need of needs) {
       if (!skillPresent(root, need)) warnings.push(`${name} needs ${need}, which is not installed; restore ${need} or remove ${name} too`);

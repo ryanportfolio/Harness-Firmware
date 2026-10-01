@@ -44,6 +44,10 @@ and say what it buys.
   Keep descriptions precise, omit filler, and state how to verify useful behavior.
 - Update `CHANGELOG.md` under an unreleased or upcoming version heading when
   the change is user-visible.
+- A new file outside the paths `.agents/template-manifest.json` already lists
+  needs an entry there: under `projectPaths` if new projects should get it,
+  under `templateOnly` if it maintains or distributes the template.
+  `node bootstrap/tests/check-template-manifest.mjs` fails until it has one.
 
 ## safety rules for shipped files
 
@@ -74,6 +78,8 @@ A good skill PR contains:
 - A native Codex version registered in `.agents/skill-modes.json` with its capability
   classification, or a `disabled` entry when the skill needs Claude-only tools. Include
   sync and contract verification.
+- The skill's name in one group under `skills.groups` in
+  `.agents/template-manifest.json`.
 - The context-weight number before and after, when the skill is large.
 
 Skills earn their place. Prefer improving an existing one over adding a
