@@ -13,6 +13,16 @@ condensed.
 
 ### Added
 
+- Project CI from `/init-project`. New projects had no CI: the template's
+  `validate-template.yml` is removed at creation. `.claude/scripts/write-ci-workflow.mjs`
+  detects Node, Python, Rust and Go at the repo root and builds a
+  `.github/workflows/ci.yml` with one job per stack, running only the typecheck, test
+  and build commands the project has, plus a `firmware` job for the Codex skill sync
+  check. With nothing detected, the workflow posts a notice instead of a test that
+  checks nothing. It prints by default; `--write` writes the file and refuses to
+  replace an existing one without `--force`. `init-project` (Claude and Codex) shows the
+  result and writes it after approval. Subfolder projects are not detected.
+
 - `merge-ready` skill: the review loop that gets an open PR ready to merge. Round
   one runs `codex-fullreview` and `codex-review` in parallel on the PR's branch diff;
   confirmed 🔴 and 🟡 findings are fixed, committed and pushed, then `codex-review`

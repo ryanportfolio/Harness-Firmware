@@ -14,7 +14,7 @@ Use the full template when a project needs the rule kernel, hooks, committed mem
 
 Keep the extracted Windows launcher, PowerShell module, and `template/` folder together. The bundled snapshot supports local-only project creation without GitHub access.
 
-`/init-project` detects the stack, asks a short set of unresolved questions, fills the verification and deployment sections, seeds reference files, prunes irrelevant skills, removes spawn-only files, and prepares the result for verification.
+`/init-project` detects the stack, asks a short set of unresolved questions, fills the verification and deployment sections, seeds reference files, prunes irrelevant skills, removes spawn-only files, offers a `.github/workflows/ci.yml` that runs the detected stack's typecheck, test and build commands, and prepares the result for verification.
 
 Two setup choices affect every later session:
 
