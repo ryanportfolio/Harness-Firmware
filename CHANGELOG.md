@@ -19,7 +19,9 @@ condensed.
   reruns on the full diff at the new head until a round confirms none, with at most
   3 reruns before it stops and asks. It never merges and grants no merge authority,
   so a personal `/merge` skill can call it as its review gate without bringing
-  auto-merge back into the template. Claude Code only.
+  auto-merge back into the template. User-invoke only: it runs when the user types
+  `/merge-ready`, or when `/merge` reads the skill file; the model never starts it
+  on its own. Claude Code only.
 
 - `long-horizon-swarm` skill: the `long-horizon` contract with Opus, Sol and Astra
   as peers who contribute ideas, critique and code throughout a run. It attaches to
