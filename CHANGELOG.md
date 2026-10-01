@@ -19,9 +19,12 @@ condensed.
   `.github/workflows/ci.yml` with one job per stack, running only the typecheck, test
   and build commands the project has, plus a `firmware` job for the Codex skill sync
   check. With nothing detected, the workflow posts a notice instead of a test that
-  checks nothing. It prints by default; `--write` writes the file and refuses to
-  replace an existing one without `--force`. `init-project` (Claude and Codex) shows the
-  result and writes it after approval. Subfolder projects are not detected.
+  checks nothing. Python runs pytest only when `test_*.py` or `*_test.py` files exist,
+  and installs pytest, mypy or pyright itself unless a dependency list the install step
+  installs already names it (extras and dependency groups it skips do not count). It
+  prints by default; `--write` writes the file and refuses to replace an existing one
+  without `--force`. `init-project` (Claude and Codex) shows the result and writes it
+  after approval. Subfolder projects are not detected.
 
 - `merge-ready` skill: the review loop that gets an open PR ready to merge. Round
   one runs `codex-fullreview` and `codex-review` in parallel on the PR's branch diff;

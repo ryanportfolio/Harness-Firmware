@@ -137,6 +137,64 @@ test("Python with pip installs requirements, the package and pytest", (t) => {
   assert.ok(yamlFor(project(t, { "requirements.txt": "flask\n" })).includes(NOTICE));
 });
 
+test("Python tools count as installed only from what the install step installs", (t) => {
+  const py = (body) => `[project]\nname = "x"\nversion = "0.1.0"\ndependencies = []\n\n${body}`;
+  const testFile = { "tests/test_a.py": "def test_a():\n    pass\n" };
+
+  // uv sync installs neither extras nor non-default groups.
+  const uvExtra = yamlFor(project(t, { "pyproject.toml": py('[project.optional-dependencies]\ntest = ["pytest"]\n'), "uv.lock": "", ...testFile }));
+  assert.match(uvExtra, /- name: Test\n {8}run: uv run --with pytest pytest\n/);
+  const uvGroup = yamlFor(project(t, { "pyproject.toml": py('[dependency-groups]\ntest = ["pytest"]\n'), "uv.lock": "", ...testFile }));
+  assert.match(uvGroup, /- name: Test\n {8}run: uv run --with pytest pytest\n/);
+  // [project].dependencies and groups named in [tool.uv] default-groups are installed.
+  const uvDeps = yamlFor(project(t, { "pyproject.toml": '[project]\nname = "x"\ndependencies = [\n  "pytest>=8",  # tests\n]\n', "uv.lock": "", ...testFile }));
+  assert.match(uvDeps, /run: uv run pytest\n/);
+  const uvDefault = yamlFor(project(t, { "pyproject.toml": py('[dependency-groups]\ntest = ["pytest"]\n\n[tool.uv]\ndefault-groups = ["test"]\n'), "uv.lock": "", ...testFile }));
+  assert.match(uvDefault, /run: uv run pytest\n/);
+
+  // pip install -e . installs no extras; the unselected qa and ci extras do not count.
+  const pipQa = yamlFor(project(t, { "pyproject.toml": py('[project.optional-dependencies]\nqa = ["mypy"]\n\n[tool.mypy]\nstrict = true\n') }));
+  assert.match(pipQa, / {10}pip install -e \.\n {10}pip install mypy\n {6}- name: Typecheck\n {8}run: mypy \.\n/);
+  const pipCi = yamlFor(project(t, { "pyproject.toml": py('[project.optional-dependencies]\nci = ["pytest"]\n'), ...testFile }));
+  assert.match(pipCi, / {10}pip install -e \.\n {10}pip install pytest\n {6}- name: Test\n {8}run: python -m pytest\n/);
+  // A selected extra does count.
+  const pipTestExtra = yamlFor(project(t, { "pyproject.toml": py('[project.optional-dependencies]\ntest = ["pytest"]\nqa = ["mypy"]\n'), ...testFile }));
+  assert.ok(pipTestExtra.includes(`          pip install -e ".[test]"\n`));
+  assert.doesNotMatch(pipTestExtra, /pip install pytest/);
+
+  // setup.cfg: install_requires and selected extras count, other extras do not.
+  const cfg = (extras) => ({
+    "setup.py": "from setuptools import setup\nsetup()\n",
+    "setup.cfg": `[metadata]\nname = x\n\n[options]\ninstall_requires =\n    requests\n\n[options.extras_require]\n${extras}`,
+    "mypy.ini": "[mypy]\n",
+    ...testFile,
+  });
+  const cfgSelected = yamlFor(project(t, cfg("test =\n    pytest\n    mypy\n")));
+  assert.ok(cfgSelected.includes(`          pip install -e ".[test]"\n`));
+  assert.doesNotMatch(cfgSelected, /pip install (pytest|mypy)/);
+  const cfgOther = yamlFor(project(t, cfg("lint =\n    pytest\n    mypy\n")));
+  assert.match(cfgOther, / {10}pip install -e \.\n {10}pip install pytest mypy\n/);
+
+  // pip with pytest in requirements-dev.txt installs it from there.
+  const reqDev = yamlFor(project(t, { "requirements.txt": "requests\n", "requirements-dev.txt": "pytest\n", ...testFile }));
+  assert.match(reqDev, / {10}pip install -r requirements-dev\.txt\n {6}- name: Test\n {8}run: python -m pytest\n/);
+  // A commented-out requirement is not installed.
+  assert.match(yamlFor(project(t, { "requirements.txt": "requests  # pytest later\n", ...testFile })), / {10}pip install pytest\n/);
+});
+
+test("a tests folder without Python test files adds no Python test step", (t) => {
+  const root = project(t, {
+    "package.json": { name: "x", scripts: { test: "node --test tests" } },
+    "package-lock.json": "{}",
+    "pyproject.toml": "[tool.black]\nline-length = 100\n",
+    "tests/a.test.js": "",
+  });
+  const y = yamlFor(root);
+  assert.match(y, /^ {2}node:$/m);
+  assert.doesNotMatch(y, /^ {2}python:$/m);
+  assert.doesNotMatch(y, /pytest/);
+});
+
 test("Rust builds locked when Cargo.lock exists and tests", (t) => {
   const locked = yamlFor(project(t, { "Cargo.toml": "[package]\nname = \"x\"\n", "Cargo.lock": "" }));
   assert.match(locked, /run: cargo build --locked\n/);

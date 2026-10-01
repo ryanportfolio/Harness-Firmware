@@ -133,9 +133,12 @@ function detectPython(root) {
   if (!hasPyproject && !hasSetupPy && requirements.length === 0) return null;
 
   const pyproject = read(root, "pyproject.toml");
-  // A tool counts as declared when its name appears as a dependency, not as a [tool.x] config key.
+  const setupCfg = read(root, "setup.cfg");
+  // A tool counts as installed only when its name appears in a dependency list the install step
+  // installs. Extras and groups the install step does not select do not count.
   const mentions = (text, name) => new RegExp(`(^|[^A-Za-z0-9_.[-])${name}([^A-Za-z0-9_.-]|$)`, "m").test(text);
-  const declares = (name) => mentions([pyproject, read(root, "setup.py"), read(root, "setup.cfg"), ...requirements.map((f) => read(root, f))].join("\n"), name);
+  const requirementsText = (f) => read(root, f).replace(/(^|\s)#.*$/gm, "");
+  const projectDeps = tomlArray(sectionOf(pyproject, "project"), "dependencies");
   const uv = exists(root, "uv.lock");
 
   let versionFile = null;
@@ -155,12 +158,27 @@ function detectPython(root) {
   if (/^\s*\[tool\.mypy[\].]/m.test(pyproject) || exists(root, "mypy.ini") || exists(root, ".mypy.ini") || /^\s*\[mypy\]/m.test(read(root, "setup.cfg"))) typechecker = "mypy";
   else if (/^\s*\[tool\.pyright\]/m.test(pyproject) || exists(root, "pyrightconfig.json")) typechecker = "pyright";
 
-  const hasTests = exists(root, "tests") || hasPythonTestFiles(root);
+  // A tests/ folder alone is not enough: it may hold another stack's tests.
+  const hasTests = hasPythonTestFiles(root);
   const commands = [];
   let install = [];
   if (uv) {
     install = ["uv sync --locked"];
-    const uvRun = (tool) => (declares(tool) ? `uv run ${tool}` : `uv run --with ${tool} ${tool}`);
+    // uv sync installs [project].dependencies and the default groups: dev, unless
+    // [tool.uv] default-groups names others. Extras need --extra, so they do not count.
+    const toolUv = sectionOf(pyproject, "tool.uv");
+    const groups = sectionOf(pyproject, "dependency-groups");
+    let synced = [projectDeps];
+    if (/^\s*default-groups\s*=\s*["']all["']/m.test(toolUv)) synced.push(groups, tomlArray(toolUv, "dev-dependencies"));
+    else {
+      const named = tomlArray(toolUv, "default-groups");
+      const names = named ? [...named.matchAll(/["']([^"']+)["']/g)].map((m) => m[1]) : ["dev"];
+      synced.push(...names.map((g) => tomlArray(groups, g)));
+      // Legacy [tool.uv] dev-dependencies belong to the dev group.
+      if (names.includes("dev")) synced.push(tomlArray(toolUv, "dev-dependencies"));
+    }
+    synced = synced.join("\n");
+    const uvRun = (tool) => (mentions(synced, tool) ? `uv run ${tool}` : `uv run --with ${tool} ${tool}`);
     if (typechecker === "mypy") commands.push({ name: "Typecheck", run: `${uvRun("mypy")} .` });
     if (typechecker === "pyright") commands.push({ name: "Typecheck", run: uvRun("pyright") });
     if (hasTests) commands.push({ name: "Test", run: uvRun("pytest") });
@@ -171,13 +189,17 @@ function detectPython(root) {
       : requirements;
     for (const f of main) install.push(`pip install -r ${f}`);
     const installable = hasSetupPy || /^\s*\[(project|build-system)\]/m.test(pyproject);
-    if (installable) {
-      const extras = ["dev", "test", "tests"].filter((x) => new RegExp(`^\\s*${x}\\s*=\\s*\\[`, "m").test(sectionOf(pyproject, "project.optional-dependencies")));
-      install.push(extras.length ? `pip install -e ".[${extras.join(",")}]"` : "pip install -e .");
-    }
-    // Only what pip installs above counts: pip install -e . skips [dependency-groups].
-    const installedFrom = installable ? [stripSection(pyproject, "dependency-groups"), read(root, "setup.py"), read(root, "setup.cfg")] : [];
-    const installed = [...main.map((f) => read(root, f)), ...installedFrom].join("\n");
+    // Package metadata comes from [project] when present, else from setup.cfg. setup.py is
+    // Python code and is not parsed, so its dependencies never count as installed.
+    const fromPyproject = /^\s*\[project\]/m.test(pyproject);
+    const depsOf = fromPyproject ? projectDeps : iniValue(sectionOf(setupCfg, "options"), "install_requires");
+    const extraOf = (x) =>
+      fromPyproject ? tomlArray(sectionOf(pyproject, "project.optional-dependencies"), x) : iniValue(sectionOf(setupCfg, "options.extras_require"), x);
+    const extras = installable ? ["dev", "test", "tests"].filter((x) => extraOf(x).trim()) : [];
+    if (installable) install.push(extras.length ? `pip install -e ".[${extras.join(",")}]"` : "pip install -e .");
+    // Only what pip installs above counts: other extras and [dependency-groups] are skipped.
+    const installedFrom = installable ? [depsOf, ...extras.map(extraOf)] : [];
+    const installed = [...main.map(requirementsText), ...installedFrom].join("\n");
     const extra = [];
     if (hasTests && !mentions(installed, "pytest")) extra.push("pytest");
     if (typechecker && !mentions(installed, typechecker)) extra.push(typechecker);
@@ -200,9 +222,45 @@ function sectionOf(toml, name) {
   const { lines, start, end } = sectionRange(toml, name);
   return start < 0 ? "" : lines.slice(start + 1, end).join("\n");
 }
-function stripSection(toml, name) {
-  const { lines, start, end } = sectionRange(toml, name);
-  return start < 0 ? toml : [...lines.slice(0, start), ...lines.slice(end)].join("\n");
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Text of the array in `key = [...]` within one TOML section, comments dropped; "" when absent.
+function tomlArray(section, key) {
+  const m = new RegExp(`^[ \\t]*["']?${escapeRegExp(key)}["']?[ \\t]*=[ \\t]*\\[`, "m").exec(section);
+  if (!m) return "";
+  let out = "";
+  let depth = 0;
+  let quote = null;
+  for (let i = m.index + m[0].length - 1; i < section.length; i++) {
+    const c = section[i];
+    if (quote) {
+      out += c;
+      if (c === "\\" && quote === '"') out += section[++i] ?? "";
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === "#") {
+      const nl = section.indexOf("\n", i);
+      i = nl < 0 ? section.length : nl - 1;
+      continue;
+    }
+    if (c === '"' || c === "'") quote = c;
+    else if (c === "[") depth++;
+    else if (c === "]" && --depth === 0) return out + c;
+    out += c;
+  }
+  return out;
+}
+// Value of `key = ...` within one INI section, with its indented continuation lines; "" when absent.
+function iniValue(section, key) {
+  const lines = section.split(/\r?\n/);
+  const i = lines.findIndex((l) => new RegExp(`^${escapeRegExp(key)}[ \\t]*[=:]`).test(l));
+  if (i < 0) return "";
+  const out = [lines[i].replace(/^[^=:]*[=:]/, "")];
+  for (const l of lines.slice(i + 1)) {
+    if (l.trim() && !/^\s/.test(l)) break;
+    if (!/^\s*[#;]/.test(l)) out.push(l);
+  }
+  return out.join("\n");
 }
 
 function detectRust(root) {
