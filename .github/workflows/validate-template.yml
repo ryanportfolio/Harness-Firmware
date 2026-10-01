@@ -81,6 +81,9 @@ jobs:
       - name: long-horizon Baseline manifest detects each kind of change
         run: node --test .claude/scripts/test-long-horizon-manifest.mjs
 
+      - name: Project CI workflow generator detects each stack
+        run: node --test .claude/scripts/test-write-ci-workflow.mjs
+
       # Missing skills and the removal record only warn.
       - name: Skill presence and removal record
         run: node .claude/scripts/removed-skills.mjs
