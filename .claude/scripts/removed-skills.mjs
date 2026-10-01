@@ -31,6 +31,7 @@ export const DEPENDENCIES = {
   "astra-review": ["codex-review", "external-review"],
   "codex-fullreview": ["impartial-review"],
   "codex-review": ["external-review"],
+  "merge-ready": ["codex-fullreview", "codex-review"],
 };
 
 // Parses JSON and names the file when it cannot be read.

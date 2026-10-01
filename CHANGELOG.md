@@ -13,6 +13,14 @@ condensed.
 
 ### Added
 
+- `merge-ready` skill: the review loop that gets an open PR ready to merge. Round
+  one runs `codex-fullreview` and `codex-review` in parallel on the PR's branch diff;
+  confirmed 🔴 and 🟡 findings are fixed, committed and pushed, then `codex-review`
+  reruns on the full diff at the new head until a round confirms none, with at most
+  3 reruns before it stops and asks. It never merges and grants no merge authority,
+  so a personal `/merge` skill can call it as its review gate without bringing
+  auto-merge back into the template. Claude Code only.
+
 - `long-horizon-swarm` skill: the `long-horizon` contract with Opus, Sol and Astra
   as peers who contribute ideas, critique and code throughout a run. It attaches to
   an existing run's state file, logs contributions and Codex spend in `swarm.md`, and
