@@ -214,6 +214,10 @@ test("a needed skill turned off in skillOverrides warns like a missing one", asy
     fs.writeFileSync(path.join(root, ".claude/skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
   }
   const registered = new Set(["codex-fullreview", "impartial-review"]);
+  // Without a template manifest (a project older than it) no dependency rule applies.
+  assert.deepEqual(reviewRemovals(root, registered, [], new Set(["impartial-review"])), []);
+  fs.mkdirSync(path.join(root, ".agents"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".agents/template-manifest.json"), JSON.stringify({ version: 1, skills: { required: [], dependencies: { "codex-fullreview": ["impartial-review"] } } }));
   assert.deepEqual(reviewRemovals(root, registered, [], new Set()), []);
   const warnings = reviewRemovals(root, registered, [], new Set(["impartial-review"]));
   assert.equal(warnings.length, 1);
@@ -222,4 +226,16 @@ test("a needed skill turned off in skillOverrides warns like a missing one", asy
   fs.mkdirSync(path.join(root, ".claude"), { recursive: true });
   fs.writeFileSync(path.join(root, ".claude/settings.json"), JSON.stringify({ skillOverrides: { "impartial-review": "off" } }));
   assert.equal(reviewRemovals(root, registered, []).length, 1);
+});
+
+test("a template manifest with an unknown version or key fails the removal review", async (t) => {
+  const { reviewRemovals } = await import("./removed-skills.mjs");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "skill-manifest-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, ".agents"), { recursive: true });
+  const manifest = path.join(root, ".agents/template-manifest.json");
+  fs.writeFileSync(manifest, JSON.stringify({ version: 2, skills: {} }));
+  assert.throws(() => reviewRemovals(root, new Set(), []), /template-manifest\.json: version 2 is not supported/);
+  fs.writeFileSync(manifest, JSON.stringify({ version: 1, skills: {}, extra: true }));
+  assert.throws(() => reviewRemovals(root, new Set(), []), /template-manifest\.json: unknown top-level key extra/);
 });

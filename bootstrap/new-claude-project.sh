@@ -9,6 +9,13 @@
 #   bash bootstrap/new-claude-project.sh --name my-app
 #   bash bootstrap/new-claude-project.sh --name my-app --dest ~/code
 #
+# Needs git and node. The template-only paths and the required files are listed
+# in .agents/template-manifest.json inside the template; node reads that file.
+#
+# HARNESS_TEMPLATE_URL overrides the clone source of the fallback, for mirrors
+# and tests. It takes anything git clone accepts, a local path included. The gh
+# path always creates the repo from the GitHub template.
+#
 # gh installed and signed in -> a PRIVATE GitHub repo is created from the
 # template and cloned. Otherwise -> a shallow clone with its history dropped,
 # a fresh initial commit, and the manual GitHub steps printed at the end.
@@ -22,28 +29,43 @@
 set -euo pipefail
 
 TEMPLATE='ryanportfolio/Harness-Firmware'
-TEMPLATE_URL='https://github.com/ryanportfolio/Harness-Firmware.git'
+TEMPLATE_URL="${HARNESS_TEMPLATE_URL:-https://github.com/ryanportfolio/Harness-Firmware.git}"
+MANIFEST='.agents/template-manifest.json'
 
-# Mirrors $script:TemplateOnlyPaths in NewProjectCore.psm1 and the potential cleanup
-# paths in .claude/skills/init-project/references/profiles.md. Keep all three in sync.
-# These files maintain or distribute the template itself; a spawned project must
-# not inherit them as if they were its own history, process, or support links.
-TEMPLATE_ONLY_PATHS=(
-    'bootstrap'
-    '.claude-plugin'
-    '.github/workflows/validate-template.yml'
-    '.github/ISSUE_TEMPLATE'
-    'CHANGELOG.md'
-    'CONTRIBUTING.md'
-)
+# Filled by load_manifest from the manifest of the tree about to be stripped.
+# Template-only paths maintain or distribute the template itself; a new project
+# must not inherit them as its own history, process, or support links.
+TEMPLATE_ONLY_PATHS=()
+REQUIRED_PROJECT_FILES=()
 
-# Mirrors $script:RequiredProjectFiles in NewProjectCore.psm1. Keep in sync.
-REQUIRED_PROJECT_FILES=(
-    'AGENTS.md'
-    '.agents/skills/init-project/SKILL.md'
-    '.claude/skills/init-project/SKILL.md'
-    '.claude/scripts/sync-codex-skills.mjs'
-)
+# Reads the manifest. Usage: node -e "$MANIFEST_JS" <file> <mode> [name]
+#   templateOnly or requiredFiles: print the list, one path per line.
+#   readme <name>: print readmeStub with {name} replaced by <name>.
+# Fails with one line on a missing file, invalid JSON, a version other than 1,
+# or an unknown top-level key.
+# shellcheck disable=SC2016
+MANIFEST_JS='
+const fs = require("fs");
+const [file, mode, name] = process.argv.slice(1);
+const fail = (message) => { process.stderr.write(file + ": " + message + "\n"); process.exit(1); };
+let manifest;
+try { manifest = JSON.parse(fs.readFileSync(file, "utf8")); } catch (error) { fail(error.message); }
+if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) fail("expected a JSON object");
+if (manifest.version !== 1) fail("version " + JSON.stringify(manifest.version) + " is not supported; expected 1");
+const keys = ["version", "template", "requiredFiles", "projectPaths", "templateOnly", "readmeStub", "skills"];
+const unknown = Object.keys(manifest).filter((key) => !keys.includes(key));
+if (unknown.length) fail("unknown top-level key " + unknown.join(", "));
+if (mode === "readme") {
+  if (typeof manifest.readmeStub !== "string") fail("readmeStub must be a string");
+  process.stdout.write(manifest.readmeStub.split("{name}").join(name));
+} else {
+  const list = manifest[mode];
+  const valid = (entry) => typeof entry === "string" && entry !== "" && !entry.startsWith("/") && !entry.endsWith("/")
+    && !/[\\*?]/.test(entry) && !entry.split("/").some((part) => part === "" || part === "." || part === "..");
+  if (!Array.isArray(list) || !list.every(valid)) fail(mode + " must be an array of repo-relative paths");
+  for (const entry of list) process.stdout.write(entry + "\n");
+}
+'
 
 usage() {
     cat <<'EOF'
@@ -78,36 +100,70 @@ is_valid_name() {
     return 0
 }
 
-# Mirrors Remove-NewProjectLocalTemplateFiles: template-only paths, the
-# template README, and any scratch directory the checkout picked up.
+# Fills TEMPLATE_ONLY_PATHS and REQUIRED_PROJECT_FILES from the manifest in the
+# given tree. There is no built-in fallback list: a tree without a readable
+# manifest stops the run.
+load_manifest() {
+    local target="$1"
+    local file="$target/$MANIFEST"
+    local line listing
+    if [ ! -f "$file" ]; then
+        die "The template has no $MANIFEST, so its template-only files cannot be stripped. Use a template version that ships it."
+    fi
+    TEMPLATE_ONLY_PATHS=()
+    REQUIRED_PROJECT_FILES=()
+    listing="$(node -e "$MANIFEST_JS" "$file" templateOnly)" || die "Cannot read $MANIFEST."
+    while IFS= read -r line; do
+        if [ -n "$line" ]; then TEMPLATE_ONLY_PATHS+=("$line"); fi
+    done <<< "$listing"
+    listing="$(node -e "$MANIFEST_JS" "$file" requiredFiles)" || die "Cannot read $MANIFEST."
+    while IFS= read -r line; do
+        if [ -n "$line" ]; then REQUIRED_PROJECT_FILES+=("$line"); fi
+    done <<< "$listing"
+    # Both lists are never empty in a valid manifest, and an empty array under
+    # set -u fails on bash older than 4.4.
+    if [ "${#TEMPLATE_ONLY_PATHS[@]}" -eq 0 ] || [ "${#REQUIRED_PROJECT_FILES[@]}" -eq 0 ]; then
+        die "$MANIFEST must list templateOnly paths and requiredFiles."
+    fi
+}
+
+# Mirrors Remove-NewProjectLocalTemplateFiles: the template-only paths (the
+# template README among them) and any scratch directory the checkout picked up.
 strip_template_only_files() {
     local target="$1"
     local path
     for path in "${TEMPLATE_ONLY_PATHS[@]}"; do
         rm -rf "${target:?}/$path"
     done
-    rm -f "${target:?}/README.md"
     for path in "${target:?}"/.tmp*; do
         if [ -e "$path" ]; then rm -rf "$path"; fi
     done
-    # Removing the workflow and the issue templates can empty .github/ out.
-    # rmdir only succeeds on an empty directory, so a project that ships its
-    # own workflows keeps them.
-    rmdir "${target:?}/.github/workflows" 2>/dev/null || true
-    rmdir "${target:?}/.github" 2>/dev/null || true
+    # Removing template-only paths can leave their parent folders empty, such
+    # as .github/ or assets/. rmdir only succeeds on an empty directory, so a
+    # project that keeps its own files there keeps the folder.
+    for path in "${TEMPLATE_ONLY_PATHS[@]}"; do
+        path="$(dirname "$path")"
+        while [ "$path" != '.' ]; do
+            rmdir "${target:?}/$path" 2>/dev/null || break
+            path="$(dirname "$path")"
+        done
+    done
 }
 
-# Mirrors Assert-NewProjectContract: a generated project must carry the Codex
-# assets and must not carry anything template-only.
+# Mirrors Assert-NewProjectContract: a generated project must carry the required
+# files and must not carry anything template-only.
 assert_project_contract() {
     local target="$1"
     local path
     for path in "${REQUIRED_PROJECT_FILES[@]}"; do
         if [ ! -f "$target/$path" ]; then
-            die "Generated project is missing required Codex asset: $path"
+            die "Generated project is missing required file: $path"
         fi
     done
     for path in "${TEMPLATE_ONLY_PATHS[@]}"; do
+        # README.md is template-only and rewritten from the stub, so it is the
+        # one template-only path a project keeps.
+        if [ "$path" = 'README.md' ]; then continue; fi
         if [ -e "$target/$path" ]; then
             die "Generated project still contains template-only asset: $path"
         fi
@@ -122,7 +178,8 @@ assert_project_contract() {
 write_readme_stub() {
     local target="$1"
     local project="$2"
-    printf '# %s\n' "$project" > "$target/README.md"
+    node -e "$MANIFEST_JS" "$target/$MANIFEST" readme "$project" > "$target/README.md" \
+        || die "Cannot write README.md from $MANIFEST."
 }
 
 name=''
@@ -169,6 +226,9 @@ fi
 if ! command -v git >/dev/null 2>&1; then
     die 'git was not found on PATH. Install git, then run this again.'
 fi
+if ! command -v node >/dev/null 2>&1; then
+    die 'node was not found on PATH. It reads the template manifest. Install Node.js, then run this again.'
+fi
 
 if [ -z "$dest" ]; then dest="$PWD"; fi
 mkdir -p "$dest"
@@ -201,7 +261,8 @@ if [ "$mode" = 'gh' ]; then
         fi
 
         echo 'Stripping template-only files and replacing README.md ...'
-        git -C "$target" rm -rq --ignore-unmatch -- "${TEMPLATE_ONLY_PATHS[@]}" 'README.md'
+        load_manifest "$target"
+        git -C "$target" rm -rq --ignore-unmatch -- "${TEMPLATE_ONLY_PATHS[@]}"
         strip_template_only_files "$target"
         write_readme_stub "$target" "$name"
         git -C "$target" add README.md
@@ -227,13 +288,14 @@ if [ "$mode" = 'gh' ]; then
 fi
 
 if [ "$mode" = 'clone' ]; then
-    echo "Cloning template $TEMPLATE ..."
+    echo "Cloning template from $TEMPLATE_URL ..."
     git clone --depth 1 --single-branch "$TEMPLATE_URL" "$target"
 
     # Drop the template's history so the first commit in the new repo is yours.
     rm -rf "${target:?}/.git"
 
     echo 'Stripping template-only files and replacing README.md ...'
+    load_manifest "$target"
     strip_template_only_files "$target"
     write_readme_stub "$target" "$name"
     assert_project_contract "$target"

@@ -25,6 +25,25 @@ condensed.
   prints by default; `--write` writes the file and refuses to replace an existing one
   without `--force`. `init-project` (Claude and Codex) shows the result and writes it
   after approval. Subfolder projects are not detected.
+- `.agents/template-manifest.json`: one list, shipped into every new project, of
+  which paths a new project gets (`projectPaths`), which stay in the template
+  (`templateOnly`), the files a new project must have (`requiredFiles`), the README
+  stub, and the skill groups, required skills, dependencies and the `minimal`
+  preset. It replaces the copies of the template-only list that lived in
+  `new-claude-project.sh`, `NewProjectCore.psm1`, the generator test and the
+  `init-project` prose. The template-only list grows from 6 paths, plus the
+  README the creators already replaced with a stub, to 16: `GUIDE.md`, `LICENSE`,
+  the README and diagram assets and scripts, and `docs/research`, `docs/specs` and
+  `docs/superpowers` no longer ship into new projects.
+- `bootstrap/tests/check-template-manifest.mjs` and its tests, run in CI: every
+  file in the template sits under exactly one `projectPaths` or `templateOnly`
+  entry, every entry matches a file, required files exist and ship, every skill
+  folder is in exactly one group, and every skill named in the rules exists. It
+  lives in `bootstrap/`, so new projects neither get it nor fail on it.
+- `bootstrap/tests/smoke-new-claude-project.sh`, run in CI on Linux: creates a
+  project with `new-claude-project.sh` from a local copy of the commit with `gh`
+  blocked, then checks it against the manifest. `HARNESS_TEMPLATE_URL` sets the
+  clone source of the script's fallback, for mirrors and tests.
 
 - `merge-ready` skill: the review loop that gets an open PR ready to merge. Round
   one runs `codex-fullreview` and `codex-review` in parallel on the PR's branch diff;
@@ -70,6 +89,25 @@ condensed.
   `sync-codex-skills.mjs` warns if a copy reappears from an old sync.
 
 ### Changed
+
+- Project creators read the template manifest from the tree they are about to
+  strip and have no built-in list to fall back on. `new-claude-project.sh` now
+  needs `node` and stops with a clear message without it. Both creators also
+  remove parent folders the strip leaves empty, such as `assets/`, and the
+  Windows creator's offline copy skips template-only paths by full path rather
+  than by name, so a nested file that shares a name with one, such as a future
+  skill's own `README.md`, would still be copied.
+- `removed-skills.mjs` reads the required skills and dependencies from the
+  manifest; its `REQUIRED` and `DEPENDENCIES` exports still work. In a project
+  older than the manifest it applies no required or dependency rule.
+- `test-codex-contract.mjs` passes in a new project: it checks the `bootstrap/`
+  creators only where `bootstrap/` exists, and the template-only path checks moved
+  to the manifest check.
+- `init-project` and `adopt-repo` read the template-only paths and the `minimal`
+  preset from the manifest, and `sync-starter` never pulls a `templateOnly` path
+  into a project. Links from shipped files into template-only files
+  (`PROVENANCE.md`, `docs/codex-skills.md`) now point at the template on GitHub,
+  and `GUIDE.md` says the README build scripts apply to the template only.
 
 - `long-horizon` and `long-horizon-workflows` take over the useful parts of the
   retired `long-horizon-swarm`. A round whose execution or done-check costs hours

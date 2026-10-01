@@ -1,24 +1,65 @@
 Set-StrictMode -Version 2.0
 
-$script:RequiredProjectFiles = @(
-    'AGENTS.md',
-    '.agents\skills\init-project\SKILL.md',
-    '.claude\skills\init-project\SKILL.md',
-    '.claude\scripts\sync-codex-skills.mjs'
-)
+# The template-only paths, the required files and the README stub live in
+# .agents\template-manifest.json. Every function reads the manifest of the tree
+# it is about to strip; there is no built-in fallback list. Template-only paths
+# maintain or distribute the template itself; a new project must not inherit
+# them as its own history, process, or support links.
+$script:ManifestRelativePath = '.agents/template-manifest.json'
+$script:ManifestKeys = @('version', 'template', 'requiredFiles', 'projectPaths', 'templateOnly', 'readmeStub', 'skills')
 
-# Mirrors TEMPLATE_ONLY_PATHS in new-claude-project.sh and the potential cleanup
-# paths in .claude\skills\init-project\references\profiles.md. Keep all three in sync. These
-# files maintain or distribute the template itself; a spawned project must not
-# inherit them as if they were its own history, process, or support links.
-$script:TemplateOnlyPaths = @(
-    'bootstrap',
-    '.claude-plugin',
-    '.github\workflows\validate-template.yml',
-    '.github\ISSUE_TEMPLATE',
-    'CHANGELOG.md',
-    'CONTRIBUTING.md'
-)
+function Get-NewProjectManifest {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root
+    )
+
+    $path = Join-Path $Root $script:ManifestRelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "The template has no $($script:ManifestRelativePath), so its template-only files cannot be stripped. Use a template version that ships it."
+    }
+    try {
+        $manifest = [IO.File]::ReadAllText($path) | ConvertFrom-Json
+    }
+    catch {
+        throw "Cannot read $($script:ManifestRelativePath): $($_.Exception.Message)"
+    }
+    if ($null -eq $manifest -or $manifest -isnot [System.Management.Automation.PSCustomObject]) {
+        throw "$($script:ManifestRelativePath): expected a JSON object"
+    }
+    $names = @($manifest.PSObject.Properties | ForEach-Object { $_.Name })
+    if (-not ($names -contains 'version') -or
+        -not ($manifest.version -is [int] -or $manifest.version -is [long]) -or
+        $manifest.version -ne 1) {
+        throw "$($script:ManifestRelativePath): only version 1 is supported"
+    }
+    $unknown = @($names | Where-Object { $script:ManifestKeys -notcontains $_ })
+    if ($unknown.Count -gt 0) {
+        throw "$($script:ManifestRelativePath): unknown top-level key $($unknown -join ', ')"
+    }
+    foreach ($key in @('templateOnly', 'requiredFiles')) {
+        $list = @()
+        if ($names -contains $key) { $list = @($manifest.$key) }
+        if ($list.Count -eq 0) {
+            throw "$($script:ManifestRelativePath): $key must list at least one path"
+        }
+        foreach ($entry in $list) {
+            if ($entry -isnot [string] -or $entry -eq '' -or $entry.StartsWith('/') -or $entry.EndsWith('/') -or
+                $entry -match '[\\*?]' -or @($entry.Split('/') | Where-Object { $_ -eq '' -or $_ -eq '.' -or $_ -eq '..' }).Count -gt 0) {
+                throw "$($script:ManifestRelativePath): $key entry '$entry' is not a repo-relative path"
+            }
+        }
+    }
+    if (-not ($names -contains 'readmeStub') -or $manifest.readmeStub -isnot [string]) {
+        throw "$($script:ManifestRelativePath): readmeStub must be a string"
+    }
+
+    return [pscustomobject]@{
+        TemplateOnly = @($manifest.templateOnly)
+        RequiredFiles = @($manifest.requiredFiles)
+        ReadmeStub = [string]$manifest.readmeStub
+    }
+}
 
 function Write-NewProjectLog {
     param(
@@ -143,16 +184,21 @@ function Resolve-NewProjectLocalTemplate {
 function Assert-NewProjectContract {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Target
+        [string]$Target,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Manifest
     )
 
-    foreach ($required in $script:RequiredProjectFiles) {
+    foreach ($required in $Manifest.RequiredFiles) {
         if (-not (Test-Path -LiteralPath (Join-Path $Target $required) -PathType Leaf)) {
-            throw "Generated project is missing required Codex asset: $required"
+            throw "Generated project is missing required file: $required"
         }
     }
 
-    foreach ($forbidden in $script:TemplateOnlyPaths) {
+    # README.md is template-only and is rewritten from the stub, so it is the one
+    # template-only path a project keeps.
+    foreach ($forbidden in @($Manifest.TemplateOnly | Where-Object { $_ -ne 'README.md' })) {
         if (Test-Path -LiteralPath (Join-Path $Target $forbidden)) {
             throw "Generated project still contains template-only asset: $forbidden"
         }
@@ -164,22 +210,25 @@ function Assert-NewProjectContract {
     }
 }
 
-function Remove-NewProjectEmptyGithubDirectories {
+function Remove-NewProjectEmptyParentDirectories {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Target
+        [string]$Target,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Manifest
     )
 
-    # Removing the workflow and the issue templates can empty .github\ out. Only
-    # delete directories that are actually empty, so a project that ships its
-    # own workflows keeps them.
-    foreach ($relativePath in @('.github\workflows', '.github')) {
-        $fullPath = Join-Path $Target $relativePath
-        if (Test-Path -LiteralPath $fullPath -PathType Container) {
-            $remaining = @(Get-ChildItem -LiteralPath $fullPath -Force)
-            if ($remaining.Count -eq 0) {
-                Remove-Item -Force -LiteralPath $fullPath
-            }
+    # Removing template-only paths can leave their parent folders empty, such as
+    # .github\ or assets\. Only delete folders that are actually empty, so a
+    # project that keeps its own files there keeps the folder.
+    foreach ($relativePath in $Manifest.TemplateOnly) {
+        $parts = @($relativePath.Split('/'))
+        for ($depth = $parts.Count - 1; $depth -ge 1; $depth--) {
+            $fullPath = Join-Path $Target ($parts[0..($depth - 1)] -join '\')
+            if (-not (Test-Path -LiteralPath $fullPath -PathType Container)) { continue }
+            if (@(Get-ChildItem -LiteralPath $fullPath -Force).Count -gt 0) { break }
+            Remove-Item -Force -LiteralPath $fullPath
         }
     }
 }
@@ -187,10 +236,14 @@ function Remove-NewProjectEmptyGithubDirectories {
 function Remove-NewProjectLocalTemplateFiles {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Target
+        [string]$Target,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Manifest
     )
 
-    foreach ($relativePath in $script:TemplateOnlyPaths) {
+    # README.md is in the template-only list; the caller writes the stub.
+    foreach ($relativePath in $Manifest.TemplateOnly) {
         $fullPath = Join-Path $Target $relativePath
         if (Test-Path -LiteralPath $fullPath) {
             Remove-Item -Recurse -Force -LiteralPath $fullPath
@@ -201,12 +254,7 @@ function Remove-NewProjectLocalTemplateFiles {
         Where-Object { $_.Name -like '.tmp*' } |
         Remove-Item -Recurse -Force
 
-    $readmePath = Join-Path $Target 'README.md'
-    if (Test-Path -LiteralPath $readmePath) {
-        Remove-Item -Force -LiteralPath $readmePath
-    }
-
-    Remove-NewProjectEmptyGithubDirectories -Target $Target
+    Remove-NewProjectEmptyParentDirectories -Target $Target -Manifest $Manifest
 }
 
 function Copy-NewProjectTemplate {
@@ -245,17 +293,32 @@ function Copy-NewProjectTemplate {
         }
     }
     else {
-        $copy = Invoke-NewProjectNative -File 'robocopy' -Arguments @(
-            $TemplateRoot, $Target, '/E',
-            '/XD', '.git', 'bootstrap', '.claude-plugin', 'ISSUE_TEMPLATE', '.tmp*', 'dist', 'build', '.worktrees', 'worktrees',
-            '/XF', '.git', 'README.md', 'validate-template.yml', 'CHANGELOG.md', 'CONTRIBUTING.md'
+        # Skip the template-only paths during the copy. Full paths, so a file in
+        # a subfolder that shares a template-only name is still copied.
+        $sourceManifest = Get-NewProjectManifest -Root $TemplateRoot
+        $excludedDirectories = @('.git', '.tmp*', 'dist', 'build', '.worktrees', 'worktrees')
+        $excludedFiles = @('.git')
+        foreach ($relativePath in $sourceManifest.TemplateOnly) {
+            $fullPath = Join-Path $TemplateRoot ($relativePath -replace '/', '\')
+            if (Test-Path -LiteralPath $fullPath -PathType Container) {
+                $excludedDirectories += $fullPath
+            }
+            else {
+                $excludedFiles += $fullPath
+            }
+        }
+        $copy = Invoke-NewProjectNative -File 'robocopy' -Arguments (@(
+            $TemplateRoot, $Target, '/E', '/XD') + $excludedDirectories + @('/XF') + $excludedFiles
         ) -LogAction $LogAction -Tone 'dim' -QuietOutput
         if ($copy.ExitCode -ge 8) {
             throw "Template copy failed (robocopy exit $($copy.ExitCode))."
         }
     }
 
-    Remove-NewProjectLocalTemplateFiles -Target $Target
+    # The copy is the tree about to be stripped, so its own manifest decides.
+    $manifest = Get-NewProjectManifest -Root $Target
+    Remove-NewProjectLocalTemplateFiles -Target $Target -Manifest $manifest
+    return $manifest
 }
 
 function Initialize-NewProjectReadme {
@@ -264,14 +327,19 @@ function Initialize-NewProjectReadme {
         [string]$Target,
 
         [Parameter(Mandatory = $true)]
-        [string]$Name
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Manifest
     )
 
     $readmePath = Join-Path $Target 'README.md'
     if (Test-Path -LiteralPath $readmePath) {
         Remove-Item -Force -LiteralPath $readmePath
     }
-    [IO.File]::WriteAllText($readmePath, "# $Name`r`n", [Text.Encoding]::ASCII)
+    # Windows line endings, as this generator has always written the stub.
+    $content = $Manifest.ReadmeStub.Replace('{name}', $Name).Replace("`r`n", "`n").Replace("`n", "`r`n")
+    [IO.File]::WriteAllText($readmePath, $content, (New-Object Text.UTF8Encoding $false))
 }
 
 function Remove-NewProjectTemplateFiles {
@@ -286,31 +354,29 @@ function Remove-NewProjectTemplateFiles {
     )
 
     Write-NewProjectLog $LogAction 'Stripping template-only files and replacing README.md ...' 'out'
-    $trackedTemplateOnly = @($script:TemplateOnlyPaths | ForEach-Object { $_ -replace '\\', '/' })
-    $removeArgs = @('-C', $Target, 'rm', '-rq', '--ignore-unmatch', '--') +
-        $trackedTemplateOnly +
-        @('README.md')
+    $manifest = Get-NewProjectManifest -Root $Target
+    $removeArgs = @('-C', $Target, 'rm', '-rq', '--ignore-unmatch', '--') + @($manifest.TemplateOnly)
     $remove = Invoke-NewProjectNative -File 'git' -Arguments $removeArgs -LogAction $LogAction -Tone 'dim'
     if ($remove.ExitCode -ne 0) {
         throw 'Failed to remove template-only files from the cloned repository.'
     }
 
-    foreach ($relativePath in $script:TemplateOnlyPaths) {
+    foreach ($relativePath in $manifest.TemplateOnly) {
         $fullPath = Join-Path $Target $relativePath
         if (Test-Path -LiteralPath $fullPath) {
             Remove-Item -Recurse -Force -LiteralPath $fullPath
         }
     }
 
-    Remove-NewProjectEmptyGithubDirectories -Target $Target
+    Remove-NewProjectEmptyParentDirectories -Target $Target -Manifest $Manifest
 
-    Initialize-NewProjectReadme -Target $Target -Name $Name
+    Initialize-NewProjectReadme -Target $Target -Name $Name -Manifest $manifest
     $add = Invoke-NewProjectNative -File 'git' -Arguments @('-C', $Target, 'add', 'README.md') -LogAction $LogAction -Tone 'dim'
     if ($add.ExitCode -ne 0) {
         throw 'Failed to stage the replacement README.'
     }
 
-    Assert-NewProjectContract -Target $Target
+    Assert-NewProjectContract -Target $Target -Manifest $manifest
 }
 
 function Invoke-NewProject {
@@ -403,10 +469,10 @@ function Invoke-NewProject {
 
     $templateRoot = Resolve-NewProjectLocalTemplate -LocalTemplate $LocalTemplate
     Write-NewProjectLog $LogAction ("Copying template from {0} ..." -f $templateRoot) 'out'
-    Copy-NewProjectTemplate -TemplateRoot $templateRoot -Target $target -LogAction $LogAction
+    $manifest = Copy-NewProjectTemplate -TemplateRoot $templateRoot -Target $target -LogAction $LogAction
 
-    Initialize-NewProjectReadme -Target $target -Name $Name
-    Assert-NewProjectContract -Target $target
+    Initialize-NewProjectReadme -Target $target -Name $Name -Manifest $manifest
+    Assert-NewProjectContract -Target $target -Manifest $manifest
 
     $init = Invoke-NewProjectNative -File 'git' -Arguments @('-C', $target, 'init', '-b', 'main') -LogAction $LogAction -Tone 'dim'
     if ($init.ExitCode -ne 0) { throw 'Failed to initialize the local repository.' }
@@ -425,9 +491,14 @@ function Invoke-NewProject {
 }
 
 function Get-NewProjectTemplateOnlyPath {
-    # The single source of truth for callers outside this module, so the
-    # release builder cannot drift from the spawn path.
-    return $script:TemplateOnlyPaths
+    # The template-only paths from the manifest under Root (by default the
+    # repository this module sits in), so the release builder strips exactly
+    # what the spawn path strips.
+    param(
+        [string]$Root = (Split-Path -Parent $PSScriptRoot)
+    )
+
+    return (Get-NewProjectManifest -Root $Root).TemplateOnly
 }
 
 Export-ModuleMember -Function Test-NewProjectName, Get-NewProjectMode, Invoke-NewProject, Get-NewProjectTemplateOnlyPath

@@ -38,7 +38,7 @@ LICENSE/NOTICE files in the skill folder.
 `impartial-review`, `init-project`, `lab`, `merge-ready`, `optimize-context`, `perf-loop`,
 `recall`, `session-hub`, `showpiece`, `sync-starter`, `why`, `wow-loop`.
 
-Homegrown skills are MIT, same as the repo (see the root `LICENSE`).
+Homegrown skills are MIT, same as the template (see its [`LICENSE`](https://github.com/ryanportfolio/Harness-Firmware/blob/main/LICENSE)).
 
 Runtime coverage follows `.agents/skill-modes.json` and the skill folders: `astra-fullreview`, `compact-review`,
 `codex-fullreview`, `long-horizon-workflows` and `merge-ready` are Claude-only, `external-review`
@@ -57,7 +57,7 @@ about the upstream repository's license.
 `perf-loop` now has a Claude entrypoint adapted from the repository's native Codex workflow,
 with the same three domain references and measurement gates. Dispatch remains runtime-specific.
 The full 36-name maintenance ledger and retained behaviors are in
-[`docs/research/2026-09-14-skill-parity-changes.md`](../../docs/research/2026-09-14-skill-parity-changes.md).
+[`docs/research/2026-09-14-skill-parity-changes.md`](https://github.com/ryanportfolio/Harness-Firmware/blob/main/docs/research/2026-09-14-skill-parity-changes.md).
 That ledger is a 2026-09-14 snapshot: it still lists `merge` (since removed from the
 template), `automate-me` and `verify-this` (retired 2026-09-23), and predates
 `long-horizon-workflows` (#136), `external-review`, `codex-fullreview` and

@@ -23,13 +23,15 @@ git fetch starter
 Only these paths are sync candidates:
 
 ```
-git diff --stat HEAD starter/main -- AGENTS.md .agents/CODEX-SKILL-COMPATIBILITY.md .agents/skill-modes.json .agents/skill-sources.json .agents/skills .claude/skills .claude/hooks .claude/scripts .claude/output-styles .claude/settings.json
+git diff --stat HEAD starter/main -- AGENTS.md .agents/CODEX-SKILL-COMPATIBILITY.md .agents/skill-modes.json .agents/skill-sources.json .agents/template-manifest.json .agents/skills .claude/skills .claude/hooks .claude/scripts .claude/output-styles .claude/settings.json
 ```
 
 Diverged by design; never bulk-pull these:
 
 - `CLAUDE.md` is project-configured (FILL IN sections replaced). If the template's kernel changed, read the template version (`git show starter/main:CLAUDE.md`) and hand-merge the relevant rule into the project copy.
 - `.claude/reference/*` is project knowledge. The template only ships skeletons.
+
+Template-only; never pull these. Every path under `templateOnly` in the template's `.agents/template-manifest.json` (`git show starter/main:.agents/template-manifest.json`). They maintain or distribute the template itself (its README, changelog, bootstrap scripts, CI workflow, research docs), and new projects are created without them. Leave them out of every selection, even when they differ.
 
 ### Step 3: present and pick
 
@@ -80,6 +82,7 @@ When the user authorized propagation of a generic skill fix, new skill, or hook 
 
 - Do not `git checkout starter/main -- .claude` wholesale; it clobbers diverged-by-design files.
 - Do not overwrite `settings.json`; union the permission lists.
+- Do not pull a `templateOnly` path from the template's manifest into the project.
 - Do not push project-flavored content back to the template; genericize or leave it.
 - Do not treat a `CLAUDE.md` diff as pullable; kernel changes are always a hand-merge.
 - Do not ship a generated `.agents/skills/` adapter. Write a native port under `.agents/skills/<name>/` and register it `native`, or register the skill `disabled`.

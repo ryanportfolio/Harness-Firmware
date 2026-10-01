@@ -35,11 +35,11 @@ try {
     }
     [IO.Compression.ZipFile]::ExtractToDirectory($snapshotArchive, $templateStage)
 
-    # Derived from NewProjectCore so the snapshot cannot drift from the spawn
-    # path. README.md is stripped here too: the spawn path replaces it with a
-    # stub rather than deleting it.
+    # Read from the snapshot's own .agents\template-manifest.json through
+    # NewProjectCore, so the snapshot cannot drift from the spawn path. The list
+    # includes README.md; the spawn path writes a stub in its place.
     Import-Module -Force (Join-Path $PSScriptRoot 'NewProjectCore.psm1')
-    $templateOnlyPaths = @(Get-NewProjectTemplateOnlyPath) + @('README.md')
+    $templateOnlyPaths = @(Get-NewProjectTemplateOnlyPath -Root $templateStage)
 
     foreach ($templateOnlyPath in $templateOnlyPaths) {
         $fullPath = Join-Path $templateStage $templateOnlyPath
