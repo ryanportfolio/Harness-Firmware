@@ -11,6 +11,8 @@ condensed.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-01
+
 ### Added
 
 - Project CI from `/init-project`. New projects had no CI: the template's
@@ -46,7 +48,6 @@ condensed.
   project with `new-claude-project.sh` from a local copy of the commit with `gh`
   blocked, then checks it against the manifest. `HARNESS_TEMPLATE_URL` sets the
   clone source of the script's fallback, for mirrors and tests.
-
 - `merge-ready` skill: the review loop that gets an open PR ready to merge. Round
   one runs `codex-fullreview` and `codex-review` in parallel on the PR's branch diff;
   confirmed 🔴 and 🟡 findings are fixed, committed and pushed, then `codex-review`
@@ -56,39 +57,6 @@ condensed.
   auto-merge back into the template. User-invoke only: it runs when the user types
   `/merge-ready`, or when `/merge` reads the skill file; the model never starts it
   on its own. Claude Code only.
-
-- `long-horizon-swarm` skill: the `long-horizon` contract with Opus, Sol and Astra
-  as peers who contribute ideas, critique and code throughout a run. It attaches to
-  an existing run's state file, logs contributions and Codex spend in `swarm.md`, and
-  reports disagreements to the user instead of blocking on them. The per-round
-  auditor stays fresh and never sees swarm output. Each peer works through a lens,
-  either a swarm lens in `lenses/` (starting with `done-check`) or an existing skill's
-  criteria. Authors reply to critique before the host acts, any peer can execute a
-  round, and `references/codex-peer.md` holds the tested Windows copy and launch
-  recipe. Revised from a live dogfood run of the skill on itself. Claude Code only.
-
-### Removed
-
-- The `merge` skill leaves the template. Session-wide auto-merge is a personal
-  authorization policy, not a repository one, so it now lives as a global skill in
-  `~/.claude/skills/merge`. The kernel's squash-by-default and one-PR-per-unit rules
-  are unchanged.
-- The skill capability manifest `.agents/skill-capabilities.json`, its checker
-  `check-skill-capabilities.mjs`, its tests, its CI step and the generated catalog
-  in `docs/codex-skills.md`. Copies of the template kept failing when the manifest
-  drifted from the skill folders. `.agents/skill-modes.json` is now the only record
-  of which Codex copies are native or disabled. The removal policy (required skills
-  and dependencies) moved into `removed-skills.mjs`, and the list of retired skills
-  moved into `sync-codex-skills.mjs`, which still warns when one reappears.
-- The `long-horizon-swarm` skill is retired, with its `done-check` lens and
-  `references/codex-peer.md`. On an 11-round study-engine run its draft reviews
-  caught dozens of flawed done-checks before costly rounds ran, but it cost 21
-  Codex runs and about 12 extra Opus passes, and its rule of continuing while any
-  pass found something produced review chains that mostly polished wording. A
-  review of the finished branch then found 3 real defects in a verification tool
-  that eleven rounds of peer review had never looked at. The parts that paid off
-  moved into `long-horizon` and `long-horizon-workflows` (see Changed).
-  `sync-codex-skills.mjs` warns if a copy reappears from an old sync.
 
 ### Changed
 
@@ -110,7 +78,6 @@ condensed.
   into a project. Links from shipped files into template-only files
   (`PROVENANCE.md`, `docs/codex-skills.md`) now point at the template on GitHub,
   and `GUIDE.md` says the README build scripts apply to the template only.
-
 - `long-horizon` and `long-horizon-workflows` take over the useful parts of the
   retired `long-horizon-swarm`. A round whose execution or done-check costs hours
   gets one fresh read-only draft review of its step and done-check, preferably
@@ -122,12 +89,10 @@ condensed.
   round before merge. Before resuming a run another session may still manage, the
   Manager asks the user whether to take over. The Codex `long-horizon` port uses
   `claude-review` and `opus-fullreview` for the same reviews.
-
 - The README skill list comes from the skill folders. `scripts/readme/items.json`
   only adds labels, groups and order: a folder without an entry now joins the
   specialist group under its folder name instead of being left out, and an entry
   without a folder is still left out.
-
 - Codex has two accepted routes: a ChatGPT login, or a `model_provider` gateway set in
   `config.toml` in `$CODEX_HOME` (default `~/.codex`), for example a CLIProxyAPI gateway
   over subscription accounts. `codex-review` and `codex-fullreview` accept either without
@@ -145,74 +110,49 @@ condensed.
   skill body and its triage, rendering, loading and services references are rewritten
   in compressed Caveman style, about 15% smaller, with every rule kept.
   `evidence-report.md` is unchanged because it must match the `wow-loop` copy.
+
+### Removed
+
+- The skill capability manifest `.agents/skill-capabilities.json`, its checker
+  `check-skill-capabilities.mjs`, its tests, its CI step and the generated catalog
+  in `docs/codex-skills.md`. Copies of the template kept failing when the manifest
+  drifted from the skill folders. `.agents/skill-modes.json` is now the only record
+  of which Codex copies are native or disabled. The removal policy (required skills
+  and dependencies) moved into `removed-skills.mjs`, and the list of retired skills
+  moved into `sync-codex-skills.mjs`, which still warns when one reappears.
+- The `long-horizon-swarm` skill is retired, with its `done-check` lens and
+  `references/codex-peer.md`. On an 11-round study-engine run its draft reviews
+  caught dozens of flawed done-checks before costly rounds ran, but it cost 21
+  Codex runs and about 12 extra Opus passes, and its rule of continuing while any
+  pass found something produced review chains that mostly polished wording. A
+  review of the finished branch then found 3 real defects in a verification tool
+  that eleven rounds of peer review had never looked at. The parts that paid off
+  moved into `long-horizon` and `long-horizon-workflows` (see Changed).
+  `sync-codex-skills.mjs` warns if a copy reappears from an old sync.
+
+## [1.6.4] - 2026-09-27
+
+### Changed
+
 - `.claude/reference/pitfalls.md` ships empty, like the other reference files. Its
   entries were the template's own accumulated gotchas: its tooling and README panels, its
   maintainer's machine, and general lessons such as escaping JSON inside `<script>`, stale
   preview servers and background server ports. Each one was copied into every repository
   created from the template. The kernel's browser rule no longer points at it for detail.
-- A skill folder that `scripts/readme/items.json` does not list no longer produces a
-  README warning. The README still leaves it out until it is listed.
-- Adding or removing a skill no longer fails a check. Codex sync, the capability and
-  contract checks, the doctor, and the README verify step and tests now warn and exit 0
-  for a missing or unregistered skill, a missing dependency, a retired skill that
-  reappears (the warning names its replacement), adapter drift, a stale capability
-  catalog, and a README that differs from a fresh build, including hand edits. CI shows
-  the warnings as annotations. A check still fails when a file cannot be read: invalid
-  JSON in a manifest, the removal record, or settings, or a `SKILL.md` without
-  frontmatter or a description. `verify.mjs` builds into a scratch directory and no
-  longer rewrites the committed README. README tests check a fresh build instead of the
-  committed files and no longer pin the template's skill counts.
-- README counts read naturally at one ("1 workflow", "browse the only skill") and leave
-  out empty groups; group counts and the narrow memory map follow the skills installed.
-  After a rebuild, the quickstart, the "what the firmware adds" table, and the feedback
-  loop text name only installed skills. The template's own README is unchanged.
-- Check failures caused by unreadable JSON print one line naming the file instead of a
-  stack trace. Codex sync generates no adapter for a retired skill, and each warning
-  appears once in CI.
 
-- General Writing now checks evidence and reader understanding before style, scopes
-  clarity and style verdicts, and allows explanations to follow reader needs. Claude
-  and Codex each ship a complete standalone package with local references and licenses.
-
-- Every Codex skill is now a maintained native skill. The 14 that were generated
-  adapters (`adopt-repo`, `advocate`, `arena`, `astra-review`, `automate-me`,
-  `babysit-ci`, `claude-review`, `codex-review`, `dare`, `forge-repo-ui-skill`, `lab`,
-  `optimize-context`, `session-hub`, `sync-starter`) no longer tell Codex to read the
-  Claude workflow. Each is written for Codex: exposed agents with fresh context that
-  fail closed, `update_plan` and direct questions instead of Claude-only tools,
-  `~/.codex/sessions/` for `automate-me`, and the same-vendor disclosure when
-  `codex-review` or `astra-review` runs from Codex. Supporting files for
-  `forge-repo-ui-skill` and `session-hub` now sit beside their Codex skill. The Claude
-  skills are unchanged, and a new skill without a native version still gets a generated
-  adapter.
-- `refine` gates edits on three checks before changing anything: the failure is
-  attributable to an instruction, tool, or configuration; the causal link is stated from
-  evidence; and the rule being changed was active in the failure. It also checks what the
-  agent saw and remembered before blaming instructions. Informed by ModularRSI's
-  failure-mode checklist, in original wording.
-- Evidence workflows package compact reports and comparable before/after presentation.
-  Design, planning and review workflows add selective shared-code refactoring guidance
-  for Claude and Codex, with standalone resources and existing authorization preserved.
-- Skill authoring now starts with `addskill`; `writing-skills` discovery is retired
-  with authoring resources and licenses preserved. Caveman includes Unslop, with
-  explicit prose and code cleanup retained after standalone Unslop retirement.
-- Claude and Codex workflows align evidence, independent review, authorization,
-  runtime discovery and selective native propagation. Claude gains `perf-loop`.
-- Capability coverage, resources, ownership and retirement now have a manifest
-  and regression checks. Older disabled retirement entries remain compatible;
-  startup and contributor guidance follow the consolidated routes.
-- Existing projects receive explicit retirement migration steps, a native Codex
-  drift reminder, and optional-settings compatibility in copy and README tooling.
-
-- `writing` skill: pattern 31 carries the Latinate-dress-up trap table
-  from Corewise.Academy `plain-words` (prohibition → ban, verbatim →
-  word-for-word, and so on) plus the what-never-changes list; the
-  plain-words rule in SKILL.md names the swaps. Pattern 5 labels its
-  After text as citing a source the writer already had, so the example
-  no longer reads as permission to invent one.
+## [1.6.1] - 2026-09-26
 
 ### Added
 
+- `long-horizon-swarm` skill: the `long-horizon` contract with Opus, Sol and Astra
+  as peers who contribute ideas, critique and code throughout a run. It attaches to
+  an existing run's state file, logs contributions and Codex spend in `swarm.md`, and
+  reports disagreements to the user instead of blocking on them. The per-round
+  auditor stays fresh and never sees swarm output. Each peer works through a lens,
+  either a swarm lens in `lenses/` (starting with `done-check`) or an existing skill's
+  criteria. Authors reply to critique before the host acts, any peer can execute a
+  round, and `references/codex-peer.md` holds the tested Windows copy and launch
+  recipe. Revised from a live dogfood run of the skill on itself. Claude Code only.
 - A removal record, `.agents/removed-skills.json`, for skills a project deletes on
   purpose. A missing skill listed there produces no warning. The new `removal` block
   in `.agents/skill-capabilities.json` names the skills the template expects every
@@ -232,15 +172,98 @@ condensed.
   agents cannot inherit Manager context, verdicts are schema enums, and the run
   journal records every agent's input and output. Judge count is chosen per round.
   Claude Code only; Codex keeps `long-horizon`.
-- `scripts/lib/launch-chrome.mjs`: headed Chrome launcher that puts the
-  window on a display the operator is not using and hands the keyboard
-  back, so the real-GPU browser rule stops interrupting them.
-- `refine` skill: post-task pass that mines the session for friction and
-  commits the smallest edit that prevents a repeat (concept port of
-  prime-agent's Continual Harness).
-- `long-horizon` skill: Manager/Executor/Auditor rounds with audit-gated
-  durable state for tasks bigger than one context window (concept port of
-  AMAP-ML's LongHorizon-Harness).
+
+### Changed
+
+- A skill folder that `scripts/readme/items.json` does not list no longer produces a
+  README warning. The README still leaves it out until it is listed.
+- Adding or removing a skill no longer fails a check. Codex sync, the capability and
+  contract checks, the doctor, and the README verify step and tests now warn and exit 0
+  for a missing or unregistered skill, a missing dependency, a retired skill that
+  reappears (the warning names its replacement), adapter drift, a stale capability
+  catalog, and a README that differs from a fresh build, including hand edits. CI shows
+  the warnings as annotations. A check still fails when a file cannot be read: invalid
+  JSON in a manifest, the removal record, or settings, or a `SKILL.md` without
+  frontmatter or a description. `verify.mjs` builds into a scratch directory and no
+  longer rewrites the committed README. README tests check a fresh build instead of the
+  committed files and no longer pin the template's skill counts.
+- README counts read naturally at one ("1 workflow", "browse the only skill") and leave
+  out empty groups; group counts and the narrow memory map follow the skills installed.
+  After a rebuild, the quickstart, the "what the firmware adds" table, and the feedback
+  loop text name only installed skills. The template's own README is unchanged.
+- Check failures caused by unreadable JSON print one line naming the file instead of a
+  stack trace. Codex sync generates no adapter for a retired skill, and each warning
+  appears once in CI.
+- General Writing now checks evidence and reader understanding before style, scopes
+  clarity and style verdicts, and allows explanations to follow reader needs. Claude
+  and Codex each ship a complete standalone package with local references and licenses.
+- Every Codex skill is now a maintained native skill. The 14 that were generated
+  adapters (`adopt-repo`, `advocate`, `arena`, `astra-review`, `automate-me`,
+  `babysit-ci`, `claude-review`, `codex-review`, `dare`, `forge-repo-ui-skill`, `lab`,
+  `optimize-context`, `session-hub`, `sync-starter`) no longer tell Codex to read the
+  Claude workflow. Each is written for Codex: exposed agents with fresh context that
+  fail closed, `update_plan` and direct questions instead of Claude-only tools,
+  `~/.codex/sessions/` for `automate-me`, and the same-vendor disclosure when
+  `codex-review` or `astra-review` runs from Codex. Supporting files for
+  `forge-repo-ui-skill` and `session-hub` now sit beside their Codex skill. The Claude
+  skills are unchanged, and a new skill without a native version still gets a generated
+  adapter.
+
+### Removed
+
+- The `merge` skill leaves the template. Session-wide auto-merge is a personal
+  authorization policy, not a repository one, so it now lives as a global skill in
+  `~/.claude/skills/merge`. The kernel's squash-by-default and one-PR-per-unit rules
+  are unchanged.
+
+## [1.6.0] - 2026-09-19
+
+### Changed
+
+- `refine` gates edits on three checks before changing anything: the failure is
+  attributable to an instruction, tool, or configuration; the causal link is stated from
+  evidence; and the rule being changed was active in the failure. It also checks what the
+  agent saw and remembered before blaming instructions. Informed by ModularRSI's
+  failure-mode checklist, in original wording.
+- Evidence workflows package compact reports and comparable before/after presentation.
+  Design, planning and review workflows add selective shared-code refactoring guidance
+  for Claude and Codex, with standalone resources and existing authorization preserved.
+
+## [1.5.0] - 2026-09-14
+
+### Changed
+
+- Skill authoring now starts with `addskill`; `writing-skills` discovery is retired
+  with authoring resources and licenses preserved. Caveman includes Unslop, with
+  explicit prose and code cleanup retained after standalone Unslop retirement.
+- Claude and Codex workflows align evidence, independent review, authorization,
+  runtime discovery and selective native propagation. Claude gains `perf-loop`.
+- Capability coverage, resources, ownership and retirement now have a manifest
+  and regression checks. Older disabled retirement entries remain compatible;
+  startup and contributor guidance follow the consolidated routes.
+- Existing projects receive explicit retirement migration steps, a native Codex
+  drift reminder, and optional-settings compatibility in copy and README tooling.
+
+## [1.4.0] - 2026-09-07
+
+### Changed
+
+- `writing` skill: pattern 31 carries the Latinate-dress-up trap table
+  from Corewise.Academy `plain-words` (prohibition → ban, verbatim →
+  word-for-word, and so on) plus the what-never-changes list; the
+  plain-words rule in SKILL.md names the swaps. Pattern 5 labels its
+  After text as citing a source the writer already had, so the example
+  no longer reads as permission to invent one.
+- Codex planning, review, authorization, and recovery workflows have clearer scope and
+  verification rules. `addskill` and `fable-mode` now have native bodies registered in
+  `.agents/skill-modes.json`. Claude workflows and existing disabled choices are preserved.
+- A read-only copy checker detects drift in explicitly selected personal skill roots;
+  maintenance documentation covers backup, reconciliation, and discovery checks.
+
+## [1.3.0] - 2026-09-04
+
+### Added
+
 - `writing` skill: one skill for text that leaves the session (docs,
   READMEs, site and UI copy, emails) and for editing or auditing a draft
   for AI tells. Adds the rhetoric patterns from petergyang/no-ai-slop
@@ -249,15 +272,6 @@ condensed.
 
 ### Changed
 
-- Codex planning, review, authorization, and recovery workflows have clearer scope and
-  verification rules. `addskill` and `fable-mode` now have native bodies registered in
-  `.agents/skill-modes.json`. Claude workflows and existing disabled choices are preserved.
-- A read-only copy checker detects drift in explicitly selected personal skill roots;
-  maintenance documentation covers backup, reconciliation, and discovery checks.
-
-- `README.md`: the safety model section became "what's different here", the
-  template's differentiators; the safety rules moved to `CONTRIBUTING.md`
-  beside the PR checklist that enforces them.
 - `CLAUDE.md`, `caveman`, `session-start.sh`: the always-on core-tells
   digest now points at `writing/patterns.md` instead of the removed
   `unslop` skill.
@@ -268,6 +282,26 @@ condensed.
   `bootstrap/machine/home-claude/skills/writing` copy, folded into
   `writing`. The always-on digest in `CLAUDE.md` and `caveman` is
   unchanged.
+
+## [1.2.1] - 2026-08-29
+
+### Added
+
+- `scripts/lib/launch-chrome.mjs`: headed Chrome launcher that puts the
+  window on a display the operator is not using and hands the keyboard
+  back, so the real-GPU browser rule stops interrupting them.
+- `refine` skill: post-task pass that mines the session for friction and
+  commits the smallest edit that prevents a repeat (concept port of
+  prime-agent's Continual Harness).
+- `long-horizon` skill: Manager/Executor/Auditor rounds with audit-gated
+  durable state for tasks bigger than one context window (concept port of
+  AMAP-ML's LongHorizon-Harness).
+
+### Changed
+
+- `README.md`: the safety model section became "what's different here", the
+  template's differentiators; the safety rules moved to `CONTRIBUTING.md`
+  beside the PR checklist that enforces them.
 
 ## [1.2.0] - 2026-07-25
 

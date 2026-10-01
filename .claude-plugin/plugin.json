@@ -1,8 +1,8 @@
 {
   "name": "claude-starter",
   "displayName": "Harness Firmware Skills",
-  "version": "1.6.6",
-  "description": "The Harness Firmware skill set for Claude Code without cloning the full template: durable memory, context controls, safe shipping, debugging, TDD, review, planning, frontend craft, and terse-mode workflows.",
+  "version": "1.7.0",
+  "description": "The Harness Firmware skill set for Claude Code without cloning the full template: project memory, context trimming, cross-vendor and multi-agent code review, CI repair, planning, long multi-round tasks, performance tuning, UI and visual design, writing, and terse replies.",
   "author": {
     "name": "ryanportfolio",
     "url": "https://github.com/ryanportfolio"
@@ -16,9 +16,12 @@
     "workflow",
     "skills",
     "template",
-    "tdd",
-    "debugging",
-    "frontend"
+    "memory",
+    "code-review",
+    "planning",
+    "performance",
+    "frontend",
+    "writing"
   ],
   "skills": "./.claude/skills/",
   "outputStyles": "./.claude/output-styles/"
