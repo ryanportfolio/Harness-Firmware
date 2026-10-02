@@ -38,21 +38,16 @@ condensed.
   reference nothing further, the layout Vite generates; anything else, or a base
   config that cannot be read, gets plain `tsc -b`.
 - `write-ci-workflow.mjs` reads a tsconfig that starts with a byte order mark,
-  and finds a package base in `extends` the way TypeScript 5.9 does: through the
-  package's `exports` path, then `node_modules/<name>.json`, then its `tsconfig`
-  field (with `.json` added when missing), then the package's `tsconfig.json`.
-  Either case used to read as unknown and get plain `tsc -b`, which fails with
-  TS5096 when a referenced project uses `allowImportingTsExtensions` without
-  `noEmit`. A package is looked up from the extending config's folder upward, as
-  tsc does, moving on while a copy lacks the requested file. An `exports` entry other than a plain `.json` path, a package path or
-  field with another extension, or a package with `typesVersions` still reads as
-  unknown.
+  and asks the project's own TypeScript (`tsc --showConfig`, from
+  `node_modules/typescript`) for the root's inputs when `extends` names a
+  package. Both cases used to read as unknown and get plain `tsc -b`, which fails
+  with TS5096 when a referenced project uses `allowImportingTsExtensions` without
+  `noEmit`. Without TypeScript installed, a package base still reads as unknown.
 - `write-ci-workflow.mjs` no longer counts a Python dependency with an
   environment marker, such as `pytest; sys_platform == "win32"`, as installed.
-  This includes a marker on a backslash-continued requirements line and a `;`
-  written as a TOML escape.
   pip and uv skip it on the ubuntu runner, so the workflow now installs the tool
-  (`pip install pytest`, or `uv run --with pytest`).
+  (`pip install pytest`, or `uv run --with pytest`). This includes a marker on a
+  backslash-continued requirements line and a `;` written as a TOML escape.
 - `write-ci-workflow.mjs` quotes requirements filenames for the shell, so
   `requirements dev.txt` reaches `pip install -r` as one argument.
 - `.agents/template-manifest.json` lists `impartial-review` as a dependency of

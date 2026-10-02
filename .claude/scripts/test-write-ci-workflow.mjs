@@ -134,45 +134,26 @@ test("TypeScript project references typecheck in build mode", (t) => {
   assert.match(ts("^5.9.3", extending('{ "compilerOptions": { "strict": true } }')), /run: npx tsc -b --noEmit\n/);
   const { "tsconfig.base.json": _, ...missingBase } = extending("");
   assert.match(ts("^5.9.3", missingBase), /run: npx tsc -b\n/, "missing base");
-  const pkgBase = { "tsconfig.json": '{ "extends": ["@acme/tsconfig/base", "./local"], "files": [], "references": [{ "path": "./lib" }] }', "lib/tsconfig.json": "{}", "local.json": "{}" };
-  assert.match(ts("^5.9.3", { ...pkgBase, "node_modules/@acme/tsconfig/base.json": '{ "include": ["src"] }' }), /run: npx tsc -b\n/, "package base");
-  assert.match(ts("^5.9.3", { ...pkgBase, "node_modules/@acme/tsconfig/base.json": "{}" }), /run: npx tsc -b --noEmit\n/, "package base without inputs");
-  // A package base named by package.json "tsconfig" or by a plain "exports" path, as tsc finds it.
+  // A package base is resolved by the project's own tsc --showConfig. Without TypeScript in
+  // node_modules it reads as unknown; a root that sets both keys itself needs no base at all.
   const pkgRoot = { "tsconfig.json": '{ "extends": "@acme/tsconfig", "files": [], "references": [{ "path": "./lib" }] }', "lib/tsconfig.json": "{}" };
-  const pkgJson = (fields) => ({ "node_modules/@acme/tsconfig/package.json": JSON.stringify({ name: "@acme/tsconfig", ...fields }) });
-  const viaField = { ...pkgRoot, ...pkgJson({ tsconfig: "./base.json" }) };
-  assert.match(ts("^5.9.3", { ...viaField, "node_modules/@acme/tsconfig/base.json": "{}" }), /run: npx tsc -b --noEmit\n/, "tsconfig field");
-  assert.match(ts("^5.9.3", { ...viaField, "node_modules/@acme/tsconfig/base.json": '{ "include": ["src"] }' }), /run: npx tsc -b\n/, "tsconfig field with inputs");
-  const viaExports = { ...pkgRoot, ...pkgJson({ exports: { ".": "./base.json" } }), "node_modules/@acme/tsconfig/base.json": "{}" };
-  assert.match(ts("^5.9.3", viaExports), /run: npx tsc -b --noEmit\n/, "exports path");
-  assert.match(ts("^5.9.3", { ...viaExports, ...pkgJson({ exports: { ".": { node: "./base.json" } } }) }), /run: npx tsc -b\n/, "conditional exports read as unknown");
-  // tsc reads node_modules/<name>.json before the package folder, adds .json to an extensionless
-  // tsconfig field, and remaps through typesVersions; each base below sets include for tsc.
-  const withInputs = '{ "include": ["src"] }';
-  assert.match(ts("^5.9.3", { ...pkgRoot, "node_modules/@acme/tsconfig.json": withInputs, "node_modules/@acme/tsconfig/tsconfig.json": "{}" }), /run: npx tsc -b\n/, "sibling .json file");
-  const extensionless = { ...pkgRoot, ...pkgJson({ tsconfig: "./base" }), "node_modules/@acme/tsconfig/base": "{}", "node_modules/@acme/tsconfig/base.json": withInputs };
-  assert.match(ts("^5.9.3", extensionless), /run: npx tsc -b\n/, "extensionless field");
-  const remapped = { ...viaField, ...pkgJson({ tsconfig: "./base.json", typesVersions: { "*": { "base.json": ["actual.json"] } } }), "node_modules/@acme/tsconfig/base.json": "{}" };
-  assert.match(ts("^5.9.3", remapped), /run: npx tsc -b\n/, "typesVersions read as unknown");
-  // A package base that extends another package finds it in its own node_modules first, as tsc does.
-  const nested = {
-    ...viaField,
-    "node_modules/@acme/tsconfig/base.json": '{ "extends": "other" }',
-    "node_modules/@acme/tsconfig/node_modules/other/tsconfig.json": withInputs,
-    "node_modules/other/tsconfig.json": "{}",
-  };
-  assert.match(ts("^5.9.3", nested), /run: npx tsc -b\n/, "nested node_modules");
-  // A nested copy without the requested file sends tsc on to the parent folder's copy.
-  const nestedMissing = {
-    ...viaField,
-    "node_modules/@acme/tsconfig/base.json": '{ "extends": "other/strict" }',
-    "node_modules/@acme/tsconfig/node_modules/other/package.json": '{ "name": "other" }',
-    "node_modules/other/strict.json": "{}",
-  };
-  assert.match(ts("^5.9.3", nestedMissing), /run: npx tsc -b --noEmit\n/, "nested copy without the file");
-  // tsc swaps a .js target for .json, so a non-.json target reads as unknown.
-  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgJson({ exports: { ".": "./base.js" } }), "node_modules/@acme/tsconfig/base.js": "{}" }), /run: npx tsc -b\n/, "exports .js target");
-  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgJson({ tsconfig: "./base.js" }), "node_modules/@acme/tsconfig/base.js.json": "{}" }), /run: npx tsc -b\n/, "tsconfig field .js target");
+  const pkgBase = { "node_modules/@acme/tsconfig/tsconfig.json": "{}" };
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase }), /run: npx tsc -b\n/, "package base without TypeScript installed");
+  const ownKeys = '{ "extends": "@acme/tsconfig", "files": [], "include": [], "references": [{ "path": "./lib" }] }';
+  assert.match(ts("^5.9.3", { ...pkgRoot, "tsconfig.json": ownKeys }), /run: npx tsc -b --noEmit\n/, "own files and include");
+  // A stand-in tsc that checks its arguments and prints a --showConfig result, or fails.
+  const tsc = (shown) => ({
+    "node_modules/typescript/bin/tsc": [
+      "const [p, config, flag] = process.argv.slice(2);",
+      'if (p !== "-p" || !config.endsWith("tsconfig.json") || flag !== "--showConfig") process.exit(3);',
+      shown === null ? "process.exit(1);" : `process.stdout.write(${JSON.stringify(JSON.stringify(shown))});`,
+    ].join("\n"),
+  });
+  const libRefs = [{ path: "./lib" }];
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase, ...tsc({ compilerOptions: {}, references: libRefs }) }), /run: npx tsc -b --noEmit\n/, "tsc shows no inputs");
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase, ...tsc({ files: ["./src/a.ts"], include: ["src"], references: libRefs }) }), /run: npx tsc -b\n/, "tsc shows inputs");
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase, ...tsc({ include: ["nothing/**/*.ts"], references: libRefs }) }), /run: npx tsc -b\n/, "an include pattern counts");
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase, ...tsc(null) }), /run: npx tsc -b\n/, "tsc fails");
   // A byte order mark at the start of a tsconfig is not a parse failure.
   const bom = String.fromCharCode(0xfeff);
   assert.match(ts("^5.9.3", { "tsconfig.json": bom + leafOnly, "lib/tsconfig.json": `${bom}{}` }), /run: npx tsc -b --noEmit\n/, "byte order mark");

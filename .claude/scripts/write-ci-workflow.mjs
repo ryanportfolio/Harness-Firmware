@@ -174,53 +174,37 @@ function buildNoEmitSafe(root) {
       return null;
     }
   };
-  const isFile = (f) => typeof f === "string" && fs.existsSync(f) && fs.statSync(f).isFile();
-  const firstFile = (candidates) => candidates.find(isFile) ?? null;
-  // Resolves `extends` the way TypeScript 5.9 does, or returns null where this reading could
-  // differ from tsc's. A path starting `./` or `../`, or an absolute one, is tried as written and
-  // then with `.json`. Anything else is a package, looked up in the node_modules folder next to the
-  // extending config and then in each parent folder up to the repo root, moving up while the
-  // package found has no matching file. In the package: its `exports` entry when it has one; else
-  // the path as a `.json` file, then the folder's package.json `tsconfig` field, then the folder's
-  // tsconfig.json. tsc adds `.json` to a package path or field without an extension and swaps
-  // other extensions for it; a path, field or `exports` target with an extension other than
-  // `.json` returns null, as do `exports` without a plain match and packages with `typesVersions`.
+  const rootConfig = path.join(root, "tsconfig.json");
+  // A base path starting `./` or `../`, or an absolute one, is tried as written and then with
+  // `.json`, as tsc does. A package base is left to tsc itself (tscInputs): its lookup rules
+  // (exports, typesVersions, nested node_modules) are too many to copy reliably.
+  let packageBase = false;
   const resolveBase = (from, spec) => {
     if (typeof spec !== "string") return null;
     const s = spec.replaceAll("\\", "/");
-    if (path.isAbsolute(s) || s.startsWith("./") || s.startsWith("../")) {
-      const base = path.resolve(path.dirname(from), s);
-      return firstFile([base, `${base}.json`]);
+    if (!path.isAbsolute(s) && !s.startsWith("./") && !s.startsWith("../")) {
+      packageBase = true;
+      return null;
     }
-    const parts = s.split("/");
-    const nameLength = s.startsWith("@") ? 2 : 1;
-    const sub = parts.slice(nameLength).join("/");
-    for (let d = path.dirname(from); !path.relative(root, d).startsWith(".."); d = path.dirname(d)) {
-      const found = resolveInPackage(path.join(d, "node_modules", ...parts.slice(0, nameLength)), sub);
-      if (found !== undefined) return found;
-      if (path.relative(root, d) === "") break;
-    }
-    return null;
+    const base = path.resolve(path.dirname(from), s);
+    return [base, `${base}.json`].find((f) => fs.existsSync(f) && fs.statSync(f).isFile()) ?? null;
   };
-  // The config file for `sub` in one installed package; null when unknown, undefined when absent.
-  const resolveInPackage = (dir, sub) => {
-    const json = (f) => (path.extname(f) === ".json" ? f : path.extname(f) ? null : `${f}.json`);
-    const pkg = parse(path.join(dir, "package.json")) ?? {};
-    if (pkg.exports !== undefined) {
-      const subpaths = pkg.exports && typeof pkg.exports === "object" && Object.keys(pkg.exports).some((k) => k.startsWith("."));
-      const target = subpaths ? pkg.exports[sub ? `./${sub}` : "."] : sub ? undefined : pkg.exports;
-      return typeof target === "string" && path.extname(target) === ".json" ? firstFile([path.join(dir, target)]) : null;
+  // The root's `files` and `include` as the project's own TypeScript resolves them, through
+  // `tsc --showConfig`, which leaves out an empty `files` or `include`. null when TypeScript is not
+  // installed in node_modules or tsc fails, for example on a base it cannot find.
+  const tscInputs = () => {
+    const tsc = path.join(root, "node_modules", "typescript", "bin", "tsc");
+    if (!fs.existsSync(tsc)) return null;
+    const r = spawnSync(process.execPath, [tsc, "-p", rootConfig, "--showConfig"], { cwd: root, encoding: "utf8", timeout: 60_000 });
+    try {
+      const shown = r.status === 0 ? JSON.parse(r.stdout) : null;
+      return shown && { files: shown.files ?? [], include: shown.include ?? [] };
+    } catch {
+      return null;
     }
-    const target = path.join(dir, sub);
-    if (json(target) === null) return null;
-    const folderPkg = sub ? (parse(path.join(target, "package.json")) ?? {}) : pkg;
-    if (pkg.typesVersions !== undefined || folderPkg.typesVersions !== undefined) return null;
-    const field = typeof folderPkg.tsconfig === "string" ? json(path.join(target, folderPkg.tsconfig)) : undefined;
-    if (field === null) return null;
-    return firstFile([json(target), field, path.join(target, "tsconfig.json")]) ?? undefined;
   };
   // `files` and `include` as tsc resolves them: a config's own value wins, then the last base that
-  // sets it. null when the config or a base it needs cannot be read.
+  // sets it. null when the config or a base it needs cannot be read here.
   const inputs = (file, depth = 0) => {
     const config = depth > 8 ? null : parse(file);
     if (!config) return null;
@@ -235,10 +219,10 @@ function buildNoEmitSafe(root) {
     }
     return own;
   };
-  const rootConfig = path.join(root, "tsconfig.json");
   const top = parse(rootConfig);
-  const own = inputs(rootConfig);
-  if (!top || !own) return false;
+  if (!top) return false;
+  const own = inputs(rootConfig) ?? (packageBase ? tscInputs() : null);
+  if (!own) return false;
   const empty = (v) => Array.isArray(v) && v.length === 0;
   // Without `include`, `files` decides: absent means every file, `[]` means none.
   const noInputs = own.include === undefined ? empty(own.files) : empty(own.include) && (own.files === undefined || empty(own.files));
