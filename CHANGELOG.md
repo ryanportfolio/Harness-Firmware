@@ -110,6 +110,22 @@ condensed.
   round before merge. Before resuming a run another session may still manage, the
   Manager asks the user whether to take over. The Codex `long-horizon` port uses
   `claude-review` and `opus-fullreview` for the same reviews.
+- `long-horizon`, `long-horizon-workflows` and the Codex `long-horizon` port cover
+  cases the first real `long-horizon-swarm` workload ran into. The round records the
+  workspace it writes and any it only reads, and a new Method notes section holds
+  rules later rounds must follow, unconfirmed until a later done-check covers them.
+  The state file and briefs are written with the file-edit tool, since shell and
+  script strings drop backslashes and backticks, and each brief is re-read before
+  dispatch. Workers log long-lived processes to `processes.log`, and a resumed run
+  stops those whose worker is gone. Executors of hours-long jobs check between
+  batches that their workspaces are whole and stop on a mismatch. Evidence taken on
+  another revision names that revision, and executors find cited code by anchor
+  text, not line number. Integrate copies cited result files from outside the task
+  directory into `evidence/round-<N>/`. With one PR per phase, the state records
+  `Waiting: merge of <PR>` and the next phase starts in a fresh workspace from the
+  merged default branch. In `long-horizon` and its Codex port, an auditor brief
+  dispatched by path counts as unchanged when the agent checks it against the
+  sha256 recorded at Plan.
 - The README skill list comes from the skill folders. `scripts/readme/items.json`
   only adds labels, groups and order: a folder without an entry now joins the
   specialist group under its folder name instead of being left out, and an entry
@@ -136,6 +152,8 @@ condensed.
   other's results nor edit the same files, start their subagents in one message.
   Dependent or overlapping work stays sequential, and parallel writers get separate
   files or worktrees.
+- The kernel tells agents not to write unit tests or type tests unless the user
+  asks (`CLAUDE.md` under Core principles, `AGENTS.md` under Defaults).
 - Eleven skills run only when the user calls them, through
   `disable-model-invocation: true`: `why`, `lab`, `dare`, `adopt-repo`,
   `claude-review`, `astra-review`, `astra-fullreview`, `long-horizon-workflows`,
@@ -143,8 +161,8 @@ condensed.
   subscription run, acts outside the repository, or already said it runs only on
   request, and no other skill needs the model to start it. The eight with Codex
   ports get `allow_implicit_invocation: false` in `agents/openai.yaml`.
-  `codex-fullreview` got the same flag and then lost it, so the model can still
-  start a full Codex review.
+  `codex-fullreview`, which has no Codex port, got `disable-model-invocation: true`
+  too and then lost it, so the model can still start a full Codex review.
 - Several skills name an established term beside the prose that explains it
   (pre-registration, bottom line up front, atomic write, walking skeleton, issue
   tree, last known-good state, coordinated omission, elegant variation, hypophora),
