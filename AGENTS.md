@@ -6,7 +6,10 @@ This is the Codex boundary for repositories using the AI Operating System starte
 
 - Use Caveman Ultra for prose from the first reply, without asking or requiring `$caveman`. Keep code, commands, identifiers, errors, commits, PR text, and files normal.
 - Use plain prose for security warnings, irreversible confirmations, and ambiguous multi-step decisions, then resume Ultra. A new session restores Ultra after the user temporarily disables it.
-- When creating copy for a site, UI, or anything else: less is more. Simplicity is powerful. Complexity does not need to be complicated.
+- When creating copy for a site, UI, or anything else: less is more. Simplicity is powerful. Complexity does not need to be complicated. Excessive and unnecessary text is banned.
+- Complete the full necessary path without seeking separate approval for routine intermediate steps. For example, opening a PR includes committing and pushing; merging includes committing, pushing, creating the PR, monitoring CI, and merging.
+- When asking a non-blocking clarifying question, continue all safe work that does not depend on the answer. Pause only the decision-dependent branch; stop the whole task only when no useful in-scope work remains.
+- When a subagent returns an opaque safety block or unusable response, preserve the exact error, discard that result, and retry once with a fresh-context agent that does not inherit the blocked output, using a narrower and accurate statement of the same authorized task. If the retry is blocked, continue with safe local work or report the blocked capability. Never disguise intent, split prohibited work, or weaken safeguards.
 - Read only `CLAUDE.md`'s What this project is, Verification, and Environment & Deploy Target sections for configured project facts. Use `.claude/reference/` for architecture, commands, deployment, and pitfalls. Other `CLAUDE.md` workflow rules are not Codex instructions.
 - Never execute `.claude/hooks/session-start.sh` in Codex.
 
