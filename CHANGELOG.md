@@ -43,8 +43,10 @@ condensed.
   field (with `.json` added when missing), then the package's `tsconfig.json`.
   Either case used to read as unknown and get plain `tsc -b`, which fails with
   TS5096 when a referenced project uses `allowImportingTsExtensions` without
-  `noEmit`. An `exports` entry other than a plain path, or a package with
-  `typesVersions`, still reads as unknown.
+  `noEmit`. A package is looked up from the extending config's folder upward, as
+  tsc does. An `exports` entry other than a plain `.json` path, a package path or
+  field with another extension, or a package with `typesVersions` still reads as
+  unknown.
 - `write-ci-workflow.mjs` no longer counts a Python dependency with an
   environment marker, such as `pytest; sys_platform == "win32"`, as installed.
   This includes a marker on a backslash-continued requirements line and a `;`

@@ -176,12 +176,15 @@ function buildNoEmitSafe(root) {
   };
   const isFile = (f) => typeof f === "string" && fs.existsSync(f) && fs.statSync(f).isFile();
   const firstFile = (candidates) => candidates.find(isFile) ?? null;
-  // Resolves `extends` the way TypeScript 5.9 does. A path starting `./` or `../`, or an absolute
-  // one, is tried as written and then with `.json`. Anything else is a package in the root
-  // node_modules: its `exports` entry when it has one; else the path as a `.json` file, then the
-  // folder's package.json `tsconfig` field, then the folder's tsconfig.json. tsc adds `.json` to a
-  // package path or field that lacks it and never reads the extensionless file. An `exports` entry
-  // other than a plain path, or a package with `typesVersions`, counts as unreadable.
+  // Resolves `extends` the way TypeScript 5.9 does, or returns null where this reading could
+  // differ from tsc's. A path starting `./` or `../`, or an absolute one, is tried as written and
+  // then with `.json`. Anything else is a package, looked up in the node_modules folder next to the
+  // extending config and then in each parent folder up to the repo root. In the package: its
+  // `exports` entry when it has one; else the path as a `.json` file, then the folder's
+  // package.json `tsconfig` field, then the folder's tsconfig.json. tsc adds `.json` to a package
+  // path or field without an extension and swaps other extensions for it; a path, field or
+  // `exports` target with an extension other than `.json` returns null, as do conditional
+  // `exports` and packages with `typesVersions`.
   const resolveBase = (from, spec) => {
     if (typeof spec !== "string") return null;
     const s = spec.replaceAll("\\", "/");
@@ -191,19 +194,27 @@ function buildNoEmitSafe(root) {
     }
     const parts = s.split("/");
     const nameLength = s.startsWith("@") ? 2 : 1;
-    const dir = path.join(root, "node_modules", ...parts.slice(0, nameLength));
+    let dir = null;
+    for (let d = path.dirname(from); !path.relative(root, d).startsWith(".."); d = path.dirname(d)) {
+      const candidate = path.join(d, "node_modules", ...parts.slice(0, nameLength));
+      if (fs.existsSync(candidate) || fs.existsSync(`${candidate}.json`)) dir = candidate;
+      if (dir || path.relative(root, d) === "") break;
+    }
+    if (!dir) return null;
     const sub = parts.slice(nameLength).join("/");
     const pkg = parse(path.join(dir, "package.json")) ?? {};
+    const json = (f) => (path.extname(f) === ".json" ? f : path.extname(f) ? null : `${f}.json`);
     if (pkg.exports !== undefined) {
       const subpaths = pkg.exports && typeof pkg.exports === "object" && Object.keys(pkg.exports).some((k) => k.startsWith("."));
       const target = subpaths ? pkg.exports[sub ? `./${sub}` : "."] : sub ? undefined : pkg.exports;
-      return typeof target === "string" ? firstFile([path.join(dir, target)]) : null;
+      return typeof target === "string" && path.extname(target) === ".json" ? firstFile([path.join(dir, target)]) : null;
     }
-    const json = (f) => (f.endsWith(".json") ? f : `${f}.json`);
     const target = path.join(dir, sub);
+    if (json(target) === null) return null;
     const folderPkg = sub ? (parse(path.join(target, "package.json")) ?? {}) : pkg;
     if (pkg.typesVersions !== undefined || folderPkg.typesVersions !== undefined) return null;
-    const field = typeof folderPkg.tsconfig === "string" ? json(path.join(target, folderPkg.tsconfig)) : null;
+    const field = typeof folderPkg.tsconfig === "string" ? json(path.join(target, folderPkg.tsconfig)) : undefined;
+    if (field === null) return null;
     return firstFile([json(target), field, path.join(target, "tsconfig.json")]);
   };
   // `files` and `include` as tsc resolves them: a config's own value wins, then the last base that

@@ -154,6 +154,17 @@ test("TypeScript project references typecheck in build mode", (t) => {
   assert.match(ts("^5.9.3", extensionless), /run: npx tsc -b\n/, "extensionless field");
   const remapped = { ...viaField, ...pkgJson({ tsconfig: "./base.json", typesVersions: { "*": { "base.json": ["actual.json"] } } }), "node_modules/@acme/tsconfig/base.json": "{}" };
   assert.match(ts("^5.9.3", remapped), /run: npx tsc -b\n/, "typesVersions read as unknown");
+  // A package base that extends another package finds it in its own node_modules first, as tsc does.
+  const nested = {
+    ...viaField,
+    "node_modules/@acme/tsconfig/base.json": '{ "extends": "other" }',
+    "node_modules/@acme/tsconfig/node_modules/other/tsconfig.json": withInputs,
+    "node_modules/other/tsconfig.json": "{}",
+  };
+  assert.match(ts("^5.9.3", nested), /run: npx tsc -b\n/, "nested node_modules");
+  // tsc swaps a .js target for .json, so a non-.json target reads as unknown.
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgJson({ exports: { ".": "./base.js" } }), "node_modules/@acme/tsconfig/base.js": "{}" }), /run: npx tsc -b\n/, "exports .js target");
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgJson({ tsconfig: "./base.js" }), "node_modules/@acme/tsconfig/base.js.json": "{}" }), /run: npx tsc -b\n/, "tsconfig field .js target");
   // A byte order mark at the start of a tsconfig is not a parse failure.
   const bom = String.fromCharCode(0xfeff);
   assert.match(ts("^5.9.3", { "tsconfig.json": bom + leafOnly, "lib/tsconfig.json": `${bom}{}` }), /run: npx tsc -b --noEmit\n/, "byte order mark");
