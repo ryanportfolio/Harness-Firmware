@@ -75,8 +75,8 @@ A good skill PR contains:
 - A row in `.claude/skills/PROVENANCE.md` if the skill is forked or adapted
   from a third party, plus that upstream's LICENSE or NOTICE file kept inside
   the skill folder. Record what you changed.
-- A native Codex version registered in `.agents/skill-modes.json` with its capability
-  classification, or a `disabled` entry when the skill needs Claude-only tools. Include
+- A native Codex version registered as `native` in `.agents/skill-modes.json`, or a
+  `disabled` entry when the skill needs Claude-only tools. Include
   sync and contract verification.
 - The skill's name in one group under `skills.groups` in
   `.agents/template-manifest.json`.
