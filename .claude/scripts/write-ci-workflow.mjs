@@ -93,9 +93,10 @@ function detectNode(root) {
   // `tsc --noEmit`; build mode checks every referenced project. tsc accepts --noEmit with
   // --build from TypeScript 5.6 and rejects the pair before that (TS5094), so an older or
   // unknown declared version gets plain `tsc -b`, which emits per each project's config.
+  // Plain `tsc -b` is also the choice when the references form a chain (see buildNoEmitSafe).
   const [, tsMajor, tsMinor = "0"] = String(deps.typescript ?? "").match(/(\d+)(?:\.(\d+))?/) ?? [];
   const buildNoEmit = Number(tsMajor) > 5 || (Number(tsMajor) === 5 && Number(tsMinor) >= 6);
-  const tscArgs = !hasReferences(read(root, "tsconfig.json")) ? "--noEmit" : buildNoEmit ? "-b --noEmit" : "-b";
+  const tscArgs = !hasReferences(read(root, "tsconfig.json")) ? "--noEmit" : buildNoEmit && buildNoEmitSafe(root) ? "-b --noEmit" : "-b";
   const tscCommand = `${{ npm: "npx tsc", pnpm: "pnpm exec tsc", yarn: "yarn tsc", bun: "bunx tsc" }[pm]} ${tscArgs}`;
 
   const commands = [];
@@ -157,6 +158,58 @@ function hasReferences(tsconfig) {
     return /"references"\s*:\s*\[\s*\{/.test(text);
   }
 }
+// `tsc -b --noEmit` turns off emit in every project, and tsc rejects a project that has input
+// files of its own and references another project that does not emit (TS6310). The pair is safe
+// only when the root tsconfig has no inputs (`files` and `include` empty or absent, but not both
+// absent, counting values inherited through `extends`) and each project it references references
+// nothing further: the layout Vite generates. Anything else, or a tsconfig or base that cannot be
+// read, gets plain `tsc -b`.
+function buildNoEmitSafe(root) {
+  const parse = (file) => {
+    try {
+      return JSON.parse(stripJsonc(fs.readFileSync(file, "utf8")));
+    } catch {
+      return null;
+    }
+  };
+  // A relative base resolves from the config's folder; a package base from the root node_modules.
+  const resolveBase = (from, spec) => {
+    if (typeof spec !== "string") return null;
+    const relative = /^\.{1,2}([\\/]|$)/.test(spec) || path.isAbsolute(spec);
+    const base = relative ? path.resolve(path.dirname(from), spec) : path.join(root, "node_modules", spec);
+    return [base, `${base}.json`, path.join(base, "tsconfig.json")].find((f) => fs.existsSync(f) && fs.statSync(f).isFile()) ?? null;
+  };
+  // `files` and `include` as tsc resolves them: a config's own value wins, then the last base that
+  // sets it. null when the config or a base it needs cannot be read.
+  const inputs = (file, depth = 0) => {
+    const config = depth > 8 ? null : parse(file);
+    if (!config) return null;
+    const own = { files: config.files, include: config.include };
+    for (const spec of [config.extends ?? []].flat().reverse()) {
+      if (own.files !== undefined && own.include !== undefined) break;
+      const base = resolveBase(file, spec);
+      const inherited = base && inputs(base, depth + 1);
+      if (!inherited) return null;
+      own.files ??= inherited.files;
+      own.include ??= inherited.include;
+    }
+    return own;
+  };
+  const rootConfig = path.join(root, "tsconfig.json");
+  const top = parse(rootConfig);
+  const own = inputs(rootConfig);
+  if (!top || !own) return false;
+  const empty = (v) => Array.isArray(v) && v.length === 0;
+  // Without `include`, `files` decides: absent means every file, `[]` means none.
+  const noInputs = own.include === undefined ? empty(own.files) : empty(own.include) && (own.files === undefined || empty(own.files));
+  if (!noInputs) return false;
+  return top.references.every((ref) => {
+    let file = path.resolve(root, String(ref?.path ?? ""));
+    if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "tsconfig.json");
+    const project = parse(file);
+    return project !== null && !(Array.isArray(project.references) && project.references.length > 0);
+  });
+}
 
 // Finds test_*.py or *_test.py within a few levels, skipping hidden and build folders.
 function hasPythonTestFiles(dir, depth = 0) {
@@ -186,9 +239,19 @@ function detectPython(root) {
   const pyproject = read(root, "pyproject.toml");
   const setupCfg = read(root, "setup.cfg");
   // A tool counts as installed only when its name appears in a dependency list the install step
-  // installs. Extras and groups the install step does not select do not count.
+  // installs. Extras and groups the install step does not select do not count. Neither does a
+  // declaration with an environment marker (`pytest; sys_platform == "win32"`): pip and uv skip it
+  // when the marker is false, and the generated job runs on ubuntu.
   const mentions = (text, name) => new RegExp(`(^|[^A-Za-z0-9_.[-])${name}([^A-Za-z0-9_.-]|$)`, "m").test(text);
-  const requirementsText = (f) => read(root, f).replace(/(^|\s)#.*$/gm, "");
+  const unmarkedLines = (text) => text.split(/\r?\n/).filter((l) => !l.includes(";")).join("\n");
+  // Double-quoted TOML strings are decoded first, so an escaped `;` still reads as a marker.
+  const unmarkedStrings = (toml) =>
+    [...toml.matchAll(/"((?:[^"\\\n]|\\.)*)"|'([^'\n]*)'/g)]
+      .map((m) => (m[1] === undefined ? m[2] : tomlUnescape(m[1])))
+      .filter((s) => !s.includes(";"))
+      .join("\n");
+  // pip joins backslash-continued lines before it drops comments.
+  const requirementsText = (f) => unmarkedLines(read(root, f).replace(/\\\r?\n/g, "").replace(/(^|\s)#.*$/gm, ""));
   const projectDeps = tomlArray(sectionOf(pyproject, "project"), "dependencies");
   const uv = exists(root, "uv.lock");
 
@@ -228,7 +291,7 @@ function detectPython(root) {
       // Legacy [tool.uv] dev-dependencies belong to the dev group.
       if (names.includes("dev")) synced.push(tomlArray(toolUv, "dev-dependencies"));
     }
-    synced = synced.join("\n");
+    synced = unmarkedStrings(synced.join("\n"));
     const uvRun = (tool) => (mentions(synced, tool) ? `uv run ${tool}` : `uv run --with ${tool} ${tool}`);
     if (typechecker === "mypy") commands.push({ name: "Typecheck", run: `${uvRun("mypy")} .` });
     if (typechecker === "pyright") commands.push({ name: "Typecheck", run: uvRun("pyright") });
@@ -238,7 +301,7 @@ function detectPython(root) {
     const main = requirements.includes("requirements.txt")
       ? ["requirements.txt", ...requirements.filter((f) => /^requirements[-_](dev|test|tests)\.txt$/.test(f))]
       : requirements;
-    for (const f of main) install.push(`pip install -r ${f}`);
+    for (const f of main) install.push(`pip install -r ${shellWord(f)}`);
     const fromPyproject = sectionRange(pyproject, "project").start >= 0;
     const installable = hasSetupPy || fromPyproject || sectionRange(pyproject, "build-system").start >= 0;
     // Package metadata comes from [project] when present, else from setup.cfg. setup.py is
@@ -249,7 +312,8 @@ function detectPython(root) {
     const extras = installable ? ["dev", "test", "tests"].filter((x) => extraOf(x).trim()) : [];
     if (installable) install.push(extras.length ? `pip install -e ".[${extras.join(",")}]"` : "pip install -e .");
     // Only what pip installs above counts: other extras and [dependency-groups] are skipped.
-    const installedFrom = installable ? [depsOf, ...extras.map(extraOf)] : [];
+    const unmarked = fromPyproject ? unmarkedStrings : unmarkedLines;
+    const installedFrom = installable ? [depsOf, ...extras.map(extraOf)].map(unmarked) : [];
     const installed = [...main.map(requirementsText), ...installedFrom].join("\n");
     const extra = [];
     if (hasTests && !mentions(installed, "pytest")) extra.push("pytest");
@@ -276,6 +340,16 @@ function sectionOf(toml, name) {
   return start < 0 ? "" : lines.slice(start + 1, end).join("\n");
 }
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Escape sequences of a TOML basic string; an invalid one is left as written.
+const TOML_ESCAPES = { b: "\b", t: "\t", n: "\n", f: "\f", r: "\r", e: "\x1b", '"': '"', "\\": "\\" };
+const tomlUnescape = (s) =>
+  s.replace(/\\(?:u([0-9A-Fa-f]{4})|U([0-9A-Fa-f]{8})|(.))/g, (m, u4, u8, c) => {
+    if (c !== undefined) return TOML_ESCAPES[c] ?? m;
+    const cp = parseInt(u4 ?? u8, 16);
+    return cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+  });
+// POSIX shell word: plain when safe, otherwise single-quoted, so `requirements dev.txt` stays one argument.
+const shellWord = (s) => (/^[A-Za-z0-9_./=+-]+$/.test(s) ? s : `'${s.replaceAll("'", "'\\''")}'`);
 // Text of the array in `key = [...]` within one TOML section, comments dropped; "" when absent.
 function tomlArray(section, key) {
   const m = new RegExp(`^[ \\t]*["']?${escapeRegExp(key)}["']?[ \\t]*=[ \\t]*\\[`, "m").exec(section);
