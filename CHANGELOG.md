@@ -57,6 +57,27 @@ condensed.
   auto-merge back into the template. User-invoke only: it runs when the user types
   `/merge-ready`, or when `/merge` reads the skill file; the model never starts it
   on its own. Claude Code only.
+- `opus-fullreview` skill, the Claude counterpart of `codex-fullreview`. From a
+  Codex session, Claude CLI runs the repository's Claude `impartial-review` as
+  Manager with fresh Opus sub-reviewers, then Codex verifies every finding, so the
+  review is cross-vendor. It stops unless Claude CLI shows a claude.ai login on a
+  Max plan with no API key or provider variables set, and points to `claude-review`
+  when the repository has no Claude `impartial-review`. Claude runs in read-only
+  plan mode with skills turned off, and the skill confirms the skill read, the
+  sub-reviewers, their models and which one received the author brief from
+  Claude's saved transcripts. It never retries on its own. Registered `native` in
+  `.agents/skill-modes.json`. Codex only.
+- `long-horizon` ships `scripts/manifest.mjs`, a Node helper with no dependencies
+  that builds the round Baseline, which each run used to script for itself. It
+  hashes every dirty tracked file, every untracked file and every file under the
+  extra paths given, records deleted paths, HEAD and a `git stash create` snapshot
+  pinned with `git update-ref`, and `--diff` lists what was added, modified or
+  deleted since. It handles cases an earlier hand-written script got wrong: a dirty
+  file the executor reverts or commits unchanged, executor commits, and staged
+  renames. Links and junctions are recorded by target, never followed.
+  `long-horizon`, `long-horizon-workflows` and the Codex `long-horizon` port point to
+  it, and the Codex port carries its own copy. Its tests,
+  `.claude/scripts/test-long-horizon-manifest.mjs`, run in CI.
 
 ### Changed
 
@@ -110,6 +131,47 @@ condensed.
   skill body and its triage, rendering, loading and services references are rewritten
   in compressed Caveman style, about 15% smaller, with every rule kept.
   `evidence-report.md` is unchanged because it must match the `wow-loop` copy.
+- The kernel asks for independent work to run in parallel (`CLAUDE.md` under
+  Subagents, `AGENTS.md` under Capabilities): when parts neither depend on each
+  other's results nor edit the same files, start their subagents in one message.
+  Dependent or overlapping work stays sequential, and parallel writers get separate
+  files or worktrees.
+- Eleven skills run only when the user calls them, through
+  `disable-model-invocation: true`: `why`, `lab`, `dare`, `adopt-repo`,
+  `claude-review`, `astra-review`, `astra-fullreview`, `long-horizon-workflows`,
+  `compact-review`, `forge-repo-ui-skill` and `optimize-context`. Each one bills a
+  subscription run, acts outside the repository, or already said it runs only on
+  request, and no other skill needs the model to start it. The eight with Codex
+  ports get `allow_implicit_invocation: false` in `agents/openai.yaml`.
+  `codex-fullreview` got the same flag and then lost it, so the model can still
+  start a full Codex review.
+- Several skills name an established term beside the prose that explains it
+  (pre-registration, bottom line up front, atomic write, walking skeleton, issue
+  tree, last known-good state, coordinated omission, elegant variation, hypophora),
+  in both runtimes where the passage exists. The explanations stay. A 19-line table
+  and closing section that repeated earlier content are removed from the retired
+  `writing-skills/testing-skills-with-subagents.md`.
+- Codex reviews pin `gpt-6.1-sol` in place of `gpt-6-sol`, which OpenAI no longer
+  lists: `codex-review` in both runtimes, `codex-fullreview` and its sub-reviewers,
+  and the example command in `impartial-review`.
+- `codex-fullreview`, `astra-fullreview` and `opus-fullreview` no longer tell the
+  agent to announce, before launch, that a full review uses more than the
+  single-reviewer version.
+- `wow-loop` accepts a target score ("get it to 8/10") and sets of like items, and
+  still never produces a score of its own. A named score is settled once with the
+  user: the items it covers, that it applies to each item rather than the average,
+  and the benchmark. At 90% of the top of the user's scale or higher it means
+  standard acceptance; lower makes checks the user confirms advisory, through a
+  contract amendment with a neutral ID. Critics and judges never see the target.
+  Items mode applies one shared rubric of three to six checks to each item and
+  reviews each item on its own, while the files one writer owns stay the unit of
+  work. Target, before/after and items runs start with a review-only baseline pass.
+  Critic briefs carry fixed severity anchors, and a disputed judged verdict gets one
+  second blind critic whose stricter verdict stands unless a measurement refutes it.
+  At acceptance the skill offers to move the `check.sh` checks into the project's
+  tests and to commit a scorecard. Reports give checks passed and findings by
+  severity per item, before and after. The Codex port matches. Adapted from MengTo's
+  workflow-score-to-target skill, without its 0-10 scoring.
 
 ### Removed
 
@@ -129,6 +191,44 @@ condensed.
   that eleven rounds of peer review had never looked at. The parts that paid off
   moved into `long-horizon` and `long-horizon-workflows` (see Changed).
   `sync-codex-skills.mjs` warns if a copy reappears from an old sync.
+
+### Fixed
+
+- `removed-skills.mjs` warns when a present skill needs one that
+  `.claude/settings.json` turns `"off"` in `skillOverrides`. The check looked only
+  for skill files, so a project that turned off `impartial-review` got no warning
+  while the Codex sync shipped no copy of it and `/codex-fullreview` stopped at
+  preflight. A skill that is itself turned off is not checked.
+
+## [1.6.6] - 2026-09-27
+
+### Changed
+
+- `impartial-review` adds an open-lens reviewer to every review except a tiny
+  diff. It gets the diff and the names of the lenses already assigned, never their
+  findings or the author brief, picks the one or two lenses most likely to find a
+  real problem nobody else covers (such as frame budget, reduced motion or
+  cross-platform shell behavior), and ties each choice to specific lines. Every
+  report lists each standard review area that had no reviewer, with a one-line
+  reason, and the lenses the open-lens reviewer chose. `codex-fullreview` carries
+  both into its attribution. The Codex copy of `impartial-review` gets the same
+  reviewer and report lines.
+
+## [1.6.5] - 2026-09-27
+
+### Changed
+
+- `impartial-review` takes an optional author brief of facts: the goal, the files
+  or behaviors most likely to break, related work in flight and the checks already
+  run. Only a new intent reviewer sees it; it checks whether the change achieves
+  its goal on every path, which required cases are unhandled, and whether the
+  risky areas are actually safe. The five existing reviewers never see the brief,
+  so every review keeps a layer free of the author's framing, and without a brief
+  the review runs as before. The Manager tags each finding blind, intent or both.
+  The Claude and Codex copies both change. `codex-fullreview` and
+  `astra-fullreview` write a brief by default unless the user asks for a fully
+  blind review, and `codex-fullreview` checks the Codex session files to confirm
+  exactly one sub-reviewer received it.
 
 ## [1.6.4] - 2026-09-27
 
