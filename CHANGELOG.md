@@ -11,6 +11,21 @@ condensed.
 
 ## [Unreleased]
 
+### Fixed
+
+- `write-ci-workflow.mjs` no longer emits `tsc -b --noEmit` for TypeScript
+  project references that form a chain. `--noEmit` reaches every project, and
+  TypeScript rejects a project with source files that references one that does
+  not emit (TS6310, reproduced with TypeScript 5.9.3). The pair is kept only for
+  a root `tsconfig.json` with `files: []` whose referenced projects reference
+  nothing further, the layout Vite generates; anything else gets plain `tsc -b`.
+- `write-ci-workflow.mjs` no longer counts a Python dependency with an
+  environment marker, such as `pytest; sys_platform == "win32"`, as installed.
+  pip and uv skip it on the ubuntu runner, so the workflow now installs the tool
+  (`pip install pytest`, or `uv run --with pytest`).
+- `write-ci-workflow.mjs` quotes requirements filenames for the shell, so
+  `requirements dev.txt` reaches `pip install -r` as one argument.
+
 ## [1.7.0] - 2026-10-01
 
 ### Added
