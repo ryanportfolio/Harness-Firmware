@@ -83,3 +83,9 @@ Never reset unrelated work, force-push, or push direct to target. Interrupted â†
 ## Report
 
 Per PR: each round w/ source attribution as review skill presents it, surviving findings, fix commit SHAs, waivers + reasons, CI result. End w/ 1 line: `merged <PR URL> at <head SHA>`, or `blocked` + open items.
+
+After merges land (each time no PR in flight is still pending), close w/ **ELI5 recap**: super-short bullets, plain words a 5-year-old gets, no jargon/SHAs/skill names, not caveman. One bullet per merged PR = what it's for; one bullet = what session did overall. Example:
+
+- PR #12: the save button works again.
+- PR #13: the page loads faster.
+- Overall: fixed two things people kept tripping on.
