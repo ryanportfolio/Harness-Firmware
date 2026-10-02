@@ -20,8 +20,8 @@ condensed.
   findings, then `codex-review` on the full diff at each new head until a round
   confirms none, with at most 3 reruns before it stops and asks. After the loop and
   CI pass at the same head, it squash-merges. `/merge` also turns on merge mode for
-  the rest of the session: every later PR goes through the same loop and merges
-  without another prompt. Round one no longer runs `codex-review` alongside
+  the rest of the session: open PRs the session already made go through the loop
+  right away, and every later PR goes through it and merges without another prompt. Round one no longer runs `codex-review` alongside
   `codex-fullreview`. User-invoke only; Claude Code only.
 - `codex-fullreview` falls back to the global Codex skill at
   `~/.agents/skills/impartial-review/SKILL.md` when the reviewed repository has no

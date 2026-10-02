@@ -14,8 +14,8 @@ Only the user starts this skill, by typing `/merge`. Never start it on your own 
 
 Typing `/merge` turns on merge mode for the rest of the session. Say so in plain prose when it turns on ("Merge mode is on for this session: every PR goes through the Codex loop and merges when clean"), so the mode is still on record after the conversation is summarized. While it is on:
 
-- The PR in front of you when the user typed `/merge` goes through every step below.
-- Every later PR the session opens or updates goes through the same steps and merges without another prompt. Before each one, read this file again; after a summary, its text may no longer be in context.
+- Right away, every PR this session already opened or pushed to that is still open goes through every step below, one PR at a time. So does finished work that has no PR yet: Step 1 opens one for it. PRs this session never touched are left alone unless the user names them.
+- After that, every PR the session opens or updates goes through the same steps and merges without another prompt. Before each one, read this file again; after a summary, its text may no longer be in context.
 - Each PR gets its own review loop and its own rerun budget.
 
 Merge mode ends when the user says so ("stop merging", "stop merge mode", "don't merge this one"), when the user switches to `/main`, or when the session ends. A request to hold one PR holds only that PR.
