@@ -146,6 +146,14 @@ test("TypeScript project references typecheck in build mode", (t) => {
   const viaExports = { ...pkgRoot, ...pkgJson({ exports: { ".": "./base.json" } }), "node_modules/@acme/tsconfig/base.json": "{}" };
   assert.match(ts("^5.9.3", viaExports), /run: npx tsc -b --noEmit\n/, "exports path");
   assert.match(ts("^5.9.3", { ...viaExports, ...pkgJson({ exports: { ".": { node: "./base.json" } } }) }), /run: npx tsc -b\n/, "conditional exports read as unknown");
+  // tsc reads node_modules/<name>.json before the package folder, adds .json to an extensionless
+  // tsconfig field, and remaps through typesVersions; each base below sets include for tsc.
+  const withInputs = '{ "include": ["src"] }';
+  assert.match(ts("^5.9.3", { ...pkgRoot, "node_modules/@acme/tsconfig.json": withInputs, "node_modules/@acme/tsconfig/tsconfig.json": "{}" }), /run: npx tsc -b\n/, "sibling .json file");
+  const extensionless = { ...pkgRoot, ...pkgJson({ tsconfig: "./base" }), "node_modules/@acme/tsconfig/base": "{}", "node_modules/@acme/tsconfig/base.json": withInputs };
+  assert.match(ts("^5.9.3", extensionless), /run: npx tsc -b\n/, "extensionless field");
+  const remapped = { ...viaField, ...pkgJson({ tsconfig: "./base.json", typesVersions: { "*": { "base.json": ["actual.json"] } } }), "node_modules/@acme/tsconfig/base.json": "{}" };
+  assert.match(ts("^5.9.3", remapped), /run: npx tsc -b\n/, "typesVersions read as unknown");
   // A byte order mark at the start of a tsconfig is not a parse failure.
   const bom = String.fromCharCode(0xfeff);
   assert.match(ts("^5.9.3", { "tsconfig.json": bom + leafOnly, "lib/tsconfig.json": `${bom}{}` }), /run: npx tsc -b --noEmit\n/, "byte order mark");

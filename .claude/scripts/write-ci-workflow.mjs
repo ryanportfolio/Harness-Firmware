@@ -178,9 +178,10 @@ function buildNoEmitSafe(root) {
   const firstFile = (candidates) => candidates.find(isFile) ?? null;
   // Resolves `extends` the way TypeScript 5.9 does. A path starting `./` or `../`, or an absolute
   // one, is tried as written and then with `.json`. Anything else is a package in the root
-  // node_modules: its `exports` entry when it has one, else the file, the file with `.json`, then
-  // the package's `tsconfig` field or the folder's tsconfig.json. An `exports` entry other than a
-  // plain path counts as unreadable.
+  // node_modules: its `exports` entry when it has one; else the path as a `.json` file, then the
+  // folder's package.json `tsconfig` field, then the folder's tsconfig.json. tsc adds `.json` to a
+  // package path or field that lacks it and never reads the extensionless file. An `exports` entry
+  // other than a plain path, or a package with `typesVersions`, counts as unreadable.
   const resolveBase = (from, spec) => {
     if (typeof spec !== "string") return null;
     const s = spec.replaceAll("\\", "/");
@@ -198,9 +199,12 @@ function buildNoEmitSafe(root) {
       const target = subpaths ? pkg.exports[sub ? `./${sub}` : "."] : sub ? undefined : pkg.exports;
       return typeof target === "string" ? firstFile([path.join(dir, target)]) : null;
     }
-    const base = path.join(dir, sub);
-    const field = !sub && typeof pkg.tsconfig === "string" ? path.join(dir, pkg.tsconfig) : null;
-    return firstFile([sub && base, sub && `${base}.json`, field, field && `${field}.json`, path.join(base, "tsconfig.json")]);
+    const json = (f) => (f.endsWith(".json") ? f : `${f}.json`);
+    const target = path.join(dir, sub);
+    const folderPkg = sub ? (parse(path.join(target, "package.json")) ?? {}) : pkg;
+    if (pkg.typesVersions !== undefined || folderPkg.typesVersions !== undefined) return null;
+    const field = typeof folderPkg.tsconfig === "string" ? json(path.join(target, folderPkg.tsconfig)) : null;
+    return firstFile([json(target), field, path.join(target, "tsconfig.json")]);
   };
   // `files` and `include` as tsc resolves them: a config's own value wins, then the last base that
   // sets it. null when the config or a base it needs cannot be read.
