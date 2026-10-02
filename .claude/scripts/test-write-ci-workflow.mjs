@@ -162,6 +162,14 @@ test("TypeScript project references typecheck in build mode", (t) => {
     "node_modules/other/tsconfig.json": "{}",
   };
   assert.match(ts("^5.9.3", nested), /run: npx tsc -b\n/, "nested node_modules");
+  // A nested copy without the requested file sends tsc on to the parent folder's copy.
+  const nestedMissing = {
+    ...viaField,
+    "node_modules/@acme/tsconfig/base.json": '{ "extends": "other/strict" }',
+    "node_modules/@acme/tsconfig/node_modules/other/package.json": '{ "name": "other" }',
+    "node_modules/other/strict.json": "{}",
+  };
+  assert.match(ts("^5.9.3", nestedMissing), /run: npx tsc -b --noEmit\n/, "nested copy without the file");
   // tsc swaps a .js target for .json, so a non-.json target reads as unknown.
   assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgJson({ exports: { ".": "./base.js" } }), "node_modules/@acme/tsconfig/base.js": "{}" }), /run: npx tsc -b\n/, "exports .js target");
   assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgJson({ tsconfig: "./base.js" }), "node_modules/@acme/tsconfig/base.js.json": "{}" }), /run: npx tsc -b\n/, "tsconfig field .js target");

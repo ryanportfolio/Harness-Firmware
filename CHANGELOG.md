@@ -44,7 +44,7 @@ condensed.
   Either case used to read as unknown and get plain `tsc -b`, which fails with
   TS5096 when a referenced project uses `allowImportingTsExtensions` without
   `noEmit`. A package is looked up from the extending config's folder upward, as
-  tsc does. An `exports` entry other than a plain `.json` path, a package path or
+  tsc does, moving on while a copy lacks the requested file. An `exports` entry other than a plain `.json` path, a package path or
   field with another extension, or a package with `typesVersions` still reads as
   unknown.
 - `write-ci-workflow.mjs` no longer counts a Python dependency with an
