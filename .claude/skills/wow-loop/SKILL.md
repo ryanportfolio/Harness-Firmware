@@ -1,5 +1,5 @@
 ---
-description: Multi-agent perfection loop for any deliverable. Recon, one spec, one implementer, adversarial screenshot-verified critique until an evidence gate passes. Use when the user says /wow-loop, asks for "wow factor" or "dial it to 11".
+description: Multi-agent perfection loop for any deliverable; recon, one spec, one implementer, adversarial screenshot-verified critique until an evidence gate passes. Use when the user says /wow-loop, asks for "wow factor" or "dial it to 11".
 ---
 
 # Wow loop — evidence-gated pursuit of utterly perfect
