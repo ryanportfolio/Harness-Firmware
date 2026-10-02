@@ -115,9 +115,11 @@ function detectNode(root) {
   return { stack: "node", pm, lockfile, packageManager, yarnBerry, version, versionFile, install, commands };
 }
 
-// tsconfig.json is JSON with comments and trailing commas. Drops both outside strings:
-// comments on the first pass, then commas followed only by whitespace and a closing bracket.
+// tsconfig.json is JSON with comments and trailing commas, and may start with a byte order mark.
+// Drops all three outside strings: the mark, comments on the first pass, then commas followed only
+// by whitespace and a closing bracket.
 function stripJsonc(text) {
+  text = text.replace(/^\uFEFF/, "");
   const pass = (src, other) => {
     let out = "";
     let quote = false;
@@ -172,12 +174,33 @@ function buildNoEmitSafe(root) {
       return null;
     }
   };
-  // A relative base resolves from the config's folder; a package base from the root node_modules.
+  const isFile = (f) => typeof f === "string" && fs.existsSync(f) && fs.statSync(f).isFile();
+  const firstFile = (candidates) => candidates.find(isFile) ?? null;
+  // Resolves `extends` the way TypeScript 5.9 does. A path starting `./` or `../`, or an absolute
+  // one, is tried as written and then with `.json`. Anything else is a package in the root
+  // node_modules: its `exports` entry when it has one, else the file, the file with `.json`, then
+  // the package's `tsconfig` field or the folder's tsconfig.json. An `exports` entry other than a
+  // plain path counts as unreadable.
   const resolveBase = (from, spec) => {
     if (typeof spec !== "string") return null;
-    const relative = /^\.{1,2}([\\/]|$)/.test(spec) || path.isAbsolute(spec);
-    const base = relative ? path.resolve(path.dirname(from), spec) : path.join(root, "node_modules", spec);
-    return [base, `${base}.json`, path.join(base, "tsconfig.json")].find((f) => fs.existsSync(f) && fs.statSync(f).isFile()) ?? null;
+    const s = spec.replaceAll("\\", "/");
+    if (path.isAbsolute(s) || s.startsWith("./") || s.startsWith("../")) {
+      const base = path.resolve(path.dirname(from), s);
+      return firstFile([base, `${base}.json`]);
+    }
+    const parts = s.split("/");
+    const nameLength = s.startsWith("@") ? 2 : 1;
+    const dir = path.join(root, "node_modules", ...parts.slice(0, nameLength));
+    const sub = parts.slice(nameLength).join("/");
+    const pkg = parse(path.join(dir, "package.json")) ?? {};
+    if (pkg.exports !== undefined) {
+      const subpaths = pkg.exports && typeof pkg.exports === "object" && Object.keys(pkg.exports).some((k) => k.startsWith("."));
+      const target = subpaths ? pkg.exports[sub ? `./${sub}` : "."] : sub ? undefined : pkg.exports;
+      return typeof target === "string" ? firstFile([path.join(dir, target)]) : null;
+    }
+    const base = path.join(dir, sub);
+    const field = !sub && typeof pkg.tsconfig === "string" ? path.join(dir, pkg.tsconfig) : null;
+    return firstFile([sub && base, sub && `${base}.json`, field, field && `${field}.json`, path.join(base, "tsconfig.json")]);
   };
   // `files` and `include` as tsc resolves them: a config's own value wins, then the last base that
   // sets it. null when the config or a base it needs cannot be read.

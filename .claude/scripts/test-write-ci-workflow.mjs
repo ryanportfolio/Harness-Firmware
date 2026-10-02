@@ -137,6 +137,18 @@ test("TypeScript project references typecheck in build mode", (t) => {
   const pkgBase = { "tsconfig.json": '{ "extends": ["@acme/tsconfig/base", "./local"], "files": [], "references": [{ "path": "./lib" }] }', "lib/tsconfig.json": "{}", "local.json": "{}" };
   assert.match(ts("^5.9.3", { ...pkgBase, "node_modules/@acme/tsconfig/base.json": '{ "include": ["src"] }' }), /run: npx tsc -b\n/, "package base");
   assert.match(ts("^5.9.3", { ...pkgBase, "node_modules/@acme/tsconfig/base.json": "{}" }), /run: npx tsc -b --noEmit\n/, "package base without inputs");
+  // A package base named by package.json "tsconfig" or by a plain "exports" path, as tsc finds it.
+  const pkgRoot = { "tsconfig.json": '{ "extends": "@acme/tsconfig", "files": [], "references": [{ "path": "./lib" }] }', "lib/tsconfig.json": "{}" };
+  const pkgJson = (fields) => ({ "node_modules/@acme/tsconfig/package.json": JSON.stringify({ name: "@acme/tsconfig", ...fields }) });
+  const viaField = { ...pkgRoot, ...pkgJson({ tsconfig: "./base.json" }) };
+  assert.match(ts("^5.9.3", { ...viaField, "node_modules/@acme/tsconfig/base.json": "{}" }), /run: npx tsc -b --noEmit\n/, "tsconfig field");
+  assert.match(ts("^5.9.3", { ...viaField, "node_modules/@acme/tsconfig/base.json": '{ "include": ["src"] }' }), /run: npx tsc -b\n/, "tsconfig field with inputs");
+  const viaExports = { ...pkgRoot, ...pkgJson({ exports: { ".": "./base.json" } }), "node_modules/@acme/tsconfig/base.json": "{}" };
+  assert.match(ts("^5.9.3", viaExports), /run: npx tsc -b --noEmit\n/, "exports path");
+  assert.match(ts("^5.9.3", { ...viaExports, ...pkgJson({ exports: { ".": { node: "./base.json" } } }) }), /run: npx tsc -b\n/, "conditional exports read as unknown");
+  // A byte order mark at the start of a tsconfig is not a parse failure.
+  const bom = String.fromCharCode(0xfeff);
+  assert.match(ts("^5.9.3", { "tsconfig.json": bom + leafOnly, "lib/tsconfig.json": `${bom}{}` }), /run: npx tsc -b --noEmit\n/, "byte order mark");
 
   // An empty list, or references only inside a comment or string, keeps tsc --noEmit.
   const noRefs = (tsconfig) =>
