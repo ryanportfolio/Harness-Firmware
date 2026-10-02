@@ -96,13 +96,16 @@ function detectNode(root) {
   // Plain `tsc -b` is also the choice when the references form a chain (see buildNoEmitSafe).
   const [, tsMajor, tsMinor = "0"] = String(deps.typescript ?? "").match(/(\d+)(?:\.(\d+))?/) ?? [];
   const buildNoEmit = Number(tsMajor) > 5 || (Number(tsMajor) === 5 && Number(tsMinor) >= 6);
-  const tscArgs = !hasReferences(read(root, "tsconfig.json")) ? "--noEmit" : buildNoEmit && buildNoEmitSafe(root) ? "-b --noEmit" : "-b";
-  const tscCommand = `${{ npm: "npx tsc", pnpm: "pnpm exec tsc", yarn: "yarn tsc", bun: "bunx tsc" }[pm]} ${tscArgs}`;
+  // A function, so buildNoEmitSafe (which may run tsc) runs only when this fallback is used.
+  const tscCommand = () => {
+    const tscArgs = !hasReferences(read(root, "tsconfig.json")) ? "--noEmit" : buildNoEmit && buildNoEmitSafe(root) ? "-b --noEmit" : "-b";
+    return `${{ npm: "npx tsc", pnpm: "pnpm exec tsc", yarn: "yarn tsc", bun: "bunx tsc" }[pm]} ${tscArgs}`;
+  };
 
   const commands = [];
   const typecheckScript = TYPECHECK_SCRIPTS.find((s) => typeof scripts[s] === "string");
   if (typecheckScript) commands.push({ name: "Typecheck", run: `${run} ${typecheckScript}` });
-  else if (exists(root, "tsconfig.json") && deps.typescript) commands.push({ name: "Typecheck", run: tscCommand });
+  else if (exists(root, "tsconfig.json") && deps.typescript) commands.push({ name: "Typecheck", run: tscCommand() });
   if (typeof scripts.test === "string" && !NPM_DEFAULT_TEST.test(scripts.test)) commands.push({ name: "Test", run: `${run} test` });
   if (typeof scripts.build === "string") commands.push({ name: "Build", run: `${run} build` });
 
@@ -115,9 +118,11 @@ function detectNode(root) {
   return { stack: "node", pm, lockfile, packageManager, yarnBerry, version, versionFile, install, commands };
 }
 
-// tsconfig.json is JSON with comments and trailing commas. Drops both outside strings:
-// comments on the first pass, then commas followed only by whitespace and a closing bracket.
+// tsconfig.json is JSON with comments and trailing commas, and may start with a byte order mark.
+// Drops all three outside strings: the mark, comments on the first pass, then commas followed only
+// by whitespace and a closing bracket.
 function stripJsonc(text) {
+  text = text.replace(/^\uFEFF/, "");
   const pass = (src, other) => {
     let out = "";
     let quote = false;
@@ -172,15 +177,41 @@ function buildNoEmitSafe(root) {
       return null;
     }
   };
-  // A relative base resolves from the config's folder; a package base from the root node_modules.
+  const rootConfig = path.join(root, "tsconfig.json");
+  // A base path starting `./` or `../`, or an absolute one, is tried as written and then with
+  // `.json`, as tsc does. A package base is left to tsc itself (tscInputs): its lookup rules
+  // (exports, typesVersions, nested node_modules) are too many to copy reliably.
+  let packageBase = false;
   const resolveBase = (from, spec) => {
     if (typeof spec !== "string") return null;
-    const relative = /^\.{1,2}([\\/]|$)/.test(spec) || path.isAbsolute(spec);
-    const base = relative ? path.resolve(path.dirname(from), spec) : path.join(root, "node_modules", spec);
-    return [base, `${base}.json`, path.join(base, "tsconfig.json")].find((f) => fs.existsSync(f) && fs.statSync(f).isFile()) ?? null;
+    const s = spec.replaceAll("\\", "/");
+    if (!path.isAbsolute(s) && !s.startsWith("./") && !s.startsWith("../")) {
+      packageBase = true;
+      return null;
+    }
+    const base = path.resolve(path.dirname(from), s);
+    return [base, `${base}.json`].find((f) => fs.existsSync(f) && fs.statSync(f).isFile()) ?? null;
+  };
+  // The root's `files` and `include` as the project's own TypeScript resolves them, through
+  // `tsc --showConfig`. null when TypeScript is not installed in node_modules or tsc fails, for
+  // example on a base it cannot find. --showConfig leaves out an empty list and the default
+  // `include` alike, so output with neither key counts as no inputs only when the root itself
+  // sets `files`, which turns the default `include` off.
+  const tscInputs = (top) => {
+    const tsc = path.join(root, "node_modules", "typescript", "bin", "tsc");
+    if (!fs.existsSync(tsc)) return null;
+    const r = spawnSync(process.execPath, [tsc, "-p", rootConfig, "--showConfig"], { cwd: root, encoding: "utf8", timeout: 60_000 });
+    let shown;
+    try {
+      shown = r.status === 0 ? JSON.parse(r.stdout) : null;
+    } catch {
+      return null;
+    }
+    if (!shown || (shown.files === undefined && shown.include === undefined && !Array.isArray(top.files))) return null;
+    return { files: shown.files ?? [], include: shown.include ?? [] };
   };
   // `files` and `include` as tsc resolves them: a config's own value wins, then the last base that
-  // sets it. null when the config or a base it needs cannot be read.
+  // sets it. null when the config or a base it needs cannot be read here.
   const inputs = (file, depth = 0) => {
     const config = depth > 8 ? null : parse(file);
     if (!config) return null;
@@ -195,10 +226,10 @@ function buildNoEmitSafe(root) {
     }
     return own;
   };
-  const rootConfig = path.join(root, "tsconfig.json");
   const top = parse(rootConfig);
-  const own = inputs(rootConfig);
-  if (!top || !own) return false;
+  if (!top) return false;
+  const own = inputs(rootConfig) ?? (packageBase ? tscInputs(top) : null);
+  if (!own) return false;
   const empty = (v) => Array.isArray(v) && v.length === 0;
   // Without `include`, `files` decides: absent means every file, `[]` means none.
   const noInputs = own.include === undefined ? empty(own.files) : empty(own.include) && (own.files === undefined || empty(own.files));

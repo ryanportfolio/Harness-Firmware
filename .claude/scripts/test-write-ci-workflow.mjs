@@ -134,9 +134,37 @@ test("TypeScript project references typecheck in build mode", (t) => {
   assert.match(ts("^5.9.3", extending('{ "compilerOptions": { "strict": true } }')), /run: npx tsc -b --noEmit\n/);
   const { "tsconfig.base.json": _, ...missingBase } = extending("");
   assert.match(ts("^5.9.3", missingBase), /run: npx tsc -b\n/, "missing base");
-  const pkgBase = { "tsconfig.json": '{ "extends": ["@acme/tsconfig/base", "./local"], "files": [], "references": [{ "path": "./lib" }] }', "lib/tsconfig.json": "{}", "local.json": "{}" };
-  assert.match(ts("^5.9.3", { ...pkgBase, "node_modules/@acme/tsconfig/base.json": '{ "include": ["src"] }' }), /run: npx tsc -b\n/, "package base");
-  assert.match(ts("^5.9.3", { ...pkgBase, "node_modules/@acme/tsconfig/base.json": "{}" }), /run: npx tsc -b --noEmit\n/, "package base without inputs");
+  // A package base is resolved by the project's own tsc --showConfig. Without TypeScript in
+  // node_modules it reads as unknown; a root that sets both keys itself needs no base at all.
+  const pkgRoot = { "tsconfig.json": '{ "extends": "@acme/tsconfig", "files": [], "references": [{ "path": "./lib" }] }', "lib/tsconfig.json": "{}" };
+  const pkgBase = { "node_modules/@acme/tsconfig/tsconfig.json": "{}" };
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase }), /run: npx tsc -b\n/, "package base without TypeScript installed");
+  const ownKeys = '{ "extends": "@acme/tsconfig", "files": [], "include": [], "references": [{ "path": "./lib" }] }';
+  assert.match(ts("^5.9.3", { ...pkgRoot, "tsconfig.json": ownKeys }), /run: npx tsc -b --noEmit\n/, "own files and include");
+  // A stand-in tsc that checks its arguments and prints a --showConfig result, or fails.
+  const tsc = (shown) => ({
+    "node_modules/typescript/bin/tsc": [
+      "const [p, config, flag] = process.argv.slice(2);",
+      'if (p !== "-p" || !config.endsWith("tsconfig.json") || flag !== "--showConfig") process.exit(3);',
+      shown === null ? "process.exit(1);" : `process.stdout.write(${JSON.stringify(JSON.stringify(shown))});`,
+    ].join("\n"),
+  });
+  const libRefs = [{ path: "./lib" }];
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase, ...tsc({ compilerOptions: {}, references: libRefs }) }), /run: npx tsc -b --noEmit\n/, "tsc shows no inputs");
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase, ...tsc({ files: ["./src/a.ts"], include: ["src"], references: libRefs }) }), /run: npx tsc -b\n/, "tsc shows inputs");
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase, ...tsc({ include: ["nothing/**/*.ts"], references: libRefs }) }), /run: npx tsc -b\n/, "an include pattern counts");
+  assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase, ...tsc(null) }), /run: npx tsc -b\n/, "tsc fails");
+  // --showConfig omits the default include too, so neither key proves nothing without the root's own files.
+  const noFilesKey = '{ "extends": "@acme/tsconfig", "references": [{ "path": "./lib" }] }';
+  assert.match(ts("^5.9.3", { ...pkgRoot, "tsconfig.json": noFilesKey, ...pkgBase, ...tsc({ compilerOptions: {}, references: libRefs }) }), /run: npx tsc -b\n/, "default include");
+  // A typecheck script wins before tsc is ever run.
+  const scripted = { ...pkgRoot, ...pkgBase, "node_modules/typescript/bin/tsc": 'require("fs").writeFileSync("tsc-ran", ""); process.stdout.write("{}");' };
+  const scriptedRoot = project(t, { "package.json": { devDependencies: { typescript: "^5.9.3" }, scripts: { typecheck: "tsc -b" } }, ...scripted });
+  assert.match(yamlFor(scriptedRoot), /run: npm run typecheck\n/);
+  assert.equal(fs.existsSync(path.join(scriptedRoot, "tsc-ran")), false, "tsc not run for a typecheck script");
+  // A byte order mark at the start of a tsconfig is not a parse failure.
+  const bom = String.fromCharCode(0xfeff);
+  assert.match(ts("^5.9.3", { "tsconfig.json": bom + leafOnly, "lib/tsconfig.json": `${bom}{}` }), /run: npx tsc -b --noEmit\n/, "byte order mark");
 
   // An empty list, or references only inside a comment or string, keeps tsc --noEmit.
   const noRefs = (tsconfig) =>
