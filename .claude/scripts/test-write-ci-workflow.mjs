@@ -124,6 +124,19 @@ test("TypeScript project references typecheck in build mode", (t) => {
   const leafOnly = '{ "files": [], "references": [{ "path": "./lib" }] }';
   assert.match(ts("^5.9.3", { "tsconfig.json": leafOnly, "lib/tsconfig.json": "{}" }), /run: npx tsc -b --noEmit\n/, "directory reference");
   assert.match(ts("^5.9.3", { "tsconfig.json": leafOnly }), /run: npx tsc -b\n/, "missing reference");
+  // An empty include is no inputs too, so a leaf relying on --noEmit (TS5096 without it) keeps it.
+  for (const root of ['{ "files": [], "include": [], "references": [{ "path": "./lib" }] }', '{ "include": [], "references": [{ "path": "./lib" }] }']) {
+    assert.match(ts("^5.9.3", { "tsconfig.json": root, "lib/tsconfig.json": "{}" }), /run: npx tsc -b --noEmit\n/, root);
+  }
+  // Inputs inherited through extends count; an unreadable base gets plain build mode.
+  const extending = (base) => ({ "tsconfig.json": '{ "extends": "./tsconfig.base.json", "files": [], "references": [{ "path": "./lib" }] }', "lib/tsconfig.json": "{}", "tsconfig.base.json": base });
+  assert.match(ts("^5.9.3", extending('{ "include": ["src/**/*.ts"] }')), /run: npx tsc -b\n/);
+  assert.match(ts("^5.9.3", extending('{ "compilerOptions": { "strict": true } }')), /run: npx tsc -b --noEmit\n/);
+  const { "tsconfig.base.json": _, ...missingBase } = extending("");
+  assert.match(ts("^5.9.3", missingBase), /run: npx tsc -b\n/, "missing base");
+  const pkgBase = { "tsconfig.json": '{ "extends": ["@acme/tsconfig/base", "./local"], "files": [], "references": [{ "path": "./lib" }] }', "lib/tsconfig.json": "{}", "local.json": "{}" };
+  assert.match(ts("^5.9.3", { ...pkgBase, "node_modules/@acme/tsconfig/base.json": '{ "include": ["src"] }' }), /run: npx tsc -b\n/, "package base");
+  assert.match(ts("^5.9.3", { ...pkgBase, "node_modules/@acme/tsconfig/base.json": "{}" }), /run: npx tsc -b --noEmit\n/, "package base without inputs");
 
   // An empty list, or references only inside a comment or string, keeps tsc --noEmit.
   const noRefs = (tsconfig) =>
@@ -232,6 +245,12 @@ test("Python tools count as installed only from what the install step installs",
   assert.match(cfgMarked, / {10}pip install -e "\.\[test\]"\n {10}pip install pytest\n/);
   const uvMarked = yamlFor(project(t, { "pyproject.toml": py(`[dependency-groups]\ndev = ["pytest; sys_platform == 'win32'", "mypy"]\n`), "uv.lock": "", ...testFile }));
   assert.match(uvMarked, /run: uv run --with pytest pytest\n/);
+  // A marker on a continued line, or written as a TOML escape, is still a marker.
+  assert.match(yamlFor(project(t, { "requirements.txt": 'pytest \\\n  ; sys_platform == "win32"\n', ...testFile })), / {10}pip install pytest\n/);
+  assert.doesNotMatch(yamlFor(project(t, { "requirements.txt": "pytest \\\n  >=8\n", ...testFile })), /pip install pytest/, "continued line without a marker");
+  const escaped = `[project]\nname = "x"\ndependencies = ["pytest\\u003b sys_platform == 'win32'"]\n`;
+  assert.match(yamlFor(project(t, { "pyproject.toml": escaped, ...testFile })), / {10}pip install pytest\n/);
+  assert.match(yamlFor(project(t, { "pyproject.toml": escaped, "uv.lock": "", ...testFile })), /run: uv run --with pytest pytest\n/);
   // The same declaration without the marker still counts.
   assert.doesNotMatch(yamlFor(project(t, { "requirements.txt": "requests\npytest\n", ...testFile })), /pip install pytest/);
 });

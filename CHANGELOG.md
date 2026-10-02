@@ -17,10 +17,14 @@ condensed.
   project references that form a chain. `--noEmit` reaches every project, and
   TypeScript rejects a project with source files that references one that does
   not emit (TS6310, reproduced with TypeScript 5.9.3). The pair is kept only for
-  a root `tsconfig.json` with `files: []` whose referenced projects reference
-  nothing further, the layout Vite generates; anything else gets plain `tsc -b`.
+  a root `tsconfig.json` with no inputs of its own (`files: []` or `include: []`,
+  including values inherited through `extends`) whose referenced projects
+  reference nothing further, the layout Vite generates; anything else, or a base
+  config that cannot be read, gets plain `tsc -b`.
 - `write-ci-workflow.mjs` no longer counts a Python dependency with an
   environment marker, such as `pytest; sys_platform == "win32"`, as installed.
+  This includes a marker on a backslash-continued requirements line and a `;`
+  written as a TOML escape.
   pip and uv skip it on the ubuntu runner, so the workflow now installs the tool
   (`pip install pytest`, or `uv run --with pytest`).
 - `write-ci-workflow.mjs` quotes requirements filenames for the shell, so
