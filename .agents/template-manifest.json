@@ -65,7 +65,8 @@
       "astra-review": ["codex-review", "external-review"],
       "codex-fullreview": ["impartial-review"],
       "codex-review": ["external-review"],
-      "merge-ready": ["codex-fullreview", "codex-review"]
+      "merge-ready": ["codex-fullreview", "codex-review"],
+      "opus-fullreview": ["impartial-review"]
     },
     "presets": {
       "minimal": {
