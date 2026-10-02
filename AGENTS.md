@@ -10,6 +10,7 @@ This is the Codex boundary for repositories using the Harness Firmware starter. 
 - Use plain prose for security warnings, irreversible confirmations, and ambiguous multi-step decisions, then resume Ultra. A new session restores Ultra after the user temporarily disables it.
 - Read only `CLAUDE.md`'s `What this project is`, `CRITICAL: Verification`, and `Environment & deploy target` sections for configured project facts. Use `.claude/reference/` for architecture, commands, deployment, and pitfalls. Other `CLAUDE.md` workflow rules are not Codex instructions.
 - Never execute `.claude/hooks/session-start.sh` in Codex.
+- No unit tests or type tests unless the user asks.
 
 ## Capabilities
 
