@@ -154,6 +154,14 @@ test("TypeScript project references typecheck in build mode", (t) => {
   assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase, ...tsc({ files: ["./src/a.ts"], include: ["src"], references: libRefs }) }), /run: npx tsc -b\n/, "tsc shows inputs");
   assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase, ...tsc({ include: ["nothing/**/*.ts"], references: libRefs }) }), /run: npx tsc -b\n/, "an include pattern counts");
   assert.match(ts("^5.9.3", { ...pkgRoot, ...pkgBase, ...tsc(null) }), /run: npx tsc -b\n/, "tsc fails");
+  // --showConfig omits the default include too, so neither key proves nothing without the root's own files.
+  const noFilesKey = '{ "extends": "@acme/tsconfig", "references": [{ "path": "./lib" }] }';
+  assert.match(ts("^5.9.3", { ...pkgRoot, "tsconfig.json": noFilesKey, ...pkgBase, ...tsc({ compilerOptions: {}, references: libRefs }) }), /run: npx tsc -b\n/, "default include");
+  // A typecheck script wins before tsc is ever run.
+  const scripted = { ...pkgRoot, ...pkgBase, "node_modules/typescript/bin/tsc": 'require("fs").writeFileSync("tsc-ran", ""); process.stdout.write("{}");' };
+  const scriptedRoot = project(t, { "package.json": { devDependencies: { typescript: "^5.9.3" }, scripts: { typecheck: "tsc -b" } }, ...scripted });
+  assert.match(yamlFor(scriptedRoot), /run: npm run typecheck\n/);
+  assert.equal(fs.existsSync(path.join(scriptedRoot, "tsc-ran")), false, "tsc not run for a typecheck script");
   // A byte order mark at the start of a tsconfig is not a parse failure.
   const bom = String.fromCharCode(0xfeff);
   assert.match(ts("^5.9.3", { "tsconfig.json": bom + leafOnly, "lib/tsconfig.json": `${bom}{}` }), /run: npx tsc -b --noEmit\n/, "byte order mark");

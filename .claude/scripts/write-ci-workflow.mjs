@@ -96,13 +96,16 @@ function detectNode(root) {
   // Plain `tsc -b` is also the choice when the references form a chain (see buildNoEmitSafe).
   const [, tsMajor, tsMinor = "0"] = String(deps.typescript ?? "").match(/(\d+)(?:\.(\d+))?/) ?? [];
   const buildNoEmit = Number(tsMajor) > 5 || (Number(tsMajor) === 5 && Number(tsMinor) >= 6);
-  const tscArgs = !hasReferences(read(root, "tsconfig.json")) ? "--noEmit" : buildNoEmit && buildNoEmitSafe(root) ? "-b --noEmit" : "-b";
-  const tscCommand = `${{ npm: "npx tsc", pnpm: "pnpm exec tsc", yarn: "yarn tsc", bun: "bunx tsc" }[pm]} ${tscArgs}`;
+  // A function, so buildNoEmitSafe (which may run tsc) runs only when this fallback is used.
+  const tscCommand = () => {
+    const tscArgs = !hasReferences(read(root, "tsconfig.json")) ? "--noEmit" : buildNoEmit && buildNoEmitSafe(root) ? "-b --noEmit" : "-b";
+    return `${{ npm: "npx tsc", pnpm: "pnpm exec tsc", yarn: "yarn tsc", bun: "bunx tsc" }[pm]} ${tscArgs}`;
+  };
 
   const commands = [];
   const typecheckScript = TYPECHECK_SCRIPTS.find((s) => typeof scripts[s] === "string");
   if (typecheckScript) commands.push({ name: "Typecheck", run: `${run} ${typecheckScript}` });
-  else if (exists(root, "tsconfig.json") && deps.typescript) commands.push({ name: "Typecheck", run: tscCommand });
+  else if (exists(root, "tsconfig.json") && deps.typescript) commands.push({ name: "Typecheck", run: tscCommand() });
   if (typeof scripts.test === "string" && !NPM_DEFAULT_TEST.test(scripts.test)) commands.push({ name: "Test", run: `${run} test` });
   if (typeof scripts.build === "string") commands.push({ name: "Build", run: `${run} build` });
 
@@ -190,18 +193,22 @@ function buildNoEmitSafe(root) {
     return [base, `${base}.json`].find((f) => fs.existsSync(f) && fs.statSync(f).isFile()) ?? null;
   };
   // The root's `files` and `include` as the project's own TypeScript resolves them, through
-  // `tsc --showConfig`, which leaves out an empty `files` or `include`. null when TypeScript is not
-  // installed in node_modules or tsc fails, for example on a base it cannot find.
-  const tscInputs = () => {
+  // `tsc --showConfig`. null when TypeScript is not installed in node_modules or tsc fails, for
+  // example on a base it cannot find. --showConfig leaves out an empty list and the default
+  // `include` alike, so output with neither key counts as no inputs only when the root itself
+  // sets `files`, which turns the default `include` off.
+  const tscInputs = (top) => {
     const tsc = path.join(root, "node_modules", "typescript", "bin", "tsc");
     if (!fs.existsSync(tsc)) return null;
     const r = spawnSync(process.execPath, [tsc, "-p", rootConfig, "--showConfig"], { cwd: root, encoding: "utf8", timeout: 60_000 });
+    let shown;
     try {
-      const shown = r.status === 0 ? JSON.parse(r.stdout) : null;
-      return shown && { files: shown.files ?? [], include: shown.include ?? [] };
+      shown = r.status === 0 ? JSON.parse(r.stdout) : null;
     } catch {
       return null;
     }
+    if (!shown || (shown.files === undefined && shown.include === undefined && !Array.isArray(top.files))) return null;
+    return { files: shown.files ?? [], include: shown.include ?? [] };
   };
   // `files` and `include` as tsc resolves them: a config's own value wins, then the last base that
   // sets it. null when the config or a base it needs cannot be read here.
@@ -221,7 +228,7 @@ function buildNoEmitSafe(root) {
   };
   const top = parse(rootConfig);
   if (!top) return false;
-  const own = inputs(rootConfig) ?? (packageBase ? tscInputs() : null);
+  const own = inputs(rootConfig) ?? (packageBase ? tscInputs(top) : null);
   if (!own) return false;
   const empty = (v) => Array.isArray(v) && v.length === 0;
   // Without `include`, `files` decides: absent means every file, `[]` means none.
