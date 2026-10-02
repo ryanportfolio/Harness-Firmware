@@ -29,6 +29,10 @@ condensed.
   (`pip install pytest`, or `uv run --with pytest`).
 - `write-ci-workflow.mjs` quotes requirements filenames for the shell, so
   `requirements dev.txt` reaches `pip install -r` as one argument.
+- `.agents/template-manifest.json` lists `impartial-review` as a dependency of
+  `opus-fullreview`. Its Manager reads `.claude/skills/impartial-review/SKILL.md`
+  and stops without it, so a project that kept `opus-fullreview` but dropped
+  `impartial-review` got a review skill that could not run.
 
 ## [1.7.0] - 2026-10-01
 
