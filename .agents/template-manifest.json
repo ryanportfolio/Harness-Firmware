@@ -50,7 +50,7 @@
         "id": "discipline",
         "label": "Quality disciplines",
         "description": "Planning, review, and dependable long-form execution",
-        "skills": ["brainstorming", "writing-plans", "impartial-review", "perf-loop", "long-horizon", "long-horizon-workflows", "babysit-ci", "codex-review", "external-review", "astra-review", "codex-fullreview", "opus-fullreview", "astra-fullreview", "merge-ready", "claude-review", "dare"]
+        "skills": ["brainstorming", "writing-plans", "impartial-review", "perf-loop", "long-horizon", "long-horizon-workflows", "babysit-ci", "codex-review", "external-review", "astra-review", "codex-fullreview", "opus-fullreview", "astra-fullreview", "merge", "claude-review", "dare"]
       },
       {
         "id": "specialist",
@@ -65,7 +65,7 @@
       "astra-review": ["codex-review", "external-review"],
       "codex-fullreview": ["impartial-review"],
       "codex-review": ["external-review"],
-      "merge-ready": ["codex-fullreview", "codex-review"],
+      "merge": ["codex-fullreview", "codex-review"],
       "opus-fullreview": ["impartial-review"]
     },
     "presets": {

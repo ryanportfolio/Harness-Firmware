@@ -35,13 +35,13 @@ LICENSE/NOTICE files in the skill folder.
 `addskill`, `adopt-repo`, `advocate`, `astra-fullreview`, `astra-review`,
 `claude-review`, `codex-fullreview`, `codex-review`, `compact-review`, `dare`, `enhance-prompt`,
 `external-review`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`,
-`impartial-review`, `init-project`, `lab`, `merge-ready`, `optimize-context`, `perf-loop`,
+`impartial-review`, `init-project`, `lab`, `merge`, `optimize-context`, `perf-loop`,
 `recall`, `session-hub`, `showpiece`, `sync-starter`, `why`, `wow-loop`.
 
 Homegrown skills are MIT, same as the template (see its [`LICENSE`](https://github.com/ryanportfolio/Harness-Firmware/blob/main/LICENSE)).
 
 Runtime coverage follows `.agents/skill-modes.json` and the skill folders: `astra-fullreview`, `compact-review`,
-`codex-fullreview`, `long-horizon-workflows` and `merge-ready` are Claude-only, `external-review`
+`codex-fullreview`, `long-horizon-workflows` and `merge` are Claude-only, `external-review`
 is Codex-only, and every other active skill ships in both runtimes. `recall` and
 `why` share names with unrelated pstack skills; ours predate the pstack ports
 (initial release, 2026-07-04) and do different jobs.
@@ -58,8 +58,8 @@ about the upstream repository's license.
 with the same three domain references and measurement gates. Dispatch remains runtime-specific.
 The full 36-name maintenance ledger and retained behaviors are in
 [`docs/research/2026-09-14-skill-parity-changes.md`](https://github.com/ryanportfolio/Harness-Firmware/blob/main/docs/research/2026-09-14-skill-parity-changes.md).
-That ledger is a 2026-09-14 snapshot: it still lists `merge` (since removed from the
-template), `automate-me` and `verify-this` (retired 2026-09-23), and predates
+That ledger is a 2026-09-14 snapshot: it still lists `merge` (removed from the
+template, later restored), `automate-me` and `verify-this` (retired 2026-09-23), and predates
 `long-horizon-workflows` (#136), `external-review`, `codex-fullreview` and
 `astra-fullreview` (#143).
 

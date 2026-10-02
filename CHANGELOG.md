@@ -11,6 +11,22 @@ condensed.
 
 ## [Unreleased]
 
+### Changed
+
+- `merge-ready` and the personal `/merge` skill are now one `merge` skill, shipped
+  in the template and installed as the same file at `~/.claude/skills/merge`.
+  Typing `/merge` commits, pushes and opens or reuses the PR, then runs the review
+  loop: one `codex-fullreview` on the full PR diff, fixes for confirmed 🔴 and 🟡
+  findings, then `codex-review` on the full diff at each new head until a round
+  confirms none, with at most 3 reruns before it stops and asks. After the loop and
+  CI pass at the same head, it squash-merges. `/merge` also turns on merge mode for
+  the rest of the session: open PRs the session already made go through the loop
+  right away, and every later PR goes through it and merges without another prompt. Round one no longer runs `codex-review` alongside
+  `codex-fullreview`. User-invoke only; Claude Code only.
+- `codex-fullreview` falls back to the global Codex skill at
+  `~/.agents/skills/impartial-review/SKILL.md` when the reviewed repository has no
+  `.agents/skills/impartial-review/SKILL.md`, so it runs outside template repos.
+
 ### Fixed
 
 - `write-ci-workflow.mjs` no longer emits `tsc -b --noEmit` for TypeScript

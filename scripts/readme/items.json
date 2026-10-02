@@ -100,8 +100,8 @@
       "group": "discipline"
     },
     {
-      "name": "merge-ready",
-      "label": "Merge ready",
+      "name": "merge",
+      "label": "Merge",
       "group": "discipline"
     },
     {
