@@ -17,7 +17,7 @@ process.on("exit", () => fs.rmSync(out, { recursive: true, force: true }));
 const build = spawnSync(process.execPath, [absolute("scripts/readme/build.mjs")], { env: { ...process.env, README_OUT_DIR: out }, encoding: "utf8" });
 const built = (relativePath) => fs.readFileSync(path.join(out, relativePath), "utf8");
 const groupCounts = facts.groups.filter((group) => facts.tierCounts[group.id] > 0).map((group) => `${facts.tierCounts[group.id]} ${group.id}`);
-const requiredLinks = ["GUIDE.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "actions/workflows/validate-template.yml"];
+const requiredLinks = ["https://harnessfirmware.com", "GUIDE.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "actions/workflows/validate-template.yml"];
 
 test("the generator builds every README artifact", () => {
   assert.equal(build.status, 0, build.stderr);

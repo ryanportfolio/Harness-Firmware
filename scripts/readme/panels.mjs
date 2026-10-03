@@ -8,6 +8,9 @@ const facts = collectFacts();
  * Four variants must read at 880px and a real 390px viewport, in both themes.
  * SVGs require no scripts, hover, fonts, or external requests; motion loops and
  * reduced motion preserves every label. Plain Markdown carries usage and links.
+ * Every panel paints its own opaque canvas: <picture> follows the OS colour
+ * scheme, not GitHub's theme setting, and some renderers drop <source>, so the
+ * light variant can land on a dark page. It must stay readable when it does.
  */
 const fmtKiB = (bytes) => `${(bytes / 1024).toFixed(1)} KiB`;
 
@@ -25,6 +28,7 @@ ${narrowCss}
 ${extraCss}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}.feedback-pulse,.scan-bar,.boot-cursor,.runtime-packet{display:none!important}.boot-ready{opacity:1!important}}
 </style>
+<rect width="${width}" height="${height}" fill="${theme.canvas}"/>
 ${body}
 </svg>
 `;
