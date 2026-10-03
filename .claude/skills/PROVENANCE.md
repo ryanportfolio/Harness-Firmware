@@ -3,6 +3,10 @@
 Where each skill came from, its license, and what this repo changed. Not loaded
 into context; it is reference for maintainers and public users.
 
+**License terms:** a skill folder that carries its own LICENSE or NOTICE file is
+covered by those terms for that skill's contents. Everything else is MIT under
+the root `LICENSE`.
+
 **Maintenance rule:** when you materially change a forked skill, update its
 "Our deltas" cell here. When adding a third-party skill, add a row and keep its
 LICENSE/NOTICE files in the skill folder.
