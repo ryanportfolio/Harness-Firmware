@@ -44,7 +44,7 @@
         "id": "core",
         "label": "Core workflows",
         "description": "Setup, memory, maintenance, and everyday project control",
-        "skills": ["init-project", "recall", "addskill", "sync-starter", "optimize-context", "refine", "adopt-repo"]
+        "skills": ["init-project", "recall", "addskill", "sync-starter", "optimize-context", "refine", "adopt-repo", "wrapup", "servers"]
       },
       {
         "id": "discipline",
@@ -67,7 +67,8 @@
       "codex-fullreview": ["impartial-review"],
       "codex-review": ["external-review"],
       "merge": ["codex-fullreview", "codex-review"],
-      "opus-fullreview": ["impartial-review"]
+      "opus-fullreview": ["impartial-review"],
+      "wrapup": ["servers"]
     },
     "presets": {
       "minimal": {
