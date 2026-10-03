@@ -22,7 +22,7 @@ In this starter, inspect the Codex sync check and ownership registry before appl
 settings: Claude legacy skillOverrides and Codex .agents/skill-modes.json have distinct
 roles. Preserve explicit native ownership and intentional disables. Each Claude skill is
 registered `native`, with a maintained port in `.agents/skills/<name>/`, or `disabled`;
-`node .claude/scripts/sync-codex-skills.mjs --check` enforces this and never generates or
+`node .claude/scripts/sync-codex-skills.mjs --check` warns when one is not and never generates or
 restores Codex bodies/resources.
 Use the runtime's supported setting only after verifying it in installed sources. Record
 what should disappear from discovery and verify after reload; source edits alone do not

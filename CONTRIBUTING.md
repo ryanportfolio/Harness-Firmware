@@ -8,7 +8,7 @@ judged on what they cost to keep loaded, not just on whether they work.
 Each runtime gets its own maintained skill: Claude's in `.claude/skills/`, Codex's in
 `.agents/skills/`, registered as `native` in `.agents/skill-modes.json`, or `disabled` when
 it needs Claude-only tools. There are no generated adapters: a Claude skill change needs a
-Codex port update or a re-baseline, or the drift check fails. See
+Codex port update or a re-baseline, or the drift check warns. See
 [Codex skill maintenance](docs/codex-skills.md).
 
 ```sh
