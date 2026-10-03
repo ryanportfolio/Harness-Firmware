@@ -334,25 +334,106 @@ function importsOf(text) {
   return found;
 }
 
-function candidates(fromPath, spec) {
-  const target = path.posix.normalize(path.posix.join(path.posix.dirname(fromPath), spec.replace(/[?#].*$/, "")));
+// Files a root-relative target may resolve to.
+function variants(target) {
   const list = [target, ...EXTS.map((e) => target + e), ...EXTS.map((e) => `${target}/index${e}`), `${target}/package.json`];
   const swap = { ".js": [".ts", ".tsx"], ".jsx": [".tsx"], ".mjs": [".mts"], ".cjs": [".cts"] }[path.posix.extname(target)];
   if (swap) list.push(...swap.map((e) => target.slice(0, -path.posix.extname(target).length) + e));
   return list;
 }
 
-function packageDeclared(root, fromPath, name) {
+const candidates = (fromPath, spec) => variants(path.posix.normalize(path.posix.join(path.posix.dirname(fromPath), spec.replace(/[?#].*$/, ""))));
+
+// Folders from the importing file's folder up to the root, as root-relative paths ("." last).
+function ancestors(fromPath) {
+  const dirs = [];
   for (let dir = path.posix.dirname(fromPath); ; dir = path.posix.dirname(dir)) {
-    const base = dir === "." ? root : path.join(root, dir);
+    dirs.push(dir);
+    if (dir === ".") return dirs;
+  }
+}
+
+// JSON with comments and trailing commas, as tsconfig allows.
+function parseJsonc(text) {
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      const end = /"(?:[^"\\]|\\.)*"/y;
+      end.lastIndex = i;
+      const m = end.exec(text);
+      if (!m) throw new Error("unterminated string");
+      out += m[0];
+      i += m[0].length - 1;
+    } else if (c === "/" && text[i + 1] === "/") i = text.indexOf("\n", i) < 0 ? text.length : text.indexOf("\n", i) - 1;
+    else if (c === "/" && text[i + 1] === "*") i = text.indexOf("*/", i + 2) < 0 ? text.length : text.indexOf("*/", i + 2) + 1;
+    else out += c;
+  }
+  // Comments are gone and strings were copied whole, so a comma before } or ] here is trailing.
+  let json = "";
+  const closes = /\s*[}\]]/y;
+  for (let i = 0; i < out.length; i++) {
+    closes.lastIndex = i + 1;
+    if (out[i] === '"') {
+      const end = /"(?:[^"\\]|\\.)*"/y;
+      end.lastIndex = i;
+      const m = end.exec(out);
+      json += m[0];
+      i += m[0].length - 1;
+    } else if (out[i] !== "," || !closes.test(out)) json += out[i];
+  }
+  return JSON.parse(json.replace(/^\uFEFF/, ""));
+}
+
+// `compilerOptions.paths` from the nearest tsconfig.json or jsconfig.json that sets it, with
+// the root-relative folder its targets resolve from. A nearer config without paths is skipped,
+// which stands in for `extends`.
+function pathAliases(root, fromPath, cache) {
+  for (const dir of ancestors(fromPath)) {
+    if (!cache.has(dir)) {
+      let found = null;
+      for (const name of ["tsconfig.json", "jsconfig.json"]) {
+        try {
+          const opts = parseJsonc(fs.readFileSync(path.join(root, dir, name), "utf8")).compilerOptions ?? {};
+          if (opts.paths) found = { base: path.posix.normalize(path.posix.join(dir, opts.baseUrl ?? ".")), paths: opts.paths };
+        } catch {}
+        if (found) break;
+      }
+      cache.set(dir, found);
+    }
+    if (cache.get(dir)) return cache.get(dir);
+  }
+  return null;
+}
+
+// Root-relative files an alias specifier may resolve to, or null when no alias matches. As in
+// TypeScript, the pattern with the longest prefix before its "*" wins.
+function aliasCandidates(aliases, spec) {
+  let best = null;
+  for (const [key, targets] of Object.entries(aliases.paths)) {
+    const star = key.indexOf("*");
+    const [pre, post] = star < 0 ? [key, null] : [key.slice(0, star), key.slice(star + 1)];
+    const hit = post === null ? spec === key : spec.length >= pre.length + post.length && spec.startsWith(pre) && spec.endsWith(post);
+    if (hit && (!best || pre.length > best.pre.length)) best = { key, pre, targets, capture: post === null ? "" : spec.slice(pre.length, spec.length - post.length) };
+  }
+  if (!best || !Array.isArray(best.targets)) return null;
+  const list = best.targets.flatMap((t) => variants(path.posix.normalize(path.posix.join(aliases.base, String(t).replace("*", best.capture)))));
+  return { key: best.key, list };
+}
+
+// Package lookup: true when `name` is installed or declared in a package.json from the file's
+// folder up to the root. With `scope` set, true when any package of that scope is.
+function packageDeclared(root, fromPath, name, scope = false) {
+  for (const dir of ancestors(fromPath)) {
+    const base = path.join(root, dir);
     if (fs.existsSync(path.join(base, "node_modules", name))) return true;
     try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(base, "package.json"), "utf8"));
-      if (pkg.name === name) return true;
-      for (const k of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) if (pkg[k]?.[name]) return true;
+      const pkg = JSON.parse(fs.readFileSync(path.join(base, "package.json"), "utf8").replace(/^\uFEFF/, ""));
+      const names = [pkg.name, ...["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"].flatMap((k) => Object.keys(pkg[k] ?? {}))];
+      if (names.some((n) => (scope ? n?.startsWith(`${name}/`) : n === name))) return true;
     } catch {}
-    if (dir === ".") return false;
   }
+  return false;
 }
 
 function dependencyNote(root, entries) {
@@ -365,21 +446,34 @@ function dependencyNote(root, entries) {
   };
   const unresolvedDeps = [];
   const unchecked = [];
+  const configs = new Map();
+  // Root-relative files a relative or tsconfig/jsconfig alias specifier may resolve to, or null.
+  const local = (from, s) => {
+    if (s.startsWith(".")) return { how: "relative path", list: candidates(from, s) };
+    const aliases = pathAliases(root, from, configs);
+    const hit = aliases && aliasCandidates(aliases, s);
+    return hit && { how: `path alias "${hit.key}"`, list: hit.list };
+  };
   const changed = entries.filter((e) => JS.test(e.path) && !e.binary && (e.status === "added" || e.status === "modified"));
   for (const e of changed) {
     for (const { specifier: s, line } of importsOf(toLF(e._head).toString("utf8"))) {
       const at = { from: e.path, line, specifier: s };
-      if (s.startsWith(".")) {
-        if (!candidates(e.path, s).some(isFile)) unresolvedDeps.push({ ...at, reason: "no file at this relative path" });
+      const files = /^[a-z][\w+.-]*:/i.test(s) ? null : local(e.path, s);
+      if (files) {
+        if (!files.list.some(isFile)) unresolvedDeps.push({ ...at, reason: `no file at this ${files.how}` });
       } else if (/^[a-z][\w+.-]*:/i.test(s)) {
         if (s.startsWith("node:") && !isBuiltin(s)) unresolvedDeps.push({ ...at, reason: "not a Node built-in" });
       } else if (/^(?:@\/|[~#/$])/.test(s)) {
-        unchecked.push({ ...at, reason: "path alias or absolute path; aliases are not resolved" });
+        unchecked.push({ ...at, reason: "path alias not set in tsconfig.json or jsconfig.json, or an absolute path" });
       } else {
         const name = s.split("/").slice(0, s.startsWith("@") ? 2 : 1).join("/");
-        if (!isBuiltin(name) && !packageDeclared(root, e.path, name)) {
-          unresolvedDeps.push({ ...at, reason: `package "${name}" is not declared in a package.json up to the root and not installed` });
-        }
+        const scope = s.startsWith("@") && name.split("/")[0];
+        if (isBuiltin(name) || packageDeclared(root, e.path, name)) continue;
+        // No package of this scope anywhere: more likely a bundler alias (vite, webpack) than a
+        // missing package.
+        if (scope && !packageDeclared(root, e.path, scope, true)) {
+          unchecked.push({ ...at, reason: `no package of scope ${scope} is declared; likely a bundler alias, not resolved` });
+        } else unresolvedDeps.push({ ...at, reason: `package "${name}" is not declared in a package.json up to the root and not installed` });
       }
     }
   }
@@ -395,15 +489,14 @@ function dependencyNote(root, entries) {
       if (fs.statSync(file).size > 1 << 20) continue;
       scanned++;
       for (const { specifier: s, line } of importsOf(fs.readFileSync(file, "utf8"))) {
-        if (!s.startsWith(".")) continue;
-        const c = candidates(p, s);
-        const gone = c.find((x) => deleted.has(x));
-        if (gone && !c.some(isFile)) unresolvedDeps.push({ from: p, line, specifier: s, reason: `imports ${gone}, which this change deletes` });
+        const files = /^[a-z][\w+.-]*:/i.test(s) ? null : local(p, s);
+        const gone = files?.list.find((x) => deleted.has(x));
+        if (gone && !files.list.some(isFile)) unresolvedDeps.push({ from: p, line, specifier: s, reason: `imports ${gone}, which this change deletes` });
       }
     }
   }
   return {
-    scope: "JS/TS import statements only (import, export from, dynamic import, require) found by pattern, not a compiler: imports in changed files, plus workspace files importing a deleted file. Path aliases, re-exported names and type-level breakage are not checked.",
+    scope: "JS/TS import statements only (import, export from, dynamic import, require) found by pattern, not a compiler: imports in changed files, plus workspace files importing a deleted file. Path aliases set in the nearest tsconfig.json or jsconfig.json `paths` are resolved; aliases set only in a bundler config, re-exported names and type-level breakage are not checked.",
     changedFilesChecked: changed.length,
     workspaceFilesScanned: scanned,
     unresolvedDeps,
