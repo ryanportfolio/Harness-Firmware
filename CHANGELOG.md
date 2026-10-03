@@ -43,9 +43,9 @@ condensed.
   exists, it keeps a decision ledger at `.tmp/deep-plan/<slug>/ledger.md` so a
   later session can resume. It stops at a recap with a reversal check on the
   weightiest decisions and builds nothing until the user picks Go, then offers
-  `writing-plans` as the handoff. It runs only when the user invokes it, as
-  `/deep-plan` in Claude Code and `$deep-plan` in Codex; the Codex version is
-  classified Adapted.
+  `writing-plans` as the handoff. Start it with `/deep-plan` in Claude Code, where
+  the model can also load it when asked, or `$deep-plan` in Codex, which never
+  starts it on its own; the Codex version is classified Adapted.
 
 ### Changed
 
