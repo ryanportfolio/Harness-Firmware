@@ -17,6 +17,15 @@ condensed.
   subagent, including Explore and Plan, now gets terse writing rules for all its prose, reasoning and notes included: result
   first, shortest text that keeps every fact, paths, code and errors kept exact,
   uncertainty marked. The caveman output style never reached subagents.
+- Skill locks: a project lists skills it keeps as they are in the optional
+  `.agents/skill-locks.json` (`{"version": 1, "locks": {"<skill>": "<reason>"}}`).
+  The `sync-starter` pull skips every locked skill's `.claude/skills/<name>/` and
+  `.agents/skills/<name>/` folders and registry entries and reports each skip with
+  its reason; `addskill` imports and updates, `init-project` profiles and
+  `adopt-repo` follow the same rule. An unreadable lock file stops the change
+  instead of being ignored. Pushing a change back to the template is unaffected.
+  Harness Console's skill sync reads the same file. Documented in
+  `docs/codex-skills.md`.
 
 ### Changed
 
