@@ -87,7 +87,7 @@ Answers arrive as option labels or Other text. Classify each one and echo one li
 1. Stop when the frontier is empty and you can write a short paragraph a newcomer could follow on how the result works. If you cannot, the gap becomes a new question and rounds continue.
 2. Recap in chat, numbered by ID: each decision, in the user's own words where they overrode, then assumptions, unknowns and parked items. An objection to an assumption reopens it.
 3. Pick the 1-3 weightiest decisions. Run the `why` skill on each and show one line on what the check changed; this is the only `why` check in deep-plan, never inside rounds. Then ask once in chat, free text: "If this decision were reversed, what would go wrong?" Record the answers; a real gap they expose becomes a new question.
-4. Gate popup, one call with two questions: `Q<n> Go` with "a) Go (Recommended)" and "b) Not yet: reopen something", and `Q<n+1> Handoff` with "a) writing-plans (Recommended)", "b) long-horizon contract", "c) enhance-prompt", "d) None"; offer only the skills available in this session, and always keep None. Not yet ignores the handoff answer and returns to rounds. Go must be this explicit pick, never inferred from a round answer.
+4. Gate popup, one call with two questions: `Q<n> Go` with "a) Go (Recommended)" and "b) Not yet: reopen something", and `Q<n+1> Handoff` with "a) writing-plans (Recommended)", "b) long-horizon contract", "c) enhance-prompt", "d) None"; offer only the skills available in this session, and always keep None. If None is the only handoff left, drop the Handoff question: the gate popup asks Go alone and the handoff is None. Not yet ignores the handoff answer and returns to rounds. Go must be this explicit pick, never inferred from a round answer.
 
 ## Handoff
 
