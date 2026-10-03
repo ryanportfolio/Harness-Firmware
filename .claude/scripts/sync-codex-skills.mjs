@@ -363,7 +363,9 @@ for (const name of Object.keys(sources)) {
   else warnings.push(`.agents/skill-sources.json: ${name} is stale; it is not a native Codex skill with a Claude source, so remove its entry`);
 }
 
-// --write deletes generated adapters, except under an enabled native skill.
+// --write deletes generated adapters, except under an enabled native skill or a locked one,
+// also when another folder links to the locked folder or the locked folder is the link.
+const lockedFolders = new Set([...locked].map((name) => path.join(targetRoot, name)).filter((folder) => fs.existsSync(folder)).map((folder) => fs.realpathSync(folder)));
 const actions = [];
 if (fs.existsSync(targetRoot)) {
   for (const entry of fs.readdirSync(targetRoot, { withFileTypes: true })) {
@@ -383,7 +385,7 @@ if (fs.existsSync(targetRoot)) {
       readMetadata(entry.name, adapterPath);
       warnings.push(`${adapterPath}: ${entry.name}: Codex-only skill has no .agents/skill-modes.json entry; add "${entry.name}": "native"`);
     }
-    if (generatedAdapter(adapterPath) && !locked.has(entry.name)) actions.push({ type: "remove", skillDir: entry.name, adapterPath });
+    if (generatedAdapter(adapterPath) && !locked.has(entry.name) && !lockedFolders.has(fs.realpathSync(path.join(targetRoot, entry.name)))) actions.push({ type: "remove", skillDir: entry.name, adapterPath });
   }
 }
 
