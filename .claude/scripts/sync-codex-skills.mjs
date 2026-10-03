@@ -197,13 +197,22 @@ function sourceHash(name) {
   for (const relative of listed?.get(name) ?? []) {
     const full = path.join(base, relative);
     // A tracked file deleted from disk is skipped; a linked directory is walked like the fallback,
-    // and a "" entry walks the whole linked skill folder.
-    if (!fs.existsSync(full)) continue;
-    if (fs.statSync(full).isDirectory()) walk(full, base, files);
+    // and a "" entry walks the whole linked skill folder. Any other stat error, such as a denied
+    // permission, fails rather than silently dropping the file from the hash.
+    let stats;
+    try {
+      stats = fs.statSync(full);
+    } catch (error) {
+      if (error.code === "ENOENT" || error.code === "ENOTDIR") continue;
+      throw error;
+    }
+    if (stats.isDirectory()) walk(full, base, files);
     else files.push(relative);
   }
   const hash = crypto.createHash("sha256");
-  for (const relative of files.sort()) {
+  // A tracked file replaced on disk by a directory is listed by git and found again by the walk;
+  // each path counts once, so the hash does not depend on what is staged.
+  for (const relative of [...new Set(files)].sort()) {
     let content = fs.readFileSync(path.join(base, relative));
     if (!content.includes(0)) content = Buffer.from(content.toString("latin1").replaceAll("\r\n", "\n"), "latin1");
     hash.update(`${relative}\0${content.length}\0`);
@@ -313,17 +322,23 @@ if (fs.existsSync(sourceRoot)) {
     } else if (removed.has(entry.name)) {
       warnings.push(`${skillPath}: ${entry.name} is recorded in .agents/removed-skills.json but its Claude folder remains; delete the folder or register it in .agents/skill-modes.json`);
     } else {
+      // A warning must not hide broken input: readMetadata throws on missing frontmatter or description.
+      readMetadata(entry.name, skillPath);
       warnings.push(`${skillPath}: ${entry.name} has no entry in .agents/skill-modes.json; ${port(entry.name)}`);
     }
   }
 }
 
 // A Claude skill that changed since its Codex port was last reviewed warns until the port is reviewed.
+// Its Claude SKILL.md is validated first, so a drift warning never hides broken input.
 const baseline = (name) => `node .claude/scripts/sync-codex-skills.mjs --baseline ${name}`;
+const claudeValid = (name) => readMetadata(name, path.join(sourceRoot, name, "SKILL.md"));
 for (const name of covered) {
   if (!Object.hasOwn(sources, name)) {
+    claudeValid(name);
     warnings.push(`.agents/skill-sources.json: ${name} has no reviewed Claude source hash; review .agents/skills/${name}/ against .claude/skills/${name}/, then run ${baseline(name)}`);
   } else if (sources[name] !== sourceHash(name)) {
+    claudeValid(name);
     warnings.push(`.agents/skill-sources.json: ${name}: the Claude skill changed since its Codex port was last reviewed; update .agents/skills/${name}/ to match, then run ${baseline(name)}`);
   }
 }
@@ -351,6 +366,7 @@ if (fs.existsSync(targetRoot)) {
     // reported by the Claude-side scan above.
     if (!Object.hasOwn(modes.skills, entry.name) && !disabled.has(entry.name) && !Object.hasOwn(retired, entry.name)
       && fs.existsSync(adapterPath) && !generatedAdapter(adapterPath) && !fs.existsSync(path.join(sourceRoot, entry.name, "SKILL.md"))) {
+      readMetadata(entry.name, adapterPath);
       warnings.push(`${adapterPath}: ${entry.name}: Codex-only skill has no .agents/skill-modes.json entry; add "${entry.name}": "native"`);
     }
     if (generatedAdapter(adapterPath)) actions.push({ type: "remove", skillDir: entry.name, adapterPath });

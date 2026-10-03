@@ -172,7 +172,7 @@ const drift = /the Claude skill changed since its Codex port was last reviewed/;
 test("a changed Claude SKILL.md or reference file warns until the port is baselined", (t) => {
   for (const file of ["SKILL.md", "references/guide.md"]) {
     const f = fixture(t);
-    f.write(`.claude/skills/long-horizon/${file}`, "Changed Claude content.\n");
+    f.write(`.claude/skills/long-horizon/${file}`, "---\nname: long-horizon\ndescription: Changed Claude content.\n---\n");
     const result = f.run("--check");
     assert.equal(result.status, 0, file);
     assert.match(result.stdout,/long-horizon: the Claude skill changed since its Codex port was last reviewed; update \.agents\/skills\/long-horizon\/ to match, then run node \.claude\/scripts\/sync-codex-skills\.mjs --baseline long-horizon/);
@@ -205,6 +205,37 @@ test("a git-ignored file in a Claude skill folder keeps the source hash", (t) =>
   assert.doesNotMatch(result.stdout, drift);
   assert.equal(f.run("--baseline", "long-horizon").status, 0);
   assert.equal(sources(f)["long-horizon"], reviewed);
+});
+
+test("a tracked file replaced by a directory hashes the same staged or not", (t) => {
+  const f = fixture(t);
+  const git = (...args) => spawnSync("git", args, { cwd: f.root, encoding: "utf8" });
+  const init = git("init", "-q");
+  if (init.error || init.status !== 0) return t.skip("git is not available");
+  f.write(".claude/skills/long-horizon/notes", "file\n");
+  assert.equal(git("add", "-A").status, 0);
+  fs.rmSync(path.join(f.root, ".claude/skills/long-horizon/notes"));
+  f.write(".claude/skills/long-horizon/notes/guide.md", "directory\n");
+  assert.equal(f.run("--baseline", "long-horizon").status, 0);
+  const unstaged = sources(f)["long-horizon"];
+  assert.equal(git("add", "-A").status, 0);
+  assert.equal(f.run("--baseline", "long-horizon").status, 0);
+  assert.equal(sources(f)["long-horizon"], unstaged);
+});
+
+test("a malformed Claude skill still fails behind a warning", (t) => {
+  const f = fixture(t);
+  unregistered(f);
+  f.write(".claude/skills/ordinary/SKILL.md", "No frontmatter.\n");
+  let result = f.run("--check");
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /ordinary[\\/]SKILL\.md: missing YAML frontmatter/);
+  // A drifted covered skill is validated too.
+  f.write(".claude/skills/ordinary/SKILL.md", "---\ndescription: Valid.\n---\n");
+  f.write(".claude/skills/long-horizon/SKILL.md", "---\nname: long-horizon\n---\n");
+  result = f.run("--check");
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /long-horizon[\\/]SKILL\.md: missing description/);
 });
 
 test("a stale source entry warns and asks for its removal", (t) => {

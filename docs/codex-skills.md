@@ -36,7 +36,7 @@ node .claude/scripts/test-codex-contract.mjs
 node --test .claude/scripts/test-sync-codex-skills.mjs .claude/scripts/test-codex-skill-sync.mjs .claude/scripts/test-codex-skill-copies.mjs
 ```
 
-Sync refuses missing or still-generated standalone entry points. It preserves handwritten
+Sync warns about missing or still-generated standalone entry points. It preserves handwritten
 content and never silently replaces it with a pointer. Validate referenced resources and
 meaningful decision scenarios separately; metadata checks cannot establish workflow quality.
 

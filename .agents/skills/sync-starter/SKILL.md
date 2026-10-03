@@ -7,7 +7,7 @@ description: "Use when the user asks to pull template improvements into a spawne
 
 Spawned projects freeze the template at spawn date; the template keeps improving. This skill closes the gap in both directions. Template repo: `ryanportfolio/Harness-Firmware` (formerly `claude-starter`; the old URL redirects, but use the new one).
 
-Both runtimes share this surface. Claude reads `CLAUDE.md` and `.claude/`; Codex reads `AGENTS.md` and `.agents/skills/`. Every skill is registered in `.agents/skill-modes.json` as `native`, with a maintained port in `.agents/skills/<name>/`, or `disabled` when it needs Claude-only tools. There are no generated adapters. `.agents/skill-sources.json` records the Claude skill hash each port matches, so a Claude change without a port update fails the sync check.
+Both runtimes share this surface. Claude reads `CLAUDE.md` and `.claude/`; Codex reads `AGENTS.md` and `.agents/skills/`. Every skill is registered in `.agents/skill-modes.json` as `native`, with a maintained port in `.agents/skills/<name>/`, or `disabled` when it needs Claude-only tools. There are no generated adapters. `.agents/skill-sources.json` records the Claude skill hash each port matches, so the sync check warns about a Claude change without a port update.
 
 ## Direction A: pull template improvements into this project
 
