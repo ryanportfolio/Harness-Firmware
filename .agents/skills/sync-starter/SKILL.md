@@ -7,7 +7,7 @@ description: "Use when the user asks to pull template improvements into a spawne
 
 Spawned projects freeze the template at spawn date; the template keeps improving. This skill closes the gap in both directions. Template repo: `ryanportfolio/Harness-Firmware` (formerly `claude-starter`; the old URL redirects, but use the new one).
 
-Both runtimes share this surface. Claude reads `CLAUDE.md` and `.claude/`; Codex reads `AGENTS.md` and `.agents/skills/`. Every skill is registered in `.agents/skill-modes.json` as `native`, with a maintained port in `.agents/skills/<name>/`, or `disabled` when it needs Claude-only tools. There are no generated adapters. `.agents/skill-sources.json` records the Claude skill hash each port matches, so a Claude change without a port update fails the sync check.
+Both runtimes share this surface. Claude reads `CLAUDE.md` and `.claude/`; Codex reads `AGENTS.md` and `.agents/skills/`. Every skill is registered in `.agents/skill-modes.json` as `native`, with a maintained port in `.agents/skills/<name>/`, or `disabled` when it needs Claude-only tools. There are no generated adapters. `.agents/skill-sources.json` records the Claude skill hash each port matches, so the sync check warns about a Claude change without a port update.
 
 ## Direction A: pull template improvements into this project
 
@@ -56,7 +56,7 @@ node .claude/scripts/sync-codex-skills.mjs --write
 node .claude/scripts/test-codex-contract.mjs
 ```
 
-`--write` deletes leftover generated adapters and fails on unregistered skills or Claude skills that drifted from their port. Stage `.agents/skill-sources.json` and any deleted adapter files along with the selected pulled paths.
+`--write` deletes leftover generated adapters and warns about unregistered skills or Claude skills that drifted from their port. Stage `.agents/skill-sources.json` and any deleted adapter files along with the selected pulled paths.
 
 ### Step 5: ship
 
@@ -74,7 +74,7 @@ When the user authorized propagation of a generic skill fix, new skill, or hook 
    - CI gates both `push` and `pull_request`, so direct-to-main is still checked, but only after the change is live to everyone spawning a project. That is why PR is the default.
    - The dual trigger means a PR shows two check runs and sits at `mergeStateStatus: UNSTABLE` until the second finishes. Wait for it (`gh run watch <id> --exit-status`); do not merge on the first green.
    - The template allows squash only: `gh pr merge <n> --squash`, when merging is authorized.
-   - If the change touched a skill, update its Claude version in `.claude/skills/` to match when it has one. Once the Codex port and the Claude version match, run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` for that `native` skill, then `node .claude/scripts/sync-codex-skills.mjs --check`. Never baseline a Claude change the Codex port does not reflect. A `disabled` (Claude-only) skill takes no port or baseline; run `--check` only. CI runs the same check and fails when a Claude skill changed without a re-baseline, or when a skill has no `native` or `disabled` entry.
+   - If the change touched a skill, update its Claude version in `.claude/skills/` to match when it has one. Once the Codex port and the Claude version match, run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` for that `native` skill, then `node .claude/scripts/sync-codex-skills.mjs --check`. Never baseline a Claude change the Codex port does not reflect. A `disabled` (Claude-only) skill takes no port or baseline; run `--check` only. CI runs the same check and warns when a Claude skill changed without a re-baseline, or when a skill has no `native` or `disabled` entry.
 4. **Bump the plugin version** when the change touches the shared surface (`.claude/skills`, `.claude/hooks`, `.claude/output-styles`, `.claude/settings.json`): edit `version` in the template's `.claude-plugin/plugin.json`, patch for fixes, minor for new skills. Plugin installs only receive updates when this number changes; spawned projects get changes through Direction A regardless.
 5. Mention that other spawned projects pick it up through Direction A.
 

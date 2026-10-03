@@ -3,7 +3,7 @@
 `.claude/skills/` is Claude's source; `.agents/skills/` holds Codex's own maintained versions. Every skill has a native Codex version or is disabled; there are no generated adapters. A Codex skill exposes a workflow; it does not prove every runtime capability exists.
 
 `.agents/skill-modes.json` declares `native` or `disabled` for every skill; `adapter` is no
-longer valid, and an unregistered Claude skill fails the sync check. Maintain native skills directly in `.agents/skills/<name>/`;
+longer valid, and the sync check warns about an unregistered Claude skill. Maintain native skills directly in `.agents/skills/<name>/`;
 they do not load Claude workflow bodies. Sync preserves native content and validates
 metadata and local references. Legacy `skillOverrides: off` remains disabled. Move a
 maintained skill outside discovery explicitly before disabling it. Ownership is separate
