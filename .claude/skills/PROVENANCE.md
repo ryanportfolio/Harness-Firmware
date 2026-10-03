@@ -3,6 +3,11 @@
 Where each skill came from, its license, and what this repo changed. Not loaded
 into context; it is reference for maintainers and public users.
 
+**License terms:** third-party material keeps its own license: the LICENSE or
+NOTICE file in its skill folder, or the license this document names for it, as
+for `.agents/skills/humanizer/patterns.md` below. Homegrown skills are MIT under
+the root `LICENSE`.
+
 **Maintenance rule:** when you materially change a forked skill, update its
 "Our deltas" cell here. When adding a third-party skill, add a row and keep its
 LICENSE/NOTICE files in the skill folder.
