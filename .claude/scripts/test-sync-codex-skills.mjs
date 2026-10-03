@@ -212,10 +212,12 @@ test("a tracked file replaced by a directory hashes the same staged or not", (t)
   const git = (...args) => spawnSync("git", args, { cwd: f.root, encoding: "utf8" });
   const init = git("init", "-q");
   if (init.error || init.status !== 0) return t.skip("git is not available");
+  f.write(".gitignore", "Thumbs.db\n");
   f.write(".claude/skills/long-horizon/notes", "file\n");
   assert.equal(git("add", "-A").status, 0);
   fs.rmSync(path.join(f.root, ".claude/skills/long-horizon/notes"));
   f.write(".claude/skills/long-horizon/notes/guide.md", "directory\n");
+  f.write(".claude/skills/long-horizon/notes/Thumbs.db", "ignored\n");
   assert.equal(f.run("--baseline", "long-horizon").status, 0);
   const unstaged = sources(f)["long-horizon"];
   assert.equal(git("add", "-A").status, 0);

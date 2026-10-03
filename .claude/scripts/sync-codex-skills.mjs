@@ -196,22 +196,28 @@ function sourceHash(name) {
   if (!listed) walk(base, base, files);
   for (const relative of listed?.get(name) ?? []) {
     const full = path.join(base, relative);
-    // A tracked file deleted from disk is skipped; a linked directory is walked like the fallback,
-    // and a "" entry walks the whole linked skill folder. Any other stat error, such as a denied
-    // permission, fails rather than silently dropping the file from the hash.
-    let stats;
+    // A tracked file deleted from disk, or a link whose target is gone, is skipped. Any other stat
+    // error, such as a denied permission, fails rather than silently dropping the file from the hash.
+    let link, stats;
     try {
-      stats = fs.statSync(full);
+      link = fs.lstatSync(full);
+      stats = link.isSymbolicLink() ? fs.statSync(full) : link;
     } catch (error) {
       if (error.code === "ENOENT" || error.code === "ENOTDIR") continue;
       throw error;
     }
-    if (stats.isDirectory()) walk(full, base, files);
-    else files.push(relative);
+    // A real directory here is a tracked file replaced on disk by a folder. Git already lists the
+    // folder's non-ignored files, so walking it would add ignored ones and make the hash depend on
+    // what is staged. Only a directory link (symlink or junction, including a "" entry for a linked
+    // skill folder) is walked, because git lists the link and not its contents.
+    if (stats.isDirectory()) {
+      if (link.isSymbolicLink()) walk(full, base, files);
+      continue;
+    }
+    files.push(relative);
   }
   const hash = crypto.createHash("sha256");
-  // A tracked file replaced on disk by a directory is listed by git and found again by the walk;
-  // each path counts once, so the hash does not depend on what is staged.
+  // Each path counts once, however git and the walk listed it.
   for (const relative of [...new Set(files)].sort()) {
     let content = fs.readFileSync(path.join(base, relative));
     if (!content.includes(0)) content = Buffer.from(content.toString("latin1").replaceAll("\r\n", "\n"), "latin1");
