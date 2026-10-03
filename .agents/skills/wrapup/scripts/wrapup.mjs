@@ -64,11 +64,25 @@ function unpushedCount(cwd, branch, heads) {
   if (own && !git(['cat-file', '-e', `${own}^{commit}`], cwd).ok) git(['fetch', '--quiet', 'origin', `refs/heads/${branch}`], cwd);
   // one batch lookup for which live heads this clone has, one rev-list fed through stdin
   const shas = [...new Set(heads.values())];
-  const have = spawnSync('git', ['cat-file', '--batch-check'], { cwd, input: shas.join('\n') + '\n', encoding: 'utf8', windowsHide: true });
-  if (have.status !== 0) return null;
-  const live = have.stdout.split('\n').filter((l) => / commit /.test(l)).map((l) => l.split(' ')[0]);
-  const r = spawnSync('git', ['rev-list', '--count', 'HEAD', '--stdin'], { cwd, input: live.map((s) => `^${s}`).join('\n') + '\n', encoding: 'utf8', windowsHide: true });
-  return r.status === 0 ? +r.stdout.trim() : null;
+  const count = () => {
+    const have = spawnSync('git', ['cat-file', '--batch-check'], { cwd, input: shas.join('\n') + '\n', encoding: 'utf8', windowsHide: true });
+    if (have.status !== 0) return null;
+    const lines = have.stdout.split('\n').filter(Boolean);
+    const live = lines.filter((l) => / commit /.test(l)).map((l) => l.split(' ')[0]);
+    const missing = lines.filter((l) => / missing$/.test(l)).map((l) => l.split(' ')[0]);
+    const r = spawnSync('git', ['rev-list', '--count', 'HEAD', '--stdin'], { cwd, input: live.map((s) => `^${s}`).join('\n') + '\n', encoding: 'utf8', windowsHide: true });
+    return r.status === 0 ? { n: +r.stdout.trim(), missing } : null;
+  };
+  let c = count();
+  // a clone that fetches only main lacks other branch tips; one of them may already hold HEAD's
+  // commits, so before calling anything unpushed, fetch those tips and count again
+  if (c && c.n && c.missing.length) {
+    const f = spawnSync('git', ['fetch', '--quiet', '--no-tags', '--stdin', 'origin'], { cwd, input: c.missing.join('\n') + '\n', encoding: 'utf8', windowsHide: true });
+    if (f.status !== 0) return null;
+    c = count();
+    if (c && c.missing.length) return null;
+  }
+  return c ? c.n : null;
 }
 
 function prFor(branch, cwd) {
@@ -149,7 +163,8 @@ export function wrapup(cwd = process.cwd()) {
   else if (unpushed) blockers.push(`${unpushed} commit(s) at HEAD not on any remote`);
   if (!branch) notes.push('detached HEAD');
   if (pr?.state === 'OPEN') notes.push(`PR #${pr.number} is open, not merged (${pr.url})`);
-  if (pr?.unavailable) notes.push(`PR check unavailable: ${pr.unavailable}`);
+  if (pr?.unavailable === 'gh not installed') notes.push('PR check skipped: gh not installed');
+  else if (pr?.unavailable) blockers.push(`PR check failed: ${pr.unavailable}`);
   for (const s of scratch) notes.push(`${s.dir}/ holds ${s.files} file(s), ${(s.bytes / 1e6).toFixed(1)} MB; removing this worktree deletes them`);
   const mine = running.filter((r) => same(r.worktree, here));
   if (mine.length) blockers.push(`${mine.length} server(s)/browser(s) still running from this checkout`);

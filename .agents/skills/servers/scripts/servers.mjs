@@ -69,6 +69,8 @@ $p = @(Get-CimInstance Win32_Process | Select-Object @{n='pid';e={[int]$_.Proces
   if (!procs.length) throw new Error('ps returned no processes');
   const lsof = sh('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn']);
   if (lsof.error) throw new Error(`lsof unavailable: ${lsof.error.message}`);
+  // lsof exits 1 with no output when nothing listens; anything else, or 1 with errors, is a failure
+  if (lsof.status > 1 || (lsof.status === 1 && (lsof.stderr || '').trim())) throw new Error(`lsof failed: ${(lsof.stderr || '').trim().split('\n')[0] || `exit ${lsof.status}`}`);
   const listeners = [];
   for (const line of (lsof.stdout || '').split('\n')) {
     if (line.startsWith('p')) listeners.push({ pid: +line.slice(1), port: null });
@@ -91,7 +93,11 @@ function repoRoot(p) {
 
 /* Absolute paths in a command line, and whether the worktree they point into still exists. */
 function worktreeOf(cmd) {
-  const paths = String(cmd || '').match(/[A-Za-z]:[\\/][^"'\s]+|\/(?:home|Users|srv|opt|var|tmp|mnt)\/[^"'\s]+/g) || [];
+  // quoted paths whole (they may hold spaces), then bare ones
+  const text = String(cmd || '');
+  const quoted = [...text.matchAll(/"((?:[A-Za-z]:[\\/]|\/)[^"]+)"|'((?:[A-Za-z]:[\\/]|\/)[^']+)'/g)].map((m) => m[1] || m[2]);
+  const bare = text.replace(/"[^"]*"|'[^']*'/g, ' ').match(/[A-Za-z]:[\\/][^"'\s]+|\/(?:home|Users|srv|opt|var|tmp|mnt)\/[^"'\s]+/g) || [];
+  const paths = [...quoted, ...bare];
   for (const p of paths) {
     const m = p.replace(/\\/g, '/').match(/^(.*?\/\.claude\/worktrees\/[^/]+)/);
     if (m) return { worktree: path.normalize(m[1]), gone: !fs.existsSync(m[1]) };
