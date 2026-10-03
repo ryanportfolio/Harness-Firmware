@@ -15,7 +15,7 @@ disable-model-invocation: true
 
 ## Round 0: scope
 
-1. Look for a ledger with `Status: open` under `.tmp/deep-plan/*/ledger.md`. If one exists, the first question offers "a) Resume <slug> (Recommended)" and "b) Start new". On resume: re-read the ledger, rebuild the frontier from statuses and depends-on edges, show a short recap, ask "Has anything changed since we stopped?" in the same popup, and continue from Next ID.
+1. Look for a ledger with `Status: open` under `.tmp/deep-plan/*/ledger.md`. If one exists and its `Updated` time is within the last 30 minutes, another session may still be running it: tell the user, and resume only after they confirm that session has stopped. Otherwise the first question offers "a) Resume <slug> (Recommended)" and "b) Start new". On resume: re-read the ledger, rebuild the frontier from statuses and depends-on edges, show a short recap, ask "Has anything changed since we stopped?" in the same popup, and continue from Next ID.
 2. Otherwise propose, in one popup: a one-sentence destination, the out-of-scope list (never asked about later), and the slug. Slug: kebab-case from the destination sentence, at most about 5 words; the user accepts it or renames it through Other. If `.tmp/deep-plan/<slug>/` already exists, append `-2` (then `-3`).
 3. If the idea holds several independent branches too big for one session, propose a split and ask which piece to plan now. A large piece can go to `long-horizon` later.
 4. Goal and scope are settled by the user, never assumed. Round 0 starts at Q1; IDs never reset.
@@ -28,7 +28,7 @@ Path: `.tmp/deep-plan/<slug>/ledger.md` from the working directory root (`.tmp/`
 # <slug>
 Destination: <one sentence>
 Out of scope: <list>
-Status: open | Round: <n> | Next ID: Q<n> | Pace: <questions per round>
+Status: open | Round: <n> | Next ID: Q<n> | Pace: <questions per round> | Updated: <ISO time>
 
 | ID | Title | Status | Answer (user's words) | Depends on | Rejected options | Round |
 
@@ -38,7 +38,7 @@ Notes:
 
 Statuses: `open`, `settled`, `assumed`, `unknown`, `parked`, `reopened`, `void`. Assumptions and parked items are rows too, so there is one ID sequence. At close, append the mechanism paragraph, the reversal answers and the handoff block.
 
-Write it after round 0, after each round's answers are classified and before the next popup, on a premise change, at the gate, and on Go (`Status: closed`). Re-read it before every round and after any compaction. Never re-ask a settled ID unless the user reopens it.
+Write it after round 0, after each round's answers are classified and before the next popup, on a premise change, at the gate, and on Go (`Status: closed`). Every write sets `Updated`. Re-read it before every round and after any compaction. Never re-ask a settled ID unless the user reopens it.
 
 If a write fails, say so once and continue chat-only; never claim a ledger you did not write. With no working directory or no write permission, the echo lines and the recap are the record; to resume, the user pastes the recap back.
 
