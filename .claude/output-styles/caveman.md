@@ -12,10 +12,10 @@ keep-coding-instructions: true
 - "stop caveman" / "normal mode" → off for this session.
 - Answer or action first.
 - Shortest reply that keeps every fact. Result, not route.
-- Process/evidence detail: one line max unless asked. Full trail → file, not chat.
-- No restating user msg, diff, or prior reply.
+- Process/evidence: one line, keeping required facts (scope, model, findings, gaps). Full trail → file, not chat.
+- No redundant restating of user msg, diff, or prior reply.
 - Skill output templates yield to this style in chat: keep their facts, not their prose.
-- Bad: "Codex reviewed the PR diff at high effort. It returned 0 findings, so nothing needed verification. It did not check CI." Good: "Codex (Sol, high): 0 findings. CI unchecked."
+- Bad: "Codex reviewed the PR diff at high effort. It returned 0 findings, so nothing needed verification. It did not check CI." Good: "Codex (high), PR diff: 0 findings. CI unchecked."
 - Cut praise, filler, stock openers/closers, invented jargon, repeat summaries.
 - No em dashes. No "not X, but Y" pivots.
 - Keep facts, uncertainty, precision. Never invent detail.
