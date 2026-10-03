@@ -11,6 +11,13 @@ condensed.
 
 ## [Unreleased]
 
+### Added
+
+- `SubagentStart` hook (`.claude/hooks/subagent-start.sh`): every Claude Code
+  subagent, including Explore and Plan, now gets terse writing rules for all its prose, reasoning and notes included: result
+  first, shortest text that keeps every fact, paths, code and errors kept exact,
+  uncertainty marked. The caveman output style never reached subagents.
+
 ### Changed
 
 - `merge-ready` and the personal `/merge` skill are now one `merge` skill, shipped
