@@ -93,8 +93,13 @@ function readHead(root, p, indexModes) {
     throw new Error(`cannot read ${p}: ${e.code ?? e.message}`);
   }
   if (st.isSymbolicLink()) return { kind: "symlink", mode: "120000", bytes: Buffer.from(slash(fs.readlinkSync(abs))) };
-  // A folder is a submodule only with its own .git; a file replaced by a plain folder is gone.
-  if (st.isDirectory() && !fs.existsSync(path.join(abs, ".git"))) return { kind: null, mode: null, bytes: null };
+  // A folder without its own .git is an uninitialized submodule when the index holds a gitlink
+  // for it (its commit is the index entry); otherwise a file was replaced by a folder and is gone.
+  if (st.isDirectory() && !fs.existsSync(path.join(abs, ".git"))) {
+    const m = /^160000 ([0-9a-f]+) 0\t/.exec(git(root, ["ls-files", "-s", "-z", "--", `:(literal)${p}`]).toString("utf8"));
+    if (!m) return { kind: null, mode: null, bytes: null };
+    return { kind: "submodule", mode: "160000", dirty: null, bytes: Buffer.from(`Subproject commit ${m[1]}\n`) };
+  }
   if (st.isDirectory()) {
     // Hash of its status and diff, so further edits inside it still change the scope hash.
     const status = git(abs, ["status", "--porcelain", "--untracked-files=all"]);
