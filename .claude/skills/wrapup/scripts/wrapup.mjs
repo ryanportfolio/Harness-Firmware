@@ -12,7 +12,8 @@
      worktrees     other worktrees of this repository, main checkout included: linked ones sitting
                    exactly on a merged PR head are cleanup candidates (the main checkout never is),
                    dirty or unpushed ones hold work
-   Prints BLOCKED with the reasons, or READY. A check that cannot run blocks READY: missing
+   Prints BLOCKED with the reasons, or READY. READY means archiving loses nothing; it does not
+   mean the work shipped, so an open PR is a note. A check that cannot run blocks READY: missing
    evidence is never read as "nothing to worry about". Exit code 0 either way; 2 when not a git
    checkout. Read-only apart from a `git fetch`. */
 import { spawnSync } from 'node:child_process';

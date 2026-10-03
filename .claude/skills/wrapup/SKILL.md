@@ -1,6 +1,6 @@
 ---
 name: wrapup
-description: "Use on /wrapup or when the user asks if a session is done, good to archive, safe to ship, or what is left: one verdict from git, the PR, scratch files and running servers or browsers."
+description: "Use on /wrapup or when the user asks if a session is done, good to archive, or what is left: one verdict from git, the PR, scratch files and running servers or browsers."
 ---
 
 # Wrap up
@@ -14,7 +14,7 @@ Answer "good to archive?" from evidence, not memory. Read-only until the user ag
    - servers and automation browsers still running from this checkout (through `.claude/skills/servers/scripts/servers.mjs`);
    - other worktrees of the repo: holding work, or sitting exactly on a merged PR head and removable.
 2. Add what only this session knows: browsers opened through MCP tools, background tasks or agents still running, task chips you offered, worktrees you created by hand, and promises made earlier in the conversation that are not done.
-3. Reply with the verdict first, one line: **Ready to archive**, or **Not yet**, then each blocker with the action that clears it (commit and push, merge or close PR #N, stop the server on :PORT, copy `.tmp/` findings somewhere durable). Notes that do not block go after, briefly.
+3. Reply with the verdict first, one line: **Ready to archive**, or **Not yet**, then each blocker with the action that clears it (commit and push, merge or close PR #N, stop the server on :PORT, copy `.tmp/` findings somewhere durable). Notes that do not block go after, briefly. The script's READY means archiving loses nothing, not that the work shipped: an open PR is only a note there. When the user asked whether the work is done, say **Not done** until its PR is merged.
 4. Offer the fixes as one go. With the user's yes: push, close the servers and browsers this session started (`node .claude/skills/servers/scripts/servers.mjs close <port> --yes`), and remove only worktrees this session created, after removing their `node_modules` links with `rmdir`. Never `git worktree remove --force` through a junction, never delete other sessions' worktrees, never discard uncommitted work.
 
 A merged PR with leftover local commits is a note, not a pass: check that those commits were part of the merge before saying ready.

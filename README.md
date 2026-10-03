@@ -149,7 +149,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`bro`](.claude/skills/bro/SKILL.md) · Plain-language restatement. Use on /bro anywhere in a message, "plain english", "plain language", "dumb it down", "I don't understand", or "what does that mean".
 - [`session-hub`](.claude/skills/session-hub/SKILL.md) · Coordinate parallel Claude Code sessions via a shared append-only HTML hub. Use on /session-hub, 'run parallel sessions on this', joining a hub, or proactively when edits or commits this session did not make appear in the checkout.
 - [`servers`](.claude/skills/servers/SKILL.md) · Use on /servers, after starting a dev server, or when the user asks what is running, which port is which, why browsers are open, or to close old servers and browsers.
-- [`wrapup`](.claude/skills/wrapup/SKILL.md) · Use on /wrapup or when the user asks if a session is done, good to archive, safe to ship, or what is left: one verdict from git, the PR, scratch files and running servers or browsers.
+- [`wrapup`](.claude/skills/wrapup/SKILL.md) · Use on /wrapup or when the user asks if a session is done, good to archive, or what is left: one verdict from git, the PR, scratch files and running servers or browsers.
 <!-- skill-list:end -->
 
 </details>

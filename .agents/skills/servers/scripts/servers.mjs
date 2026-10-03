@@ -282,7 +282,8 @@ function killVerified(entries) {
     // Windows PowerShell 5.1 emits a parsed JSON array as one object; foreach enumerates it
     const ps = `$list = $env:SERVERS_KILL_LIST | ConvertFrom-Json
 foreach ($e in $list) {
-  $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($e.pid)"
+  # a failed query is not proof the process is gone
+  try { $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($e.pid)" -ErrorAction Stop } catch { "$($e.pid) failed"; continue }
   if (-not $p) { "$($e.pid) gone"; continue }
   if ($p.CreationDate.ToUniversalTime().ToString('o') -ne $e.start) { "$($e.pid) changed"; continue }
   try { Stop-Process -Id $e.pid -Force -ErrorAction Stop; "$($e.pid) killed" }
