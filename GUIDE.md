@@ -66,11 +66,13 @@ The doctor checks hook wiring, skill frontmatter, that every Claude skill has a 
 
 ## add or remove skills
 
-Removing a skill never fails a check. Adding or changing a Claude skill fails `node .claude/scripts/sync-codex-skills.mjs --check`, locally and in CI, until its Codex side is settled: a new skill needs a `native` or `disabled` entry in `.agents/skill-modes.json`, and a changed skill needs its Codex port updated and `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` run. Otherwise the checks warn about what they notice and exit 0, locally, in the doctor, and in CI, where warnings show up as annotations on the run. Beyond that, only a file the tools cannot read fails: invalid JSON in `.agents/skill-modes.json`, the removal record, or settings; a `SKILL.md` without frontmatter or a description; or a check script that crashes.
+Removing, adding, or changing a skill never fails a check. `node .claude/scripts/sync-codex-skills.mjs --check` warns until a Claude skill's Codex side is settled: a new skill needs a `native` or `disabled` entry in `.agents/skill-modes.json`, and a changed skill needs its Codex port updated and `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` run. The checks warn about what they notice and exit 0, locally, in the doctor, and in CI, where warnings show up as annotations on the run. Only a file the tools cannot read fails: invalid JSON in `.agents/skill-modes.json`, the removal record, or settings; a `SKILL.md` without frontmatter or a description; or a check script that crashes.
 
 What produces a warning:
 
 - A registered skill that is missing from a runtime. The warning suggests recording it or restoring it.
+- A Claude skill or a Codex-only skill with no entry in `.agents/skill-modes.json`, or a changed Claude skill whose Codex port has not been re-baselined. The warning gives the fix.
+- A skill the template marks required that is installed in neither runtime, even when its registration was deleted too.
 - A skill that needs another one that is not installed, for example `astra-review` without `codex-review`. The warning names both.
 - A retired skill that reappears, such as `verify-this`. The warning names the skill that replaced it; delete the folder unless you mean to bring it back.
 - In the template repository only: a README or README image that no longer matches a fresh build, including hand edits. Run `node scripts/readme/build.mjs` there to rebuild it. New projects get a one-line README and none of the README build scripts.

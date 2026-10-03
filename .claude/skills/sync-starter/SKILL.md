@@ -54,7 +54,7 @@ For `settings.json`: merge, don't overwrite — the project may have its own per
 
 After any skill, sync script, compatibility matrix, or `skillOverrides` change, run
 `node .claude/scripts/sync-codex-skills.mjs --write` (it deletes leftover generated
-adapters and fails on unregistered skills or Claude skills that drifted from their port),
+adapters and warns about unregistered skills or Claude skills that drifted from their port),
 and `node .claude/scripts/test-codex-contract.mjs`. Stage
 `.agents/skill-sources.json` and any deleted adapter files along with the selected pulled paths.
 
@@ -74,7 +74,7 @@ When the user authorized propagation of a generic skill fix / new skill / hook i
    - CI gates **both** `push` and `pull_request`, so direct-to-main is still checked — just after the change is live to everyone spawning a project, which is why PR is the default.
    - That dual trigger means a PR shows two check runs and sits at `mergeStateStatus: UNSTABLE` until the second finishes. Wait for it (`gh run watch <id> --exit-status`); don't merge on the first green.
    - The template allows squash only: `gh pr merge <n> --squash`.
-   - If the change touched a skill registered `native`, update its Codex version in `.agents/skills/` to match, run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>`, then `node .claude/scripts/sync-codex-skills.mjs --check`. A `disabled` (Claude-only) skill takes no port or baseline; run `--check` only. CI runs the same check and fails when a Claude skill changed without a re-baseline, or when a skill has no `native` or `disabled` entry.
+   - If the change touched a skill registered `native`, update its Codex version in `.agents/skills/` to match, run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>`, then `node .claude/scripts/sync-codex-skills.mjs --check`. A `disabled` (Claude-only) skill takes no port or baseline; run `--check` only. CI runs the same check and warns when a Claude skill changed without a re-baseline, or when a skill has no `native` or `disabled` entry.
 4. **Bump the plugin version** when the change touches the shared surface (`.claude/skills`, `.claude/hooks`, `.claude/output-styles`, `.claude/settings.json`): edit `version` in the template's `.claude-plugin/plugin.json` — patch for fixes, minor for new skills. Plugin installs only receive updates when this number changes; spawned projects get changes via Direction A regardless.
 5. Mention that other spawned projects pick it up via Direction A.
 

@@ -26,7 +26,7 @@ For this repository:
    maintained Codex port in `.agents/skills/<name>/` registered `native`, or a `disabled` entry.
    Edit that source only when changing Claude behavior is authorized. After a change to a `native`
    skill's Claude source, update its Codex port to match, then run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>`;
-   `--check` fails until both are done.
+   `--check` warns until both are done.
 3. Classify every active Codex skill once in `.agents/CODEX-SKILL-COMPATIBILITY.md`. Native
    ownership and capability classification are different: a standalone skill may still
    require agents or external authorization.

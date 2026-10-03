@@ -33,8 +33,25 @@ condensed.
 - `codex-fullreview` falls back to the global Codex skill at
   `~/.agents/skills/impartial-review/SKILL.md` when the reviewed repository has no
   `.agents/skills/impartial-review/SKILL.md`, so it runs outside template repos.
+- `sync-codex-skills.mjs --check` and `--write` now warn and exit 0 on a Claude
+  skill changed since its Codex port was reviewed, a skill with no
+  `.agents/skill-modes.json` entry, mode `adapter`, a missing or stale
+  `.agents/skill-sources.json` entry, and a leftover generated adapter. They exit 1
+  only on broken input: unreadable or malformed JSON, a skill without frontmatter or
+  a description, an invalid skill name or mode, or a deletion that would leave the
+  repository.
 
 ### Fixed
+
+- The Claude source hash in `sync-codex-skills.mjs` covers only the files git would
+  commit (tracked, plus untracked files no `.gitignore` rule excludes), so an ignored
+  `Thumbs.db` or `.DS_Store` in a skill folder no longer reads as drift. Without git
+  it walks the folder as before. Hashes of committed folders are unchanged.
+- `sync-codex-skills.mjs` warns about a hand-written Codex-only skill in
+  `.agents/skills/` with no `.agents/skill-modes.json` entry; it passed silently.
+- `removed-skills.mjs` warns when a skill the template manifest marks required is
+  installed in neither runtime, even after its registration was deleted too; it
+  warned only when the skill was still registered.
 
 - `write-ci-workflow.mjs` no longer emits `tsc -b --noEmit` for TypeScript
   project references that form a chain. `--noEmit` reaches every project, and
