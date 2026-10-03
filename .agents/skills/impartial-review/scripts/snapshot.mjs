@@ -337,11 +337,14 @@ const IMPORT_RES = [
 
 // Code with comments blanked out (newlines kept, so positions and line numbers hold). Strings and
 // regex literals are copied whole, so "/*" inside either is not a comment. Single and double
-// quoted strings and regex literals end at a line break; template literals span lines. A "/"
-// starts a regex literal where an operand is expected: at the start, after an operator or
-// opening bracket, or after a keyword such as `return`.
+// quoted strings and regex literals end at a line break; template literals span lines, and the
+// code inside their `${...}` is scanned as code. A "/" starts a regex literal where an operand is
+// expected: at the start, after an operator or opening bracket, after a keyword such as `return`,
+// or after the closing parenthesis of `if`, `while`, `for` or `with`. A "/*" never closed is not
+// a comment (that would be a syntax error), so a misread cannot blank the rest of the file.
 const REGEX_AFTER = new Set("(,=:[!&|?{};+-*%<>~^".split(""));
 const REGEX_KEYWORDS = new Set(["return", "typeof", "case", "do", "else", "in", "of", "new", "delete", "void", "throw", "yield", "await", "instanceof"]);
+const CONTROL = new Set(["if", "while", "for", "with"]);
 function stripComments(text) {
   let out = "";
   let quote = null;
@@ -349,25 +352,43 @@ function stripComments(text) {
   let last;
   let token = "";
   let inWord = false;
+  // Open "(" with the identifier before each; true after a control statement's ")".
+  const parens = [];
+  let afterControl = false;
+  // Brace depth in code, and the depth at which each open `${` returns to its template.
+  let depth = 0;
+  const templates = [];
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (quote) {
       out += c;
       if (c === "\\") out += text[++i] ?? "";
-      else if (c === quote || (c === "\n" && quote !== "`")) quote = null;
-    } else if (c === "/" && text[i + 1] === "/") {
+      else if (quote === "`" && c === "$" && text[i + 1] === "{") {
+        out += "{";
+        i++;
+        templates.push(depth++);
+        [quote, last, token, inWord, afterControl] = [null, "{", "", false, false];
+      } else if (c === quote || (c === "\n" && quote !== "`")) quote = null;
+      continue;
+    }
+    if (c === "/" && text[i + 1] === "/") {
       const end = text.indexOf("\n", i);
       const stop = end < 0 ? text.length : end;
       out += " ".repeat(stop - i);
       i = stop - 1;
       inWord = false;
-    } else if (c === "/" && text[i + 1] === "*") {
+      continue;
+    }
+    if (c === "/" && text[i + 1] === "*") {
       const end = text.indexOf("*/", i + 2);
-      const stop = end < 0 ? text.length : end + 2;
-      out += text.slice(i, stop).replace(/[^\n]/g, " ");
-      i = stop - 1;
-      inWord = false;
-    } else if (c === "/" && (last === undefined || REGEX_AFTER.has(last) || REGEX_KEYWORDS.has(token))) {
+      if (end >= 0) {
+        out += text.slice(i, end + 2).replace(/[^\n]/g, " ");
+        i = end + 1;
+        inWord = false;
+        continue;
+      }
+    }
+    if (c === "/" && (last === undefined || REGEX_AFTER.has(last) || REGEX_KEYWORDS.has(token) || (last === ")" && afterControl))) {
       let j = i + 1;
       let inClass = false;
       for (; j < text.length && text[j] !== "\n"; j++) {
@@ -379,19 +400,33 @@ function stripComments(text) {
       const stop = Math.min(j + 1, text.length);
       out += text.slice(i, stop);
       i = stop - 1;
-      [last, token, inWord] = [")", "", false]; // a regex literal is an operand
-    } else {
-      out += c;
-      if (/[\w$]/.test(c)) {
-        token = inWord ? token + c : c;
-        inWord = true;
-        last = c;
-      } else {
-        inWord = false;
-        if (!/\s/.test(c)) [last, token] = [c, ""];
-      }
-      if (c === '"' || c === "'" || c === "`") [quote, last] = [c, ")"]; // a string is an operand
+      [last, token, inWord, afterControl] = [")", "", false, false]; // a regex literal is an operand
+      continue;
     }
+    if (c === "}" && templates.length && depth - 1 === templates.at(-1)) {
+      out += c;
+      depth--;
+      templates.pop();
+      quote = "`";
+      continue;
+    }
+    out += c;
+    if (/[\w$]/.test(c)) {
+      token = inWord ? token + c : c;
+      inWord = true;
+      last = c;
+      afterControl = false;
+      continue;
+    }
+    inWord = false;
+    if (/\s/.test(c)) continue;
+    afterControl = false;
+    if (c === "(") parens.push(token);
+    else if (c === ")") afterControl = CONTROL.has(parens.pop());
+    else if (c === "{") depth++;
+    else if (c === "}") depth = Math.max(0, depth - 1);
+    [last, token] = [c, ""];
+    if (c === '"' || c === "'" || c === "`") [quote, last] = [c, ")"]; // a string is an operand
   }
   return out;
 }
