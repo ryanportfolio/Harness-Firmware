@@ -12,8 +12,8 @@
      worktrees     other worktrees of this repository, main checkout included: linked ones sitting
                    exactly on a merged PR head are cleanup candidates (the main checkout never is),
                    dirty or unpushed ones hold work
-   Prints BLOCKED with the reasons, or READY. READY means archiving loses nothing; it does not
-   mean the work shipped, so an open PR is a note. A check that cannot run blocks READY: missing
+   Prints BLOCKED with the reasons, or READY. An open PR blocks READY: a session is not ready to
+   archive while its PR waits to merge. A check that cannot run blocks READY: missing
    evidence is never read as "nothing to worry about". Exit code 0 either way; 2 when not a git
    checkout. Read-only apart from a `git fetch`. */
 import { spawnSync } from 'node:child_process';
@@ -170,7 +170,7 @@ export function wrapup(cwd = process.cwd()) {
   else if (unpushed && pr?.state === 'MERGED' && pr.headRefOid === head) notes.push(`HEAD is the merged head of PR #${pr.number}; its commits are on main through the merge`);
   else if (unpushed) blockers.push(`${unpushed} commit(s) at HEAD not on any remote`);
   if (!branch) notes.push('detached HEAD');
-  if (pr?.state === 'OPEN') notes.push(`PR #${pr.number} is open, not merged (${pr.url})`);
+  if (pr?.state === 'OPEN') blockers.push(`PR #${pr.number} is open, not merged (${pr.url})`);
   if (pr?.unavailable) blockers.push(`PR check failed: ${pr.unavailable}`);
   for (const s of scratch) {
     if (s.error) blockers.push(`could not inspect ${s.dir}/ (${s.error}); removing this worktree may delete files in it`);
