@@ -130,7 +130,9 @@ as parallel rounds.
    never claim fresh independent audit. Honor explicit user model choice, else session
    model. Requested model unavailable → disclose, never silently substitute. Executor
    implements, verifies only its step; returns changed paths, commands/results, blockers.
-   Can't edit Manager state or dispatch agents.
+   Can't edit Manager state or dispatch agents. Returns w/o promised artifacts, or says
+   it's waiting on helpers → send it follow-up input via exposed agent tools, not new
+   round or failed audit.
 3. **Audit after execution stops.** Separate fresh agent gets prewritten auditor brief
    byte for byte, or by path if agent first checks recorded hash. Never rewrite after
    reading executor output; Plan defect → next round. Explicit user amendment → reconcile
