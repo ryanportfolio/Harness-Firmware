@@ -291,12 +291,17 @@ foreach ($e in $list) {
     for (const e of entries) if (!result.has(e.pid)) result.set(e.pid, 'failed');
     return result;
   }
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (err) { return err.code !== 'ESRCH'; } };
   for (const e of entries) {
     const ps = sh('ps', ['-o', 'lstart=', '-p', String(e.pid)]);
     if (ps.status !== 0 || !ps.stdout.trim()) { result.set(e.pid, 'gone'); continue; }
     if (new Date(ps.stdout.trim()).toISOString() !== e.start) { result.set(e.pid, 'changed'); continue; }
-    try { process.kill(e.pid, 'SIGTERM'); result.set(e.pid, 'killed'); }
-    catch (err) { result.set(e.pid, err.code === 'ESRCH' ? 'gone' : 'failed'); }
+    try { process.kill(e.pid, 'SIGTERM'); }
+    catch (err) { result.set(e.pid, err.code === 'ESRCH' ? 'gone' : 'failed'); continue; }
+    // SIGTERM can be handled or ignored: only an exit within the wait counts as closed
+    const wait = new Int32Array(new SharedArrayBuffer(4));
+    for (let i = 0; i < 30 && alive(e.pid); i++) Atomics.wait(wait, 0, 0, 100);
+    result.set(e.pid, alive(e.pid) ? 'failed' : 'killed');
   }
   return result;
 }
