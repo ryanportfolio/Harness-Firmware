@@ -20,8 +20,11 @@ condensed.
 - The same hook tells every subagent to collect every helper result before it
   stops. A subagent's turn ending is final, so a background task still running
   then loses its result; a long-horizon executor lost four helper results this
-  way. Helper agents run in the foreground; a Bash command that may pass the
-  10-minute tool limit runs in the background while the subagent polls it.
+  way in an Agent SDK session, where a launching subagent does not wait for
+  its background helpers (interactive sessions already make it wait). Helper
+  agents run in the foreground when the Agent tool offers that choice; a Bash
+  command that may pass the 10-minute tool limit runs in the background while
+  the subagent polls it.
   `long-horizon` carries the same rule for executors and has the Manager
   resume, by message, an executor that returns without its promised files.
 
