@@ -17,12 +17,13 @@ condensed.
   subagent, including Explore and Plan, now gets terse writing rules for all its prose, reasoning and notes included: result
   first, shortest text that keeps every fact, paths, code and errors kept exact,
   uncertainty marked. The caveman output style never reached subagents.
-- The same hook tells every subagent to run its own helper agents and Bash
-  tasks in the foreground. A subagent's turn ending is final, so a background
-  task still running then loses its result; a long-horizon executor lost four
-  helper results this way. `long-horizon` also makes executor helpers
-  foreground-only and has the Manager resume, by message, an executor that
-  returns without its promised files.
+- The same hook tells every subagent to collect every helper result before it
+  stops. A subagent's turn ending is final, so a background task still running
+  then loses its result; a long-horizon executor lost four helper results this
+  way. Helper agents run in the foreground; a Bash command that may pass the
+  10-minute tool limit runs in the background while the subagent polls it.
+  `long-horizon` carries the same rule for executors and has the Manager
+  resume, by message, an executor that returns without its promised files.
 
 ### Changed
 
