@@ -57,7 +57,7 @@ If a write fails, say so once and continue chat-only; never claim a ledger you d
    - Question text is self-contained plain prose, with background first for an unfamiliar term.
    - 2-4 options labelled `a) ...`, `b) ...`. The recommendation comes first, its label ends "(Recommended)", and it answers the question as worded. Word a yes/no question so Yes is the recommendation.
    - Use multi-select only for a genuine pick-all-that-apply decision.
-3. With no popup exposed, ask in chat with the same cap and IDs:
+3. With no popup exposed, or one the current mode will not let you call (some Codex builds allow the input tool only in Plan mode), ask in chat with the same cap and IDs. The same fallback covers round 0 and the gate:
 
 ```text
 ❓ **Q<n>** - **<title>**: <question>

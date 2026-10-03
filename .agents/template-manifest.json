@@ -66,6 +66,7 @@
       "caveman": ["why"],
       "codex-fullreview": ["impartial-review"],
       "codex-review": ["external-review"],
+      "deep-plan": ["why"],
       "merge": ["codex-fullreview", "codex-review"],
       "opus-fullreview": ["impartial-review"],
       "wrapup": ["servers"]
