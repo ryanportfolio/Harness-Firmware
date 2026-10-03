@@ -20,7 +20,10 @@
 //   node snapshot.mjs --verify <snapshot dir>
 //     Rebuilds the scope from the workspace and exits 1 when it no longer matches.
 //
+// <ref> may also be a tree, such as the empty tree for a root commit, unless --merge-base is set.
 // Binary files (a NUL byte in the first 8000 bytes, git's own test) are hashed, not copied.
+// Patch and pages keep the original bytes, so text that is not UTF-8 is not altered. A dirty
+// submodule is listed as not covered: only the commit it points at is snapshotted.
 // The dependency note covers JS/TS import statements only: imports in changed files, and
 // imports anywhere in the workspace that pointed at a deleted file.
 import { spawnSync } from "node:child_process";
@@ -91,7 +94,12 @@ function readHead(root, p) {
   if (st.isSymbolicLink()) return { kind: "symlink", mode: "120000", bytes: Buffer.from(slash(fs.readlinkSync(abs))) };
   // A folder is a submodule only with its own .git; a file replaced by a plain folder is gone.
   if (st.isDirectory() && !fs.existsSync(path.join(abs, ".git"))) return { kind: null, mode: null, bytes: null };
-  if (st.isDirectory()) return { kind: "submodule", mode: "160000", bytes: Buffer.from(`Subproject commit ${gitText(abs, ["rev-parse", "HEAD"])}\n`) };
+  if (st.isDirectory()) {
+    // Hash of its status and diff, so further edits inside it still change the scope hash.
+    const status = git(abs, ["status", "--porcelain", "--untracked-files=all"]);
+    const dirty = status.length ? sha256(Buffer.concat([status, git(abs, ["diff", "HEAD"])])) : null;
+    return { kind: "submodule", mode: "160000", dirty, bytes: Buffer.from(`Subproject commit ${gitText(abs, ["rev-parse", "HEAD"])}\n`) };
+  }
   // Windows has no executable bit; git there ignores it too (core.fileMode false).
   return { kind: "file", mode: POSIX ? (st.mode & 0o100 ? "100755" : "100644") : null, bytes: fs.readFileSync(abs) };
 }
@@ -124,6 +132,8 @@ function collect(root, baseSha, excluded) {
     const baseKind = !t ? null : t.type === "commit" ? "submodule" : t.mode === "120000" ? "symlink" : "file";
     const head = readHead(root, p);
     if (base === null && head.bytes === null) continue; // staged add since deleted from disk
+    // Edits inside a submodule are not captured; the commit it points at is.
+    if (head.dirty) uncovered.push(`submodule with uncommitted changes, only its commit is snapshotted: ${p}`);
     const binary = isBinary(base) || isBinary(head.bytes);
     let status = base === null ? "added" : head.bytes === null ? "deleted" : "modified";
     if (status === "modified" && base.equals(head.bytes)) status = "mode-only";
@@ -135,6 +145,7 @@ function collect(root, baseSha, excluded) {
       kind: head.kind ?? baseKind,
       baseMode: t?.mode ?? null,
       headMode: head.mode,
+      submoduleDirtyHash: head.dirty ?? null,
       binary,
       baseSha256: base === null ? null : sha256(base),
       headSha256: head.bytes === null ? null : sha256(head.bytes),
@@ -145,14 +156,20 @@ function collect(root, baseSha, excluded) {
       _head: head.bytes,
     });
   }
-  const scopeHash = sha256(JSON.stringify([baseSha, entries.map((e) => [e.path, e.status, e.baseMode, e.headMode, e.baseSha256, e.headSha256])]));
+  const scopeHash = sha256(JSON.stringify([baseSha, entries.map((e) => [e.path, e.status, e.baseMode, e.headMode, e.baseSha256, e.headSha256, e.submoduleDirtyHash]), uncovered]));
   return { entries, uncovered, scopeHash };
 }
 
-// Splits text into pages of at most `limit` bytes and MAX_LINES lines, cutting between lines
-// and inside a line only when that line alone is over the limit. Returns [{text, from, to}]
-// with 1-based line numbers.
-function paginate(text, limit) {
+// Patch and page text is handled as latin1 strings: one character per byte, so non-UTF-8
+// content survives byte for byte and a string's length is its size in bytes.
+const BYTES = "latin1";
+const lineCount = (t) => (t.match(/\n/g)?.length ?? 0) + (t && !t.endsWith("\n") ? 1 : 0);
+
+// Splits byte text into pages of at most `limit` bytes and `maxLines` lines, cutting between
+// lines and inside a line only when that line alone is over the limit. Returns
+// [{text, from, to}] with 1-based line numbers.
+function paginate(text, limit, maxLines = MAX_LINES) {
+  if (limit < 64 || maxLines < 1) throw new Error("page budget too small; raise --part-kb");
   const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
   const pages = [];
   let cur = [];
@@ -165,42 +182,42 @@ function paginate(text, limit) {
   };
   lines.forEach((line, i) => {
     const n = i + 1;
-    let bytes = Buffer.byteLength(line);
-    if (size + bytes > limit || cur.length >= MAX_LINES) flush(n - 1);
+    if (size + line.length > limit || cur.length >= maxLines) flush(n - 1);
     if (!cur.length) from = n;
-    let buf = Buffer.from(line);
-    while (buf.length > limit) {
+    while (line.length > limit) {
       let end = limit;
-      while (end > 0 && (buf[end] & 0xc0) === 0x80) end--; // never split a UTF-8 sequence
-      cur.push(buf.subarray(0, end).toString());
+      while (end > 0 && (line.charCodeAt(end) & 0xc0) === 0x80) end--; // keep UTF-8 sequences whole
+      if (end === 0) end = limit;
+      cur.push(line.slice(0, end));
       flush(n);
       from = n;
-      buf = buf.subarray(end);
+      line = line.slice(end);
     }
-    bytes = buf.length;
-    cur.push(buf.toString());
-    size += bytes;
+    cur.push(line);
+    size += line.length;
   });
   flush(lines.length);
   return pages;
 }
 
-function writeFile(file, data) {
+function writeFile(file, data, encoding = "utf8") {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, data);
+  fs.writeFileSync(file, data, encoding);
   return slash(file);
 }
 
-// Undoes git's C-style quoting of one path token.
+const fromBytes = (s) => Buffer.from(s, BYTES).toString("utf8");
+
+// Undoes git's C-style quoting of one path token given as byte text.
 function unquote(s) {
-  const esc = { a: "\x07", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v" };
+  const esc = { a: 7, b: 8, f: 12, n: 10, r: 13, t: 9, v: 11 };
   const bytes = [];
   for (let i = 0; i < s.length; i++) {
-    if (s[i] !== "\\") bytes.push(...Buffer.from(s[i]));
+    if (s[i] !== "\\") bytes.push(s.charCodeAt(i));
     else if (/[0-7]/.test(s[i + 1])) {
       bytes.push(parseInt(s.slice(i + 1, i + 4), 8));
       i += 3;
-    } else bytes.push(...Buffer.from(esc[s[++i]] ?? s[i]));
+    } else bytes.push(esc[s[++i]] ?? s.charCodeAt(i));
   }
   return Buffer.from(bytes).toString("utf8");
 }
@@ -212,7 +229,7 @@ function diffSnapshot(out) {
     "-c", "core.quotePath=false", "-c", "core.autocrlf=false", "-c", "core.safecrlf=false",
     "diff", "--no-index", "--no-renames", "--no-ext-diff", "--no-color", "--no-textconv", "--text",
     "--src-prefix=a/", "--dst-prefix=b/", "base", "head",
-  ], { ok: [0, 1] }).toString("utf8");
+  ], { ok: [0, 1] }).toString(BYTES);
   const sections = [];
   let header = false;
   for (const line of raw.match(/[^\n]*\n|[^\n]+$/g) ?? []) {
@@ -224,12 +241,13 @@ function diffSnapshot(out) {
       let text;
       if (rest.startsWith('"')) {
         const m = /^"a\/(?:base|head)\/((?:[^"\\]|\\.)*)" "b\/(?:base|head)\//.exec(rest);
-        if (!m) throw new Error(`unexpected diff header: ${rest}`);
+        if (!m) throw new Error(`unexpected diff header: ${fromBytes(rest)}`);
         p = unquote(m[1]);
         text = `diff --git "a/${m[1]}" "b/${m[1]}"\n`;
       } else {
-        p = rest.slice(7, 7 + (rest.length - 15) / 2);
-        text = `diff --git a/${p} b/${p}\n`;
+        const raw = rest.slice(7, 7 + (rest.length - 15) / 2);
+        p = fromBytes(raw);
+        text = `diff --git a/${raw} b/${raw}\n`;
       }
       sections.push({ path: p, text });
       continue;
@@ -242,30 +260,36 @@ function diffSnapshot(out) {
 }
 
 // Patch pages: whole file sections packed together while they fit; a section over the limit
-// is cut at hunk boundaries, then at lines, with its file header repeated on every piece.
+// is cut at hunk boundaries, then at lines, with its file header repeated on every piece
+// unless the header itself takes more than half a page.
 function patchParts(sections, limit) {
   const units = [];
   for (const s of sections) {
-    if (Buffer.byteLength(s.text) <= limit && s.text.split("\n").length <= MAX_LINES) {
+    if (s.text.length <= limit && lineCount(s.text) <= MAX_LINES) {
       units.push({ text: s.text, paths: [s.path] });
       continue;
     }
     const lines = s.text.match(/[^\n]*\n|[^\n]+$/g);
     const first = Math.max(1, lines.findIndex((l) => l.startsWith("@@")));
     const head = lines.slice(0, first).join("");
+    if (head.length > limit / 2 || first > MAX_LINES / 2) {
+      for (const page of paginate(s.text, limit)) units.push({ text: page.text, paths: [s.path] });
+      continue;
+    }
     const hunks = [];
     for (const l of lines.slice(first)) {
       if (l.startsWith("@@") || !hunks.length) hunks.push("");
       hunks[hunks.length - 1] += l;
     }
-    const budget = limit - Buffer.byteLength(head);
-    for (const hunk of hunks) for (const page of paginate(hunk, budget)) units.push({ text: head + page.text, paths: [s.path] });
+    for (const hunk of hunks) {
+      for (const page of paginate(hunk, limit - head.length, MAX_LINES - first)) units.push({ text: head + page.text, paths: [s.path] });
+    }
   }
   const parts = [];
   for (const u of units) {
     const last = parts[parts.length - 1];
     const joined = last && last.text + u.text;
-    if (last && Buffer.byteLength(joined) <= limit && joined.split("\n").length <= MAX_LINES) {
+    if (last && joined.length <= limit && lineCount(joined) <= MAX_LINES) {
       last.text = joined;
       for (const p of u.paths) if (!last.paths.includes(p)) last.paths.push(p);
     } else parts.push({ text: u.text, paths: [...u.paths] });
@@ -344,7 +368,7 @@ function dependencyNote(root, entries) {
     }
   }
   // Workspace files that imported a file this change deletes.
-  const deleted = new Set(entries.filter((e) => e.status === "deleted" && JS.test(e.path)).map((e) => e.path));
+  const deleted = new Set(entries.filter((e) => e.status === "deleted").map((e) => e.path));
   let scanned = 0;
   if (deleted.size) {
     const all = git(root, ["ls-files", "-co", "--exclude-standard", "-z"]).toString("utf8").split("\0");
@@ -400,10 +424,17 @@ function brief(inv) {
     L.push(`- ${f.status}${f.untracked ? " (untracked)" : ""}: \`${f.path}\``);
     for (const p of pages) L.push(`  - page \`${p.path}\`, lines ${p.lines}`);
   }
-  const quiet = inv.files.filter((f) => f.status === "eol-only" || f.status === "mode-only");
-  if (quiet.length) {
-    L.push("", "## Line-ending or mode changes only (not in the patch; not findings)", "");
-    for (const f of quiet) L.push(`- ${f.status}: \`${f.path}\`${f.status === "eol-only" ? ` (${f.eol.base} to ${f.eol.head})` : ""}`);
+  // A dirty submodule on an unchanged commit is listed under "Not covered" instead.
+  const modes = inv.files.filter((f) => (f.status === "mode-only" && !f.submoduleDirtyHash) || (CONTENT.has(f.status) && f.baseMode && f.headMode && f.baseMode !== f.headMode));
+  if (modes.length) {
+    L.push("", "## File mode or type changes (not shown in the patch; review them: 100755 is executable, 120000 a symlink, 160000 a submodule)", "");
+    for (const f of modes) L.push(`- ${f.status}: \`${f.path}\` (${f.baseMode} to ${f.headMode ?? "regular file; executable bit not recorded on Windows"})`);
+  }
+  const eol = inv.files.filter((f) => f.status === "eol-only");
+  if (eol.length) {
+    L.push("", `## Line-ending changes only (${eol.length}; not in the patch; not findings)`, "");
+    for (const f of eol.slice(0, 20)) L.push(`- \`${f.path}\` (${f.eol.base} to ${f.eol.head})`);
+    if (eol.length > 20) L.push(`- ${eol.length - 20} more, listed in \`${inv.snapshot}/source-inventory.json\``);
   }
   const bin = inv.files.filter((f) => f.binary);
   if (bin.length) {
@@ -473,7 +504,7 @@ function verify(dir) {
   for (const e of now.entries) {
     const f = then.get(e.path);
     if (!f) drift.push(`new change: ${e.path}`);
-    else if (f.headSha256 !== e.headSha256 || f.status !== e.status || f.headMode !== e.headMode) drift.push(`changed since snapshot: ${e.path}`);
+    else if (f.headSha256 !== e.headSha256 || f.status !== e.status || f.headMode !== e.headMode || f.submoduleDirtyHash !== e.submoduleDirtyHash) drift.push(`changed since snapshot: ${e.path}`);
     then.delete(e.path);
   }
   for (const p of then.keys()) drift.push(`no longer changed: ${p}`);
@@ -484,7 +515,14 @@ function verify(dir) {
 
 function snapshot(o) {
   const root = path.resolve(gitText(path.resolve(o.root), ["rev-parse", "--show-toplevel"]));
-  let baseSha = gitText(root, ["rev-parse", "--verify", `${o.base}^{commit}`]);
+  // A tree base (such as the empty tree for a root commit) works for a plain comparison.
+  let baseSha;
+  try {
+    baseSha = gitText(root, ["rev-parse", "--verify", `${o.base}^{commit}`]);
+  } catch (e) {
+    if (o.mergeBase) throw e;
+    baseSha = gitText(root, ["rev-parse", "--verify", `${o.base}^{tree}`]);
+  }
   if (o.mergeBase) baseSha = gitText(root, ["merge-base", baseSha, "HEAD"]);
   const head = gitText(root, ["rev-parse", "HEAD"]);
   const out = path.resolve(o.out ?? path.join(root, ".tmp", "review-snapshots", `${new Date().toISOString().replace(/[:.]/g, "-")}-${baseSha.slice(0, 7)}`));
@@ -505,11 +543,11 @@ function snapshot(o) {
       if (bytes === null) continue;
       const lf = toLF(bytes);
       f[side] = writeFile(path.join(out, side, ...e.path.split("/")), lf);
-      const text = lf.toString("utf8");
-      if (lf.length > limit || text.split("\n").length > MAX_LINES) {
+      const text = lf.toString(BYTES);
+      if (lf.length > limit || lineCount(text) > MAX_LINES) {
         const pages = paginate(text, limit);
         f.pages[side] = pages.map((pg, i) => ({
-          path: writeFile(path.join(out, "pages", side, ...`${e.path}.part-${String(i + 1).padStart(3, "0")}-of-${String(pages.length).padStart(3, "0")}.txt`.split("/")), pg.text),
+          path: writeFile(path.join(out, "pages", side, ...`${e.path}.part-${String(i + 1).padStart(3, "0")}-of-${String(pages.length).padStart(3, "0")}.txt`.split("/")), pg.text, BYTES),
           lines: `${pg.from}-${pg.to}`,
         }));
       }
@@ -519,7 +557,7 @@ function snapshot(o) {
 
   const sections = diffSnapshot(out);
   const patchText = sections.map((s) => s.text).join("");
-  const patchPath = writeFile(path.join(out, "scope.patch"), patchText);
+  const patchPath = writeFile(path.join(out, "scope.patch"), patchText, BYTES);
   const inPatch = new Set(sections.map((s) => s.path));
   const required = files.filter((f) => CONTENT.has(f.status) && !f.binary).map((f) => f.path);
   const missing = required.filter((p) => !inPatch.has(p));
@@ -530,10 +568,10 @@ function snapshot(o) {
       `scope.patch does not match the changed paths; no inventory written.${missing.length ? `\n  missing from the patch: ${missing.join(", ")}` : ""}${unexpected.length ? `\n  in the patch but not a content change: ${unexpected.join(", ")}` : ""}`,
     );
   }
-  const parts = Buffer.byteLength(patchText) > limit || patchText.split("\n").length > MAX_LINES ? patchParts(sections, limit) : [];
+  const parts = patchText.length > limit || lineCount(patchText) > MAX_LINES ? patchParts(sections, limit) : [];
   const partEntries = parts.map((p, i) => ({
-    path: writeFile(path.join(out, "scope.patch.parts", `part-${String(i + 1).padStart(3, "0")}-of-${String(parts.length).padStart(3, "0")}.patch`), p.text),
-    bytes: Buffer.byteLength(p.text),
+    path: writeFile(path.join(out, "scope.patch.parts", `part-${String(i + 1).padStart(3, "0")}-of-${String(parts.length).padStart(3, "0")}.patch`), p.text, BYTES),
+    bytes: p.text.length,
     files: p.paths,
   }));
 
@@ -548,7 +586,7 @@ function snapshot(o) {
     partLimitBytes: limit,
     excluded,
     uncovered,
-    patch: { path: patchPath, bytes: Buffer.byteLength(patchText), sha256: sha256(patchText), parts: partEntries },
+    patch: { path: patchPath, bytes: patchText.length, sha256: sha256(Buffer.from(patchText, BYTES)), parts: partEntries },
     counts: Object.fromEntries(["added", "modified", "deleted", "eol-only", "mode-only"].map((s) => [s, files.filter((f) => f.status === s).length])),
     files,
     dependencyNote: dependencyNote(root, entries),
