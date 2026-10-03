@@ -71,7 +71,7 @@ Ready = all deps verified. Ready steps share batch only if:
 - every allowed write path inside workspace root. Step writing outside runs alone, in main
   workspace: separate checkout can't isolate outside path, edits hit main env whatever
   audit says.
-  In-place round skips batch integration steps 1-3 (nothing to copy; its edits already differ from Baseline by design) → normal Integrate on its own audit.
+  In-place round skips batch integration steps 1-4 (nothing to copy; its edits already differ from Baseline by design) → normal Integrate on its own audit.
 
 Each batch round keeps full contract: own state entry, workspace, baseline, briefs,
 executor, auditor. Parallel executors never share workspace: one's edits land in other's
@@ -80,26 +80,17 @@ baseline diff → both audits `suspect`. Build round workspace from main, before
 `git worktree add --detach <path> <sha>`, copy in all main's untracked files + any ignored artifacts step needs (deps, build output). Never worktree at HEAD: drops earlier rounds'
 uncommitted verified work. Never plain copy of Git checkout: copied `.git` file still
 points at original's index, HEAD. Plain copies only outside Git. Take baseline inside
-round's own workspace.
+round's own workspace. Before checkout, record main's hashes for round's allowed write paths (`manifest.mjs` on main w/ those paths): conflict reference for integration. Round baseline stays executor-attribution reference; checkout filters (e.g. `core.autocrlf`) can make round bytes differ from main's.
 
 Dispatch all batch executors before waiting on any. Each auditor starts when its executor
 stops, not waiting on batch. Integrate after whole batch audited:
 
-1. Accepted round: apply manifest diff to main verbatim; copy added/modified paths from
-   round workspace, delete deleted paths. Main file not matching round baseline (or
-   present where baseline had none) = conflict → step back to Remaining for later batch;
-   not dead end.
-2. Separate-workspace verdicts don't prove steps work together. >1 round applied → one
-   fresh auditor runs all applied rounds' done-checks in main before any counts verified.
-   Failing step → Remaining w/ output; its applied paths recorded w/ revert-or-keep
-   decision.
-3. Rejected round's delta stays out of main: patch under `evidence/round-<N>/` (recovery
-   brief may cite), recorded not applied.
+1. Each accepted round: apply manifest diff to main workspace verbatim: copy each added/modified path from round workspace, delete each deleted path. Main file not matching main's pre-checkout hashes (or present where none recorded) = conflict → step back to Remaining for later batch; not dead end.
+2. Rejected round's delta stays out of main. Save as patch under `evidence/round-<N>/` (recovery brief may cite); record in state as not applied.
+3. Before removing any round workspace: copy every cited evidence file living in it (done-check output, ignored artifacts) into `evidence/round-<N>/`. Then unlink dep links in it (`rmdir` on junction/symlink), then `git worktree remove --force <path>`: dirty by design, so plain `git worktree remove` refuses; forcing before unlinking deletes through link into shared target.
+4. Separate-workspace verdicts don't prove steps work together or survive workspace removal (e.g. link into removed worktree). After removal, one fresh auditor runs every applied round's done-check in main workspace before any counts as verified. Step failing there → Remaining w/ that output; its applied paths → state w/ revert-or-keep decision.
 
-Then remove batch workspaces. Dirty by design, so plain `git worktree remove` refuses.
-After delta applied or patched: unlink dep links (`rmdir` junction/symlink), then
-`git worktree remove --force <path>`. Forcing first deletes through link into shared
-target. In-round, executor runs independent reads/searches/commands at once; read-only
+In-round, executor runs independent reads/searches/commands at once; read-only
 helpers OK if runtime allows. Parallel writers needed → split into steps in Remaining, run
 as parallel rounds.
 

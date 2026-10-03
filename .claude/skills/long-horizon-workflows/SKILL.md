@@ -111,7 +111,7 @@ Ready = all dependencies in Verified progress. Ready steps share batch only if:
 - every Write scope path inside workspace root. Step writing outside → runs alone, in main
   workspace: separate checkout can't isolate outside path, edits reach main env whatever
   audit says.
-  In-place round skips batch integration steps 1-3 (nothing to copy; its edits already differ from Baseline by design) → normal Integrate on its own audit.
+  In-place round skips batch integration steps 1-4 (nothing to copy; its edits already differ from Baseline by design) → normal Integrate on its own audit.
 
 Each batch round keeps whole contract: own Current round block, workspace, Baseline, briefs,
 executor, audit. Parallel executors never share workspace: one writer's edits land in other's
@@ -120,26 +120,17 @@ manifest diff → both audits `suspect`. Build each round's workspace from main 
 then copy in all main's untracked files + any ignored artifacts step needs (deps, build output).
 Never worktree at HEAD: drops earlier rounds' uncommitted verified work. Never plain copy of
 Git checkout: copied `.git` file still points at original's index + HEAD. Plain copies only
-for non-Git workspaces. Baseline taken inside round's own workspace.
+for non-Git workspaces. Baseline taken inside round's own workspace. Before checkout, record main's hashes for round's Write scope paths (`manifest.mjs` on main w/ those paths): conflict reference for integration. Round Baseline stays executor-attribution reference; checkout filters (e.g. `core.autocrlf`) can make round bytes differ from main's.
 
 Workflow engine: one Workflow call per round, own `args` (`workspace` = round's workspace);
 all batch calls in one msg. Agent engine: all executors in one msg; each auditor once its
 executor stops. Integrate after whole batch audited:
 
-1. Each passed round: apply manifest diff to main workspace verbatim: copy each
-   added/modified path from round workspace, delete each deleted path. Main file not matching
-   round's Baseline (or present where Baseline had none) = conflict → step back to Remaining
-   for later batch; not Dead end.
-2. Separate-workspace verdicts don't prove steps work together. >1 round applied → one fresh
-   auditor runs every applied round's done-check in main workspace before any enters
-   Verified progress. Step failing there → Remaining w/ that output; its applied paths →
-   Residue w/ revert-or-keep decision.
-3. Failed round's delta stays out of main. Save as patch under `evidence/round-<N>/`
-   (recovery brief may cite); record under Residue as not applied.
+1. Each passed round: apply manifest diff to main workspace verbatim: copy each added/modified path from round workspace, delete each deleted path. Main file not matching main's pre-checkout hashes (or present where none recorded) = conflict → step back to Remaining for later batch; not Dead end.
+2. Failed round's delta stays out of main. Save as patch under `evidence/round-<N>/` (recovery brief may cite); record in Residue as not applied.
+3. Before removing any round workspace: copy every cited evidence file living in it (done-check output, ignored artifacts) into `evidence/round-<N>/`. Then unlink dep links in it (`rmdir` on junction/symlink), then `git worktree remove --force <path>`: dirty by design, so plain `git worktree remove` refuses; forcing before unlinking deletes through link into shared target.
+4. Separate-workspace verdicts don't prove steps work together or survive workspace removal (e.g. link into removed worktree). After removal, one fresh auditor runs every applied round's done-check in main workspace before any enters Verified progress. Step failing there → Remaining w/ that output; its applied paths → Residue w/ revert-or-keep decision.
 
-Then remove batch workspaces. Dirty by design → plain `git worktree remove` refuses. Once
-delta applied or saved as patch: unlink dep links in it (`rmdir` on junction/symlink), then
-`git worktree remove --force <path>`. Forcing first deletes through link into shared target.
 Within round, executor runs independent reads/searches/commands at once; may fan out
 read-only subagents. Parallel-writer work = several steps: split in Remaining, run as
 parallel rounds.
