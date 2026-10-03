@@ -14,6 +14,25 @@ dirty/untracked content. Capture enough baseline to distinguish existing work. S
 Use path/content hashes for relevant dirty and untracked content; exclude task-owned
 report artifacts. Review evidence applies to that content; relevant later edits require renewed review.
 
+For uncommitted or untracked work, or a diff over about 1500 lines, freeze the scope with
+`node <this skill>/scripts/snapshot.mjs --base <ref> [--merge-base] [--root <dir>] [--exclude <report dir>]`
+(`--base` defaults to `HEAD`; use `--base origin/main --merge-base` for a branch or PR). The
+script always snapshots the checked-out working tree. To review a commit, branch or range
+whose head is not checked out, or a checkout with unrelated local edits, first create a clean
+worktree at the requested head (`git worktree add --detach <dir> <head>`) and pass `--root <dir>`. It
+compares the base with the working tree, untracked files included, and writes a folder under
+`.tmp/review-snapshots/` with `base/` and `head/` copies of changed files, `scope.patch`,
+`source-inventory.json` (path, status, SHA-256, absolute paths, scope hash) and `BRIEF.md`.
+CRLF becomes LF before diffing, so a pure line-ending flip is listed `eol-only` and stays out
+of the patch. Copies and patches over 48 KB or 1800 lines are also split into pages. The brief
+ends with a JS/TS import check listing `unresolvedDeps`. Exit 1 with no inventory means a
+changed path is missing from the patch: fix the cause, never review a partial patch. Before
+accepting findings, run `snapshot.mjs --verify <snapshot dir>`; exit 1 lists drifted paths,
+and findings on them are stale. When the caller already supplied a snapshot (a `BRIEF.md`
+path), use it as is. When this session cannot write files, for example a Manager in a
+read-only sandbox, do not run the script: use git commands for the scope, record the hashes
+above by hand, and state in the report that the scope was not frozen.
+
 An author brief is optional: facts only (the goal in one or two sentences, the files or
 behaviors most likely to break, related work in flight such as other PRs or merge order,
 and checks already run with results), never a verdict. The caller may supply one, or the
@@ -33,8 +52,13 @@ of the normal areas; correctness coverage is unchanged.
 Use currently exposed native agents first. Spawn with `fork_turns: "none"` or the runtime's
 actual fresh-context equivalent. Do not pass Manager reasoning or an author's proposed
 verdict. Give each reviewer scope, raw artifacts, relevant constraints, and these rules.
+With a snapshot, the scope is its `BRIEF.md` pasted verbatim; reviewers resolve every path
+against the absolute snapshot and workspace paths it names, never their own working directory
+or another checkout.
 The author brief goes to the intent reviewer only; every other reviewer gets the diff without it.
 Each is a leaf reviewer: no agents or review subprocesses of its own, no fixes or Git writes.
+Reviewers never enter plan mode, write a plan, or wait for approval; a report that does is a
+failed review for that area: rerun it or report the area as uncovered.
 
 For a small, low-risk change, use one independent reviewer. For broader work, cover all
 five areas, assigning reviewers or bounded batches according to actual available capacity:
@@ -76,13 +100,18 @@ shared product constraints remain relevant regardless of author. Do not import C
 session policies as Codex obligations.
 
 For each finding include location, concrete trigger, consequence, evidence, proposed fix,
-severity, and confidence. Keep severity separate from confidence. Missing access means a
+severity, and confidence, plus three lines: `Scope:` (the first 12 characters of the scope
+hash, or the git range), `Evidence: read-only` or `Evidence: executed` with each command and
+its result, and `Files read:` with absolute paths. Keep severity separate from confidence. Missing access means a
 check was unavailable, not that code passed. Report credible uncertain findings with their
 uncertainty; do not invent issues or promote style preferences into correctness blockers.
 Finding nothing is valid.
 
-Manager deduplicates and tries to refute findings against the actual source. Confirm,
-dismiss with evidence, or retain explicit uncertainty. When the intent reviewer ran, tag each
+Manager first sets aside findings whose `Scope:` differs from the run's scope hash or that sit
+on paths `--verify` reports as drifted; they need renewed review. Manager then deduplicates and
+tries to refute findings against the same snapshot copies the reviewer read, never a different
+checkout; a disagreement with a reviewer is settled there, citing the lines read and any
+command run. Confirm, dismiss with evidence, or retain explicit uncertainty. When the intent reviewer ran, tag each
 finding blind (diff-only reviewers), intent, or both; flag a blind-only finding in an area the
 brief called risky or covered. Rank globally by impact. Report
 actionable findings, material unavailable checks, reviewed scope, whether the intent reviewer ran, each standard
