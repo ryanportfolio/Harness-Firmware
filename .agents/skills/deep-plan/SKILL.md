@@ -90,7 +90,7 @@ Answers arrive as option labels or Other text. Classify each one and echo one li
 
 ## Handoff
 
-On Go, set `Status: closed` and render the ledger into a handoff block: Goal, Non-goals, Decisions (ID, choice, rejected options and why), Assumptions, Unknowns, Parked. Follow the chosen skill (`$writing-plans`, `$long-horizon`, `$enhance-prompt`) with the block; for long-horizon, shape it as the Contract and Acceptance sections; for None, or if the chosen skill turns out to be unavailable, print it. The receiving skill maps every decision ID to a step or N/A and does not reopen settled decisions.
+On Go, set `Status: closed` and render the ledger into a handoff block: Goal, Non-goals, Decisions (ID, choice, rejected options and why), Assumptions, Unknowns, Parked. Follow `$writing-plans` or `$enhance-prompt` with the block. For long-horizon, print the block shaped as its Contract and Acceptance sections and hand the user the `$long-horizon` command; do not start it, since it executes. For None, or if the chosen skill turns out to be unavailable, print the block. The receiving skill maps every decision ID to a step or N/A and does not reopen settled decisions.
 
 ## Pitfalls
 
