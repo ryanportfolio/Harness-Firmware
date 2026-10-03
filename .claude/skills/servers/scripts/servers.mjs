@@ -1,0 +1,299 @@
+#!/usr/bin/env node
+/* List, label and close the dev servers and automation browsers that sessions leave running.
+
+   node <servers skill>/scripts/servers.mjs [list] [--here] [--json] [--old-hours N]
+   node <servers skill>/scripts/servers.mjs register --port N | --pid N  --purpose "menu preview"
+   node <servers skill>/scripts/servers.mjs close stale|old|<port>|pid:<pid> [--yes]
+
+   What counts: TCP listeners on port 1024+ owned by a dev runtime (node, bun, deno, python, ...)
+   or by a recorded process, and Chrome/Edge/Chromium browser processes started for automation
+   (a --remote-debugging-* flag or their own --user-data-dir). A personal browser launched
+   normally has neither and is never listed.
+
+   Records live in ~/.claude/servers-registry/<pid>.json and say who started a process and why,
+   because Windows does not expose another process's working directory: `npm run dev` from a
+   worktree looks the same as one from any other folder. A record only counts while its pid
+   belongs to the same process: one that started after the record was written is a reused pid.
+
+   Flags per row:
+     gone      its worktree no longer exists on disk (a server left running after cleanup)
+     old       older than --old-hours (default 12)
+     unknown   a server with no record and no worktree path in its command line; never closed
+               by `stale`/`old` (automation browsers are never unknown: their flags identify them)
+     protected it, or a process under it, is listed in ~/.claude/servers-protect.txt (one port or
+               name substring per line); never closed by this script, since closing kills the tree
+   `close stale` closes rows flagged gone; `close old` closes recorded rows and automation
+   browsers flagged old or gone, so a long-running tool found only by its path is never swept up.
+   Without --yes it only prints the plan. Before closing, each process is checked again against a
+   fresh snapshot and skipped if its pid now belongs to a different process. */
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REG = path.join(os.homedir(), '.claude', 'servers-registry');
+const PROTECT = path.join(os.homedir(), '.claude', 'servers-protect.txt');
+const DEV_RUNTIMES = /^(node|bun|deno|python\d*|pythonw|ruby|php|java|dotnet|uvicorn|gunicorn|hugo|caddy|http-server|esbuild|vite)(\.exe)?$/i;
+const BROWSERS = /^(chrome|msedge|chromium|chrome-headless-shell)(\.exe)?$/i;
+const START_SLACK_MS = 10_000;
+
+const sh = (cmd, args) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 << 20, windowsHide: true });
+const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+
+/* Every process and every listening port. Throws when the system query fails, so a failed
+   query never looks like "nothing running" and never prunes records. */
+export function snapshot() {
+  if (process.platform === 'win32') {
+    const ps = `$ErrorActionPreference='Stop'
+$l = @(Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -ge 1024 } | Select-Object @{n='port';e={[int]$_.LocalPort}}, @{n='pid';e={[int]$_.OwningProcess}} -Unique)
+$p = @(Get-CimInstance Win32_Process | Select-Object @{n='pid';e={[int]$_.ProcessId}}, @{n='ppid';e={[int]$_.ParentProcessId}}, @{n='name';e={$_.Name}}, @{n='cmd';e={$_.CommandLine}}, @{n='start';e={if ($_.CreationDate) { $_.CreationDate.ToUniversalTime().ToString('o') }}})
+@{ listeners = $l; procs = $p } | ConvertTo-Json -Depth 3 -Compress`;
+    const r = sh('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps]);
+    if (r.status !== 0) throw new Error(`process snapshot failed: ${(r.stderr || '').trim().split('\n')[0]}`);
+    const data = JSON.parse(r.stdout);
+    const procs = [].concat(data.procs || []);
+    if (!procs.length) throw new Error('process snapshot returned no processes');
+    return { listeners: [].concat(data.listeners || []), procs };
+  }
+  const ps = sh('ps', ['-eo', 'pid=,ppid=,lstart=,args=']);
+  if (ps.status !== 0) throw new Error(`ps failed: ${(ps.stderr || '').trim()}`);
+  const procs = ps.stdout.split('\n').filter(Boolean).map((line) => {
+    const m = line.trim().match(/^(\d+)\s+(\d+)\s+(\w+\s+\w+\s+\d+\s+[\d:]+\s+\d+)\s+(.*)$/);
+    if (!m) return null;
+    const cmd = m[4];
+    return { pid: +m[1], ppid: +m[2], start: new Date(m[3]).toISOString(), cmd, name: path.basename(cmd.split(' ')[0]) };
+  }).filter(Boolean);
+  if (!procs.length) throw new Error('ps returned no processes');
+  const lsof = sh('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn']);
+  if (lsof.error) throw new Error(`lsof unavailable: ${lsof.error.message}`);
+  const listeners = [];
+  for (const line of (lsof.stdout || '').split('\n')) {
+    if (line.startsWith('p')) listeners.push({ pid: +line.slice(1), port: null });
+    else if (line.startsWith('n') && listeners.length) {
+      const port = +line.split(':').pop();
+      const last = listeners[listeners.length - 1];
+      if (last.port === null) last.port = port; else listeners.push({ pid: last.pid, port });
+    }
+  }
+  return { listeners: listeners.filter((l) => l.port >= 1024), procs };
+}
+
+/* The git worktree or repository root that contains `p`, walking up; null if none. */
+function repoRoot(p) {
+  for (let d = path.resolve(p); ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, '.git'))) return d;
+    if (path.dirname(d) === d) return null;
+  }
+}
+
+/* Absolute paths in a command line, and whether the worktree they point into still exists. */
+function worktreeOf(cmd) {
+  const paths = String(cmd || '').match(/[A-Za-z]:[\\/][^"'\s]+|\/(?:home|Users|srv|opt|var|tmp|mnt)\/[^"'\s]+/g) || [];
+  for (const p of paths) {
+    const m = p.replace(/\\/g, '/').match(/^(.*?\/\.claude\/worktrees\/[^/]+)/);
+    if (m) return { worktree: path.normalize(m[1]), gone: !fs.existsSync(m[1]) };
+    if (/[\\/]Program Files|[\\/]AppData[\\/]|[\\/]nodejs[\\/]|[\\/]usr[\\/]/i.test(p)) continue;
+    const root = repoRoot(p.split(/[\\/]node_modules[\\/]/)[0]);
+    if (root) return { worktree: root, gone: false };
+  }
+  return null;
+}
+
+/* Worktree roots of the repository containing `cwd` (its main checkout and linked worktrees). */
+export function repoWorktrees(cwd = process.cwd()) {
+  const r = sh('git', ['-C', cwd, 'worktree', 'list', '--porcelain']);
+  if (r.status !== 0) return [];
+  return r.stdout.split(/\r?\n/).filter((l) => l.startsWith('worktree ')).map((l) => path.normalize(l.slice(9)));
+}
+
+export function readRegistry() {
+  if (!fs.existsSync(REG)) return new Map();
+  const out = new Map();
+  for (const f of fs.readdirSync(REG)) {
+    try { const r = JSON.parse(fs.readFileSync(path.join(REG, f), 'utf8')); out.set(r.pid, r); } catch {}
+  }
+  return out;
+}
+
+/* A record describes this process only if the process was already running when it was written. */
+function recordMatches(rec, proc) {
+  if (!rec || !proc?.start) return false;
+  if (rec.procStart) return Math.abs(Date.parse(rec.procStart) - Date.parse(proc.start)) < 2000;
+  return Date.parse(proc.start) <= Date.parse(rec.recordedAt) + START_SLACK_MS;
+}
+
+/* Record who started a process and why. */
+export function registerProcess({ pid, port = null, kind = 'server', purpose = '', cwd = process.cwd(), procStart = null }) {
+  fs.mkdirSync(REG, { recursive: true });
+  const rec = {
+    pid, port, kind, purpose, procStart,
+    worktree: repoRoot(cwd) || path.resolve(cwd),
+    session: process.env.CLAUDE_CODE_SESSION_ID || process.env.CODEX_THREAD_ID || null,
+    recordedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(path.join(REG, `${pid}.json`), JSON.stringify(rec, null, 1));
+  return rec;
+}
+
+/* Find the browser process launched with a unique marker argument and record it.
+   Used by scripts/lib/launch-chrome.mjs, whose Playwright Browser object does not expose a pid. */
+export function registerByMarker(marker, { kind = 'browser', purpose = '', cwd = process.cwd() } = {}) {
+  const proc = snapshot().procs.find((p) => (p.cmd || '').includes(marker) && !/--type=/.test(p.cmd || ''));
+  return proc ? registerProcess({ pid: proc.pid, kind, purpose, cwd, procStart: proc.start }) : null;
+}
+
+function protectedList() {
+  if (!fs.existsSync(PROTECT)) return [];
+  return fs.readFileSync(PROTECT, 'utf8').split(/\r?\n/).map((s) => s.trim()).filter((s) => s && !s.startsWith('#'));
+}
+
+export function scan({ oldHours = 12 } = {}) {
+  const snappedAt = Date.now();
+  const { listeners, procs } = snapshot();
+  const byPid = new Map(procs.map((p) => [p.pid, p]));
+  const reg = readRegistry();
+  // prune records whose process is gone or was replaced, but never one written after this snapshot began
+  for (const [pid, rec] of reg) {
+    if (recordMatches(rec, byPid.get(pid))) continue;
+    if (Date.parse(rec.recordedAt) < snappedAt) fs.rmSync(path.join(REG, `${pid}.json`), { force: true });
+    reg.delete(pid);
+  }
+  const protect = protectedList();
+  const portsOf = new Map();
+  for (const l of listeners) portsOf.set(l.pid, [...(portsOf.get(l.pid) || []), l.port]);
+  const children = new Map();
+  for (const p of procs) children.set(p.ppid, [...(children.get(p.ppid) || []), p.pid]);
+  const isProtected = (pid) => {
+    const p = byPid.get(pid);
+    const ports = (portsOf.get(pid) || []).map(String);
+    return protect.some((x) => ports.includes(x) || (p?.name || '').includes(x) || (p?.cmd || '').includes(x));
+  };
+  /* The pid and everything under it, as the tree kill would reach it. */
+  const tree = (pid) => {
+    const out = [];
+    for (const stack = [pid]; stack.length;) {
+      const p = stack.pop();
+      if (out.includes(p)) continue;
+      out.push(p);
+      stack.push(...(children.get(p) || []));
+    }
+    return out;
+  };
+  /* A recorded ancestor labels its children: `npm run dev` records the npm pid, vite listens. */
+  const recordFor = (pid) => {
+    for (let p = pid, hops = 0; p && hops < 8; p = byPid.get(p)?.ppid, hops++) if (reg.has(p)) return reg.get(p);
+    return null;
+  };
+
+  const rows = new Map();
+  const add = (pid, kind, port) => {
+    const p = byPid.get(pid);
+    if (!p) return;
+    const row = rows.get(pid) || { pid, kind, ports: [], name: p.name, cmd: p.cmd || '', start: p.start };
+    if (port) row.ports.push(port);
+    rows.set(pid, row);
+  };
+  for (const l of listeners) {
+    const p = byPid.get(l.pid);
+    if (p && (DEV_RUNTIMES.test(p.name) || recordFor(l.pid))) add(l.pid, 'server', l.port);
+  }
+  for (const p of procs) {
+    if (!BROWSERS.test(p.name) || /--type=/.test(p.cmd || '')) continue;
+    if (/--remote-debugging-(port|pipe)|--user-data-dir/.test(p.cmd || '') || reg.has(p.pid)) add(p.pid, 'browser');
+  }
+  for (const [pid, r] of reg) if (!rows.has(pid)) add(pid, r.kind || 'server', r.port);
+
+  const now = Date.now();
+  return [...rows.values()].map((row) => {
+    const rec = recordFor(row.pid);
+    const wt = rec ? { worktree: rec.worktree, gone: !fs.existsSync(rec.worktree) } : worktreeOf(row.cmd);
+    const ageH = row.start ? (now - Date.parse(row.start)) / 36e5 : null;
+    const flags = [];
+    if (wt?.gone) flags.push('gone');
+    if (ageH !== null && ageH > oldHours) flags.push('old');
+    if (!rec && !wt && row.kind !== 'browser') flags.push('unknown');
+    if (tree(row.pid).some(isProtected)) flags.push('protected');
+    return { ...row, ageH: ageH === null ? null : +ageH.toFixed(1), worktree: wt?.worktree || null, purpose: rec?.purpose || '', session: rec?.session || null, recorded: !!rec, flags };
+  }).sort((a, b) => (a.ports[0] || 1e9) - (b.ports[0] || 1e9));
+}
+
+function treeKill(pid) {
+  if (process.platform === 'win32') return sh('taskkill', ['/PID', String(pid), '/T', '/F']).status === 0;
+  const kids = sh('pkill', ['-TERM', '-P', String(pid)]);
+  if (kids.status !== 0 && kids.status !== 1) return false; // 1 = no children matched
+  try { process.kill(pid, 'SIGTERM'); return true; } catch { return false; }
+}
+
+function fmt(r) {
+  const age = r.ageH === null ? '?' : r.ageH < 1 ? `${Math.round(r.ageH * 60)}m` : `${r.ageH}h`;
+  const where = r.worktree ? r.worktree.replace(os.homedir(), '~') : '(unknown folder)';
+  const label = r.purpose ? ` "${r.purpose}"` : '';
+  const flags = r.flags.length ? ` [${r.flags.join(', ')}]` : '';
+  return `${(r.ports.length ? ':' + r.ports.join(',:') : r.kind).padEnd(14)} pid ${String(r.pid).padEnd(7)} ${age.padStart(5)}  ${where}${label}${flags}`;
+}
+
+function main(argv) {
+  const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
+  const has = (k) => argv.includes(k);
+  const cmd = argv[0] && !argv[0].startsWith('--') ? argv[0] : 'list';
+  const oldHours = +opt('--old-hours', 12);
+
+  if (cmd === 'register') {
+    const snap = snapshot();
+    let pid = opt('--pid') ? +opt('--pid') : null;
+    const port = opt('--port') ? +opt('--port') : null;
+    if (!pid && port) pid = snap.listeners.find((l) => l.port === port)?.pid ?? null;
+    const proc = snap.procs.find((p) => p.pid === pid);
+    if (!proc) { console.error('register: no such process; pass --pid, or --port of a listening server'); return 1; }
+    const rec = registerProcess({ pid, port, kind: opt('--kind', 'server'), purpose: opt('--purpose', ''), procStart: proc.start });
+    console.log(`recorded pid ${rec.pid}${port ? ` :${port}` : ''} in ${rec.worktree}${rec.purpose ? ` "${rec.purpose}"` : ''}`);
+    return 0;
+  }
+
+  let rows = scan({ oldHours });
+  if (has('--here')) {
+    const trees = repoWorktrees();
+    rows = rows.filter((r) => r.worktree && trees.some((t) => same(t, r.worktree)));
+  }
+
+  if (cmd === 'list') {
+    if (has('--json')) { console.log(JSON.stringify(rows, null, 1)); return 0; }
+    if (!rows.length) { console.log('Nothing running.'); return 0; }
+    for (const r of rows) console.log(fmt(r));
+    return 0;
+  }
+
+  if (cmd === 'close') {
+    const target = argv[1];
+    if (!target) { console.error('close: give stale, old, a port, or pid:<pid>'); return 1; }
+    const explicit = /^\d+$|^pid:/.test(target);
+    const pick = target === 'stale' ? rows.filter((r) => r.flags.includes('gone'))
+      : target === 'old' ? rows.filter((r) => (r.recorded || r.kind === 'browser') && (r.flags.includes('old') || r.flags.includes('gone')))
+      : target.startsWith('pid:') ? rows.filter((r) => r.pid === +target.slice(4))
+      : rows.filter((r) => r.ports.includes(+target));
+    const blocked = pick.filter((r) => r.flags.includes('protected'));
+    const go = pick.filter((r) => !r.flags.includes('protected') && (explicit || !r.flags.includes('unknown')));
+    for (const r of blocked) console.log(`skip (protected, or runs a protected process) ${fmt(r)}`);
+    if (!go.length) { console.log('Nothing to close.'); return 0; }
+    for (const r of go) console.log(`${has('--yes') ? 'closing' : 'would close'} ${fmt(r)}`);
+    if (!has('--yes')) { console.log('Re-run with --yes to close these.'); return 0; }
+    const fresh = new Map(snapshot().procs.map((p) => [p.pid, p]));
+    let failed = 0;
+    for (const r of go) {
+      const now = fresh.get(r.pid);
+      if (!now) { console.log(`already gone: pid ${r.pid}`); fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true }); continue; }
+      if (now.start !== r.start) { failed++; console.error(`skipped pid ${r.pid}: it now belongs to a different process`); continue; }
+      if (treeKill(r.pid)) fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true });
+      else { failed++; console.error(`failed to close pid ${r.pid}`); }
+    }
+    return failed ? 1 : 0;
+  }
+
+  console.error(`unknown command: ${cmd}`);
+  return 1;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try { process.exitCode = main(process.argv.slice(2)); } catch (err) { console.error(err.message); process.exitCode = 1; }
+}

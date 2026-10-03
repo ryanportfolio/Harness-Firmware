@@ -23,7 +23,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { registerProcess } from './servers.mjs';
+import { randomUUID } from 'node:crypto';
 
 const PS1 = join(dirname(fileURLToPath(import.meta.url)), 'window-place.ps1');
 const OFFSCREEN = { x: -2400, y: -2400, width: 1600, height: 1000 };
@@ -69,13 +69,17 @@ function plan(mode) {
 
 /* Launch headed Chrome, placed. Returns what chromium.launch() returns.
    Extra opts: place ('other-monitor' | 'offscreen' | 'here'), args (appended),
-   purpose (label recorded for scripts/lib/servers.mjs). */
+   purpose (label recorded by the servers skill). */
 export async function launchPlacedChrome({ place, args = [], purpose, ...opts } = {}) {
   const chromium = await loadChromium();
   const mode = place || process.env.CHROME_PLACE || 'other-monitor';
   const spot = plan(mode);
+  // Chrome ignores unknown switches; this one lets the servers skill find the process, since
+  // a Playwright Browser from launch() exposes no pid
+  const marker = `--harness-launch=${randomUUID()}`;
 
   const launchArgs = [
+    marker,
     ...BACKGROUNDING_ARGS,
     ...(spot ? [`--window-position=${spot.x},${spot.y}`, `--window-size=${spot.width},${spot.height}`] : []),
     ...args,
@@ -99,14 +103,15 @@ export async function launchPlacedChrome({ place, args = [], purpose, ...opts } 
     }
   }
   if (spot) console.log(`[launch-chrome] window on ${spot.target} at ${spot.x},${spot.y}`);
-  // record the browser so `node scripts/lib/servers.mjs` can say which session opened it and close it later
-  const pid = browser.process?.()?.pid;
-  if (pid) {
-    try {
-      registerProcess({ pid, kind: 'browser', purpose: purpose || 'verification browser' });
-    } catch (err) {
-      console.warn(`[launch-chrome] browser record skipped: ${err.message}`);
+  // record the browser so the servers skill can say which session opened it and close it later;
+  // optional: a project without that skill still gets its browser
+  try {
+    const servers = await import('../../.claude/skills/servers/scripts/servers.mjs');
+    if (!servers.registerByMarker(marker, { purpose: purpose || 'verification browser' })) {
+      console.warn('[launch-chrome] browser record skipped: launched process not found');
     }
+  } catch (err) {
+    console.warn(`[launch-chrome] browser record skipped: ${err.message}`);
   }
   return browser;
 }

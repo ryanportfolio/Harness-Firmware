@@ -1,29 +1,31 @@
 #!/usr/bin/env node
 /* Is this checkout safe to archive? Collects the facts a session needs before it says yes.
 
-   node scripts/lib/wrapup.mjs [--json] [--worktrees]
+   node <wrapup skill>/scripts/wrapup.mjs [--json] [--worktrees]
 
    Checks, for the checkout in the current directory:
      uncommitted   modified, staged or untracked files (git status)
-     unpushed      commits on this branch that no remote has
+     unpushed      commits at HEAD that no remote has
      pr            this branch's pull request and its state, via gh when available
      scratch       ignored scratch folders (.tmp/) that removing this worktree would delete
-     running       dev servers and automation browsers started from this repository
-     worktrees     other worktrees of this repository: merged ones are cleanup candidates,
-                   dirty or unpushed ones hold work
-   Prints BLOCKED with the reasons, or READY. Exit code 0 either way; 2 when not a git checkout.
-   Read-only: changes nothing. */
+     running       dev servers and automation browsers started from this checkout
+     worktrees     other worktrees of this repository: ones sitting exactly on a merged PR head
+                   are cleanup candidates, dirty or unpushed ones hold work
+   Prints BLOCKED with the reasons, or READY. A check that cannot run blocks READY: missing
+   evidence is never read as "nothing to worry about". Exit code 0 either way; 2 when not a git
+   checkout. Read-only apart from a `git fetch`. */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scan } from './servers.mjs';
+import { scan, repoWorktrees } from '../../servers/scripts/servers.mjs';
 
 const run = (cmd, args, cwd) => {
   const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', windowsHide: true, maxBuffer: 32 << 20 });
-  return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || '').trim() };
+  return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || r.error?.message || '').trim() };
 };
 const git = (args, cwd) => run('git', args, cwd);
+const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 
 function dirStats(dir) {
   let files = 0, bytes = 0;
@@ -44,18 +46,33 @@ function defaultBranch(cwd) {
   return r.ok ? r.out.replace(/^origin\//, '') : 'main';
 }
 
-/* Commits on `ref` that no remote-tracking branch has. */
-function unpushedCount(ref, cwd) {
-  const r = git(['rev-list', '--count', ref, '--not', '--remotes'], cwd);
+/* Branch -> commit on origin, read from the remote itself: a clone whose fetch refspec covers
+   only main has no remote-tracking ref for other branches, so --remotes alone undercounts. */
+function remoteHeads(cwd) {
+  const r = git(['ls-remote', '--heads', 'origin'], cwd);
+  if (!r.ok) return null;
+  return new Map(r.out.split('\n').filter(Boolean).map((l) => { const [sha, ref] = l.split(/\s+/); return [ref.replace('refs/heads/', ''), sha]; }));
+}
+
+/* Commits at the checkout's HEAD that no remote has; null when git fails. `remoteSha` is the
+   branch's commit on origin, fetched first if this clone does not have it. */
+function unpushedCount(cwd, branch, heads) {
+  const remoteSha = branch && heads ? heads.get(branch) : null;
+  const args = ['rev-list', '--count', 'HEAD', '--not', '--remotes'];
+  if (remoteSha) {
+    if (git(['rev-parse', 'HEAD'], cwd).out === remoteSha) return 0;
+    if (!git(['cat-file', '-e', `${remoteSha}^{commit}`], cwd).ok) git(['fetch', '--quiet', 'origin', `refs/heads/${branch}`], cwd);
+    if (git(['cat-file', '-e', `${remoteSha}^{commit}`], cwd).ok) args.push(remoteSha);
+  }
+  const r = git(args, cwd);
   return r.ok ? +r.out : null;
 }
 
 function prFor(branch, cwd) {
   if (!run('gh', ['--version']).ok) return { unavailable: 'gh not installed' };
-  const r = run('gh', ['pr', 'list', '--head', branch, '--state', 'all', '--limit', '1', '--json', 'number,state,url,isDraft,mergeStateStatus'], cwd);
+  const r = run('gh', ['pr', 'list', '--head', branch, '--state', 'all', '--limit', '1', '--json', 'number,state,url,headRefOid'], cwd);
   if (!r.ok) return { unavailable: r.err.split('\n')[0] || 'gh failed' };
-  const pr = JSON.parse(r.out || '[]')[0];
-  return pr || null;
+  return JSON.parse(r.out || '[]')[0] || null;
 }
 
 /* Branch -> head commits of its merged pull requests. Squash merges leave the branch's own
@@ -70,11 +87,12 @@ function mergedPrHeads(cwd) {
   return heads;
 }
 
-function worktrees(cwd, here, base) {
+function worktrees(cwd, here, base, heads) {
   const r = git(['worktree', 'list', '--porcelain'], cwd);
   if (!r.ok) return [];
   const merged = new Set(git(['branch', '--format=%(refname:short)', '--merged', `origin/${base}`], cwd).out.split('\n').filter(Boolean));
   const prHeads = mergedPrHeads(cwd);
+  // the first entry is the main checkout: never a cleanup candidate
   return r.out.split(/\r?\n\r?\n/).slice(1).map((block) => {
     const wt = { path: '', branch: null };
     for (const line of block.split(/\r?\n/)) {
@@ -83,13 +101,15 @@ function worktrees(cwd, here, base) {
       if (line === 'prunable' || line.startsWith('prunable ')) wt.prunable = true;
     }
     return wt;
-  }).filter((wt) => wt.path && path.resolve(wt.path).toLowerCase() !== path.resolve(here).toLowerCase()).map((wt) => {
+  }).filter((wt) => wt.path && !same(wt.path, here)).map((wt) => {
     if (wt.prunable || !fs.existsSync(wt.path)) return { ...wt, state: 'missing folder (git worktree prune)' };
-    const dirty = git(['status', '--porcelain'], wt.path).out.split('\n').filter(Boolean).length;
+    const status = git(['status', '--porcelain'], wt.path);
+    if (!status.ok) return { ...wt, state: 'check failed' };
+    const dirty = status.out.split('\n').filter(Boolean).length;
     const head = git(['rev-parse', 'HEAD'], wt.path).out;
     const isMerged = !!wt.branch && (merged.has(wt.branch) || (prHeads.get(wt.branch) || []).includes(head));
-    const unpushed = wt.branch && !isMerged ? unpushedCount(wt.branch, cwd) : 0;
-    const state = dirty ? `${dirty} uncommitted` : unpushed ? `${unpushed} unpushed` : isMerged ? 'merged, removable' : 'clean';
+    const unpushed = isMerged ? 0 : unpushedCount(wt.path, wt.branch, heads);
+    const state = dirty ? `${dirty} uncommitted` : unpushed === null ? 'check failed' : unpushed ? `${unpushed} unpushed` : isMerged ? 'merged, removable' : 'clean';
     return { ...wt, dirty, unpushed, state };
   });
 }
@@ -98,38 +118,46 @@ export function wrapup(cwd = process.cwd()) {
   const top = git(['rev-parse', '--show-toplevel'], cwd);
   if (!top.ok) return null;
   const here = path.normalize(top.out);
-  git(['fetch', '--quiet', 'origin'], here);
+  const blockers = [];
+  const notes = [];
+  if (!git(['fetch', '--quiet', 'origin'], here).ok) notes.push('git fetch failed; remote state may be stale');
   const base = defaultBranch(here);
   const branch = git(['branch', '--show-current'], here).out || null;
-  const status = git(['status', '--porcelain'], here).out.split('\n').filter(Boolean);
-  const unpushed = branch ? unpushedCount(branch, here) : unpushedCount('HEAD', here);
+  const statusRun = git(['status', '--porcelain'], here);
+  const status = statusRun.ok ? statusRun.out.split('\n').filter(Boolean) : [];
+  const heads = remoteHeads(here);
+  if (!heads) notes.push('could not read branch heads from origin; unpushed counts use local remote-tracking refs only');
+  const unpushed = unpushedCount(here, branch, heads);
+  const head = git(['rev-parse', 'HEAD'], here).out;
   const pr = branch && branch !== base ? prFor(branch, here) : null;
   const scratch = ['.tmp'].map((d) => ({ dir: d, ...dirStats(path.join(here, d)) })).filter((s) => s.files);
   let running = [];
   let runningError = null;
   try {
-    const common = path.dirname(path.resolve(here, git(['rev-parse', '--git-common-dir'], here).out));
-    running = scan().filter((r) => r.worktree && path.resolve(r.worktree).toLowerCase().startsWith(common.toLowerCase()));
+    const trees = repoWorktrees(here);
+    running = scan().filter((r) => r.worktree && trees.some((t) => same(t, r.worktree)));
   } catch (err) { runningError = err.message; }
-  const others = worktrees(here, here, base);
+  const others = worktrees(here, here, base, heads);
 
-  const blockers = [];
-  const notes = [];
+  if (!statusRun.ok) blockers.push(`git status failed: ${statusRun.err.split('\n')[0]}`);
   if (status.length) blockers.push(`${status.length} uncommitted change(s) in ${here}`);
-  if (unpushed && pr?.state === 'MERGED') notes.push(`${unpushed} local commit(s) are not on a remote, but PR #${pr.number} merged; check they were part of it`);
-  else if (unpushed) blockers.push(`${unpushed} commit(s) on ${branch || 'HEAD'} not on any remote`);
+  if (unpushed === null) blockers.push('could not count commits missing from the remote');
+  else if (unpushed && pr?.state === 'MERGED' && pr.headRefOid === head) notes.push(`HEAD is the merged head of PR #${pr.number}; its commits are on main through the merge`);
+  else if (unpushed) blockers.push(`${unpushed} commit(s) at HEAD not on any remote`);
   if (!branch) notes.push('detached HEAD');
   if (pr?.state === 'OPEN') notes.push(`PR #${pr.number} is open, not merged (${pr.url})`);
   if (pr?.unavailable) notes.push(`PR check unavailable: ${pr.unavailable}`);
   for (const s of scratch) notes.push(`${s.dir}/ holds ${s.files} file(s), ${(s.bytes / 1e6).toFixed(1)} MB; removing this worktree deletes them`);
-  const mine = running.filter((r) => path.resolve(r.worktree).toLowerCase().startsWith(here.toLowerCase()));
+  const mine = running.filter((r) => same(r.worktree, here));
   if (mine.length) blockers.push(`${mine.length} server(s)/browser(s) still running from this checkout`);
-  else if (running.length) notes.push(`${running.length} server(s)/browser(s) running from other worktrees of this repo`);
-  if (runningError) notes.push(`running-process check failed: ${runningError}`);
+  if (running.length > mine.length) notes.push(`${running.length - mine.length} server(s)/browser(s) running from other worktrees of this repo`);
+  if (runningError) blockers.push(`running-process check failed: ${runningError}`);
   const holding = others.filter((w) => w.dirty || w.unpushed);
   const removable = others.filter((w) => w.state.startsWith('merged') || w.state.startsWith('missing'));
+  const unchecked = others.filter((w) => w.state === 'check failed');
   if (holding.length) notes.push(`${holding.length} other worktree(s) hold uncommitted or unpushed work`);
   if (removable.length) notes.push(`${removable.length} other worktree(s) are merged or missing and can be removed`);
+  if (unchecked.length) notes.push(`${unchecked.length} other worktree(s) could not be checked`);
 
   return { checkout: here, branch, base, verdict: blockers.length ? 'BLOCKED' : 'READY', blockers, notes, uncommitted: status, unpushed, pr, scratch, running, worktrees: others };
 }
