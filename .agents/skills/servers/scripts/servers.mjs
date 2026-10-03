@@ -127,7 +127,8 @@ export function readRegistry() {
 /* A record describes this process only if the process was already running when it was written. */
 function recordMatches(rec, proc) {
   if (!rec || !proc?.start) return false;
-  if (rec.procStart) return Math.abs(Date.parse(rec.procStart) - Date.parse(proc.start)) < 2000;
+  // procStart comes from the same snapshot query, so the same process reports the same value
+  if (rec.procStart) return Date.parse(rec.procStart) === Date.parse(proc.start);
   return Date.parse(proc.start) <= Date.parse(rec.recordedAt) + START_SLACK_MS;
 }
 
