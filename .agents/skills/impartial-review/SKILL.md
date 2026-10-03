@@ -28,7 +28,7 @@ of the patch. Copies and patches over 48 KB or 1800 lines are also split into pa
 ends with a JS/TS import check listing `unresolvedDeps`. Exit 1 with no inventory means a
 changed path is missing from the patch: fix the cause, never review a partial patch. Before
 accepting findings, run `snapshot.mjs --verify <snapshot dir>`; exit 1 lists drifted paths,
-and findings on them are stale. When the caller already supplied a snapshot (a `BRIEF.md`
+and findings on them are stale, or altered snapshot files, which need a fresh snapshot. When the caller already supplied a snapshot (a `BRIEF.md`
 path), use it as is. When this session cannot write files, for example a Manager in a
 read-only sandbox, do not run the script: use git commands for the scope, record the hashes
 above by hand, and state in the report that the scope was not frozen.
