@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url';
 
 const REG = path.join(os.homedir(), '.claude', 'servers-registry');
 const PROTECT = path.join(os.homedir(), '.claude', 'servers-protect.txt');
-const DEV_RUNTIMES = /^(node|bun|deno|python\d*|pythonw|ruby|php|java|dotnet|uvicorn|gunicorn|hugo|caddy|http-server|esbuild|vite)(\.exe)?$/i;
+const DEV_RUNTIMES = /^(node|bun|deno|python[\d.]*|pythonw|ruby|php|java|dotnet|uvicorn|gunicorn|hugo|caddy|http-server|esbuild|vite)(\.exe)?$/i;
 const BROWSERS = /^(chrome|msedge|chromium|chromium-browser|chrome-headless-shell|google chrome|google chrome for testing|microsoft edge)(\.exe)?$/i;
 const START_SLACK_MS = 10_000;
 
@@ -49,7 +49,10 @@ export const same = (a, b) => !!a && !!b && fold(path.resolve(a)) === fold(path.
    and never prunes records. */
 export function snapshot() {
   if (process.platform === 'win32') {
+    // Windows PowerShell writes in the console code page unless told otherwise; paths and
+    // command lines with non-ASCII characters would reach Node garbled
     const ps = `$ErrorActionPreference='Stop'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $l = @(Get-NetTCPConnection -State Listen | Select-Object @{n='port';e={[int]$_.LocalPort}}, @{n='pid';e={[int]$_.OwningProcess}} -Unique)
 $p = @(Get-CimInstance Win32_Process | Select-Object @{n='pid';e={[int]$_.ProcessId}}, @{n='ppid';e={[int]$_.ParentProcessId}}, @{n='name';e={$_.Name}}, @{n='cmd';e={$_.CommandLine}}, @{n='start';e={if ($_.CreationDate) { $_.CreationDate.ToUniversalTime().ToString('o') }}})
 @{ listeners = $l; procs = $p } | ConvertTo-Json -Depth 3 -Compress`;

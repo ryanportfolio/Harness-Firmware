@@ -129,8 +129,12 @@ function worktrees(cwd, here, base, heads) {
     const head = git(['rev-parse', 'HEAD'], wt.path).out;
     const isMerged = !!wt.branch && (merged.has(wt.branch) || (prHeads.get(wt.branch) || []).includes(head));
     const unpushed = isMerged ? 0 : unpushedCount(wt.path, wt.branch, heads);
-    const state = dirty ? `${dirty} uncommitted` : unpushed === null ? 'check failed' : unpushed ? `${unpushed} unpushed` : isMerged && !wt.main ? 'merged, removable' : 'clean';
-    return { ...wt, dirty, unpushed, state };
+    let state = dirty ? `${dirty} uncommitted` : unpushed === null ? 'check failed' : unpushed ? `${unpushed} unpushed` : isMerged && !wt.main ? 'merged, removable' : 'clean';
+    // ignored scratch is invisible to git status, and removing the worktree deletes it
+    const scratch = state === 'merged, removable' ? dirStats(path.join(wt.path, '.tmp')) : null;
+    if (scratch?.error) state = 'check failed';
+    else if (scratch?.files) state += ` (deletes .tmp/: ${scratch.files} file(s), ${(scratch.bytes / 1e6).toFixed(1)} MB)`;
+    return { ...wt, dirty, unpushed, scratch, state };
   });
 }
 
