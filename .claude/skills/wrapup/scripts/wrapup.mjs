@@ -54,18 +54,21 @@ function remoteHeads(cwd) {
   return new Map(r.out.split('\n').filter(Boolean).map((l) => { const [sha, ref] = l.split(/\s+/); return [ref.replace('refs/heads/', ''), sha]; }));
 }
 
-/* Commits at the checkout's HEAD that no remote has; null when git fails. `remoteSha` is the
-   branch's commit on origin, fetched first if this clone does not have it. */
+/* Commits at the checkout's HEAD that no live branch on origin has; null when that cannot be
+   established. Only heads origin reports right now count: a cached remote-tracking ref can
+   outlive the branch it tracked. The checkout's own branch head is fetched if missing. */
 function unpushedCount(cwd, branch, heads) {
-  const remoteSha = branch && heads ? heads.get(branch) : null;
-  const args = ['rev-list', '--count', 'HEAD', '--not', '--remotes'];
-  if (remoteSha) {
-    if (git(['rev-parse', 'HEAD'], cwd).out === remoteSha) return 0;
-    if (!git(['cat-file', '-e', `${remoteSha}^{commit}`], cwd).ok) git(['fetch', '--quiet', 'origin', `refs/heads/${branch}`], cwd);
-    if (git(['cat-file', '-e', `${remoteSha}^{commit}`], cwd).ok) args.push(remoteSha);
-  }
-  const r = git(args, cwd);
-  return r.ok ? +r.out : null;
+  if (!heads) return null;
+  const own = branch ? heads.get(branch) : null;
+  if (own && git(['rev-parse', 'HEAD'], cwd).out === own) return 0;
+  if (own && !git(['cat-file', '-e', `${own}^{commit}`], cwd).ok) git(['fetch', '--quiet', 'origin', `refs/heads/${branch}`], cwd);
+  // one batch lookup for which live heads this clone has, one rev-list fed through stdin
+  const shas = [...new Set(heads.values())];
+  const have = spawnSync('git', ['cat-file', '--batch-check'], { cwd, input: shas.join('\n') + '\n', encoding: 'utf8', windowsHide: true });
+  if (have.status !== 0) return null;
+  const live = have.stdout.split('\n').filter((l) => / commit /.test(l)).map((l) => l.split(' ')[0]);
+  const r = spawnSync('git', ['rev-list', '--count', 'HEAD', '--stdin'], { cwd, input: live.map((s) => `^${s}`).join('\n') + '\n', encoding: 'utf8', windowsHide: true });
+  return r.status === 0 ? +r.stdout.trim() : null;
 }
 
 function prFor(branch, cwd) {
@@ -126,7 +129,7 @@ export function wrapup(cwd = process.cwd()) {
   const statusRun = git(['status', '--porcelain'], here);
   const status = statusRun.ok ? statusRun.out.split('\n').filter(Boolean) : [];
   const heads = remoteHeads(here);
-  if (!heads) notes.push('could not read branch heads from origin; unpushed counts use local remote-tracking refs only');
+  if (!heads) blockers.push('could not reach origin to confirm the work is on GitHub');
   const unpushed = unpushedCount(here, branch, heads);
   const head = git(['rev-parse', 'HEAD'], here).out;
   const pr = branch && branch !== base ? prFor(branch, here) : null;
@@ -141,7 +144,7 @@ export function wrapup(cwd = process.cwd()) {
 
   if (!statusRun.ok) blockers.push(`git status failed: ${statusRun.err.split('\n')[0]}`);
   if (status.length) blockers.push(`${status.length} uncommitted change(s) in ${here}`);
-  if (unpushed === null) blockers.push('could not count commits missing from the remote');
+  if (unpushed === null) { if (heads) blockers.push('could not count commits missing from the remote'); }
   else if (unpushed && pr?.state === 'MERGED' && pr.headRefOid === head) notes.push(`HEAD is the merged head of PR #${pr.number}; its commits are on main through the merge`);
   else if (unpushed) blockers.push(`${unpushed} commit(s) at HEAD not on any remote`);
   if (!branch) notes.push('detached HEAD');

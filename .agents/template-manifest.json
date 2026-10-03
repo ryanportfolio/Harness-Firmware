@@ -67,7 +67,8 @@
       "codex-fullreview": ["impartial-review"],
       "codex-review": ["external-review"],
       "merge": ["codex-fullreview", "codex-review"],
-      "opus-fullreview": ["impartial-review"]
+      "opus-fullreview": ["impartial-review"],
+      "wrapup": ["servers"]
     },
     "presets": {
       "minimal": {

@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url';
 const REG = path.join(os.homedir(), '.claude', 'servers-registry');
 const PROTECT = path.join(os.homedir(), '.claude', 'servers-protect.txt');
 const DEV_RUNTIMES = /^(node|bun|deno|python\d*|pythonw|ruby|php|java|dotnet|uvicorn|gunicorn|hugo|caddy|http-server|esbuild|vite)(\.exe)?$/i;
-const BROWSERS = /^(chrome|msedge|chromium|chrome-headless-shell)(\.exe)?$/i;
+const BROWSERS = /^(chrome|msedge|chromium|chromium-browser|chrome-headless-shell|google chrome|google chrome for testing|microsoft edge)(\.exe)?$/i;
 const START_SLACK_MS = 10_000;
 
 const sh = (cmd, args) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 << 20, windowsHide: true });
@@ -58,11 +58,13 @@ $p = @(Get-CimInstance Win32_Process | Select-Object @{n='pid';e={[int]$_.Proces
   }
   const ps = sh('ps', ['-eo', 'pid=,ppid=,lstart=,args=']);
   if (ps.status !== 0) throw new Error(`ps failed: ${(ps.stderr || '').trim()}`);
+  // executable names come from comm, which keeps spaces ("Google Chrome" on macOS)
+  const comm = new Map(sh('ps', ['-eo', 'pid=,comm=']).stdout.split('\n').map((l) => l.trim().match(/^(\d+)\s+(.*)$/)).filter(Boolean).map((m) => [+m[1], path.basename(m[2])]));
   const procs = ps.stdout.split('\n').filter(Boolean).map((line) => {
     const m = line.trim().match(/^(\d+)\s+(\d+)\s+(\w+\s+\w+\s+\d+\s+[\d:]+\s+\d+)\s+(.*)$/);
     if (!m) return null;
     const cmd = m[4];
-    return { pid: +m[1], ppid: +m[2], start: new Date(m[3]).toISOString(), cmd, name: path.basename(cmd.split(' ')[0]) };
+    return { pid: +m[1], ppid: +m[2], start: new Date(m[3]).toISOString(), cmd, name: comm.get(+m[1]) || path.basename(cmd.split(' ')[0]) };
   }).filter(Boolean);
   if (!procs.length) throw new Error('ps returned no processes');
   const lsof = sh('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn']);
@@ -218,11 +220,20 @@ export function scan({ oldHours = 12 } = {}) {
   }).sort((a, b) => (a.ports[0] || 1e9) - (b.ports[0] || 1e9));
 }
 
-function treeKill(pid) {
+/* Kill a process and everything under it. On POSIX, signal the deepest processes first, since
+   pkill -P only reaches direct children. */
+function treeKill(pid, procs) {
   if (process.platform === 'win32') return sh('taskkill', ['/PID', String(pid), '/T', '/F']).status === 0;
-  const kids = sh('pkill', ['-TERM', '-P', String(pid)]);
-  if (kids.status !== 0 && kids.status !== 1) return false; // 1 = no children matched
-  try { process.kill(pid, 'SIGTERM'); return true; } catch { return false; }
+  const kids = new Map();
+  for (const p of procs) kids.set(p.ppid, [...(kids.get(p.ppid) || []), p.pid]);
+  const order = [];
+  const visit = (p) => { if (order.includes(p)) return; for (const c of kids.get(p) || []) visit(c); order.push(p); };
+  visit(pid);
+  let ok = true;
+  for (const p of order) {
+    try { process.kill(p, 'SIGTERM'); } catch (err) { if (err.code !== 'ESRCH') ok = false; }
+  }
+  return ok;
 }
 
 function fmt(r) {
@@ -278,13 +289,14 @@ function main(argv) {
     if (!go.length) { console.log('Nothing to close.'); return 0; }
     for (const r of go) console.log(`${has('--yes') ? 'closing' : 'would close'} ${fmt(r)}`);
     if (!has('--yes')) { console.log('Re-run with --yes to close these.'); return 0; }
-    const fresh = new Map(snapshot().procs.map((p) => [p.pid, p]));
+    const freshProcs = snapshot().procs;
+    const fresh = new Map(freshProcs.map((p) => [p.pid, p]));
     let failed = 0;
     for (const r of go) {
       const now = fresh.get(r.pid);
       if (!now) { console.log(`already gone: pid ${r.pid}`); fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true }); continue; }
       if (now.start !== r.start) { failed++; console.error(`skipped pid ${r.pid}: it now belongs to a different process`); continue; }
-      if (treeKill(r.pid)) fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true });
+      if (treeKill(r.pid, freshProcs)) fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true });
       else { failed++; console.error(`failed to close pid ${r.pid}`); }
     }
     return failed ? 1 : 0;
