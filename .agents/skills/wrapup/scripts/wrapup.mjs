@@ -9,8 +9,9 @@
      pr            this branch's pull request and its state, via gh when available
      scratch       ignored scratch folders (.tmp/) that removing this worktree would delete
      running       dev servers and automation browsers started from this checkout
-     worktrees     other worktrees of this repository: ones sitting exactly on a merged PR head
-                   are cleanup candidates, dirty or unpushed ones hold work
+     worktrees     other worktrees of this repository, main checkout included: linked ones sitting
+                   exactly on a merged PR head are cleanup candidates (the main checkout never is),
+                   dirty or unpushed ones hold work
    Prints BLOCKED with the reasons, or READY. A check that cannot run blocks READY: missing
    evidence is never read as "nothing to worry about". Exit code 0 either way; 2 when not a git
    checkout. Read-only apart from a `git fetch`. */
@@ -109,9 +110,9 @@ function worktrees(cwd, here, base, heads) {
   if (!r.ok) return [];
   const merged = new Set(git(['branch', '--format=%(refname:short)', '--merged', `origin/${base}`], cwd).out.split('\n').filter(Boolean));
   const prHeads = mergedPrHeads(cwd);
-  // the first entry is the main checkout: never a cleanup candidate
-  return r.out.split(/\r?\n\r?\n/).slice(1).map((block) => {
-    const wt = { path: '', branch: null };
+  // the first entry is the main checkout: checked for held work, never a cleanup candidate
+  return r.out.split(/\r?\n\r?\n/).map((block, i) => {
+    const wt = { path: '', branch: null, main: i === 0 };
     for (const line of block.split(/\r?\n/)) {
       if (line.startsWith('worktree ')) wt.path = path.normalize(line.slice(9));
       if (line.startsWith('branch ')) wt.branch = line.slice(7).replace('refs/heads/', '');
@@ -119,6 +120,7 @@ function worktrees(cwd, here, base, heads) {
     }
     return wt;
   }).filter((wt) => wt.path && !same(wt.path, here)).map((wt) => {
+    if (wt.main && !fs.existsSync(wt.path)) return { ...wt, state: 'check failed' };
     if (wt.prunable || !fs.existsSync(wt.path)) return { ...wt, state: 'missing folder (git worktree prune)' };
     const status = git(['status', '--porcelain'], wt.path);
     if (!status.ok) return { ...wt, state: 'check failed' };
@@ -126,7 +128,7 @@ function worktrees(cwd, here, base, heads) {
     const head = git(['rev-parse', 'HEAD'], wt.path).out;
     const isMerged = !!wt.branch && (merged.has(wt.branch) || (prHeads.get(wt.branch) || []).includes(head));
     const unpushed = isMerged ? 0 : unpushedCount(wt.path, wt.branch, heads);
-    const state = dirty ? `${dirty} uncommitted` : unpushed === null ? 'check failed' : unpushed ? `${unpushed} unpushed` : isMerged ? 'merged, removable' : 'clean';
+    const state = dirty ? `${dirty} uncommitted` : unpushed === null ? 'check failed' : unpushed ? `${unpushed} unpushed` : isMerged && !wt.main ? 'merged, removable' : 'clean';
     return { ...wt, dirty, unpushed, state };
   });
 }

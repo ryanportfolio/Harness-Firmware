@@ -156,9 +156,51 @@ function protectedList() {
   return fs.readFileSync(PROTECT, 'utf8').split(/\r?\n/).map((s) => s.trim()).filter((s) => s && !s.startsWith('#'));
 }
 
+/* The real parent of `proc`, or null. Windows keeps a dead parent's pid as ParentProcessId, so a
+   process that started later under that reused pid is not an ancestor. */
+function parentOf(proc, byPid) {
+  const parent = proc && byPid.get(proc.ppid);
+  if (!parent || parent.pid === proc.pid) return null;
+  return Date.parse(parent.start) <= Date.parse(proc.start) ? parent : null;
+}
+
+/* pid -> real child pids, using parentOf. */
+function childMap(procs) {
+  const byPid = new Map(procs.map((p) => [p.pid, p]));
+  const kids = new Map();
+  for (const p of procs) { const parent = parentOf(p, byPid); if (parent) kids.set(parent.pid, [...(kids.get(parent.pid) || []), p.pid]); }
+  return kids;
+}
+
+/* The pid and everything under it, as the tree kill would reach it. */
+function treeOf(pid, kids) {
+  const out = [];
+  for (const stack = [pid]; stack.length;) {
+    const p = stack.pop();
+    if (out.includes(p)) continue;
+    out.push(p);
+    stack.push(...(kids.get(p) || []));
+  }
+  return out;
+}
+
+/* Whether the pid, or a process under it, matches the protect list in this snapshot. */
+function runsProtected(pid, { listeners, procs }, protect = protectedList()) {
+  if (!protect.length) return false;
+  const byPid = new Map(procs.map((p) => [p.pid, p]));
+  const portsOf = new Map();
+  for (const l of listeners) portsOf.set(l.pid, [...(portsOf.get(l.pid) || []), String(l.port)]);
+  return treeOf(pid, childMap(procs)).some((q) => {
+    const p = byPid.get(q);
+    const ports = portsOf.get(q) || [];
+    return protect.some((x) => ports.includes(x) || (p?.name || '').includes(x) || (p?.cmd || '').includes(x));
+  });
+}
+
 export function scan({ oldHours = 12 } = {}) {
   const snappedAt = Date.now();
-  const { listeners, procs } = snapshot();
+  const snap = snapshot();
+  const { listeners, procs } = snap;
   const byPid = new Map(procs.map((p) => [p.pid, p]));
   const reg = readRegistry();
   // prune records whose process is gone or was replaced, but never one written after this snapshot began
@@ -168,29 +210,9 @@ export function scan({ oldHours = 12 } = {}) {
     reg.delete(pid);
   }
   const protect = protectedList();
-  const portsOf = new Map();
-  for (const l of listeners) portsOf.set(l.pid, [...(portsOf.get(l.pid) || []), l.port]);
-  const children = new Map();
-  for (const p of procs) children.set(p.ppid, [...(children.get(p.ppid) || []), p.pid]);
-  const isProtected = (pid) => {
-    const p = byPid.get(pid);
-    const ports = (portsOf.get(pid) || []).map(String);
-    return protect.some((x) => ports.includes(x) || (p?.name || '').includes(x) || (p?.cmd || '').includes(x));
-  };
-  /* The pid and everything under it, as the tree kill would reach it. */
-  const tree = (pid) => {
-    const out = [];
-    for (const stack = [pid]; stack.length;) {
-      const p = stack.pop();
-      if (out.includes(p)) continue;
-      out.push(p);
-      stack.push(...(children.get(p) || []));
-    }
-    return out;
-  };
   /* A recorded ancestor labels its children: `npm run dev` records the npm pid, vite listens. */
   const recordFor = (pid) => {
-    for (let p = pid, hops = 0; p && hops < 8; p = byPid.get(p)?.ppid, hops++) if (reg.has(p)) return reg.get(p);
+    for (let p = byPid.get(pid), hops = 0; p && hops < 8; p = parentOf(p, byPid), hops++) if (reg.has(p.pid)) return reg.get(p.pid);
     return null;
   };
 
@@ -221,23 +243,28 @@ export function scan({ oldHours = 12 } = {}) {
     if (wt?.gone) flags.push('gone');
     if (ageH !== null && ageH > oldHours) flags.push('old');
     if (!rec && !wt && row.kind !== 'browser') flags.push('unknown');
-    if (tree(row.pid).some(isProtected)) flags.push('protected');
+    if (runsProtected(row.pid, snap, protect)) flags.push('protected');
     return { ...row, ageH: ageH === null ? null : +ageH.toFixed(1), worktree: wt?.worktree || null, purpose: rec?.purpose || '', session: rec?.session || null, recorded: !!rec, flags };
   }).sort((a, b) => (a.ports[0] || 1e9) - (b.ports[0] || 1e9));
 }
 
-/* Kill a process and everything under it. On POSIX, signal the deepest processes first, since
-   pkill -P only reaches direct children. */
+/* Kill a process and everything under it, deepest first, over the same tree the protect check
+   read. taskkill /T is not used: it follows raw parent pids, which on Windows can point at an
+   unrelated process that reused a dead parent's pid. */
 function treeKill(pid, procs) {
-  if (process.platform === 'win32') return sh('taskkill', ['/PID', String(pid), '/T', '/F']).status === 0;
-  const kids = new Map();
-  for (const p of procs) kids.set(p.ppid, [...(kids.get(p.ppid) || []), p.pid]);
+  const kids = childMap(procs);
   const order = [];
   const visit = (p) => { if (order.includes(p)) return; for (const c of kids.get(p) || []) visit(c); order.push(p); };
   visit(pid);
   let ok = true;
   for (const p of order) {
-    try { process.kill(p, 'SIGTERM'); } catch (err) { if (err.code !== 'ESRCH') ok = false; }
+    if (process.platform === 'win32') {
+      // 128: the process already exited
+      const st = sh('taskkill', ['/PID', String(p), '/F']).status;
+      if (st !== 0 && st !== 128) ok = false;
+    } else {
+      try { process.kill(p, 'SIGTERM'); } catch (err) { if (err.code !== 'ESRCH') ok = false; }
+    }
   }
   return ok;
 }
@@ -295,14 +322,17 @@ function main(argv) {
     if (!go.length) { console.log('Nothing to close.'); return 0; }
     for (const r of go) console.log(`${has('--yes') ? 'closing' : 'would close'} ${fmt(r)}`);
     if (!has('--yes')) { console.log('Re-run with --yes to close these.'); return 0; }
-    const freshProcs = snapshot().procs;
-    const fresh = new Map(freshProcs.map((p) => [p.pid, p]));
+    const freshSnap = snapshot();
+    const fresh = new Map(freshSnap.procs.map((p) => [p.pid, p]));
+    const protect = protectedList();
     let failed = 0;
     for (const r of go) {
       const now = fresh.get(r.pid);
       if (!now) { console.log(`already gone: pid ${r.pid}`); fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true }); continue; }
       if (now.start !== r.start) { failed++; console.error(`skipped pid ${r.pid}: it now belongs to a different process`); continue; }
-      if (treeKill(r.pid, freshProcs)) fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true });
+      // a protected process may have started under it since the list was built
+      if (runsProtected(r.pid, freshSnap, protect)) { failed++; console.error(`skipped pid ${r.pid}: it now runs a protected process`); continue; }
+      if (treeKill(r.pid, freshSnap.procs)) fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true });
       else { failed++; console.error(`failed to close pid ${r.pid}`); }
     }
     return failed ? 1 : 0;
