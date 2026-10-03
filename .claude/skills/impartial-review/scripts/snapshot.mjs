@@ -82,7 +82,8 @@ function readBlobs(root, shas) {
   return blobs;
 }
 
-function readHead(root, p) {
+// indexModes: path to index mode when core.fileMode is false, else null.
+function readHead(root, p, indexModes) {
   const abs = path.join(root, p);
   let st;
   try {
@@ -100,8 +101,10 @@ function readHead(root, p) {
     const dirty = status.length ? sha256(Buffer.concat([status, git(abs, ["diff", "HEAD"])])) : null;
     return { kind: "submodule", mode: "160000", dirty, bytes: Buffer.from(`Subproject commit ${gitText(abs, ["rev-parse", "HEAD"])}\n`) };
   }
-  // Windows has no executable bit; git there ignores it too (core.fileMode false).
-  return { kind: "file", mode: POSIX ? (st.mode & 0o100 ? "100755" : "100644") : null, bytes: fs.readFileSync(abs) };
+  // With core.fileMode false (the Windows default) git takes a file's mode from the index, and
+  // an untracked file would be added as 100644.
+  const mode = indexModes ? (indexModes.get(p) ?? "100644") : st.mode & 0o100 ? "100755" : "100644";
+  return { kind: "file", mode, bytes: fs.readFileSync(abs) };
 }
 
 // Every path that differs between baseSha and the working tree, untracked files included,
@@ -118,6 +121,14 @@ function collect(root, baseSha, excluded) {
     if (m && changes.has(m[4])) tree.set(m[4], { mode: m[1], type: m[2], sha: m[3] });
   }
   const blobs = readBlobs(root, [...new Set([...tree.values()].filter((t) => t.type === "blob").map((t) => t.sha))]);
+  let indexModes = null;
+  if (gitText(root, ["config", "--type=bool", "--default=true", "core.fileMode"]) === "false") {
+    indexModes = new Map();
+    for (const line of git(root, ["ls-files", "-s", "-z"]).toString("utf8").split("\0")) {
+      const m = /^(\d+) [0-9a-f]+ \d\t(.*)$/s.exec(line);
+      if (m && changes.has(m[2])) indexModes.set(m[2], m[1]);
+    }
+  }
 
   const entries = [];
   const uncovered = [];
@@ -130,7 +141,7 @@ function collect(root, baseSha, excluded) {
     const t = tree.get(p);
     const base = !t ? null : t.type === "commit" ? Buffer.from(`Subproject commit ${t.sha}\n`) : blobs.get(t.sha);
     const baseKind = !t ? null : t.type === "commit" ? "submodule" : t.mode === "120000" ? "symlink" : "file";
-    const head = readHead(root, p);
+    const head = readHead(root, p, indexModes);
     if (base === null && head.bytes === null) continue; // staged add since deleted from disk
     // Edits inside a submodule are not captured; the commit it points at is.
     if (head.dirty) uncovered.push(`submodule with uncommitted changes, only its commit is snapshotted: ${p}`);
@@ -421,14 +432,15 @@ function brief(inv) {
   L.push(`## Changed files (${content.length})`, "");
   for (const f of content) {
     const pages = [...(f.pages.head ?? []), ...(f.pages.base ?? [])];
-    L.push(`- ${f.status}${f.untracked ? " (untracked)" : ""}: \`${f.path}\``);
+    const newMode = f.status === "added" && f.headMode && f.headMode !== "100644" ? `, mode ${f.headMode}` : "";
+    L.push(`- ${f.status}${f.untracked ? " (untracked)" : ""}: \`${f.path}\`${newMode}`);
     for (const p of pages) L.push(`  - page \`${p.path}\`, lines ${p.lines}`);
   }
   // A dirty submodule on an unchanged commit is listed under "Not covered" instead.
-  const modes = inv.files.filter((f) => (f.status === "mode-only" && !f.submoduleDirtyHash) || (CONTENT.has(f.status) && f.baseMode && f.headMode && f.baseMode !== f.headMode));
+  const modes = inv.files.filter((f) => (f.status === "mode-only" && !f.submoduleDirtyHash) || (f.baseMode && f.headMode && f.baseMode !== f.headMode));
   if (modes.length) {
     L.push("", "## File mode or type changes (not shown in the patch; review them: 100755 is executable, 120000 a symlink, 160000 a submodule)", "");
-    for (const f of modes) L.push(`- ${f.status}: \`${f.path}\` (${f.baseMode} to ${f.headMode ?? "regular file; executable bit not recorded on Windows"})`);
+    for (const f of modes) L.push(`- ${f.status}: \`${f.path}\` (${f.baseMode} to ${f.headMode})`);
   }
   const eol = inv.files.filter((f) => f.status === "eol-only");
   if (eol.length) {
