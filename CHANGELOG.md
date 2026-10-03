@@ -14,8 +14,8 @@ condensed.
 ### Added
 
 - `SubagentStart` hook (`.claude/hooks/subagent-start.sh`): every Claude Code
-  subagent, including Explore and Plan, now gets terse report rules: result
-  first, shortest report that keeps every fact, paths, code and errors kept exact,
+  subagent, including Explore and Plan, now gets terse writing rules for all its prose, reasoning and notes included: result
+  first, shortest text that keeps every fact, paths, code and errors kept exact,
   uncertainty marked. The caveman output style never reached subagents.
 
 ### Changed

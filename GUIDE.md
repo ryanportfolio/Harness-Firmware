@@ -148,7 +148,7 @@ Every skill has a native Codex version maintained directly under `.agents/skills
 | `.agents/template-manifest.json` | Which paths ship into new projects and which stay in the template, the files a new project must have, and the skill groups, required skills and dependencies. Every project creator reads it; `node bootstrap/tests/check-template-manifest.mjs` checks it against the template. |
 | `.claude/reference/` | Committed project memory for architecture, commands, deployment, pitfalls, secrets, and technology choices. |
 | `.claude/hooks/session-start.sh` | Claude Code startup checks and reminders. |
-| `.claude/hooks/subagent-start.sh` | Gives every Claude Code subagent, built-in or custom, the terse report rules. Output styles don't reach subagents, and Explore and Plan skip `CLAUDE.md`. |
+| `.claude/hooks/subagent-start.sh` | Gives every Claude Code subagent, built-in or custom, the terse writing rules for all its prose. Output styles don't reach subagents, and Explore and Plan skip `CLAUDE.md`. |
 | `.claude/scripts/context-weight.sh` | Always-loaded source weight measurement. |
 | `.claude/scripts/doctor.mjs` | Installation health check. |
 | `.claude/scripts/memory-audit.mjs` | Optional local Claude transcript usage counts for skills and memory. Counts are lower bounds, not proof that a resource is unused or ineffective. |
