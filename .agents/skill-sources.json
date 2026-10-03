@@ -1,8 +1,8 @@
 {
   "version": 1,
   "skills": {
-    "addskill": "e2ee36838938e115462c44b3d5e4fd3a7c71def5ae9092284e925b92d7718ad3",
-    "adopt-repo": "518222fd9f62a31babffb915070f135d48182334bd46f83ca7e0d53d57964752",
+    "addskill": "23b9b0caa2f179bbfd9e6eb9113873778ddcfd4a375facd8b58f7801b13bae5c",
+    "adopt-repo": "0c771cebafe95662974ce34903e4b8c580a3d1962a91f4423bb11b46f7d60ba9",
     "advocate": "4edb4390ab5a70d16a49dd7d173a64e4c27d774c8fd76321ada19cb898314f1e",
     "arena": "90972b515fe797270f38d2dac6f3605e75704a4ee32f4eeccbce290d71b91381",
     "astra-review": "8ccd1dbc0de78f19d1779c107ba4dc98aa25fb68c42060a7bbf9fdd187fc45c4",
@@ -18,7 +18,7 @@
     "forge-repo-ui-skill": "fd2380fc514d3c241efcda27d729023e4b6b0b531343a31329079b394cc4e63c",
     "handoff-audit": "bb64e7bfd4165c54360eeabbe0ea353643bd10fc86d027481ae0915650f5b4ca",
     "impartial-review": "d257b6bee2090384ec2117272be33bfadc40a5937329e6951642d5f8599ebabe",
-    "init-project": "db5ed3a2bc2feeaa30bcc901eefafc8cdfcfdd8f7939cc4b7e3edcdd5f289e27",
+    "init-project": "5cd358c577ff618de54bcb793cd4786fe4cf7731db9051d4435f2c20d4e5295c",
     "lab": "c5e9eefb8650216d309faa7ddc76198233dde67f7c46a917582e7ee75d4f46dd",
     "long-horizon": "4cdde5d2cb86e642473f0ec37c78beb8bbe7d058b3af95896914dc8d3291781e",
     "optimize-context": "0bde5b852b1d5ecbbc2198e3934693a6bd4a16452481cfde7c70b8305ef649c5",
@@ -28,7 +28,7 @@
     "servers": "bd99bfa25742cb45ec9b564d9e10a80f9864feb1bf18f27609823f9843587d92",
     "session-hub": "23cad18037661162862bc4e26acba29a3564579be397556f4b6f15238d659979",
     "showpiece": "b2688870d2e4f79cfb1d3e93eff4cadc5c6842f9593883a54acca54f1baefc82",
-    "sync-starter": "bbbbb71d69efe9193026958fc213678ed3fe536c292bf54944cf03013f8e8da0",
+    "sync-starter": "28604b7ffb008cc6db5c593a6f77359c977b0a7e5bbb24e3df517823118728b1",
     "why": "647e1a2a753aab17a19293af2c26be5abb7823694128dbe18a36aeb2d4de34d8",
     "wow-loop": "fe7714dd263b2899dd8004880d4d969d4efbc207cf4cac6b1f27306eea0ceafd",
     "wrapup": "15d4de757b4ca1c4551607ea96099186a62f690ef7e0f28044fc07ce2df381b8",

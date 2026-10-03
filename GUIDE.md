@@ -101,6 +101,8 @@ Removing `addskill` leaves `.claude/skills/writing-skills/` and `.agents/skills/
 
 To bring a skill back, restore its folders from the template, for example `git checkout starter/main -- .claude/skills/<name> .agents/skills/<name>` (only the paths that exist upstream), then delete its name from the record and its `skillOverrides` entry. When you pull other template updates with `sync-starter`, skip paths under removed skills; the session-start drift notice already ignores them.
 
+To keep a skill as your project has it while still pulling other template updates, list it with a reason in `.agents/skill-locks.json`. `sync-starter`, Harness Console's skill sync, `addskill`, `init-project` profiles and `adopt-repo` then leave its folders and registry entries alone. See [skill locks](docs/codex-skills.md#skill-locks).
+
 ## measure the always-loaded layer
 
 Run:
@@ -147,6 +149,7 @@ Every skill has a native Codex version maintained directly under `.agents/skills
 | `.claude/skills/` | Claude Code workflow playbooks. |
 | `.agents/skills/` | Maintained native Codex skills. |
 | `.agents/removed-skills.json` | Skills this project deleted on purpose. Checks stay quiet about the names it lists. |
+| `.agents/skill-locks.json` | Optional. Skills this project keeps as they are, each with a reason; template syncs skip them. The template ships none. |
 | `.agents/template-manifest.json` | Which paths ship into new projects and which stay in the template, the files a new project must have, and the skill groups, required skills and dependencies. Every project creator reads it; `node bootstrap/tests/check-template-manifest.mjs` checks it against the template. |
 | `.claude/reference/` | Committed project memory for architecture, commands, deployment, pitfalls, secrets, and technology choices. |
 | `.claude/hooks/session-start.sh` | Claude Code startup checks and reminders. |
