@@ -1,7 +1,6 @@
 ---
 name: deep-plan
 description: "Use for /deep-plan: interview a loose idea in short rounds of decisions and stop for an explicit go before anything is built."
-disable-model-invocation: true
 ---
 
 # deep-plan: interview a loose idea into decisions the user made
