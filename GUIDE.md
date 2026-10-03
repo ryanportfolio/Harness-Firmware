@@ -42,7 +42,7 @@ Two files assert the default and must agree:
 - `CLAUDE.md`, under `## Default prose mode: caveman ultra`.
 - `.claude/hooks/session-start.sh`, in the three marked caveman blocks.
 
-To change the default later, replace `ultra` with `lite` or `full` in both files. To remove the default, delete the marked section and hook blocks. The `caveman` skill remains available on demand.
+To change the default later, replace `ultra` with `lite` or `full` in both files. To remove the default, delete the marked section and hook blocks. Subagents get their own terse rules from `.claude/hooks/subagent-start.sh`; edit that text to match, or delete the script and its `SubagentStart` entry in `.claude/settings.json` to remove it. The `caveman` skill remains available on demand.
 
 For one session, say `stop caveman` or `normal mode`.
 

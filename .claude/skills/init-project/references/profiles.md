@@ -34,12 +34,15 @@ Preserve the user's established choice; otherwise explain the inherited Caveman 
 briefly and offer ultra/full/lite/normal if they want to change it. Code, commands, errors,
 security explanations and irreversible confirmations retain normal technical prose.
 
-For Claude, the project default may be present in CLAUDE.md, the session-start hook, and
-the output style (`.claude/output-styles/caveman.md` plus `outputStyle` in
-`.claude/settings.json`). Inspect all three. This starter marks hook blocks caveman:directive,
-caveman:reminder, and caveman:call. Change their level together with the style file's
-default for full/lite, or for normal remove those default blocks, the default section, the
-`outputStyle` key, and the style file. Keep the skill available for explicit use.
+For Claude, the project default may be present in CLAUDE.md, the session-start hook, the
+output style (`.claude/output-styles/caveman.md` plus `outputStyle` in
+`.claude/settings.json`), and the subagent hook (`.claude/hooks/subagent-start.sh` plus its
+`SubagentStart` entry in `.claude/settings.json`). Inspect all four. This starter marks hook
+blocks caveman:directive, caveman:reminder, and caveman:call. Change their level together
+with the style file's default for full/lite, editing the subagent hook's rules to match, or
+for normal remove those default blocks, the default section, the `outputStyle` key, the
+style file, the subagent hook and its `SubagentStart` entry. Keep the skill available for
+explicit use.
 Check remaining references and run bash -n on an edited shell hook; do not execute the
 hook in Codex. For Codex, update the AGENTS.md default it actually reads; Claude hook
 changes do not configure Codex. If both runtimes are in scope, keep both defaults aligned.
