@@ -24,6 +24,8 @@
                name substring per line); never closed by this script, since closing kills the tree
    `close stale` closes rows flagged gone; `close old` closes recorded rows and automation
    browsers flagged old or gone, so a long-running tool found only by its path is never swept up.
+   A server running under a recorded launcher (`npm run dev` recorded, vite listening) closes
+   with its launcher, which could otherwise restart it; `pid:<pid>` closes exactly one process.
    Without --yes it only prints the plan. Before closing, each row is checked again against a
    fresh snapshot (same process, nothing protected under it), and each process in its tree is
    killed only if its pid still belongs to the process that snapshot saw. */
@@ -266,7 +268,7 @@ export function scan({ oldHours = 12 } = {}) {
     if (ageH !== null && ageH > oldHours) flags.push('old');
     if (!rec && !wt && row.kind !== 'browser') flags.push('unknown');
     if (runsProtected(row.pid, snap, protect)) flags.push('protected');
-    return { ...row, ageH: ageH === null ? null : +ageH.toFixed(1), worktree: wt?.worktree || null, purpose: rec?.purpose || '', session: rec?.session || null, recorded: !!rec, flags };
+    return { ...row, ageH: ageH === null ? null : +ageH.toFixed(1), worktree: wt?.worktree || null, purpose: rec?.purpose || '', session: rec?.session || null, recorded: !!rec, recordPid: rec?.pid ?? null, flags };
   }).sort((a, b) => (a.ports[0] || 1e9) - (b.ports[0] || 1e9));
 }
 
@@ -342,7 +344,8 @@ function main(argv) {
     return 0;
   }
 
-  let rows = scan({ oldHours });
+  const all = scan({ oldHours });
+  let rows = all;
   if (has('--here')) {
     const trees = repoWorktrees();
     rows = rows.filter((r) => r.worktree && trees.some((t) => same(t, r.worktree)));
@@ -363,8 +366,17 @@ function main(argv) {
       : target === 'old' ? rows.filter((r) => (r.recorded || r.kind === 'browser') && (r.flags.includes('old') || r.flags.includes('gone')))
       : target.startsWith('pid:') ? rows.filter((r) => r.pid === +target.slice(4))
       : rows.filter((r) => r.ports.includes(+target));
-    const blocked = pick.filter((r) => r.flags.includes('protected'));
-    const go = pick.filter((r) => !r.flags.includes('protected') && (explicit || !r.flags.includes('unknown')));
+    // a server under a recorded launcher (`npm run dev` recorded, vite listening) closes through
+    // the launcher, which could otherwise start it again; pid:<pid> closes exactly that process
+    const launcherOf = (r) => (r.recordPid && r.recordPid !== r.pid && all.find((x) => x.pid === r.recordPid)) || r;
+    const targets = new Map();
+    for (const r of pick) {
+      const l = target.startsWith('pid:') ? r : launcherOf(r);
+      if (l !== r) console.log(`${r.ports.length ? ':' + r.ports.join(',:') : `pid ${r.pid}`} runs under recorded launcher pid ${l.pid}; the launcher and everything under it close together`);
+      targets.set(l.pid, l);
+    }
+    const blocked = [...targets.values()].filter((r) => r.flags.includes('protected'));
+    const go = [...targets.values()].filter((r) => !r.flags.includes('protected') && (explicit || !r.flags.includes('unknown')));
     for (const r of blocked) console.log(`skip (protected, or runs a protected process) ${fmt(r)}`);
     if (!go.length) { console.log('Nothing to close.'); return 0; }
     for (const r of go) console.log(`${has('--yes') ? 'closing' : 'would close'} ${fmt(r)}`);

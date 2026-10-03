@@ -31,7 +31,7 @@ When the user asks "which port is X", answer from the purpose and folder columns
 ```bash
 node .claude/skills/servers/scripts/servers.mjs close stale        # gone-worktree rows
 node .claude/skills/servers/scripts/servers.mjs close old          # recorded rows and automation browsers, old or gone
-node .claude/skills/servers/scripts/servers.mjs close 5173 --yes   # one port; pid:<pid> for a browser
+node .claude/skills/servers/scripts/servers.mjs close 5173 --yes   # one port, with its recorded launcher; pid:<pid> for exactly one process
 ```
 
 `stale` and `old` skip unknown and protected rows. Closing kills the whole process tree. Close what this session started without asking; anything else only after the user has seen the list and agreed.
