@@ -50,6 +50,11 @@
       "group": "discipline"
     },
     {
+      "name": "deep-plan",
+      "label": "Deep plan",
+      "group": "discipline"
+    },
+    {
       "name": "writing-plans",
       "label": "Plan",
       "group": "discipline"
