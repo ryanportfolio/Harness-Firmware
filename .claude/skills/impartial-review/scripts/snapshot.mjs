@@ -337,7 +337,8 @@ function importsOf(text) {
 // Files a root-relative target may resolve to.
 function variants(target) {
   const list = [target, ...EXTS.map((e) => target + e), ...EXTS.map((e) => `${target}/index${e}`), `${target}/package.json`];
-  const swap = { ".js": [".ts", ".tsx"], ".jsx": [".tsx"], ".mjs": [".mts"], ".cjs": [".cts"] }[path.posix.extname(target)];
+  // A ".js"-style import may name a TypeScript source or declaration file.
+  const swap = { ".js": [".ts", ".tsx", ".d.ts"], ".jsx": [".tsx", ".d.ts"], ".mjs": [".mts", ".d.mts"], ".cjs": [".cts", ".d.cts"] }[path.posix.extname(target)];
   if (swap) list.push(...swap.map((e) => target.slice(0, -path.posix.extname(target).length) + e));
   return list;
 }
@@ -396,6 +397,11 @@ function extendsTarget(dir, spec) {
   } else {
     for (let d = dir; ; d = path.dirname(d)) {
       const f = path.join(d, "node_modules", spec);
+      // A bare package name may point at its config through package.json "tsconfig".
+      try {
+        const named = JSON.parse(fs.readFileSync(path.join(f, "package.json"), "utf8").replace(/^\uFEFF/, "")).tsconfig;
+        if (typeof named === "string") tries.push(path.resolve(f, named));
+      } catch {}
       tries.push(f, `${f}.json`, path.join(f, "tsconfig.json"));
       if (path.dirname(d) === d) break;
     }
@@ -422,6 +428,7 @@ function effectiveOptions(file, seen) {
   } catch {
     return { incomplete: true };
   }
+  if (!json || typeof json !== "object" || Array.isArray(json)) return { incomplete: true };
   const dir = path.dirname(file);
   const out = { incomplete: false };
   for (const spec of json.extends === undefined ? [] : [].concat(json.extends)) {
@@ -546,7 +553,7 @@ function dependencyNote(root, entries, excluded) {
       if (isPackage(e.path, s)) continue;
       const name = nameOf(s);
       const scope = s.startsWith("@") && name.split("/")[0];
-      const unread = 'a tsconfig "extends" target could not be read';
+      const unread = "the tsconfig.json or jsconfig.json, or a config it extends, could not be read";
       if (files?.list && files.incomplete) unchecked.push({ ...at, reason: `no file at path alias "${files.key}", but ${unread}` });
       else if (files?.list) unresolvedDeps.push({ ...at, reason: `no file at path alias "${files.key}"` });
       else if (files?.incomplete) unchecked.push({ ...at, reason: `not resolved: ${unread}` });
