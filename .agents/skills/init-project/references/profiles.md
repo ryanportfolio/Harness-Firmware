@@ -41,8 +41,9 @@ the subagent hook (`.claude/hooks/subagent-start.sh` plus its `SubagentStart` en
 `.claude/settings.json`). Inspect them. This starter marks hook blocks caveman:directive,
 caveman:reminder, and caveman:call. Change their level together for full/lite, editing the
 subagent hook's rules to match, or for normal remove those default blocks, the default
-section, the subagent hook and its `SubagentStart` entry. Keep the skill available for
-explicit use.
+section, and the subagent hook's writing-rule lines. Keep the subagent hook and its
+`SubagentStart` entry for its rule that subagents collect their helpers' results. Keep the
+skill available for explicit use.
 Check remaining references and run bash -n on an edited shell hook; do not execute the
 hook in Codex. For Codex, update the AGENTS.md default it actually reads; Claude hook
 changes do not configure Codex. If both runtimes are in scope, keep both defaults aligned.

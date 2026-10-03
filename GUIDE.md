@@ -42,7 +42,7 @@ Two files assert the default and must agree:
 - `CLAUDE.md`, under `## Default prose mode: caveman ultra`.
 - `.claude/hooks/session-start.sh`, in the three marked caveman blocks.
 
-To change the default later, replace `ultra` with `lite` or `full` in both files. To remove the default, delete the marked section and hook blocks. Subagents get their own terse rules from `.claude/hooks/subagent-start.sh`; edit that text to match, or delete the script and its `SubagentStart` entry in `.claude/settings.json` to remove it. The `caveman` skill remains available on demand.
+To change the default later, replace `ultra` with `lite` or `full` in both files. To remove the default, delete the marked section and hook blocks. Subagents get their own terse rules from `.claude/hooks/subagent-start.sh`; edit that text to match, or delete the script and its `SubagentStart` entry in `.claude/settings.json` to remove it. Deleting the script also drops its rule that subagents collect their own helpers' results before stopping; to keep only that rule, delete the writing-rule lines from the script instead. The `caveman` skill remains available on demand.
 
 For one session, say `stop caveman` or `normal mode`.
 
@@ -153,7 +153,7 @@ Every skill has a native Codex version maintained directly under `.agents/skills
 | `.agents/template-manifest.json` | Which paths ship into new projects and which stay in the template, the files a new project must have, and the skill groups, required skills and dependencies. Every project creator reads it; `node bootstrap/tests/check-template-manifest.mjs` checks it against the template. |
 | `.claude/reference/` | Committed project memory for architecture, commands, deployment, pitfalls, secrets, and technology choices. |
 | `.claude/hooks/session-start.sh` | Claude Code startup checks and reminders. |
-| `.claude/hooks/subagent-start.sh` | Gives every Claude Code subagent, built-in or custom, the terse writing rules for all its prose. Output styles don't reach subagents, and Explore and Plan skip `CLAUDE.md`. |
+| `.claude/hooks/subagent-start.sh` | Gives every Claude Code subagent, built-in or custom, the terse writing rules for all its prose, plus a rule to collect every helper result before stopping: a background task still running when a subagent stops loses its result, so helper agents run in the foreground and long Bash commands are polled to completion. Output styles don't reach subagents, and Explore and Plan skip `CLAUDE.md`. |
 | `.claude/scripts/context-weight.sh` | Always-loaded source weight measurement. |
 | `.claude/scripts/doctor.mjs` | Installation health check. |
 | `.claude/scripts/memory-audit.mjs` | Optional local Claude transcript usage counts for skills and memory. Counts are lower bounds, not proof that a resource is unused or ineffective. |
