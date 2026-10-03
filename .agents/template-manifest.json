@@ -63,6 +63,7 @@
     "dependencies": {
       "astra-fullreview": ["codex-fullreview", "impartial-review"],
       "astra-review": ["codex-review", "external-review"],
+      "caveman": ["why"],
       "codex-fullreview": ["impartial-review"],
       "codex-review": ["external-review"],
       "merge": ["codex-fullreview", "codex-review"],
@@ -70,7 +71,7 @@
     },
     "presets": {
       "minimal": {
-        "omit": ["advocate", "enhance-prompt", "fable-mode", "forge-repo-ui-skill", "handoff-audit", "lab", "why"]
+        "omit": ["advocate", "enhance-prompt", "fable-mode", "forge-repo-ui-skill", "handoff-audit", "lab"]
       }
     }
   }
