@@ -84,7 +84,7 @@ Start all batch executors in one msg. Each round's auditor starts when that roun
 3. Before removing any round workspace: stop every process its round started (per `processes.log`), confirm gone; else old server answers step-4 check or holds its port. Step 4 starts any server it needs from main. Then copy every cited evidence file living in it (done-check output, ignored artifacts) into `evidence/round-<N>/`. Then unlink dep links in it (`rmdir` on junction/symlink), then `git worktree remove --force <path>`: dirty by design, so plain `git worktree remove` refuses; forcing before unlinking deletes through link into shared target.
 4. Separate-workspace verdicts don't prove steps work together or survive workspace removal (e.g. link into removed worktree). After removal, one fresh auditor runs every applied round's done-check in main workspace before any enters Verified progress. Step failing there → Remaining w/ that output; its applied paths → Residue w/ revert-or-keep decision.
 
-Within round, executor runs independent reads/searches/commands at once, may fan out read-only subagents. Work needing parallel writers = several steps: split in Remaining, run as parallel rounds.
+Within round, executor runs independent reads/searches/commands at once, may fan out read-only subagents. Executor is subagent: its turn ending = round over, so it dispatches helpers foreground (`run_in_background: false`) or waits for every result before stopping; helper still running at stop → output lost. Same for `arena` inside executor. Work needing parallel writers = several steps: split in Remaining, run as parallel rounds.
 
 ## Round loop
 

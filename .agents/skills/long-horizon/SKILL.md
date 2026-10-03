@@ -91,7 +91,9 @@ stops, not waiting on batch. Integrate after whole batch audited:
 4. Separate-workspace verdicts don't prove steps work together or survive workspace removal (e.g. link into removed worktree). After removal, one fresh auditor runs every applied round's done-check in main workspace before any counts as verified. Step failing there → Remaining w/ that output; its applied paths → state w/ revert-or-keep decision.
 
 In-round, executor runs independent reads/searches/commands at once; read-only
-helpers OK if runtime allows. Parallel writers needed → split into steps in Remaining, run
+helpers OK if runtime allows. Executor's turn ending = round over → wait for every helper
+result (incl. `arena` inside executor) before stopping; helper still running at stop →
+output lost. Parallel writers needed → split into steps in Remaining, run
 as parallel rounds.
 
 ## Each round
