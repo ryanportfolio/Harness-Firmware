@@ -445,9 +445,11 @@ function effectiveOptions(file, seen) {
 }
 
 // Path aliases for a file, from the nearest tsconfig.json (or jsconfig.json) above it, as
-// TypeScript picks it: { root, base, paths, incomplete }, where `base` is the absolute folder
-// alias targets resolve from (`baseUrl` when set, else the folder of the config that set `paths`).
-// Null when no config applies or none in the chain sets `paths` and the chain was read whole.
+// TypeScript picks it: { root, base, configDir, paths, incomplete }, where `base` is the absolute
+// folder alias targets resolve from (`baseUrl` when set, else the folder of the config that set
+// `paths`) and `configDir` is the picked config's folder, which `${configDir}` in `baseUrl` or a
+// target stands for even when an extended config set it. Null when no config applies or none in
+// the chain sets `paths` and the chain was read whole.
 function pathAliases(root, fromPath, cache) {
   let config = null;
   for (const dir of ancestors(fromPath)) {
@@ -459,8 +461,9 @@ function pathAliases(root, fromPath, cache) {
   if (!config) return null;
   if (!cache.has(config)) {
     const o = effectiveOptions(config, new Set());
-    const base = o.baseUrl ? path.resolve(o.baseUrl.dir, o.baseUrl.value) : o.paths?.dir;
-    cache.set(config, o.paths ? { root, base, paths: o.paths.value, incomplete: o.incomplete } : o.incomplete ? { incomplete: true } : null);
+    const configDir = slash(path.dirname(config));
+    const base = o.baseUrl ? path.resolve(o.baseUrl.dir, o.baseUrl.value.replaceAll("${configDir}", () => configDir)) : o.paths?.dir;
+    cache.set(config, o.paths ? { root, base, configDir, paths: o.paths.value, incomplete: o.incomplete } : o.incomplete ? { incomplete: true } : null);
   }
   return cache.get(config);
 }
@@ -488,7 +491,9 @@ function aliasCandidates(aliases, spec) {
   if (!best || !Array.isArray(best.targets)) return null;
   // Targets may be absolute (a drive-letter path on Windows); outside the root they stay absolute.
   const list = best.targets.flatMap((t) => {
-    const abs = path.resolve(aliases.base, String(t).replaceAll("\\", "/").replace("*", best.capture));
+    // Replacement callbacks keep "$&" and similar in names literal.
+    const target = String(t).replaceAll("\\", "/").replaceAll("${configDir}", () => aliases.configDir);
+    const abs = path.resolve(aliases.base, target.replace("*", () => best.capture));
     const rel = path.relative(aliases.root, abs);
     return variants(rel.startsWith("..") || path.isAbsolute(rel) ? slash(abs) : slash(rel) || ".");
   });
@@ -522,6 +527,7 @@ function dependencyNote(root, entries, excluded) {
   const unresolvedDeps = [];
   const unchecked = [];
   const configs = new Map();
+  const unread = "the tsconfig.json or jsconfig.json, or a config it extends, could not be read";
   const scheme = (s) => /^[a-z][\w+.-]*:/i.test(s);
   const nameOf = (s) => s.split("/").slice(0, s.startsWith("@") ? 2 : 1).join("/");
   // A bare specifier no alias resolves still loads from packages, as in TypeScript.
@@ -553,7 +559,6 @@ function dependencyNote(root, entries, excluded) {
       if (isPackage(e.path, s)) continue;
       const name = nameOf(s);
       const scope = s.startsWith("@") && name.split("/")[0];
-      const unread = "the tsconfig.json or jsconfig.json, or a config it extends, could not be read";
       if (files?.list && files.incomplete) unchecked.push({ ...at, reason: `no file at path alias "${files.key}", but ${unread}` });
       else if (files?.list) unresolvedDeps.push({ ...at, reason: `no file at path alias "${files.key}"` });
       else if (files?.incomplete) unchecked.push({ ...at, reason: `not resolved: ${unread}` });
@@ -579,7 +584,10 @@ function dependencyNote(root, entries, excluded) {
         const files = scheme(s) ? null : local(p, s);
         const gone = files?.list?.find((x) => deleted.has(x));
         if (!gone || files.list.some(isFile) || (!files.relative && isPackage(p, s))) continue;
-        unresolvedDeps.push({ from: p, line, specifier: s, reason: `imports ${gone}, which this change deletes` });
+        const at = { from: p, line, specifier: s };
+        // An unread config could override the alias, so the break is not certain.
+        if (files.incomplete) unchecked.push({ ...at, reason: `may import ${gone}, which this change deletes, but ${unread}` });
+        else unresolvedDeps.push({ ...at, reason: `imports ${gone}, which this change deletes` });
       }
     }
   }
