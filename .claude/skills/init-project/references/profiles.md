@@ -16,7 +16,9 @@ listed under `skills.required`. Caveman can also be omitted if it is not the con
 prose default. Preserve skills referenced by active instructions and user customizations.
 Show the concrete selection before applying it unless already approved. Prefer reversible
 discovery settings over deleting skill folders. A request for minimal configuration does
-not by itself authorize deleting custom resources.
+not by itself authorize deleting custom resources. A profile or preset never deletes or
+replaces a skill listed in `.agents/skill-locks.json`; a lock file that exists but cannot be
+read or parsed stops the profile change with the error.
 
 In this starter, inspect the Codex sync check and ownership registry before applying
 settings: Claude legacy skillOverrides and Codex .agents/skill-modes.json have distinct

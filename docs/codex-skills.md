@@ -102,3 +102,28 @@ partial sync, and drop the `unslop` ownership entry before running sync. Checkou
 does not remove paths absent upstream. Inspect and back up customizations first,
 preserving useful behavior in replacements or outside discovery; keep resources
 and licenses. Validate that neither retired name has a SKILL.md in either root.
+
+## Skill locks
+
+A project keeps chosen skills exactly as they are by listing them in
+`.agents/skill-locks.json`, each name with the reason it is locked:
+
+```json
+{
+  "version": 1,
+  "locks": {
+    "writing": "Custom Codex version written for this project"
+  }
+}
+```
+
+The file is optional; when it is missing, nothing is locked. Harness Console's skill sync and
+the `sync-starter` pull from the template never update, replace, or remove a locked skill's
+`.claude/skills/<name>/` or `.agents/skills/<name>/` folder or its entries in
+`.agents/skill-modes.json` and `.agents/skill-sources.json`, and they list each skipped skill
+with its reason. `addskill` imports and updates, `init-project` profiles, and `adopt-repo`
+follow the same rule. A lock file that exists but cannot be read or parsed stops those tools
+with the error; none of them treats it as empty. Editing a locked skill by hand is still
+allowed, and a lock does not affect pushing a change back to the template. The file belongs
+to the project: the template ships none, and template cleanup never removes it because
+`.agents` is a project path in `.agents/template-manifest.json`.
