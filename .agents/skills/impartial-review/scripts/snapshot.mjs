@@ -335,12 +335,20 @@ const IMPORT_RES = [
   /\brequire\s*\(\s*["']([^"'\n]+)["']\s*\)/g,
 ];
 
-// Code with comments blanked out (newlines kept, so positions and line numbers hold). Single and
-// double quoted strings end at a line break, so a quote inside a regex literal can only misread
-// the rest of its own line; template literals span lines.
+// Code with comments blanked out (newlines kept, so positions and line numbers hold). Strings and
+// regex literals are copied whole, so "/*" inside either is not a comment. Single and double
+// quoted strings and regex literals end at a line break; template literals span lines. A "/"
+// starts a regex literal where an operand is expected: at the start, after an operator or
+// opening bracket, or after a keyword such as `return`.
+const REGEX_AFTER = new Set("(,=:[!&|?{};+-*%<>~^".split(""));
+const REGEX_KEYWORDS = new Set(["return", "typeof", "case", "do", "else", "in", "of", "new", "delete", "void", "throw", "yield", "await", "instanceof"]);
 function stripComments(text) {
   let out = "";
   let quote = null;
+  // The last significant character outside comments, and the identifier it ends, if any.
+  let last;
+  let token = "";
+  let inWord = false;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (quote) {
@@ -352,14 +360,37 @@ function stripComments(text) {
       const stop = end < 0 ? text.length : end;
       out += " ".repeat(stop - i);
       i = stop - 1;
+      inWord = false;
     } else if (c === "/" && text[i + 1] === "*") {
       const end = text.indexOf("*/", i + 2);
       const stop = end < 0 ? text.length : end + 2;
       out += text.slice(i, stop).replace(/[^\n]/g, " ");
       i = stop - 1;
+      inWord = false;
+    } else if (c === "/" && (last === undefined || REGEX_AFTER.has(last) || REGEX_KEYWORDS.has(token))) {
+      let j = i + 1;
+      let inClass = false;
+      for (; j < text.length && text[j] !== "\n"; j++) {
+        if (text[j] === "\\") j++;
+        else if (text[j] === "[") inClass = true;
+        else if (text[j] === "]") inClass = false;
+        else if (text[j] === "/" && !inClass) break;
+      }
+      const stop = Math.min(j + 1, text.length);
+      out += text.slice(i, stop);
+      i = stop - 1;
+      [last, token, inWord] = [")", "", false]; // a regex literal is an operand
     } else {
-      if (c === '"' || c === "'" || c === "`") quote = c;
       out += c;
+      if (/[\w$]/.test(c)) {
+        token = inWord ? token + c : c;
+        inWord = true;
+        last = c;
+      } else {
+        inWord = false;
+        if (!/\s/.test(c)) [last, token] = [c, ""];
+      }
+      if (c === '"' || c === "'" || c === "`") [quote, last] = [c, ")"]; // a string is an operand
     }
   }
   return out;
@@ -385,12 +416,14 @@ function importsOf(text) {
     for (const m of code.matchAll(re)) found.push({ specifier: m[1], line: lineAt(m.index) });
   }
   // `import "x"`, or `import <bindings> from "x"` where the bindings hold only names, braces,
-  // commas, `*` and whitespace, within 4000 characters of the keyword.
+  // commas, `*` and whitespace, within LOOK characters of the keyword. A longer run is reported
+  // with a null specifier so the caller can list it as not checked.
+  const LOOK = 20000;
   const clause = /[\w$*{},\s]/;
   // Not after a quote, "-", "." or "$": skips text such as '--import' and obj.import.
   for (const m of code.matchAll(/(?<![\w$.'"`-])import\b/g)) {
     let i = m.index + 6;
-    const stop = Math.min(code.length, i + 4000);
+    const stop = Math.min(code.length, i + LOOK);
     while (i < stop && /\s/.test(code[i])) i++;
     if (code[i] === '"' || code[i] === "'") {
       const s = /["']([^"'\n]+)["']/y;
@@ -412,14 +445,17 @@ function importsOf(text) {
         }
       }
     }
+    if (i === stop && stop < code.length) found.push({ specifier: null, line: lineAt(m.index) });
   }
   return found;
 }
 
-// Files a root-relative target may resolve to. A "<dir>/package.json" entry stands for the files
-// its entry fields name; dependencyNote expands it.
+// Files a root-relative target may resolve to. The "<dir>/package.json" + ENTRY item stands for
+// the files that folder's package.json entry fields name; dependencyNote expands it. The marker
+// keeps it apart from an import that names a package.json file itself.
+const ENTRY = "?entry";
 function variants(target) {
-  const list = [target, ...EXTS.map((e) => target + e), ...EXTS.map((e) => `${target}/index${e}`), `${target}/package.json`];
+  const list = [target, ...EXTS.map((e) => target + e), ...EXTS.map((e) => `${target}/index${e}`), `${target}/package.json${ENTRY}`];
   // A ".js"-style import may name a TypeScript source or declaration file.
   const swap = { ".js": [".ts", ".tsx", ".d.ts"], ".jsx": [".tsx", ".d.ts"], ".mjs": [".mts", ".d.mts"], ".cjs": [".cts", ".d.cts"] }[path.posix.extname(target)];
   if (swap) list.push(...swap.map((e) => target.slice(0, -path.posix.extname(target).length) + e));
@@ -623,23 +659,25 @@ function dependencyNote(root, entries, excluded) {
   // A bare specifier no alias resolves still loads from packages, as in TypeScript. A built-in
   // is checked with its subpath (`fs/promises` is one, `fs/not-real` is not).
   const isPackage = (from, s) => !s.startsWith("/") && (isBuiltin(s) || packageDeclared(root, from, nameOf(s)));
-  // Replaces each "<dir>/package.json" candidate with the files its entry fields name (types,
-  // typings, main, module, and string targets under exports "."). A package.json without them
-  // adds nothing: the folder's index files are already candidates.
+  // Replaces each folder package.json item (see variants) with the files its entry fields name
+  // (types, typings, main, module, and string targets under exports "."). A package.json without
+  // them adds nothing: the folder's index files are already candidates. A missing package.json
+  // stays as its own path, so the deleted-file scan still sees a deleted one.
   const expand = (list) =>
     list.flatMap((c) => {
-      if (!c.endsWith("/package.json")) return [c];
+      if (!c.endsWith(ENTRY)) return [c];
+      const file = c.slice(0, -ENTRY.length);
       let pkg;
       try {
-        pkg = JSON.parse(fs.readFileSync(path.resolve(root, c), "utf8").replace(/^\uFEFF/, ""));
+        pkg = JSON.parse(fs.readFileSync(path.resolve(root, file), "utf8").replace(/^\uFEFF/, ""));
       } catch {
-        return [];
+        return fs.existsSync(path.resolve(root, file)) ? [] : [file];
       }
       const dot = pkg?.exports?.["."] ?? (typeof pkg?.exports === "string" ? pkg.exports : null);
       const strings = (v, depth = 0) => (typeof v === "string" ? [v] : v && typeof v === "object" && depth < 4 ? Object.values(v).flatMap((x) => strings(x, depth + 1)) : []);
       const fields = [pkg?.types, pkg?.typings, pkg?.main, pkg?.module, ...strings(dot)].filter((f) => typeof f === "string");
-      const dir = c.slice(0, -"/package.json".length);
-      return fields.flatMap((f) => variants(path.posix.normalize(path.posix.join(dir, f.replaceAll("\\", "/")))).filter((x) => !x.endsWith("/package.json")));
+      const dir = file.slice(0, -"/package.json".length);
+      return fields.flatMap((f) => variants(path.posix.normalize(path.posix.join(dir, f.replaceAll("\\", "/")))).filter((x) => !x.endsWith(ENTRY)));
     });
   // How a relative or tsconfig/jsconfig alias specifier resolves: { relative, baseUrl, key, list,
   // incomplete }, where `list` holds the root-relative files it may name. Null when no alias
@@ -654,6 +692,10 @@ function dependencyNote(root, entries, excluded) {
   const changed = entries.filter((e) => JS.test(e.path) && !e.binary && (e.status === "added" || e.status === "modified"));
   for (const e of changed) {
     for (const { specifier: s, line } of importsOf(toLF(e._head).toString("utf8"))) {
+      if (s === null) {
+        unchecked.push({ from: e.path, line, specifier: "import", reason: "import bindings longer than 20,000 characters; not read" });
+        continue;
+      }
       const at = { from: e.path, line, specifier: s };
       if (scheme(s)) {
         if (s.startsWith("node:") && !isBuiltin(s)) unresolvedDeps.push({ ...at, reason: "not a Node built-in" });
@@ -694,7 +736,7 @@ function dependencyNote(root, entries, excluded) {
       if (fs.statSync(file).size > 1 << 20) continue;
       scanned++;
       for (const { specifier: s, line } of importsOf(fs.readFileSync(file, "utf8"))) {
-        const files = scheme(s) ? null : local(p, s);
+        const files = s === null || scheme(s) ? null : local(p, s);
         const gone = deleted.get(FOLD(files?.list?.find((x) => deleted.has(FOLD(x))) ?? ""));
         if (!gone || files.list.some(isFile) || (!files.relative && isPackage(p, s))) continue;
         const at = { from: p, line, specifier: s };
