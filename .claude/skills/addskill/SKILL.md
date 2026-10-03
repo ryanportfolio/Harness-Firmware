@@ -32,7 +32,7 @@ For this repository:
    require agents or external authorization.
 4. Run `node .claude/scripts/sync-codex-skills.mjs --write`, its `--check` mode, and
    `node .claude/scripts/test-codex-contract.mjs`. Run relevant sync regression cases after
-   changing registration logic. Preserve the 240-character description and catalog budgets.
+   changing registration logic. Preserve the catalog budget.
 
 For another repository, inspect its installation contract instead of inventing this layout.
 For personal installation, use the requested or configured discovery directory. Do not
