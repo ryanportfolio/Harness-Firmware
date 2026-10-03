@@ -37,6 +37,15 @@ condensed.
   instead of being ignored. Pushing a change back to the template is unaffected.
   Harness Console's skill sync reads the same file. Documented in
   `docs/codex-skills.md`.
+- `deep-plan` skill: turns a loose idea on any subject into decisions the user
+  makes, asked in rounds of at most 4 questions through the question popup (a
+  chat format stands in when no popup tool is exposed). When a working directory
+  exists, it keeps a decision ledger at `.tmp/deep-plan/<slug>/ledger.md` so a
+  later session can resume. It stops at a recap with a reversal check on the
+  weightiest decisions and builds nothing until the user picks Go, then offers
+  `writing-plans` as the handoff. It runs only when the user invokes it, as
+  `/deep-plan` in Claude Code and `$deep-plan` in Codex; the Codex version is
+  classified Adapted.
 
 ### Changed
 
