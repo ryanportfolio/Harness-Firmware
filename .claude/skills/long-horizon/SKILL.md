@@ -25,10 +25,10 @@ Version: <current contract version>
 - <claim> — contract version: <version>; evidence: <file/command/output the auditor saw>
 
 # Remaining
-1. <step sized for one fresh context>
+1. <step sized for one fresh context>; depends on: <step numbers or none>; writes: <paths>
 
-# Current round  (scope and checks fixed at Plan, except for explicit user amendments)
-Round: <N>   Phase: planned | executing | awaiting-audit | audited
+# Current rounds  (one block per active round; scope and checks fixed at Plan, except for explicit user amendments)
+Round: <N>   Batch: <B>   Phase: planned | executing | awaiting-audit | audited
 Contract version: <version used for this round>
 Workspace: <absolute root the executor writes; any other workspace the round reads, marked read-only>
 Workers: <agent/process IDs, role, last observed status; update as workers start or stop>
@@ -46,7 +46,7 @@ Residue: <paths a failed earlier round left changed, and whether they were rever
 - <rule>: source round <N>; unconfirmed / confirmed in round <M> / dropped
 
 # Audit log
-- round N: <step> — <status>/<integrity>/<contract>, <one-line evidence>
+- round N (batch B): <step> — <status>/<integrity>/<contract>, <one-line evidence>
 ```
 
 Only audit-passed results enter **Verified progress**. Resume from the existing state file
@@ -89,16 +89,65 @@ Inspect exposed tools and capacity before dispatch. Use fresh context and never
 `subagent_type: fork` or an option that inherits Manager history for an auditor. If fresh
 independent context is unavailable, record the gap; inherited context or self-review cannot
 establish the audit gate. Continue useful authorized work that does not depend on it.
-Count Manager and other active workers against capacity; sequential fresh rounds are valid.
+Count Manager and other active workers against capacity; when capacity runs short, smaller
+batches or sequential fresh rounds are valid.
 
 The workspace belongs to the executor for the duration of a round. Edits from anyone else
 between Baseline and Audit make attribution impossible; the auditor reports integrity
 `suspect` rather than guessing whose change it was.
 
+## Parallel rounds
+
+Run as many rounds at once as is safe. At every Plan, take every ready step that can run
+beside the others, give each its own round, and dispatch them together as one batch. A ready
+step waits for a later batch only when a rule below forbids it; note the rule in its
+Remaining entry. A sequential run is a series of batches of one.
+
+A step is ready when every step it depends on is in Verified progress. Ready steps share a
+batch only when:
+
+- their write scopes do not overlap, and neither reads a path the other writes;
+- no two executions or done-checks contend for one resource: a port, dev server, browser
+  profile, database, GPU, or a timing or performance measurement that parallel load would skew;
+- capacity covers them, counting the Manager and every executor, auditor and other worker.
+
+Each round in a batch keeps the whole contract: its own Current round block, workspace,
+Baseline, briefs, executor and auditor. Parallel executors never share a workspace: one
+writer's edits land in the other's manifest diff and leave both audits `suspect`. Build each
+round's workspace from the main one before its Baseline: `git stash create` in the main
+workspace (empty output: use HEAD), `git worktree add --detach <path> <sha>`, then copy in the
+main workspace's untracked files and any ignored artifacts the step needs (dependencies, build
+output); or make a plain copy. Never a worktree at HEAD: it drops earlier rounds' uncommitted
+verified work. Take the round's Baseline inside its own workspace.
+
+Start every executor in the batch in one message. Each round's auditor starts as soon as that
+round's executor stops, without waiting for the rest of the batch. Integrate once every round
+in the batch is audited:
+
+1. For each passed round, apply its manifest diff to the main workspace verbatim: copy each
+   added or modified path from the round's workspace and delete each deleted path. A main
+   workspace file that no longer matches the round's Baseline (or exists where the Baseline
+   had none) is a conflict; that step returns to Remaining for a later batch and is not a
+   Dead end.
+2. Verdicts from separate workspaces do not prove the steps work together. When more than
+   one round was applied, one fresh auditor runs every applied round's done-check in the main
+   workspace before any of them enters Verified progress. A step that fails there returns to
+   Remaining with that output, and its applied paths go under Residue with a revert-or-keep
+   decision.
+3. A failed round's delta stays out of the main workspace. Save it as a patch under
+   `evidence/round-<N>/`, which a recovery brief may cite, and record it under Residue as not
+   applied.
+
+Then remove the batch's workspaces (`git worktree remove`). Inside a round, the executor runs
+independent reads, searches and commands at once and may fan out read-only subagents. Work
+that needs parallel writers is several steps: split it in Remaining and run the steps as
+parallel rounds.
+
 ## Round loop
 
-1. **Plan** — read the state file, pick ONE remaining step, and write the Current round block
-   into the state file, phase `planned`, before anything is spawned. Then take the Baseline,
+1. **Plan** — read the state file, pick the batch (every ready step that Parallel rounds
+   allows; each round works ONE step), and write each round's Current round block into the
+   state file, phase `planned`, before anything is spawned. Then, per round, take the Baseline,
    write the auditor brief to its recorded path, and write the executor brief: contract
    excerpt, the Current round block, only the verified facts that step needs, and every dead
    end that touches this step, plus the Method notes. The done-check is frozen from this
@@ -171,7 +220,8 @@ between Baseline and Audit make attribution impossible; the auditor reports inte
    - contract: aligned / drifted, with the inspected contract version and acceptance checks
    The executor's report is a claim; the auditor's inspection is the evidence. Only
    complete + clean + aligned enters Verified progress. Set phase `audited`.
-4. **Integrate** — pass: move the step into Verified progress with the auditor's evidence and
+4. **Integrate** — batches follow the order in Parallel rounds. Pass: move the step into
+   Verified progress with the auditor's evidence and
    the round's brief path and baseline ref, so the round can be re-examined later, and copy
    cited result files that live outside the task directory into its `evidence/round-<N>/`,
    since a workspace can vanish. Fail:
@@ -233,7 +283,7 @@ A round count alone cannot resolve a stalled run. Watch for repeated failures di
 
 - Same step fails audit twice in a row → the next brief must change approach, not retry the
   old one. Move the failed approach to Dead ends first.
-- Three rounds with nothing new entering Verified progress → stop spawning and rewrite
+- Three batches in a row with nothing new entering Verified progress → stop spawning and rewrite
   Remaining. The decomposition itself is the suspect, not the executor. Preserve consumed
   attempts; a new decomposition does not reset a user budget.
 
@@ -279,7 +329,8 @@ inspected revision and content manifest; later relevant changes require revalida
 - Honor explicit user model choices and required quality floors. Otherwise inherit the
   configured session model. Check actual exposure before dispatch; if a requested model or
   floor is unavailable, disclose it rather than silently downgrading or claiming it ran.
-- Size each step so one fresh context finishes it: one slice, one migration, one bug.
+- Size each step so one fresh context finishes it: one slice, one migration, one bug. Split
+  independent work into separate steps so it can run as parallel rounds.
 - Audit independence is the point — verdicts come from the auditor's own inspection in a
   fresh subagent, never from this Manager context.
 - Executors and auditors follow fable-mode discipline inside their round; fable-mode governs

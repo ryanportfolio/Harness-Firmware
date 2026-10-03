@@ -29,9 +29,9 @@ diffs it for the audit (`--diff <out.json>`).
 | Contract | Goal, authorized scope, constraints, numbered final acceptance checks |
 | Amendments | Version, explicit user instruction, changed checks, affected steps |
 | Workspace | Absolute root, branch/revision if Git, existing edits, baseline artifact paths, other workspaces the round reads (read-only) |
-| Round | Step ID, phase, agent/process IDs, allowed edits, local checks, dependencies |
+| Rounds | One entry per active round: step ID, batch, phase, workspace, agent/process IDs, allowed edits, local checks, dependencies |
 | Verified progress | Claim, contract version, inspected revision or file fingerprints, evidence path |
-| Remaining | Bounded steps, dependencies, pending final checks, invalidated claims |
+| Remaining | Bounded steps, dependencies, write paths, pending final checks, invalidated claims |
 | Dead ends | Failed approach, observed cause, evidence needed before retrying |
 | Method notes | Rules later rounds must follow (such as how to measure), source round, unconfirmed / confirmed / dropped |
 | Audit log | Round verdicts, evidence, decisions, blockers, recovery actions |
@@ -59,9 +59,56 @@ work pass. Carry existing authorization forward within its scope; ask only for m
 user-owned decisions or authority. Skill invocation does not itself authorize Git
 publication, deployments, migrations, installation, or external messages.
 
+## Parallel rounds
+
+Run as many rounds at once as is safe. At every Plan, take every ready step that can run
+beside the others, give each its own round, and dispatch them together as one batch. A ready
+step waits for a later batch only when a rule below forbids it; note the rule in its
+Remaining entry. A sequential run is a series of batches of one.
+
+A step is ready when every step it depends on is verified. Ready steps share a batch only
+when:
+
+- their write scopes do not overlap, and neither reads a path the other writes;
+- no two executions or done-checks contend for one resource: a port, dev server, browser
+  profile, database, GPU, or a timing or performance measurement that parallel load would skew;
+- available concurrency covers them, counting Manager and every executor, auditor and other
+  worker. When it runs short, smaller batches or sequential rounds are valid.
+
+Each round in a batch keeps the whole contract: its own state entry, workspace, baseline,
+briefs, executor and auditor. Parallel executors never share a workspace: one writer's edits
+land in the other's baseline diff and leave both audits `suspect`. Build each round's
+workspace from the main one before its baseline: `git stash create` in the main workspace
+(empty output: use HEAD), `git worktree add --detach <path> <sha>`, then copy in the main
+workspace's untracked files and any ignored artifacts the step needs (dependencies, build
+output); or make a plain copy. Never a worktree at HEAD: it drops earlier rounds'
+uncommitted verified work. Take the round's baseline inside its own workspace.
+
+Dispatch every executor in the batch before waiting on any. Each round's auditor starts as
+soon as that round's executor stops, without waiting for the rest of the batch. Integrate
+once every round in the batch is audited:
+
+1. For each accepted round, apply its manifest diff to the main workspace verbatim: copy each
+   added or modified path from the round's workspace and delete each deleted path. A main
+   workspace file that no longer matches the round's baseline (or exists where the baseline
+   had none) is a conflict; that step returns to Remaining for a later batch and is not a
+   dead end.
+2. Verdicts from separate workspaces do not prove the steps work together. When more than
+   one round was applied, one fresh auditor runs every applied round's done-checks in the
+   main workspace before any of them counts as verified. A step that fails there returns to
+   Remaining with that output, and its applied paths are recorded with a revert-or-keep
+   decision.
+3. A rejected round's delta stays out of the main workspace. Save it as a patch under
+   `evidence/round-<N>/`, which a recovery brief may cite, and record it as not applied.
+
+Then remove the batch's workspaces (`git worktree remove`). Inside a round, the executor runs
+independent reads, searches and commands at once and may use read-only helpers when the
+runtime allows. Work that needs parallel writers is several steps: split it in Remaining and
+run the steps as parallel rounds.
+
 ## Each round
 
-1. **Plan one step.** Define allowed paths/actions, dependencies, local done-checks, and
+1. **Plan one step per round.** Define allowed paths/actions, dependencies, local done-checks, and
    relevant task constraints. Capture a pre-round baseline, including dirty and untracked
    files, sufficient to distinguish this round's changes from existing work. Save a
    versioned auditor brief now (pre-register it), before spawning the executor, from the contract, scope,
@@ -111,7 +158,8 @@ publication, deployments, migrations, installation, or external messages.
    Auditor inspects actual changes and runs relevant
    checks itself. It does not fix implementation or write Manager state. Keep other writers
    off the audited files until the verdict is integrated.
-4. **Integrate.** Accept only `complete + clean + aligned` backed by evidence. Otherwise
+4. **Integrate.** Batches follow the order in Parallel rounds. Accept only
+   `complete + clean + aligned` backed by evidence. Otherwise
    record findings, invalidate prior claims affected by failed changes, and schedule the
    next round by the auditor's `repairable` verdict: `yes` earns one recovery round on the
    same approach with the auditor's diagnostic in its brief, counted as the step's second
@@ -177,7 +225,7 @@ to the inspected workspace; later relevant edits require revalidation.
 
 - Same step fails twice: record the cause and change approach based on evidence. A failed
   recovery round is the second failure.
-- Three rounds produce no new verified progress: pause dispatch and reconsider the
+- Three batches in a row produce no new verified progress: pause dispatch and reconsider the
   decomposition. A blocked tool or missing authority needs recovery, not repeated code edits.
 - Count both triggers from the Audit log, never from memory. A rewrite may route the stuck
   step through `arena` (parallel candidates, pick, graft) inside the executor agent; the
