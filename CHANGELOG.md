@@ -22,7 +22,8 @@ condensed.
   The `sync-starter` pull skips every locked skill's `.claude/skills/<name>/` and
   `.agents/skills/<name>/` folders and registry entries and reports each skip with
   its reason; `addskill` imports and updates, `init-project` profiles and
-  `adopt-repo` follow the same rule. An unreadable lock file stops the change
+  `adopt-repo` follow the same rule, and `sync-codex-skills.mjs --write` leaves a
+  locked skill's generated adapter in place. An unreadable lock file stops the change
   instead of being ignored. Pushing a change back to the template is unaffected.
   Harness Console's skill sync reads the same file. Documented in
   `docs/codex-skills.md`.

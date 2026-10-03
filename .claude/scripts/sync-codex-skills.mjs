@@ -257,6 +257,14 @@ for (const [name, ownership] of Object.entries(modes.skills)) {
   if (ownership === "adapter") warnings.push(`.agents/skill-modes.json: ${name} uses mode "adapter"; generated adapters are no longer supported, so ${port(name)}`);
   if (ownership === "disabled") disabled.add(name);
 }
+// Skills the project keeps as they are (docs/codex-skills.md, "Skill locks"): --write deletes nothing of theirs.
+const locksPath = path.join(root, ".agents", "skill-locks.json");
+const locks = fs.existsSync(locksPath) ? parseJson(fs.readFileSync(locksPath, "utf8"), ".agents/skill-locks.json") : { version: 1, locks: {} };
+if (locks.version !== 1 || !locks.locks || typeof locks.locks !== "object" || Array.isArray(locks.locks)
+  || Object.values(locks.locks).some((reason) => typeof reason !== "string")) {
+  throw new Error(`${locksPath}: expected version 1 and a locks object of reasons`);
+}
+const locked = new Set(Object.keys(locks.locks));
 // Retired skills and the skills that took over their behavior. A copy that reappears from an
 // old sync only warns.
 const retired = {
@@ -375,7 +383,7 @@ if (fs.existsSync(targetRoot)) {
       readMetadata(entry.name, adapterPath);
       warnings.push(`${adapterPath}: ${entry.name}: Codex-only skill has no .agents/skill-modes.json entry; add "${entry.name}": "native"`);
     }
-    if (generatedAdapter(adapterPath)) actions.push({ type: "remove", skillDir: entry.name, adapterPath });
+    if (generatedAdapter(adapterPath) && !locked.has(entry.name)) actions.push({ type: "remove", skillDir: entry.name, adapterPath });
   }
 }
 
@@ -394,7 +402,8 @@ function scanAdapters(directory) {
       if (mode === "--write" && pending.has(full)) continue;
       const name = path.relative(targetRoot, full).split(path.sep)[0];
       const fix = pending.has(full) ? "--write deletes it" : "delete it";
-      warnings.push(`${full}: generated Codex adapter for ${name}; adapters are no longer supported, so ${fix}, then ${port(name)}`);
+      if (locked.has(name)) warnings.push(`${full}: generated Codex adapter for ${name}; ${name} is locked in .agents/skill-locks.json, so --write leaves it. To replace it, unlock ${name}, delete the adapter, then ${port(name)}`);
+      else warnings.push(`${full}: generated Codex adapter for ${name}; adapters are no longer supported, so ${fix}, then ${port(name)}`);
     }
   }
 }

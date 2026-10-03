@@ -122,7 +122,8 @@ the `sync-starter` pull from the template never update, replace, or remove a loc
 `.claude/skills/<name>/` or `.agents/skills/<name>/` folder or its entries in
 `.agents/skill-modes.json` and `.agents/skill-sources.json`, and they list each skipped skill
 with its reason. `addskill` imports and updates, `init-project` profiles, and `adopt-repo`
-follow the same rule. A lock file that exists but cannot be read or parsed stops those tools
+follow the same rule, and `sync-codex-skills.mjs --write` never deletes a locked skill's
+generated adapter. A lock file that exists but cannot be read or parsed stops those tools
 with the error; none of them treats it as empty. Editing a locked skill by hand is still
 allowed, and a lock does not affect pushing a change back to the template. The file belongs
 to the project: the template ships none, and template cleanup never removes it because
