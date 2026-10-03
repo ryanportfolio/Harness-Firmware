@@ -119,7 +119,10 @@ batch only when:
 - no two executions or done-checks contend for one resource: a port, dev server, browser
   profile, database, GPU, or a timing or performance measurement that parallel load would skew;
 - capacity covers them, counting the Manager and every agent of every running round, judges
-  included.
+  included;
+- every Write scope path lies inside the workspace root. A step that writes outside it runs
+  alone, in the main workspace: a separate checkout cannot isolate an outside path, so its
+  edits would reach the main environment whatever the audit says.
 
 Each round in a batch keeps the whole contract: its own Current round block, workspace,
 Baseline, briefs, executor and audit. Parallel executors never share a workspace: one
@@ -127,8 +130,10 @@ writer's edits land in the other's manifest diff and leave both audits `suspect`
 round's workspace from the main one at Plan: `git stash create` in the main workspace (empty
 output: use HEAD), `git worktree add --detach <path> <sha>`, then copy in the main
 workspace's untracked files and any ignored artifacts the step needs (dependencies, build
-output); or make a plain copy. Never a worktree at HEAD: it drops earlier rounds'
-uncommitted verified work. The round's Baseline is taken inside its own workspace.
+output). Never a worktree at HEAD: it drops earlier rounds' uncommitted verified work. Never
+a plain copy of a Git checkout either: a copied `.git` file still points at the original's
+index and HEAD. Plain copies are for workspaces outside Git. The round's Baseline is taken
+inside its own workspace.
 
 Workflow engine: each round is its own Workflow call with its own `args` (`workspace` set to
 the round's workspace); start every call in the batch in one message. Agent engine: start
@@ -149,7 +154,10 @@ stops. Integrate once every round in the batch is audited:
    `evidence/round-<N>/`, which a recovery brief may cite, and record it under Residue as not
    applied.
 
-Then remove the batch's workspaces (`git worktree remove`). Inside a round, the executor runs
+Then remove the batch's workspaces. Each is dirty by design, so plain `git worktree remove`
+refuses it; once its delta is applied or saved as a patch, unlink any dependency links in it
+(`rmdir` on a junction or symlink), then `git worktree remove --force <path>`. Forcing first
+would delete through a link into the shared target. Inside a round, the executor runs
 independent reads, searches and commands at once and may fan out read-only subagents. Work
 that needs parallel writers is several steps: split it in Remaining and run the steps as
 parallel rounds.
