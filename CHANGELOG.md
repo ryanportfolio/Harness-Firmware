@@ -27,6 +27,16 @@ condensed.
   the subagent polls it.
   `long-horizon` carries the same rule for executors and has the Manager
   resume, by message, an executor that returns without its promised files.
+- Skill locks: a project lists skills it keeps as they are in the optional
+  `.agents/skill-locks.json` (`{"version": 1, "locks": {"<skill>": "<reason>"}}`).
+  The `sync-starter` pull skips every locked skill's `.claude/skills/<name>/` and
+  `.agents/skills/<name>/` folders and registry entries and reports each skip with
+  its reason; `addskill` imports and updates, `init-project` profiles and
+  `adopt-repo` follow the same rule, and `sync-codex-skills.mjs --write` leaves a
+  locked skill's generated adapter in place. An unreadable lock file stops the change
+  instead of being ignored. Pushing a change back to the template is unaffected.
+  Harness Console's skill sync reads the same file. Documented in
+  `docs/codex-skills.md`.
 - `deep-plan` skill: turns a loose idea on any subject into decisions the user
   makes, asked in rounds of at most 4 questions through the question popup (a
   chat format stands in when no popup tool is exposed). When a working directory
