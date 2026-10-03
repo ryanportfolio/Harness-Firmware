@@ -438,8 +438,8 @@ function effectiveOptions(file, seen) {
 }
 
 // Path aliases for a file, from the nearest tsconfig.json (or jsconfig.json) above it, as
-// TypeScript picks it: { base, paths, incomplete }, where `base` is the root-relative folder alias
-// targets resolve from (`baseUrl` when set, else the folder of the config that set `paths`).
+// TypeScript picks it: { root, base, paths, incomplete }, where `base` is the absolute folder
+// alias targets resolve from (`baseUrl` when set, else the folder of the config that set `paths`).
 // Null when no config applies or none in the chain sets `paths` and the chain was read whole.
 function pathAliases(root, fromPath, cache) {
   let config = null;
@@ -453,7 +453,7 @@ function pathAliases(root, fromPath, cache) {
   if (!cache.has(config)) {
     const o = effectiveOptions(config, new Set());
     const base = o.baseUrl ? path.resolve(o.baseUrl.dir, o.baseUrl.value) : o.paths?.dir;
-    cache.set(config, o.paths ? { base: slash(path.relative(root, base)) || ".", paths: o.paths.value, incomplete: o.incomplete } : o.incomplete ? { incomplete: true } : null);
+    cache.set(config, o.paths ? { root, base, paths: o.paths.value, incomplete: o.incomplete } : o.incomplete ? { incomplete: true } : null);
   }
   return cache.get(config);
 }
@@ -461,7 +461,9 @@ function pathAliases(root, fromPath, cache) {
 // Root-relative files an alias specifier may resolve to, or null when no alias matches. As in
 // TypeScript, an exact key wins, then the wildcard key with the longest prefix before its "*".
 function aliasCandidates(aliases, spec) {
-  spec = spec.replace(/[?#].*$/, "");
+  // Drop a query or hash suffix; a leading "#" is part of the name (`#utils`).
+  const cut = spec.slice(1).search(/[?#]/);
+  if (cut >= 0) spec = spec.slice(0, cut + 1);
   let best = null;
   for (const [key, targets] of Object.entries(aliases.paths)) {
     const star = key.indexOf("*");
@@ -477,7 +479,12 @@ function aliasCandidates(aliases, spec) {
     if (hit && (!best || pre.length > best.pre.length)) best = { key, pre, targets, capture: spec.slice(pre.length, spec.length - post.length) };
   }
   if (!best || !Array.isArray(best.targets)) return null;
-  const list = best.targets.flatMap((t) => variants(path.posix.normalize(path.posix.join(aliases.base, String(t).replaceAll("\\", "/").replace("*", best.capture)))));
+  // Targets may be absolute (a drive-letter path on Windows); outside the root they stay absolute.
+  const list = best.targets.flatMap((t) => {
+    const abs = path.resolve(aliases.base, String(t).replaceAll("\\", "/").replace("*", best.capture));
+    const rel = path.relative(aliases.root, abs);
+    return variants(rel.startsWith("..") || path.isAbsolute(rel) ? slash(abs) : slash(rel) || ".");
+  });
   return { key: best.key, list };
 }
 
@@ -500,7 +507,7 @@ function packageDeclared(root, fromPath, name, scope = false) {
 function dependencyNote(root, entries, excluded) {
   const isFile = (p) => {
     try {
-      return fs.statSync(path.join(root, p)).isFile();
+      return fs.statSync(path.resolve(root, p)).isFile();
     } catch {
       return false;
     }
