@@ -24,8 +24,9 @@
                name substring per line); never closed by this script, since closing kills the tree
    `close stale` closes rows flagged gone; `close old` closes recorded rows and automation
    browsers flagged old or gone, so a long-running tool found only by its path is never swept up.
-   Without --yes it only prints the plan. Before closing, each process is checked again against a
-   fresh snapshot and skipped if its pid now belongs to a different process. */
+   Without --yes it only prints the plan. Before closing, each row is checked again against a
+   fresh snapshot (same process, nothing protected under it), and each process in its tree is
+   killed only if its pid still belongs to the process that snapshot saw. */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -39,14 +40,17 @@ const BROWSERS = /^(chrome|msedge|chromium|chromium-browser|chrome-headless-shel
 const START_SLACK_MS = 10_000;
 
 const sh = (cmd, args) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 << 20, windowsHide: true });
-const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+// paths differ only by case on case-sensitive filesystems (Linux), so fold case only where it does not
+const fold = process.platform === 'win32' || process.platform === 'darwin' ? (s) => s.toLowerCase() : (s) => s;
+export const same = (a, b) => !!a && !!b && fold(path.resolve(a)) === fold(path.resolve(b));
 
-/* Every process and every listening port. Throws when the system query fails, so a failed
-   query never looks like "nothing running" and never prunes records. */
+/* Every process and every listening port (all ports: the protect list may name a low one).
+   Throws when the system query fails, so a failed query never looks like "nothing running"
+   and never prunes records. */
 export function snapshot() {
   if (process.platform === 'win32') {
     const ps = `$ErrorActionPreference='Stop'
-$l = @(Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -ge 1024 } | Select-Object @{n='port';e={[int]$_.LocalPort}}, @{n='pid';e={[int]$_.OwningProcess}} -Unique)
+$l = @(Get-NetTCPConnection -State Listen | Select-Object @{n='port';e={[int]$_.LocalPort}}, @{n='pid';e={[int]$_.OwningProcess}} -Unique)
 $p = @(Get-CimInstance Win32_Process | Select-Object @{n='pid';e={[int]$_.ProcessId}}, @{n='ppid';e={[int]$_.ParentProcessId}}, @{n='name';e={$_.Name}}, @{n='cmd';e={$_.CommandLine}}, @{n='start';e={if ($_.CreationDate) { $_.CreationDate.ToUniversalTime().ToString('o') }}})
 @{ listeners = $l; procs = $p } | ConvertTo-Json -Depth 3 -Compress`;
     const r = sh('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps]);
@@ -80,7 +84,7 @@ $p = @(Get-CimInstance Win32_Process | Select-Object @{n='pid';e={[int]$_.Proces
       if (last.port === null) last.port = port; else listeners.push({ pid: last.pid, port });
     }
   }
-  return { listeners: listeners.filter((l) => l.port >= 1024), procs };
+  return { listeners: listeners.filter((l) => l.port !== null), procs };
 }
 
 /* The git worktree or repository root that contains `p`, walking up; null if none. */
@@ -108,18 +112,29 @@ function worktreeOf(cmd) {
   return null;
 }
 
-/* Worktree roots of the repository containing `cwd` (its main checkout and linked worktrees). */
+/* Worktree roots of the repository containing `cwd` (its main checkout and linked worktrees).
+   Throws when git cannot list them, so a failure never reads as "no worktrees". */
 export function repoWorktrees(cwd = process.cwd()) {
   const r = sh('git', ['-C', cwd, 'worktree', 'list', '--porcelain']);
-  if (r.status !== 0) return [];
+  if (r.status !== 0) throw new Error(`git worktree list failed: ${(r.stderr || '').trim().split('\n')[0]}`);
   return r.stdout.split(/\r?\n/).filter((l) => l.startsWith('worktree ')).map((l) => path.normalize(l.slice(9)));
 }
 
+/* Throws on a record it cannot read: a lost record would turn a recorded server into an
+   unknown one. Records are written whole (temp file, then rename), so a partial one is real
+   damage; one removed by a concurrent prune is skipped. */
 export function readRegistry() {
   if (!fs.existsSync(REG)) return new Map();
   const out = new Map();
   for (const f of fs.readdirSync(REG)) {
-    try { const r = JSON.parse(fs.readFileSync(path.join(REG, f), 'utf8')); out.set(r.pid, r); } catch {}
+    if (!f.endsWith('.json')) continue;
+    let text;
+    try { text = fs.readFileSync(path.join(REG, f), 'utf8'); }
+    catch (err) { if (err.code === 'ENOENT') continue; throw new Error(`cannot read server record ${path.join(REG, f)}: ${err.message}`); }
+    let rec;
+    try { rec = JSON.parse(text); } catch { rec = null; }
+    if (!rec || !Number.isInteger(rec.pid) || !rec.recordedAt) throw new Error(`damaged server record ${path.join(REG, f)}; delete it after checking which process it described`);
+    out.set(rec.pid, rec);
   }
   return out;
 }
@@ -141,7 +156,9 @@ export function registerProcess({ pid, port = null, kind = 'server', purpose = '
     session: process.env.CLAUDE_CODE_SESSION_ID || process.env.CODEX_THREAD_ID || null,
     recordedAt: new Date().toISOString(),
   };
-  fs.writeFileSync(path.join(REG, `${pid}.json`), JSON.stringify(rec, null, 1));
+  const file = path.join(REG, `${pid}.json`);
+  fs.writeFileSync(`${file}.${process.pid}.tmp`, JSON.stringify(rec, null, 1));
+  fs.renameSync(`${file}.${process.pid}.tmp`, file);
   return rec;
 }
 
@@ -226,6 +243,7 @@ export function scan({ oldHours = 12 } = {}) {
     rows.set(pid, row);
   };
   for (const l of listeners) {
+    if (l.port < 1024) continue;
     const p = byPid.get(l.pid);
     if (p && (DEV_RUNTIMES.test(p.name) || recordFor(l.pid))) add(l.pid, 'server', l.port);
   }
@@ -249,25 +267,45 @@ export function scan({ oldHours = 12 } = {}) {
   }).sort((a, b) => (a.ports[0] || 1e9) - (b.ports[0] || 1e9));
 }
 
-/* Kill a process and everything under it, deepest first, over the same tree the protect check
-   read. taskkill /T is not used: it follows raw parent pids, which on Windows can point at an
-   unrelated process that reused a dead parent's pid. */
-function treeKill(pid, procs) {
-  const kids = childMap(procs);
+/* Kill each { pid, start } in order, but only while the pid still belongs to the process that
+   started at `start`; the check sits right before each kill, so a pid reused since the snapshot
+   is left alone. Returns pid -> killed | gone | changed | failed. */
+function killVerified(entries) {
+  const result = new Map();
+  if (!entries.length) return result;
+  if (process.platform === 'win32') {
+    // Windows PowerShell 5.1 emits a parsed JSON array as one object; foreach enumerates it
+    const ps = `$list = $env:SERVERS_KILL_LIST | ConvertFrom-Json
+foreach ($e in $list) {
+  $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($e.pid)"
+  if (-not $p) { "$($e.pid) gone"; continue }
+  if ($p.CreationDate.ToUniversalTime().ToString('o') -ne $e.start) { "$($e.pid) changed"; continue }
+  try { Stop-Process -Id $e.pid -Force -ErrorAction Stop; "$($e.pid) killed" }
+  catch { if (Get-Process -Id $e.pid -ErrorAction SilentlyContinue) { "$($e.pid) failed" } else { "$($e.pid) killed" } }
+}`;
+    const r = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], { encoding: 'utf8', windowsHide: true, env: { ...process.env, SERVERS_KILL_LIST: JSON.stringify(entries) } });
+    for (const line of (r.stdout || '').split(/\r?\n/)) { const m = line.trim().match(/^(\d+) (\w+)$/); if (m) result.set(+m[1], m[2]); }
+    for (const e of entries) if (!result.has(e.pid)) result.set(e.pid, 'failed');
+    return result;
+  }
+  for (const e of entries) {
+    const ps = sh('ps', ['-o', 'lstart=', '-p', String(e.pid)]);
+    if (ps.status !== 0 || !ps.stdout.trim()) { result.set(e.pid, 'gone'); continue; }
+    if (new Date(ps.stdout.trim()).toISOString() !== e.start) { result.set(e.pid, 'changed'); continue; }
+    try { process.kill(e.pid, 'SIGTERM'); result.set(e.pid, 'killed'); }
+    catch (err) { result.set(e.pid, err.code === 'ESRCH' ? 'gone' : 'failed'); }
+  }
+  return result;
+}
+
+/* The pid and everything under it in `snap`, deepest first, as { pid, start }. */
+function killOrder(pid, snap) {
+  const byPid = new Map(snap.procs.map((p) => [p.pid, p]));
+  const kids = childMap(snap.procs);
   const order = [];
   const visit = (p) => { if (order.includes(p)) return; for (const c of kids.get(p) || []) visit(c); order.push(p); };
   visit(pid);
-  let ok = true;
-  for (const p of order) {
-    if (process.platform === 'win32') {
-      // 128: the process already exited
-      const st = sh('taskkill', ['/PID', String(p), '/F']).status;
-      if (st !== 0 && st !== 128) ok = false;
-    } else {
-      try { process.kill(p, 'SIGTERM'); } catch (err) { if (err.code !== 'ESRCH') ok = false; }
-    }
-  }
-  return ok;
+  return order.map((p) => ({ pid: p, start: byPid.get(p).start }));
 }
 
 function fmt(r) {
@@ -323,18 +361,24 @@ function main(argv) {
     if (!go.length) { console.log('Nothing to close.'); return 0; }
     for (const r of go) console.log(`${has('--yes') ? 'closing' : 'would close'} ${fmt(r)}`);
     if (!has('--yes')) { console.log('Re-run with --yes to close these.'); return 0; }
-    const freshSnap = snapshot();
-    const fresh = new Map(freshSnap.procs.map((p) => [p.pid, p]));
     const protect = protectedList();
+    const closed = new Set();
     let failed = 0;
     for (const r of go) {
-      const now = fresh.get(r.pid);
+      // a row under one closed earlier went with it; never signal its pid a second time
+      if (closed.has(r.pid)) { console.log(`closed with its parent: pid ${r.pid}`); continue; }
+      const snap = snapshot();
+      const now = snap.procs.find((p) => p.pid === r.pid);
       if (!now) { console.log(`already gone: pid ${r.pid}`); fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true }); continue; }
       if (now.start !== r.start) { failed++; console.error(`skipped pid ${r.pid}: it now belongs to a different process`); continue; }
       // a protected process may have started under it since the list was built
-      if (runsProtected(r.pid, freshSnap, protect)) { failed++; console.error(`skipped pid ${r.pid}: it now runs a protected process`); continue; }
-      if (treeKill(r.pid, freshSnap.procs)) fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true });
-      else { failed++; console.error(`failed to close pid ${r.pid}`); }
+      if (runsProtected(r.pid, snap, protect)) { failed++; console.error(`skipped pid ${r.pid}: it now runs a protected process`); continue; }
+      const res = killVerified(killOrder(r.pid, snap).filter((e) => !closed.has(e.pid)));
+      for (const [pid, st] of res) if (st === 'killed' || st === 'gone') closed.add(pid);
+      const bad = [...res].filter(([, st]) => st === 'failed').map(([pid]) => pid);
+      if (bad.length) { failed++; console.error(`failed to close pid ${bad.join(', ')} (under pid ${r.pid})`); }
+      if (closed.has(r.pid)) fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true });
+      else if (!bad.includes(r.pid)) { failed++; console.error(`skipped pid ${r.pid}: it changed while closing`); }
     }
     return failed ? 1 : 0;
   }

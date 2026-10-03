@@ -19,26 +19,27 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scan, repoWorktrees } from '../../servers/scripts/servers.mjs';
+import { scan, repoWorktrees, same } from '../../servers/scripts/servers.mjs';
 
 const run = (cmd, args, cwd) => {
   const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', windowsHide: true, maxBuffer: 32 << 20 });
   return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || r.error?.message || '').trim() };
 };
 const git = (args, cwd) => run('git', args, cwd);
-const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 
+/* File count and size under `dir`; a missing folder is empty, any other read error is reported. */
 function dirStats(dir) {
   let files = 0, bytes = 0;
+  if (!fs.existsSync(dir)) return { files, bytes };
   const walk = (d) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const p = path.join(d, e.name);
       if (e.isSymbolicLink()) continue;
       if (e.isDirectory()) walk(p);
-      else { files++; try { bytes += fs.statSync(p).size; } catch {} }
+      else { files++; try { bytes += fs.statSync(p).size; } catch (err) { if (err.code !== 'ENOENT') throw err; } }
     }
   };
-  try { walk(dir); } catch {}
+  try { walk(dir); } catch (err) { return { files, bytes, error: err.message }; }
   return { files, bytes };
 }
 
@@ -149,11 +150,11 @@ export function wrapup(cwd = process.cwd()) {
   const unpushed = unpushedCount(here, branch, heads);
   const head = git(['rev-parse', 'HEAD'], here).out;
   const pr = branch && branch !== base ? prFor(branch, here) : null;
-  const scratch = ['.tmp'].map((d) => ({ dir: d, ...dirStats(path.join(here, d)) })).filter((s) => s.files);
+  const scratch = ['.tmp'].map((d) => ({ dir: d, ...dirStats(path.join(here, d)) })).filter((s) => s.files || s.error);
   let running = [];
   let runningError = null;
   try {
-    const trees = repoWorktrees(here);
+    const trees = [here, ...repoWorktrees(here)];
     running = scan().filter((r) => r.worktree && trees.some((t) => same(t, r.worktree)));
   } catch (err) { runningError = err.message; }
   const others = worktrees(here, here, base, heads);
@@ -165,9 +166,11 @@ export function wrapup(cwd = process.cwd()) {
   else if (unpushed) blockers.push(`${unpushed} commit(s) at HEAD not on any remote`);
   if (!branch) notes.push('detached HEAD');
   if (pr?.state === 'OPEN') notes.push(`PR #${pr.number} is open, not merged (${pr.url})`);
-  if (pr?.unavailable === 'gh not installed') notes.push('PR check skipped: gh not installed');
-  else if (pr?.unavailable) blockers.push(`PR check failed: ${pr.unavailable}`);
-  for (const s of scratch) notes.push(`${s.dir}/ holds ${s.files} file(s), ${(s.bytes / 1e6).toFixed(1)} MB; removing this worktree deletes them`);
+  if (pr?.unavailable) blockers.push(`PR check failed: ${pr.unavailable}`);
+  for (const s of scratch) {
+    if (s.error) blockers.push(`could not inspect ${s.dir}/ (${s.error}); removing this worktree may delete files in it`);
+    else notes.push(`${s.dir}/ holds ${s.files} file(s), ${(s.bytes / 1e6).toFixed(1)} MB; removing this worktree deletes them`);
+  }
   const mine = running.filter((r) => same(r.worktree, here));
   if (mine.length) blockers.push(`${mine.length} server(s)/browser(s) still running from this checkout`);
   if (running.length > mine.length) notes.push(`${running.length - mine.length} server(s)/browser(s) running from other worktrees of this repo`);
