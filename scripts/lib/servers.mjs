@@ -1,0 +1,233 @@
+#!/usr/bin/env node
+/* List, label and close the dev servers and automation browsers that sessions leave running.
+
+   node scripts/lib/servers.mjs [list] [--here] [--json] [--old-hours N]
+   node scripts/lib/servers.mjs register --port N | --pid N  --purpose "menu preview"
+   node scripts/lib/servers.mjs close stale|old|<port>|pid:<pid> [--yes]
+
+   What counts: TCP listeners on port 1024+ owned by a dev runtime (node, bun, deno, python, ...)
+   or by a recorded process, and Chrome/Edge/Chromium browser processes started for automation
+   (a --remote-debugging-* flag or their own --user-data-dir). A personal browser launched
+   normally has neither and is never listed.
+
+   Records live in ~/.claude/servers-registry/<pid>.json and say who started a process and why,
+   because Windows does not expose another process's working directory: `npm run dev` from a
+   worktree looks the same as one from any other folder.
+
+   Flags per row:
+     gone      its worktree no longer exists on disk (a server left running after cleanup)
+     old       older than --old-hours (default 12)
+     unknown   a server with no record and no worktree path in its command line; never closed
+               by `stale`/`old` (automation browsers are never unknown: their flags identify them)
+     protected listed in ~/.claude/servers-protect.txt (one port or name substring per line);
+               never closed by this script
+   `close stale` closes rows flagged gone; `close old` closes recorded rows and automation
+   browsers flagged old or gone, so a long-running tool found only by its path is never swept up. Closing kills the whole process tree. Without --yes it only prints the plan. */
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REG = path.join(os.homedir(), '.claude', 'servers-registry');
+const PROTECT = path.join(os.homedir(), '.claude', 'servers-protect.txt');
+const DEV_RUNTIMES = /^(node|bun|deno|python\d*|pythonw|ruby|php|java|dotnet|uvicorn|gunicorn|hugo|caddy|http-server|esbuild|vite)(\.exe)?$/i;
+const BROWSERS = /^(chrome|msedge|chromium|chrome-headless-shell)(\.exe)?$/i;
+
+const sh = (cmd, args) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 << 20, windowsHide: true });
+
+function snapshot() {
+  if (process.platform === 'win32') {
+    const ps = `$ErrorActionPreference='SilentlyContinue'
+$l = Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -ge 1024 } | Select-Object @{n='port';e={[int]$_.LocalPort}}, @{n='pid';e={[int]$_.OwningProcess}} -Unique
+$p = Get-CimInstance Win32_Process | Select-Object @{n='pid';e={[int]$_.ProcessId}}, @{n='ppid';e={[int]$_.ParentProcessId}}, @{n='name';e={$_.Name}}, @{n='cmd';e={$_.CommandLine}}, @{n='start';e={if ($_.CreationDate) { $_.CreationDate.ToUniversalTime().ToString('o') }}}
+@{ listeners = @($l); procs = @($p) } | ConvertTo-Json -Depth 3 -Compress`;
+    const r = sh('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps]);
+    if (r.status !== 0) throw new Error(`process snapshot failed: ${r.stderr.trim()}`);
+    return JSON.parse(r.stdout);
+  }
+  const procs = sh('ps', ['-eo', 'pid=,ppid=,lstart=,args=']).stdout.split('\n').filter(Boolean).map((line) => {
+    const m = line.trim().match(/^(\d+)\s+(\d+)\s+(\w+\s+\w+\s+\d+\s+[\d:]+\s+\d+)\s+(.*)$/);
+    if (!m) return null;
+    const cmd = m[4];
+    return { pid: +m[1], ppid: +m[2], start: new Date(m[3]).toISOString(), cmd, name: path.basename(cmd.split(' ')[0]) };
+  }).filter(Boolean);
+  const listeners = [];
+  for (const line of sh('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn']).stdout.split('\n')) {
+    if (line.startsWith('p')) listeners.push({ pid: +line.slice(1), port: null });
+    else if (line.startsWith('n') && listeners.length) {
+      const port = +line.split(':').pop();
+      const last = listeners[listeners.length - 1];
+      if (last.port === null) last.port = port; else listeners.push({ pid: last.pid, port });
+    }
+  }
+  return { listeners: listeners.filter((l) => l.port >= 1024), procs };
+}
+
+/* The git worktree or repository root that contains `p`, walking up; null if none. */
+function repoRoot(p) {
+  for (let d = path.resolve(p); ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, '.git'))) return d;
+    if (path.dirname(d) === d) return null;
+  }
+}
+
+/* Absolute paths in a command line, and whether the worktree they point into still exists. */
+function worktreeOf(cmd) {
+  const paths = String(cmd || '').match(/[A-Za-z]:[\\/][^"'\s]+|\/(?:home|Users|srv|opt|var|tmp|mnt)\/[^"'\s]+/g) || [];
+  for (const p of paths) {
+    const m = p.replace(/\\/g, '/').match(/^(.*?\/\.claude\/worktrees\/[^/]+)/);
+    if (m) return { worktree: path.normalize(m[1]), gone: !fs.existsSync(m[1]) };
+    if (/[\\/]Program Files|[\\/]AppData[\\/]|[\\/]nodejs[\\/]|[\\/]usr[\\/]/i.test(p)) continue;
+    const root = repoRoot(p.split(/[\\/]node_modules[\\/]/)[0]);
+    if (root) return { worktree: root, gone: false };
+  }
+  return null;
+}
+
+export function readRegistry() {
+  if (!fs.existsSync(REG)) return new Map();
+  const out = new Map();
+  for (const f of fs.readdirSync(REG)) {
+    try { const r = JSON.parse(fs.readFileSync(path.join(REG, f), 'utf8')); out.set(r.pid, r); } catch {}
+  }
+  return out;
+}
+
+/* Record who started a process and why. Used by the CLI and by scripts/lib/launch-chrome.mjs. */
+export function registerProcess({ pid, port = null, kind = 'server', purpose = '', cwd = process.cwd() }) {
+  fs.mkdirSync(REG, { recursive: true });
+  const rec = {
+    pid, port, kind, purpose,
+    worktree: repoRoot(cwd) || path.resolve(cwd),
+    session: process.env.CLAUDE_CODE_SESSION_ID || process.env.CODEX_THREAD_ID || null,
+    recordedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(path.join(REG, `${pid}.json`), JSON.stringify(rec, null, 1));
+  return rec;
+}
+
+function protectedList() {
+  if (!fs.existsSync(PROTECT)) return [];
+  return fs.readFileSync(PROTECT, 'utf8').split(/\r?\n/).map((s) => s.trim()).filter((s) => s && !s.startsWith('#'));
+}
+
+export function scan({ oldHours = 12 } = {}) {
+  const { listeners = [], procs = [] } = snapshot();
+  const byPid = new Map(procs.map((p) => [p.pid, p]));
+  const reg = readRegistry();
+  for (const pid of reg.keys()) if (!byPid.has(pid)) fs.rmSync(path.join(REG, `${pid}.json`), { force: true });
+  const protect = protectedList();
+  const now = Date.now();
+  const rows = new Map();
+
+  /* A recorded ancestor labels its children: `npm run dev` records the npm pid, vite listens. */
+  const recordFor = (pid) => {
+    for (let p = pid, hops = 0; p && hops < 8; p = byPid.get(p)?.ppid, hops++) if (reg.has(p)) return reg.get(p);
+    return null;
+  };
+
+  const add = (pid, kind, port) => {
+    const p = byPid.get(pid);
+    if (!p) return;
+    const row = rows.get(pid) || { pid, kind, ports: [], name: p.name, cmd: p.cmd || '', start: p.start };
+    if (port) row.ports.push(port);
+    rows.set(pid, row);
+  };
+
+  for (const l of listeners) {
+    const p = byPid.get(l.pid);
+    if (p && (DEV_RUNTIMES.test(p.name) || recordFor(l.pid))) add(l.pid, 'server', l.port);
+  }
+  for (const p of procs) {
+    if (!BROWSERS.test(p.name) || /--type=/.test(p.cmd || '')) continue;
+    if (/--remote-debugging-(port|pipe)|--user-data-dir/.test(p.cmd || '') || reg.has(p.pid)) add(p.pid, 'browser');
+  }
+  for (const [pid, r] of reg) if (byPid.has(pid) && !rows.has(pid)) add(pid, r.kind || 'server', r.port);
+
+  return [...rows.values()].map((row) => {
+    const rec = recordFor(row.pid);
+    const wt = rec ? { worktree: rec.worktree, gone: !fs.existsSync(rec.worktree) } : worktreeOf(row.cmd);
+    const ageH = row.start ? (now - Date.parse(row.start)) / 36e5 : null;
+    const flags = [];
+    if (wt?.gone) flags.push('gone');
+    if (ageH !== null && ageH > oldHours) flags.push('old');
+    if (!rec && !wt && row.kind !== 'browser') flags.push('unknown');
+    if (protect.some((x) => row.ports.map(String).includes(x) || row.name.includes(x) || row.cmd.includes(x))) flags.push('protected');
+    return { ...row, ageH: ageH === null ? null : +ageH.toFixed(1), worktree: wt?.worktree || null, purpose: rec?.purpose || '', session: rec?.session || null, recorded: !!rec, flags };
+  }).sort((a, b) => (a.ports[0] || 1e9) - (b.ports[0] || 1e9));
+}
+
+function treeKill(pid) {
+  const r = process.platform === 'win32'
+    ? sh('taskkill', ['/PID', String(pid), '/T', '/F'])
+    : sh('pkill', ['-TERM', '-P', String(pid)]);
+  if (process.platform !== 'win32') { try { process.kill(pid, 'SIGTERM'); } catch {} }
+  return r.status === 0 || process.platform !== 'win32';
+}
+
+function fmt(r) {
+  const age = r.ageH === null ? '?' : r.ageH < 1 ? `${Math.round(r.ageH * 60)}m` : `${r.ageH}h`;
+  const where = r.worktree ? r.worktree.replace(os.homedir(), '~') : '(unknown folder)';
+  const label = r.purpose ? ` "${r.purpose}"` : '';
+  const flags = r.flags.length ? ` [${r.flags.join(', ')}]` : '';
+  return `${(r.ports.length ? ':' + r.ports.join(',:') : r.kind).padEnd(14)} pid ${String(r.pid).padEnd(7)} ${age.padStart(5)}  ${where}${label}${flags}`;
+}
+
+function main(argv) {
+  const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
+  const has = (k) => argv.includes(k);
+  const cmd = argv[0] && !argv[0].startsWith('--') ? argv[0] : 'list';
+  const oldHours = +opt('--old-hours', 12);
+
+  if (cmd === 'register') {
+    let pid = opt('--pid') ? +opt('--pid') : null;
+    const port = opt('--port') ? +opt('--port') : null;
+    if (!pid && port) pid = snapshot().listeners.find((l) => l.port === port)?.pid ?? null;
+    if (!pid) { console.error('register: no process found; pass --pid, or --port of a listening server'); return 1; }
+    const rec = registerProcess({ pid, port, kind: opt('--kind', 'server'), purpose: opt('--purpose', '') });
+    console.log(`recorded pid ${rec.pid}${port ? ` :${port}` : ''} in ${rec.worktree}${rec.purpose ? ` "${rec.purpose}"` : ''}`);
+    return 0;
+  }
+
+  let rows = scan({ oldHours });
+  if (has('--here')) {
+    const root = repoRoot(process.cwd());
+    const main = root && sh('git', ['-C', root, 'rev-parse', '--path-format=absolute', '--git-common-dir']).stdout.trim();
+    const base = main ? path.dirname(main) : root;
+    rows = rows.filter((r) => r.worktree && base && path.resolve(r.worktree).toLowerCase().startsWith(path.resolve(base).toLowerCase()));
+  }
+
+  if (cmd === 'list') {
+    if (has('--json')) { console.log(JSON.stringify(rows, null, 1)); return 0; }
+    if (!rows.length) { console.log('Nothing running.'); return 0; }
+    for (const r of rows) console.log(fmt(r));
+    return 0;
+  }
+
+  if (cmd === 'close') {
+    const target = argv[1];
+    if (!target) { console.error('close: give stale, old, a port, or pid:<pid>'); return 1; }
+    const pick = target === 'stale' ? rows.filter((r) => r.flags.includes('gone'))
+      : target === 'old' ? rows.filter((r) => (r.recorded || r.kind === 'browser') && (r.flags.includes('old') || r.flags.includes('gone')))
+      : target.startsWith('pid:') ? rows.filter((r) => r.pid === +target.slice(4))
+      : rows.filter((r) => r.ports.includes(+target));
+    const blocked = pick.filter((r) => r.flags.includes('protected'));
+    const go = pick.filter((r) => !r.flags.includes('protected') && (/^\d+$|^pid:/.test(target) || !r.flags.includes('unknown')));
+    for (const r of blocked) console.log(`skip (protected) ${fmt(r)}`);
+    if (!go.length) { console.log('Nothing to close.'); return 0; }
+    for (const r of go) console.log(`${has('--yes') ? 'closing' : 'would close'} ${fmt(r)}`);
+    if (!has('--yes')) { console.log('Re-run with --yes to close these.'); return 0; }
+    let failed = 0;
+    for (const r of go) {
+      if (treeKill(r.pid)) fs.rmSync(path.join(REG, `${r.pid}.json`), { force: true });
+      else { failed++; console.error(`failed to close pid ${r.pid}`); }
+    }
+    return failed ? 1 : 0;
+  }
+
+  console.error(`unknown command: ${cmd}`);
+  return 1;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main(process.argv.slice(2));

@@ -23,6 +23,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { registerProcess } from './servers.mjs';
 
 const PS1 = join(dirname(fileURLToPath(import.meta.url)), 'window-place.ps1');
 const OFFSCREEN = { x: -2400, y: -2400, width: 1600, height: 1000 };
@@ -67,8 +68,9 @@ function plan(mode) {
 }
 
 /* Launch headed Chrome, placed. Returns what chromium.launch() returns.
-   Extra opts: place ('other-monitor' | 'offscreen' | 'here'), args (appended). */
-export async function launchPlacedChrome({ place, args = [], ...opts } = {}) {
+   Extra opts: place ('other-monitor' | 'offscreen' | 'here'), args (appended),
+   purpose (label recorded for scripts/lib/servers.mjs). */
+export async function launchPlacedChrome({ place, args = [], purpose, ...opts } = {}) {
   const chromium = await loadChromium();
   const mode = place || process.env.CHROME_PLACE || 'other-monitor';
   const spot = plan(mode);
@@ -97,5 +99,14 @@ export async function launchPlacedChrome({ place, args = [], ...opts } = {}) {
     }
   }
   if (spot) console.log(`[launch-chrome] window on ${spot.target} at ${spot.x},${spot.y}`);
+  // record the browser so `node scripts/lib/servers.mjs` can say which session opened it and close it later
+  const pid = browser.process?.()?.pid;
+  if (pid) {
+    try {
+      registerProcess({ pid, kind: 'browser', purpose: purpose || 'verification browser' });
+    } catch (err) {
+      console.warn(`[launch-chrome] browser record skipped: ${err.message}`);
+    }
+  }
   return browser;
 }
