@@ -26,7 +26,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
-import { builtinModules } from "node:module";
+import { isBuiltin } from "node:module";
 import path from "node:path";
 
 const POSIX = process.platform !== "win32";
@@ -85,14 +85,15 @@ function readHead(root, p) {
   try {
     st = fs.lstatSync(abs);
   } catch (e) {
-    if (e.code === "ENOENT" || e.code === "ENOTDIR") return { kind: null, bytes: null };
+    if (e.code === "ENOENT" || e.code === "ENOTDIR") return { kind: null, mode: null, bytes: null };
     throw new Error(`cannot read ${p}: ${e.code ?? e.message}`);
   }
-  if (st.isSymbolicLink()) return { kind: "symlink", bytes: Buffer.from(slash(fs.readlinkSync(abs))) };
+  if (st.isSymbolicLink()) return { kind: "symlink", mode: "120000", bytes: Buffer.from(slash(fs.readlinkSync(abs))) };
   // A folder is a submodule only with its own .git; a file replaced by a plain folder is gone.
-  if (st.isDirectory() && !fs.existsSync(path.join(abs, ".git"))) return { kind: null, bytes: null };
-  if (st.isDirectory()) return { kind: "submodule", bytes: Buffer.from(`Subproject commit ${gitText(abs, ["rev-parse", "HEAD"])}\n`) };
-  return { kind: "file", bytes: fs.readFileSync(abs) };
+  if (st.isDirectory() && !fs.existsSync(path.join(abs, ".git"))) return { kind: null, mode: null, bytes: null };
+  if (st.isDirectory()) return { kind: "submodule", mode: "160000", bytes: Buffer.from(`Subproject commit ${gitText(abs, ["rev-parse", "HEAD"])}\n`) };
+  // Windows has no executable bit; git there ignores it too (core.fileMode false).
+  return { kind: "file", mode: POSIX ? (st.mode & 0o100 ? "100755" : "100644") : null, bytes: fs.readFileSync(abs) };
 }
 
 // Every path that differs between baseSha and the working tree, untracked files included,
@@ -132,6 +133,8 @@ function collect(root, baseSha, excluded) {
       status,
       untracked,
       kind: head.kind ?? baseKind,
+      baseMode: t?.mode ?? null,
+      headMode: head.mode,
       binary,
       baseSha256: base === null ? null : sha256(base),
       headSha256: head.bytes === null ? null : sha256(head.bytes),
@@ -142,7 +145,7 @@ function collect(root, baseSha, excluded) {
       _head: head.bytes,
     });
   }
-  const scopeHash = sha256(JSON.stringify([baseSha, entries.map((e) => [e.path, e.status, e.baseSha256, e.headSha256])]));
+  const scopeHash = sha256(JSON.stringify([baseSha, entries.map((e) => [e.path, e.status, e.baseMode, e.headMode, e.baseSha256, e.headSha256])]));
   return { entries, uncovered, scopeHash };
 }
 
@@ -320,7 +323,6 @@ function dependencyNote(root, entries) {
       return false;
     }
   };
-  const builtins = new Set(builtinModules);
   const unresolvedDeps = [];
   const unchecked = [];
   const changed = entries.filter((e) => JS.test(e.path) && !e.binary && (e.status === "added" || e.status === "modified"));
@@ -330,12 +332,12 @@ function dependencyNote(root, entries) {
       if (s.startsWith(".")) {
         if (!candidates(e.path, s).some(isFile)) unresolvedDeps.push({ ...at, reason: "no file at this relative path" });
       } else if (/^[a-z][\w+.-]*:/i.test(s)) {
-        if (s.startsWith("node:") && !builtins.has(s.slice(5))) unresolvedDeps.push({ ...at, reason: "not a Node built-in" });
+        if (s.startsWith("node:") && !isBuiltin(s)) unresolvedDeps.push({ ...at, reason: "not a Node built-in" });
       } else if (/^(?:@\/|[~#/$])/.test(s)) {
         unchecked.push({ ...at, reason: "path alias or absolute path; aliases are not resolved" });
       } else {
         const name = s.split("/").slice(0, s.startsWith("@") ? 2 : 1).join("/");
-        if (!builtins.has(name) && !packageDeclared(root, e.path, name)) {
+        if (!isBuiltin(name) && !packageDeclared(root, e.path, name)) {
           unresolvedDeps.push({ ...at, reason: `package "${name}" is not declared in a package.json up to the root and not installed` });
         }
       }
@@ -471,7 +473,7 @@ function verify(dir) {
   for (const e of now.entries) {
     const f = then.get(e.path);
     if (!f) drift.push(`new change: ${e.path}`);
-    else if (f.headSha256 !== e.headSha256 || f.status !== e.status) drift.push(`changed since snapshot: ${e.path}`);
+    else if (f.headSha256 !== e.headSha256 || f.status !== e.status || f.headMode !== e.headMode) drift.push(`changed since snapshot: ${e.path}`);
     then.delete(e.path);
   }
   for (const p of then.keys()) drift.push(`no longer changed: ${p}`);

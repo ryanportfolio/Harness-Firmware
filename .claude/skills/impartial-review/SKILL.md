@@ -24,10 +24,10 @@ Use `$ARGUMENTS` if the user named a specific scope (file path, PR number, "the 
 
 State the scope you're reviewing in your first sentence so the user can redirect if it's wrong. Also count the changed lines (`git diff <range> --stat | tail -1`) — you'll need this for Step 2.
 
-**Freeze the scope with the snapshot script.** For any review of uncommitted or untracked work, or any diff over about 1500 lines, run `scripts/snapshot.mjs` from this skill's folder instead of assembling the diff by hand:
+**Freeze the scope with the snapshot script.** For any review of uncommitted or untracked work, or any diff over about 1500 lines, run `scripts/snapshot.mjs` from this skill's folder instead of assembling the diff by hand. The script always snapshots the checked-out working tree, so its head is that tree. To review a commit, branch or range whose head is not checked out, or a checkout with unrelated local edits, first create a clean worktree at the requested head (`git worktree add --detach <dir> <head>`) and pass `--root <dir>`:
 
 ```bash
-node <this skill>/scripts/snapshot.mjs --base <ref> [--merge-base] [--exclude <report dir>]
+node <this skill>/scripts/snapshot.mjs --base <ref> [--merge-base] [--root <dir>] [--exclude <report dir>]
 ```
 
 `--base` defaults to `HEAD` (uncommitted work only); use `--base origin/main --merge-base` for a branch or PR. The script compares the base with the working tree, untracked files included, and writes a folder under `.tmp/review-snapshots/` holding `base/` and `head/` copies of the changed files, `scope.patch`, `source-inventory.json` (path, status, SHA-256, absolute paths, scope hash) and `BRIEF.md`. It converts CRLF to LF before diffing, so a pure line-ending flip is listed as `eol-only` and stays out of the patch. Copies and patches over 48 KB or 1800 lines are also split into pages that fit the Read tool. The brief ends with a JS/TS import check that lists `unresolvedDeps`. The script exits 1 without writing the inventory when a changed path is missing from the patch; fix the cause, never review a partial patch. Exclude task-owned report folders with `--exclude`.

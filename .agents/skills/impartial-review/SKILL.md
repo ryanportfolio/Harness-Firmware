@@ -15,8 +15,11 @@ Use path/content hashes for relevant dirty and untracked content; exclude task-o
 report artifacts. Review evidence applies to that content; relevant later edits require renewed review.
 
 For uncommitted or untracked work, or a diff over about 1500 lines, freeze the scope with
-`node <this skill>/scripts/snapshot.mjs --base <ref> [--merge-base] [--exclude <report dir>]`
-(`--base` defaults to `HEAD`; use `--base origin/main --merge-base` for a branch or PR). It
+`node <this skill>/scripts/snapshot.mjs --base <ref> [--merge-base] [--root <dir>] [--exclude <report dir>]`
+(`--base` defaults to `HEAD`; use `--base origin/main --merge-base` for a branch or PR). The
+script always snapshots the checked-out working tree. To review a commit, branch or range
+whose head is not checked out, or a checkout with unrelated local edits, first create a clean
+worktree at the requested head (`git worktree add --detach <dir> <head>`) and pass `--root <dir>`. It
 compares the base with the working tree, untracked files included, and writes a folder under
 `.tmp/review-snapshots/` with `base/` and `head/` copies of changed files, `scope.patch`,
 `source-inventory.json` (path, status, SHA-256, absolute paths, scope hash) and `BRIEF.md`.
