@@ -73,7 +73,7 @@ Ready = every dependency in Verified progress. Ready steps share batch only if:
 - write scopes don't overlap; neither reads path other writes;
 - no two executions/done-checks contend for one resource: port, dev server, browser profile, DB, GPU, or timing/perf measurement parallel load would skew;
 - capacity covers them, counting Manager + every executor, auditor, other worker;
-- every Write scope path inside workspace root. Step writing outside it runs alone, in main workspace: separate checkout can't isolate outside path → edits reach main env whatever audit says.
+- every Write scope path inside workspace root. Step writing outside it runs alone, in main workspace: separate checkout can't isolate outside path → edits reach main env whatever audit says. In-place round skips batch integration steps 1-3 (nothing to copy; its edits already differ from Baseline by design) → normal Integrate on its own audit.
 
 Each batch round keeps whole contract: own Current round block, workspace, Baseline, briefs, executor, auditor. Parallel executors never share workspace: one's edits land in other's manifest diff → both audits `suspect`. Build each round workspace from main before its Baseline: `git stash create` in main workspace (empty output: use HEAD), `git worktree add --detach <path> <sha>`, copy in all main's untracked files + any ignored artifacts step needs (deps, build output). Never worktree at HEAD: drops earlier rounds' uncommitted verified work. Never plain copy of Git checkout: copied `.git` file still points at original's index + HEAD. Plain copies only for non-Git workspaces. Take Baseline inside round's own workspace.
 

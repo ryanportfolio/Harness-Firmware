@@ -111,6 +111,7 @@ Ready = all dependencies in Verified progress. Ready steps share batch only if:
 - every Write scope path inside workspace root. Step writing outside → runs alone, in main
   workspace: separate checkout can't isolate outside path, edits reach main env whatever
   audit says.
+  In-place round skips batch integration steps 1-3 (nothing to copy; its edits already differ from Baseline by design) → normal Integrate on its own audit.
 
 Each batch round keeps whole contract: own Current round block, workspace, Baseline, briefs,
 executor, audit. Parallel executors never share workspace: one writer's edits land in other's
