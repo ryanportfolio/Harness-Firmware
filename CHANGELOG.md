@@ -69,8 +69,18 @@ condensed.
   only on broken input: unreadable or malformed JSON, a skill without frontmatter or
   a description, an invalid skill name or mode, or a deletion that would leave the
   repository.
+- The project website is now https://harnessfirmware.com: the README links it,
+  the plugin manifest uses it as `homepage`, and the repository's About panel
+  comes from `scripts/readme/repo.json`. `scripts/readme/meta.mjs` validates that
+  file on every run (`--lint`), applies it through `gh api` (`--apply`), and on
+  pushes to `main` fails CI when the live About panel drifts from it (`--check`).
 
 ### Fixed
+
+- README diagrams paint an opaque background matching GitHub's canvas. A
+  `<picture>` follows the operating system's colour scheme, not GitHub's theme
+  setting, so a reader with GitHub in dark mode and a light OS got the light
+  diagram on a dark page, with its dark headings nearly invisible.
 
 - The Claude source hash in `sync-codex-skills.mjs` covers only the files git would
   commit (tracked, plus untracked files no `.gitignore` rule excludes), so an ignored

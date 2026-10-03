@@ -1,0 +1,6 @@
+{
+  "repo": "ryanportfolio/Harness-Firmware",
+  "description": "Repository firmware for Claude Code and Codex: versioned instructions, durable project memory, reusable skills, independent review, and verified workflows.",
+  "homepage": "https://harnessfirmware.com",
+  "topics": ["ai-agents", "anthropic", "claude", "claude-code", "codex", "developer-tools", "skills", "template"]
+}

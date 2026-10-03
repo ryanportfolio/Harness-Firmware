@@ -95,7 +95,7 @@ A repository starter for **Claude Code and Codex**. Harness Firmware gives both 
 
 Keep project decisions and pitfalls with the code. Carry useful lessons into the next session. Review changes before carrying them into another repository.
 
-[Install the skills or start a repository](#quickstart).
+[Install the skills or start a repository](#quickstart) · [Visit harnessfirmware.com](https://harnessfirmware.com)
 
 ## quickstart
 
@@ -177,6 +177,7 @@ node .claude/scripts/doctor.mjs
 
 ## documentation
 
+- [Project website](https://harnessfirmware.com)
 - [Setup and operating guide](GUIDE.md)
 - [Contribution process](CONTRIBUTING.md)
 - [Release history](CHANGELOG.md)

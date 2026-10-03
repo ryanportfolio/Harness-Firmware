@@ -98,6 +98,17 @@ jobs:
       - name: README generated output (warns on drift)
         run: node scripts/readme/verify.mjs
 
+      - name: Repository About panel metadata is valid
+        run: node scripts/readme/meta.mjs --lint
+
+      # A pull request that edits repo.json cannot match metadata not yet applied,
+      # so the live comparison runs only on the template's own default branch.
+      - name: Repository About panel matches repo.json
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'ryanportfolio/Harness-Firmware'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/readme/meta.mjs --check
+
       - name: settings.json is valid JSON
         run: python3 -m json.tool .claude/settings.json > /dev/null
 

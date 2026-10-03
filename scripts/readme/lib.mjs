@@ -7,8 +7,8 @@ export const MONO = "ui-monospace,'SFMono-Regular','Cascadia Mono',Menlo,Consola
 export const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif";
 
 export const THEMES = Object.freeze({
-  light: { ink: "#1f2328", mute: "#59636e", rule: "#d1d9e0", accent: "#1a7f37", soft: "#dafbe1" },
-  dark: { ink: "#f0f6fc", mute: "#9198a1", rule: "#3d444d", accent: "#3fb950", soft: "#12261e" },
+  light: { canvas: "#ffffff", ink: "#1f2328", mute: "#59636e", rule: "#d1d9e0", accent: "#1a7f37", soft: "#dafbe1" },
+  dark: { canvas: "#0d1117", ink: "#f0f6fc", mute: "#9198a1", rule: "#3d444d", accent: "#3fb950", soft: "#12261e" },
 });
 
 export function absolute(relativePath) {
