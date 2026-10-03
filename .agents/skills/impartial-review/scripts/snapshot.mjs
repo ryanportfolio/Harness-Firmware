@@ -361,8 +361,11 @@ function stripComments(text) {
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (quote) {
-      out += c;
-      if (c === "\\") out += text[++i] ?? "";
+      // Template text is blanked too: an import path is never written in backticks, so example
+      // code inside a template (generated files, fixtures) is not read as imports.
+      const keep = quote !== "`" || c === "`" || c === "\n" || (c === "$" && text[i + 1] === "{");
+      out += keep ? c : " ";
+      if (c === "\\") out += quote === "`" ? (text[++i] === "\n" ? "\n" : " ") : (text[++i] ?? "");
       else if (quote === "`" && c === "$" && text[i + 1] === "{") {
         out += "{";
         i++;
