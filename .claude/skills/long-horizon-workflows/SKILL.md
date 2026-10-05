@@ -151,8 +151,11 @@ for integration). Never HEAD: drops earlier rounds' uncommitted verified work. E
 candidate workspace of every round in the batch is a detached worktree at that sha, built by
 the round's baseline agent inside the script (Workflow engine) or by the Manager before
 dispatch (Agent engine): `git worktree add --detach <path> <sha>`, copy in every untracked
-file of main (`git ls-files --others --exclude-standard`), link or copy the ignored artifacts
-the step needs (deps as a junction or symlink, build output as a copy), then take that
+file of main (`git ls-files --others --exclude-standard`), then the ignored artifacts the
+step needs: a junction or symlink into main only for an artifact no step of the batch
+writes, since a write through the link reaches main and every other candidate and the
+manifest records the link, not its target; anything a step installs, updates or builds
+into (dependencies under an install step, build output) is copied. Then take that
 workspace's Baseline. Never plain copy of Git checkout: copied `.git` file still points at
 original's index + HEAD. Plain copies only for non-Git workspaces. Round Baseline stays the
 attribution reference; checkout filters (e.g. `core.autocrlf`) can make round bytes differ
@@ -236,8 +239,8 @@ Script rules:
 - `agent()` returns `null` when user skips or API dies. Null baseline, inspector or every
   executor = `blocked` w/ integrity `suspect`, never `complete`. Null candidate among several
   = dropout, logged, round continues. Null pick inspection = that candidate leaves the pick
-  (no delta or post-check manifest to audit against); every one null = `blocked`. Null
-  release in a serial round = `blocked`: resource state unconfirmed. Null grafter = possible
+  (no delta or post-check manifest to audit against); every one null = `blocked`. Release
+  null, or `released: false`, = `blocked`: resource state unconfirmed. Null grafter = possible
   partial edits; logged, audit runs anyway and attributes them.
 - Pass no `model`. Agents inherit session model → quality floor holds. `effort: 'low'` OK for
   baseline agents only.
@@ -259,7 +262,11 @@ export const meta = {
 }
 // args: {
 //   taskSlug, batch, mainWorkspace, baseSha, manifestScript,
-//   ignoredArtifacts: [{ from, to, mode }],   // from/to relative to a workspace root; mode 'link' | 'copy'
+//   ignoredArtifacts: [{ from, to, mode }],   // from/to relative to a workspace root; mode 'link' | 'copy'.
+//     link = junction or symlink into main: only for an artifact no step of the batch writes
+//     (a write through the link reaches main and every other candidate, and the manifest
+//     records the link, not the target). A step that installs, updates or builds into an
+//     artifact gets copy.
 //   rounds: [{ round, roundDir, workspaces, inPlace, writeScope, executorBrief, auditorBrief,
 //              judges, serial }],
 //   finalAudit: { auditorBrief, workspace, judges } | null,
@@ -317,6 +324,11 @@ const PICK = {
     }, required: ['fromCandidate', 'idea'] } },
   },
   required: ['candidates', 'base', 'premiseSplit', 'graftIdeas'],
+}
+const RELEASE = {
+  type: 'object',
+  properties: { released: { type: 'boolean' }, detail: { type: 'string' } },  // released = every listed process gone and every port free
+  required: ['released', 'detail'],
 }
 const ANGLES = ['minimal change', 'failure-proof', 'end-user-first', 'simplest to verify', 'performance-first']
 const LENSES = ['scope integrity', 'check validity', 'contract drift']
@@ -376,9 +388,11 @@ function release(r, phase, what) {
   return agent(
     `Release shared resources after ${what} of round ${r.round}. Read ${r.roundDir}/processes.log (one line per ` +
     `long-lived process a worker started: pid, port, command). Stop every listed process still running, confirm each ` +
-    `port is free again, and append a stopped line per pid. Change nothing else.`,
-    { effort: 'low', phase, label: `r${r.round} release` })
+    `port is free again, and append a stopped line per pid. Change nothing else. Return released true only when every ` +
+    `listed process is gone and every listed port is free; otherwise released false with the detail.`,
+    { schema: RELEASE, effort: 'low', phase, label: `r${r.round} release` })
 }
+const unreleased = (res) => res === null ? 'release agent returned null' : res.released ? null : `release failed: ${res.detail}`
 
 function judgePanel(r, count, phase, inputs) {
   return parallel(Array.from({ length: count }, (_, j) => () => agent(
@@ -427,7 +441,8 @@ async function runRound(r) {
     // separate worktrees do not isolate, so candidates run one at a time.
     if (r.serial) for (let i = 0; i < n; i++) {
       out.reports.push(await execute(r.workspaces[i], i))
-      if (await release(r, 'Execute', `candidate ${i + 1}`) === null) return fail(`release after candidate ${i + 1} returned null; shared resource state unconfirmed`)
+      const bad = unreleased(await release(r, 'Execute', `candidate ${i + 1}`))
+      if (bad) return fail(`after candidate ${i + 1}: ${bad}; shared resource state unconfirmed`)
     } else out.reports = await parallel(r.workspaces.map((ws, i) => () => execute(ws, i)))
     // Executor returns are kept for the Audit log only. Never passed to a pick or audit agent.
     const alive = out.reports.map((rep, i) => rep === null ? null : i).filter(i => i !== null)
@@ -439,7 +454,8 @@ async function runRound(r) {
       let inspections = []
       if (r.serial) for (const i of alive) {
         inspections.push(await inspect(r, i, `${r.roundDir}/pick/c${i + 1}`, 'Pick'))
-        if (await release(r, 'Pick', `inspection of candidate ${i + 1}`) === null) return fail(`release after inspection of candidate ${i + 1} returned null; shared resource state unconfirmed`)
+        const bad = unreleased(await release(r, 'Pick', `inspection of candidate ${i + 1}`))
+        if (bad) return fail(`after inspection of candidate ${i + 1}: ${bad}; shared resource state unconfirmed`)
       } else inspections.push(...await parallel(alive.map(i => () => inspect(r, i, `${r.roundDir}/pick/c${i + 1}`, 'Pick'))))
       // A null inspection left no delta or post-check manifest, so that candidate cannot be
       // picked or audited; it leaves the pick.
@@ -484,6 +500,12 @@ async function runRound(r) {
           `Return what you took and left, with reasons.`,
           { phase: 'Graft', label: `r${r.round} graft` })
         if (out.graft === null) log(`round ${r.round}: grafter returned null; audit attributes any partial edits`)
+        // The grafter may have left a server running, and a null return means it never reached
+        // its own cleanup; the audit's check must not answer to it.
+        if (r.serial || out.graft === null) {
+          const bad = unreleased(await release(r, 'Graft', 'the grafter'))
+          if (bad) return fail(`after the grafter: ${bad}; shared resource state unconfirmed`)
+        }
       }
     }
     out.base = r.workspaces[base]
@@ -601,7 +623,9 @@ shows agent's actual output.
    check), the paths the check changed, and a post-check manifest; the audit attributes the
    executor's and the grafter's edits separately from those and judges both. In a serial
    round, a release agent stops every process in the round's `processes.log` after each
-   executor and each inspection, so one candidate's server never answers the next one's check. Agent engine: same agents, same inputs, Manager holds the
+   executor, each inspection and the grafter, and the round blocks unless it reports every
+   process gone and every port free, so one candidate's server never answers the next
+   one's check. Agent engine: same agents, same inputs, Manager holds the
    index-to-angle map and never shows the panel an executor's report. No candidate passes its
    own check → round fails on the base's inspection, audit skipped.
 4. **Audit**: confirm all writers to the base workspace finished/stopped. Workflow engine:
