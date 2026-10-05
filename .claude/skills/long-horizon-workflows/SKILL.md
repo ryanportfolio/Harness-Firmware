@@ -266,7 +266,8 @@ export const meta = {
 //     link = junction or symlink into main: only for an artifact no step of the batch writes
 //     (a write through the link reaches main and every other candidate, and the manifest
 //     records the link, not the target). A step that installs, updates or builds into an
-//     artifact gets copy.
+//     artifact gets copy. Copied destinations join the baseline's extra paths, so the manifest
+//     covers them and every later diff keeps that coverage.
 //   rounds: [{ round, roundDir, workspaces, inPlace, writeScope, executorBrief, auditorBrief,
 //              judges, serial }],
 //   finalAudit: { auditorBrief, workspace, judges } | null,
@@ -414,11 +415,14 @@ async function runRound(r) {
       `(retry once on a git lock error), copy every untracked file of ${a.mainWorkspace} ` +
       `(\`git ls-files --others --exclude-standard\`) to the same relative path, then apply ${JSON.stringify(a.ignoredArtifacts ?? [])} ` +
       `(mode link = junction or symlink, mode copy = copy). `
+    // Copied ignored artifacts sit outside git status, so the manifest only sees them as
+    // extra paths; an executor edit to a copied dist/ must show in the delta like any other.
+    const coverage = [...new Set([...r.writeScope, ...(a.ignoredArtifacts ?? []).filter(x => x.mode === 'copy').map(x => x.to)])]
     out.baseline = await agent(
       `Prepare round ${r.round} of long-horizon task ${a.taskSlug}. Workspaces: ${JSON.stringify(r.workspaces)}. ` + build +
       `Then take a baseline of every workspace with ${a.manifestScript}: ` +
       `manifest at ${r.roundDir}/baseline-c<index>.json, ref refs/long-horizon/${a.taskSlug}/round-${r.round}-c<index> (index 1..${n}, workspace order), ` +
-      `extra paths ${JSON.stringify(r.writeScope)}. Change nothing else. Report whether every manifest holds identical hashes ` +
+      `extra paths ${JSON.stringify(coverage)}. Change nothing else. Report whether every manifest holds identical hashes ` +
       `and list coverage you could not take under uncovered.`,
       { schema: BASELINE, effort: 'low', phase: 'Baseline', label: `r${r.round} baseline` })
     if (!out.baseline) return fail('baseline agent returned null')
