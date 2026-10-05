@@ -187,7 +187,9 @@ the normal audit then judges the base. Set `Candidates:` per round, record the r
 - 3 (default when unsure): design-shaped step, several plausible approaches, done-check that
   needs interpretation, or a step whose area already holds a Dead end.
 - 3 or more, mandatory: rework round after a failed audit, or a Stagnation trigger. Angles
-  must differ from every Dead end touching the step.
+  must differ from every Dead end touching the step. In-place rounds are the one exception:
+  they always run one candidate, because nothing isolates a write outside the workspace, so
+  their rework round changes approach through the brief instead of fanning out.
 
 Angles come from the script's constant list, assigned by index; the executor brief never
 names an angle. Candidates read nothing of each other; the panel sees candidates by index
@@ -664,7 +666,7 @@ shows agent's actual output.
    Fail: keep unaffected Verified progress, mark affected claims stale; append audit
    findings; delta's paths → Residue, revert-or-keep decision each; next round per combined
    `repairable`. `yes`: one recovery round, same approach, brief carries inspector's
-   diagnostic, candidates ≥3; counts as step's second attempt under Stagnation. `no`:
+   diagnostic, candidates ≥3 (in-place: 1); counts as step's second attempt under Stagnation. `no`:
    approach → Dead ends now; next brief changes approach. `invalid check` = Plan defect →
    neither. `brief gap` = Plan defect too; fix the brief, no attempt consumed. One recovery
    per step: failed recovery = step's second failure → Stagnation forces new approach
@@ -716,8 +718,8 @@ Record recovery actions + pending checks before continuing.
 Round count alone can't resolve stall. Watch repeated failures directly:
 
 - Same step fails audit twice in a row: next brief must change approach, not retry. Move
-  failed approach to Dead ends first; next round runs with candidates ≥3, angles clear of
-  every Dead end.
+  failed approach to Dead ends first; next round runs with candidates ≥3 (in-place: 1,
+  new approach in the brief), angles clear of every Dead end.
 - 3 batches in a row w/ nothing new in Verified progress: stop spawning, rewrite Remaining.
   Decomposition is suspect, not executor. Keep consumed attempts; new decomposition doesn't
   reset user budget.
