@@ -60,7 +60,7 @@ Done-check: <commands, cwd relative to the workspace root, and the expected resu
 Write scope: <paths the executor may change; test and gate definitions only if the step is about them>
 Candidates: <count and the one-line reason, per Candidates below>
 Judges: <total verdict count including the inspector, and the one-line reason for that number>
-Serial checks: yes | no  <yes when the done-check binds a port, device or timing measurement>
+Serial candidates: yes | no  <yes when execution or the done-check binds a port, device or timing measurement; candidates then run one at a time>
 Baseline: <manifest path per candidate> + <git ref per candidate>  (taken by the baseline agent; the auditor diffs against this, never HEAD)
 Executor brief: <path>  (written at Plan)
 Auditor brief: <path>  (written at Plan, dispatched byte for byte)
@@ -131,7 +131,7 @@ Ready = all dependencies in Verified progress. Ready steps share batch only if:
 - write scopes don't overlap; neither reads path other writes;
 - no two executions/done-checks contend for one resource: port, dev server, browser profile,
   DB, GPU, or timing/perf measurement parallel load would skew. A round whose own candidates
-  contend that way sets `Serial checks: yes` (its candidate checks run one at a time) and
+  contend that way sets `Serial candidates: yes` (its executors and candidate checks run one at a time) and
   shares a batch only with rounds that never touch that resource;
 - capacity covers them, counting Manager + every agent of every running round, candidates
   and judges included;
@@ -190,7 +190,9 @@ Angles come from the script's constant list, assigned by index; the executor bri
 names an angle. Candidates read nothing of each other; the panel sees candidates by index
 only and never an executor's return value. Blinding limit, recorded in the Audit log: the
 workspace path shows the candidate index, nothing else. A grafter is a second writer in the
-base workspace, so the final audit covers its edits too. Candidates split over a basic
+base workspace, so the final audit covers its edits too. A pick inspection runs the
+done-check in the candidate's workspace before the audit and records the paths the check
+alone changed, so the audit can leave them out of the executor's delta. Candidates split over a basic
 premise → the panel reports it, the round returns `blocked: brief gap`; fix the brief, run a
 new round; a merge of both premises is never the answer.
 
@@ -256,7 +258,7 @@ export const meta = {
 //   taskSlug, batch, mainWorkspace, baseSha, manifestScript,
 //   ignoredArtifacts: [{ from, to, mode }],   // from/to relative to a workspace root; mode 'link' | 'copy'
 //   rounds: [{ round, roundDir, workspaces, inPlace, writeScope, executorBrief, auditorBrief,
-//              judges, serialChecks }],
+//              judges, serial }],
 //   finalAudit: { auditorBrief, workspace, judges } | null,
 // }
 // workspaces = one absolute root per candidate, all built from baseSha unless inPlace; its
@@ -344,13 +346,16 @@ function combine(inspector, judges, judgeCount) {
 }
 
 // Manifest diff plus the done-check, in one workspace, writing raw artifacts under outDir.
-function inspect(r, i, outDir, phase) {
+function inspect(r, i, outDir, phase, priorCheckDelta) {
   return agent(
     `Read ${r.auditorBrief} and follow it. Workspace root: ${r.workspaces[i]}. Work in this order. ` +
     `1: rebuild the manifest with the same coverage as ${r.manifests[i]}, diff it (added, modified, ` +
     `deleted), append \`git diff ${r.gitRefs[i]} --stat\` run in that root, and write the result to ${outDir}/delta.md. ` +
+    (priorCheckDelta ? `A pick inspection already ran the done-check in this workspace; the paths that check alone changed are listed in ` +
+      `${priorCheckDelta}. Exclude them from the executor delta and list them under check artifacts; they do not count against integrity. ` : '') +
     `2: run the done-check from its recorded cwd under that root and write the complete raw output to ${outDir}/check-output.txt. ` +
-    `3: return your verdicts with evidence.`,
+    `3: rebuild the manifest once more and write every path the check itself changed to ${outDir}/check-delta.md. ` +
+    `4: return your verdicts with evidence.`,
     { schema: VERDICT, phase, label: `r${r.round} c${i + 1} inspect` })
 }
 
@@ -386,14 +391,20 @@ async function runRound(r) {
     r.manifests = out.baseline.manifests
     r.gitRefs = out.baseline.gitRefs
 
+    if (r.inPlace && n !== 1) return fail('in-place round must have exactly one candidate')
     out.executed = true
-    out.reports = await parallel(r.workspaces.map((ws, i) => () => agent(
-      `Read ${r.executorBrief} and do exactly what it says, writing only inside ${ws}. ` +
+    const execute = (ws, i) => agent(
+      `Read ${r.executorBrief} and do exactly what it says, ` +
+      (r.inPlace ? `writing only the paths its write scope names. ` : `writing only inside ${ws}. `) +
       (n > 1 ? `Angle for this attempt: ${ANGLES[i % ANGLES.length]}. ` : '') +
       `Apply fable-mode discipline. Run independent reads, searches and probes through read-only helper ` +
       `subagents in the foreground when they would save time. ` +
       `Return what changed, how to check it, and the options you considered and dropped, with reasons.`,
-      { phase: 'Execute', label: `r${r.round} c${i + 1}` })))
+      { phase: 'Execute', label: `r${r.round} c${i + 1}` })
+    // serial: execution or the done-check binds a port, device or timing measurement that
+    // separate worktrees do not isolate, so candidates run one at a time.
+    if (r.serial) for (let i = 0; i < n; i++) out.reports.push(await execute(r.workspaces[i], i))
+    else out.reports = await parallel(r.workspaces.map((ws, i) => () => execute(ws, i)))
     // Executor returns are kept for the Audit log only. Never passed to a pick or audit agent.
     const alive = out.reports.map((rep, i) => rep === null ? null : i).filter(i => i !== null)
     if (!alive.length) return fail('every executor returned null; reconcile as interrupted execution')
@@ -402,7 +413,7 @@ async function runRound(r) {
     let base = alive[0]
     if (alive.length > 1) {
       const inspections = []
-      if (r.serialChecks) for (const i of alive) inspections.push(await inspect(r, i, `${r.roundDir}/pick/c${i + 1}`, 'Pick'))
+      if (r.serial) for (const i of alive) inspections.push(await inspect(r, i, `${r.roundDir}/pick/c${i + 1}`, 'Pick'))
       else inspections.push(...await parallel(alive.map(i => () => inspect(r, i, `${r.roundDir}/pick/c${i + 1}`, 'Pick'))))
       const inputs = alive.map(i => `candidate ${i + 1}: ${r.roundDir}/pick/c${i + 1}/delta.md and ${r.roundDir}/pick/c${i + 1}/check-output.txt`).join('; ')
       const panel = (await parallel(Array.from({ length: Math.max(1, judgeCount) }, (_, j) => () => agent(
@@ -444,7 +455,7 @@ async function runRound(r) {
     }
     out.base = r.workspaces[base]
 
-    const inspector = await inspect(r, base, `${r.roundDir}/audit`, 'Audit')
+    const inspector = await inspect(r, base, `${r.roundDir}/audit`, 'Audit', alive.length > 1 ? `${r.roundDir}/pick/c${base + 1}/check-delta.md` : null)
     if (!inspector) return fail('inspector returned null')
     const judges = (await judgePanel(r, judgeCount, 'Audit', `${r.roundDir}/audit/delta.md and ${r.roundDir}/audit/check-output.txt`)).filter(Boolean)
     if (judges.length < judgeCount) log(`round ${r.round}: ${judgeCount - judges.length} judge(s) returned null; integrity capped at suspect`)
@@ -467,17 +478,24 @@ let finalAudit = null
 if (a.finalAudit) {
   const f = a.finalAudit
   const judgeCount = Math.max(0, (f.judges ?? 2) - 1)
-  const inspector = await agent(
+  let inspector = null, judges = []
+  try {
+  inspector = await agent(
     `Read ${f.auditorBrief} and follow it. Workspace root: ${f.workspace}. Run every acceptance check it lists from its ` +
     `recorded cwd under that root, write the complete raw output to ${f.workspace}/.tmp/long-horizon/${a.taskSlug}/final/check-output.txt, ` +
     `and return your verdicts with evidence.`,
     { schema: VERDICT, phase: 'Audit', label: 'final inspect' })
-  const judges = inspector ? (await parallel(Array.from({ length: judgeCount }, (_, j) => () => agent(
+  judges = inspector ? (await parallel(Array.from({ length: judgeCount }, (_, j) => () => agent(
     `Independent final judge ${j + 1}, lens: ${LENSES[j % LENSES.length]}. Read ${f.auditorBrief}, then read ` +
     `${f.workspace}/.tmp/long-horizon/${a.taskSlug}/final/check-output.txt. Do not run anything and do not modify files. ` +
     `Return your own verdicts. Default to incomplete or suspect when the evidence is unclear.`,
     { schema: VERDICT, phase: 'Audit', label: `final judge ${j + 1}` })))).filter(Boolean) : []
   finalAudit = inspector ? { verdict: combine(inspector, judges, judgeCount), votes: [inspector, ...judges] } : { verdict: blocked('final inspector returned null'), votes: [] }
+  } catch (error) {
+    const reason = `blocked: agent() threw (budget ceiling or runtime error): ${error && error.message ? error.message : String(error)}`
+    log(reason)
+    finalAudit = { verdict: blocked(reason), votes: [inspector, ...judges].filter(Boolean) }
+  }
 }
 
 return { batch: a.batch, rounds, finalAudit }
@@ -494,7 +512,7 @@ shows agent's actual output.
 
 1. **Plan**: read state file; split Remaining to the finest safe grain (Parallel rounds);
    pick batch (every ready step the rules allow; each round works ONE step); set each
-   round's candidate count, judge count and serial-checks flag; write the Current batch block
+   round's candidate count, judge count and serial-candidates flag; write the Current batch block
    and each Current round block to state file, phase `planned`, before spawning anything.
    Then per round: auditor brief → its recorded path; executor brief = contract excerpt,
    Current round block, only verified facts step needs, every dead end touching step, Method
@@ -544,8 +562,9 @@ shows agent's actual output.
    dispatch returns. Executor does step, reports what changed + how to check. Confirm it
    stopped writing, record status, phase `awaiting-audit`.
 3. **Pick** (rounds with several candidates): one inspector per candidate workspace (manifest
-   diff + done-check, serial when `Serial checks: yes`), then the blind panel, then at most
-   one grafter in the base. Agent engine: same agents, same inputs, Manager holds the
+   diff + done-check, serial when `Serial candidates: yes`), then the blind panel, then at most
+   one grafter in the base. A pick inspection records the paths its check alone changed; the
+   audit excludes them from the executor's delta. Agent engine: same agents, same inputs, Manager holds the
    index-to-angle map and never shows the panel an executor's report. No candidate passes its
    own check → round fails on the base's inspection, audit skipped.
 4. **Audit**: confirm all writers to the base workspace finished/stopped. Workflow engine:
@@ -553,7 +572,8 @@ shows agent's actual output.
    engine: fresh subagent w/ prewritten auditor brief, nothing else; record its ID. Order
    fixed b/c its own done-check run writes files too:
    1. Rebuild manifest now, diff vs Baseline (added, modified, deleted) + `git diff <ref> --stat`
-      for tracked files. This delta = executor's work, grafter included.
+      for tracked files, minus the check artifacts a pick inspection recorded. This delta =
+      executor's work, grafter included.
    2. Run done-check from recorded cwd; compare w/ expected result.
    3. Return three verdicts w/ evidence:
    - status: complete / incomplete / blocked, from own done-check run. Evidence the auditor
