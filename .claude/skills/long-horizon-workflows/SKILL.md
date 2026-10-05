@@ -235,8 +235,10 @@ Script rules:
   uncommitted verified work. Workspaces come from the batch base via `args`.
 - `agent()` returns `null` when user skips or API dies. Null baseline, inspector or every
   executor = `blocked` w/ integrity `suspect`, never `complete`. Null candidate among several
-  = dropout, logged, round continues. Null grafter = possible partial edits; logged, audit
-  runs anyway and attributes them.
+  = dropout, logged, round continues. Null pick inspection = that candidate leaves the pick
+  (no delta or post-check manifest to audit against); every one null = `blocked`. Null
+  release in a serial round = `blocked`: resource state unconfirmed. Null grafter = possible
+  partial edits; logged, audit runs anyway and attributes them.
 - Pass no `model`. Agents inherit session model → quality floor holds. `effort: 'low'` OK for
   baseline agents only.
 - Under `+Nk` budget directive, `agent()` throws at ceiling. Each round catches, returns
@@ -425,21 +427,27 @@ async function runRound(r) {
     // separate worktrees do not isolate, so candidates run one at a time.
     if (r.serial) for (let i = 0; i < n; i++) {
       out.reports.push(await execute(r.workspaces[i], i))
-      await release(r, 'Execute', `candidate ${i + 1}`)
+      if (await release(r, 'Execute', `candidate ${i + 1}`) === null) return fail(`release after candidate ${i + 1} returned null; shared resource state unconfirmed`)
     } else out.reports = await parallel(r.workspaces.map((ws, i) => () => execute(ws, i)))
     // Executor returns are kept for the Audit log only. Never passed to a pick or audit agent.
     const alive = out.reports.map((rep, i) => rep === null ? null : i).filter(i => i !== null)
     if (!alive.length) return fail('every executor returned null; reconcile as interrupted execution')
     if (alive.length < n) log(`round ${r.round}: ${n - alive.length} candidate(s) returned null; dropped`)
 
-    let base = alive[0]
+    let base = alive[0], pickDir = null
     if (alive.length > 1) {
-      const inspections = []
+      let inspections = []
       if (r.serial) for (const i of alive) {
         inspections.push(await inspect(r, i, `${r.roundDir}/pick/c${i + 1}`, 'Pick'))
-        await release(r, 'Pick', `inspection of candidate ${i + 1}`)
+        if (await release(r, 'Pick', `inspection of candidate ${i + 1}`) === null) return fail(`release after inspection of candidate ${i + 1} returned null; shared resource state unconfirmed`)
       } else inspections.push(...await parallel(alive.map(i => () => inspect(r, i, `${r.roundDir}/pick/c${i + 1}`, 'Pick'))))
-      const inputs = alive.map(i => `candidate ${i + 1}: ${r.roundDir}/pick/c${i + 1}/delta.md and ${r.roundDir}/pick/c${i + 1}/check-output.txt`).join('; ')
+      // A null inspection left no delta or post-check manifest, so that candidate cannot be
+      // picked or audited; it leaves the pick.
+      const inspected = alive.filter((_, k) => inspections[k])
+      inspections = inspections.filter(Boolean)
+      if (!inspected.length) return fail('every pick inspector returned null')
+      if (inspected.length < alive.length) log(`round ${r.round}: ${alive.length - inspected.length} pick inspection(s) returned null; those candidates leave the pick`)
+      const inputs = inspected.map(i => `candidate ${i + 1}: ${r.roundDir}/pick/c${i + 1}/delta.md and ${r.roundDir}/pick/c${i + 1}/check-output.txt`).join('; ')
       const panel = (await parallel(Array.from({ length: Math.max(1, judgeCount) }, (_, j) => () => agent(
         `Blind pick judge ${j + 1} for round ${r.round}. Candidates are known by index only; do not infer who built them. ` +
         `Read ${r.auditorBrief} for the acceptance checks and done-check, then read ${inputs}. ` +
@@ -451,21 +459,22 @@ async function runRound(r) {
       out.pick = { inspections, panel }
       if (!panel.length) return fail('every pick judge returned null')
       if (panel.filter(p => p.premiseSplit).length * 2 > panel.length) return fail('brief gap: candidates split over a premise')
-      const byIndex = (i) => inspections[alive.indexOf(i)]
+      const byIndex = (i) => inspections[inspected.indexOf(i)]
       const votes = (i) => panel.filter(p => p.base === i + 1).length
-      base = alive.slice().sort((x, y) =>
+      base = inspected.slice().sort((x, y) =>
         votes(y) - votes(x)
         || ((byIndex(y)?.status === 'complete') - (byIndex(x)?.status === 'complete'))
         || ((byIndex(x)?.deltaPaths ?? []).length - (byIndex(y)?.deltaPaths ?? []).length)
         || x - y)[0]
-      if (!inspections.some(v => v && v.status === 'complete')) {
+      pickDir = `${r.roundDir}/pick/c${base + 1}`
+      if (!inspections.some(v => v.status === 'complete')) {
         log(`round ${r.round}: no candidate passed its check; audit skipped`)
         out.base = r.workspaces[base]
-        out.verdict = combine(byIndex(base) ?? blocked('inspector returned null'), [], 0)
+        out.verdict = combine(byIndex(base), [], 0)
         if (out.verdict.status === 'complete') out.verdict.status = 'incomplete'
         return out
       }
-      const ideas = panel.flatMap(p => p.graftIdeas).filter(g => g.fromCandidate !== base + 1 && alive.includes(g.fromCandidate - 1))
+      const ideas = panel.flatMap(p => p.graftIdeas).filter(g => g.fromCandidate !== base + 1 && inspected.includes(g.fromCandidate - 1))
       if (ideas.length) {
         out.graft = await agent(
           `Read ${r.executorBrief}. Base workspace: ${r.workspaces[base]}; write only inside it and only within its write scope. ` +
@@ -479,7 +488,7 @@ async function runRound(r) {
     }
     out.base = r.workspaces[base]
 
-    const inspector = await inspect(r, base, `${r.roundDir}/audit`, 'Audit', alive.length > 1 ? `${r.roundDir}/pick/c${base + 1}` : null)
+    const inspector = await inspect(r, base, `${r.roundDir}/audit`, 'Audit', pickDir)
     if (!inspector) return fail('inspector returned null')
     const judges = (await judgePanel(r, judgeCount, 'Audit', `${r.roundDir}/audit/delta.md and ${r.roundDir}/audit/check-output.txt`)).filter(Boolean)
     if (judges.length < judgeCount) log(`round ${r.round}: ${judgeCount - judges.length} judge(s) returned null; integrity capped at suspect`)
