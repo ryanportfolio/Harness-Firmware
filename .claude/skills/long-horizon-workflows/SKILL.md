@@ -191,8 +191,9 @@ names an angle. Candidates read nothing of each other; the panel sees candidates
 only and never an executor's return value. Blinding limit, recorded in the Audit log: the
 workspace path shows the candidate index, nothing else. A grafter is a second writer in the
 base workspace, so the final audit covers its edits too. A pick inspection runs the
-done-check in the candidate's workspace before the audit and records the paths the check
-alone changed, so the audit can leave them out of the executor's delta. Candidates split over a basic
+done-check in the candidate's workspace before the audit and saves the executor's delta,
+the check's own changes and a post-check manifest, so the audit attributes executor, check
+and grafter edits separately instead of excluding whole paths. Candidates split over a basic
 premise → the panel reports it, the round returns `blocked: brief gap`; fix the brief, run a
 new round; a merge of both premises is never the answer.
 
@@ -346,17 +347,35 @@ function combine(inspector, judges, judgeCount) {
 }
 
 // Manifest diff plus the done-check, in one workspace, writing raw artifacts under outDir.
-function inspect(r, i, outDir, phase, priorCheckDelta) {
+function inspect(r, i, outDir, phase, pickDir) {
   return agent(
     `Read ${r.auditorBrief} and follow it. Workspace root: ${r.workspaces[i]}. Work in this order. ` +
-    `1: rebuild the manifest with the same coverage as ${r.manifests[i]}, diff it (added, modified, ` +
-    `deleted), append \`git diff ${r.gitRefs[i]} --stat\` run in that root, and write the result to ${outDir}/delta.md. ` +
-    (priorCheckDelta ? `A pick inspection already ran the done-check in this workspace; the paths that check alone changed are listed in ` +
-      `${priorCheckDelta}. Exclude them from the executor delta and list them under check artifacts; they do not count against integrity. ` : '') +
+    (pickDir
+      ? `1: a pick inspection already ran the done-check in this workspace. Its ${pickDir}/delta.md is the executor's delta, ` +
+        `taken before any check ran; its ${pickDir}/post-check-manifest.json is the workspace right after that check. ` +
+        `Rebuild the manifest now and diff it against the post-check manifest: that is the grafter's delta. Write both deltas, ` +
+        `labelled executor and grafter, plus \`git diff ${r.gitRefs[i]} --stat\` run in that root, to ${outDir}/delta.md. ` +
+        `Integrity judges the union of the executor and grafter deltas; a path listed only in ${pickDir}/check-delta.md and ` +
+        `unchanged since the post-check manifest is a check artifact and does not count. `
+      : `1: rebuild the manifest with the same coverage as ${r.manifests[i]}, diff it (added, modified, ` +
+        `deleted), append \`git diff ${r.gitRefs[i]} --stat\` run in that root, and write the result to ${outDir}/delta.md. `) +
     `2: run the done-check from its recorded cwd under that root and write the complete raw output to ${outDir}/check-output.txt. ` +
-    `3: rebuild the manifest once more and write every path the check itself changed to ${outDir}/check-delta.md. ` +
-    `4: return your verdicts with evidence.`,
+    `3: rebuild the manifest once more, save it to ${outDir}/post-check-manifest.json, and write every path the check itself ` +
+    `changed to ${outDir}/check-delta.md. ` +
+    `4: stop every process this inspection started and confirm it is gone. ` +
+    `5: return your verdicts with evidence.`,
     { schema: VERDICT, phase, label: `r${r.round} c${i + 1} inspect` })
+}
+
+// Serial rounds share a port, device or measurement, so a candidate's leftover process would
+// bind the next candidate's resource. Runs after every serial executor and inspection, null
+// returns included.
+function release(r, phase, what) {
+  return agent(
+    `Release shared resources after ${what} of round ${r.round}. Read ${r.roundDir}/processes.log (one line per ` +
+    `long-lived process a worker started: pid, port, command). Stop every listed process still running, confirm each ` +
+    `port is free again, and append a stopped line per pid. Change nothing else.`,
+    { effort: 'low', phase, label: `r${r.round} release` })
 }
 
 function judgePanel(r, count, phase, inputs) {
@@ -398,13 +417,16 @@ async function runRound(r) {
       (r.inPlace ? `writing only the paths its write scope names. ` : `writing only inside ${ws}. `) +
       (n > 1 ? `Angle for this attempt: ${ANGLES[i % ANGLES.length]}. ` : '') +
       `Apply fable-mode discipline. Run independent reads, searches and probes through read-only helper ` +
-      `subagents in the foreground when they would save time. ` +
+      `subagents in the foreground when they would save time. Append each long-lived process you start ` +
+      `(pid, port, command) to ${r.roundDir}/processes.log and stop every one of them before returning. ` +
       `Return what changed, how to check it, and the options you considered and dropped, with reasons.`,
       { phase: 'Execute', label: `r${r.round} c${i + 1}` })
     // serial: execution or the done-check binds a port, device or timing measurement that
     // separate worktrees do not isolate, so candidates run one at a time.
-    if (r.serial) for (let i = 0; i < n; i++) out.reports.push(await execute(r.workspaces[i], i))
-    else out.reports = await parallel(r.workspaces.map((ws, i) => () => execute(ws, i)))
+    if (r.serial) for (let i = 0; i < n; i++) {
+      out.reports.push(await execute(r.workspaces[i], i))
+      await release(r, 'Execute', `candidate ${i + 1}`)
+    } else out.reports = await parallel(r.workspaces.map((ws, i) => () => execute(ws, i)))
     // Executor returns are kept for the Audit log only. Never passed to a pick or audit agent.
     const alive = out.reports.map((rep, i) => rep === null ? null : i).filter(i => i !== null)
     if (!alive.length) return fail('every executor returned null; reconcile as interrupted execution')
@@ -413,8 +435,10 @@ async function runRound(r) {
     let base = alive[0]
     if (alive.length > 1) {
       const inspections = []
-      if (r.serial) for (const i of alive) inspections.push(await inspect(r, i, `${r.roundDir}/pick/c${i + 1}`, 'Pick'))
-      else inspections.push(...await parallel(alive.map(i => () => inspect(r, i, `${r.roundDir}/pick/c${i + 1}`, 'Pick'))))
+      if (r.serial) for (const i of alive) {
+        inspections.push(await inspect(r, i, `${r.roundDir}/pick/c${i + 1}`, 'Pick'))
+        await release(r, 'Pick', `inspection of candidate ${i + 1}`)
+      } else inspections.push(...await parallel(alive.map(i => () => inspect(r, i, `${r.roundDir}/pick/c${i + 1}`, 'Pick'))))
       const inputs = alive.map(i => `candidate ${i + 1}: ${r.roundDir}/pick/c${i + 1}/delta.md and ${r.roundDir}/pick/c${i + 1}/check-output.txt`).join('; ')
       const panel = (await parallel(Array.from({ length: Math.max(1, judgeCount) }, (_, j) => () => agent(
         `Blind pick judge ${j + 1} for round ${r.round}. Candidates are known by index only; do not infer who built them. ` +
@@ -455,7 +479,7 @@ async function runRound(r) {
     }
     out.base = r.workspaces[base]
 
-    const inspector = await inspect(r, base, `${r.roundDir}/audit`, 'Audit', alive.length > 1 ? `${r.roundDir}/pick/c${base + 1}/check-delta.md` : null)
+    const inspector = await inspect(r, base, `${r.roundDir}/audit`, 'Audit', alive.length > 1 ? `${r.roundDir}/pick/c${base + 1}` : null)
     if (!inspector) return fail('inspector returned null')
     const judges = (await judgePanel(r, judgeCount, 'Audit', `${r.roundDir}/audit/delta.md and ${r.roundDir}/audit/check-output.txt`)).filter(Boolean)
     if (judges.length < judgeCount) log(`round ${r.round}: ${judgeCount - judges.length} judge(s) returned null; integrity capped at suspect`)
@@ -535,7 +559,8 @@ shows agent's actual output.
    State file + briefs: write/edit via file-edit tool; shell/script string layers drop
    backslashes, backticks. Re-read each saved brief before dispatch. Every brief: worker
    appends each long-lived process it starts (pid, port, command) to `processes.log` in task
-   dir. Hours-long job brief: executor checks between batches that workspaces still whole
+   dir (Workflow engine: the round dir, where the script's release agent reads it). Hours-long
+   job brief: executor checks between batches that workspaces still whole
    (`git worktree list`, sentinel file); mismatch → stop + report, no rebuild. Evidence from
    another revision (line numbers, patch map) names that revision; executor finds cited code
    by anchor text, not line number.
@@ -563,8 +588,11 @@ shows agent's actual output.
    stopped writing, record status, phase `awaiting-audit`.
 3. **Pick** (rounds with several candidates): one inspector per candidate workspace (manifest
    diff + done-check, serial when `Serial candidates: yes`), then the blind panel, then at most
-   one grafter in the base. A pick inspection records the paths its check alone changed; the
-   audit excludes them from the executor's delta. Agent engine: same agents, same inputs, Manager holds the
+   one grafter in the base. A pick inspection saves the executor's delta (taken before its
+   check), the paths the check changed, and a post-check manifest; the audit attributes the
+   executor's and the grafter's edits separately from those and judges both. In a serial
+   round, a release agent stops every process in the round's `processes.log` after each
+   executor and each inspection, so one candidate's server never answers the next one's check. Agent engine: same agents, same inputs, Manager holds the
    index-to-angle map and never shows the panel an executor's report. No candidate passes its
    own check → round fails on the base's inspection, audit skipped.
 4. **Audit**: confirm all writers to the base workspace finished/stopped. Workflow engine:
@@ -572,8 +600,9 @@ shows agent's actual output.
    engine: fresh subagent w/ prewritten auditor brief, nothing else; record its ID. Order
    fixed b/c its own done-check run writes files too:
    1. Rebuild manifest now, diff vs Baseline (added, modified, deleted) + `git diff <ref> --stat`
-      for tracked files, minus the check artifacts a pick inspection recorded. This delta =
-      executor's work, grafter included.
+      for tracked files. After a pick inspection: executor delta from its pre-check diff,
+      grafter delta from its post-check manifest; a path the check alone changed and nothing
+      touched since is a check artifact, not a delta.
    2. Run done-check from recorded cwd; compare w/ expected result.
    3. Return three verdicts w/ evidence:
    - status: complete / incomplete / blocked, from own done-check run. Evidence the auditor
