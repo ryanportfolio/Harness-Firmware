@@ -1,13 +1,19 @@
 {
   "name": "claude-starter",
   "owner": { "name": "ryanportfolio" },
-  "description": "Hosts the Harness Firmware skills plugin. Install the template's Claude Code skill set into any project.",
+  "description": "Hosts the Harness Firmware skills plugin and the /smart-compact mod. Install the template's Claude Code skill set into any project.",
   "plugins": [
     {
       "name": "claude-starter",
       "source": "./",
       "category": "workflow",
       "tags": ["harness-firmware", "agent-firmware", "starter", "workflow", "skills"]
+    },
+    {
+      "name": "smart-compact",
+      "source": "./.claude/skills/smart-compact",
+      "category": "workflow",
+      "tags": ["harness-firmware", "compact", "context"]
     }
   ]
 }

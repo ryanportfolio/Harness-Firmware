@@ -38,14 +38,14 @@ LICENSE/NOTICE files in the skill folder.
 ## Homegrown (this repo)
 
 `addskill`, `adopt-repo`, `advocate`, `astra-fullreview`, `astra-review`,
-`claude-review`, `codex-fullreview`, `codex-review`, `compact-review`, `dare`, `enhance-prompt`,
+`claude-review`, `codex-fullreview`, `codex-review`, `dare`, `enhance-prompt`,
 `external-review`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`,
 `impartial-review`, `init-project`, `lab`, `merge`, `optimize-context`, `perf-loop`,
 `recall`, `session-hub`, `showpiece`, `sync-starter`, `why`, `wow-loop`.
 
 Homegrown skills are MIT, same as the template (see its [`LICENSE`](https://github.com/ryanportfolio/Harness-Firmware/blob/main/LICENSE)).
 
-Runtime coverage follows `.agents/skill-modes.json` and the skill folders: `astra-fullreview`, `compact-review`,
+Runtime coverage follows `.agents/skill-modes.json` and the skill folders: `astra-fullreview`,
 `codex-fullreview`, `long-horizon-workflows` and `merge` are Claude-only, `external-review`
 is Codex-only, and every other active skill ships in both runtimes. `recall` and
 `why` share names with unrelated pstack skills; ours predate the pstack ports
