@@ -83,17 +83,22 @@ anything, or another provider's paid review.
    `$refine weekly`): an agent typed those user turns, so they are not the user's words.
 2. **Measure.** Count the threads read; user turns that correct the agent or repeat an
    instruction (the phrase grep above, plus "that's wrong", "not what I asked", "undo",
-   "revert"), per thread; and comments the user wrote on pull requests merged in the
+   "revert"), per thread, counting only turns timestamped inside the window; and comments the user wrote on pull requests merged in the
    window (`gh pr list --state merged --search "merged:>=<date>"`, then the review and issue
    comments of each, excluding bot authors), per merged pull request. Append one dated row
-   to `~/.codex/refine-weekly/<repo folder name>.md` (`$CODEX_HOME` replaces `~/.codex`
-   when set), creating it with a header row if missing, and compare against the previous
+   to `~/.codex/refine-weekly/<repo id>.md` (`$CODEX_HOME` replaces `~/.codex` when set),
+   where `<repo id>` is the repository id: its `origin` URL without scheme, user and trailing `.git`,
+   lowercased, with every non-alphanumeric character replaced by `-`; with no `origin`, the
+   main checkout's full path in the same form.
+   Create the file with a header row if missing, and compare against the previous
    four rows. A phrase match is not always a correction: report the direction of change,
    not precise rates.
-3. **Find.** Apply the review above to the collected threads. Also note any task the user
-   asked for in three or more threads across this week and the previous row's notes: it is
-   a candidate for a playbook skill. Record such tasks, without quoting chat, in the new
-   row's notes so next week can count them.
+3. **Find.** Apply the review above to the collected threads, but skip its
+   `memory-audit.mjs` run: that script reads every past transcript, beyond the window. In the new row's notes,
+   record each task the user asked for this week as a short neutral description with its
+   count of distinct threads, including tasks below three, without quoting chat. A task whose
+   counts in this row and the previous four rows add up to three or more is a candidate for
+   a playbook skill.
 4. **Act.** Edit only what passes the evidence table's save row or the three failure checks,
    and only repository files. Everything else goes in the report for the user: suggestions,
    questions, contradictions, new skills, personal-rule changes, and any finding a project
