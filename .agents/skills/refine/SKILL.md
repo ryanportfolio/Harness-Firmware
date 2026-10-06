@@ -1,6 +1,6 @@
 ---
 name: "refine"
-description: "Use for an explicit workflow-improvement review, turning the user's preferences into rules or a skill, or recurring task friction that may justify a narrow change to skills or project references."
+description: "Use for an explicit workflow-improvement review, turning the user's preferences into rules or a skill, recurring task friction that may justify a narrow change to skills or project references, or the unattended weekly review (/refine weekly)."
 ---
 
 # Improve the working process
@@ -66,6 +66,43 @@ kernel (`CLAUDE.md`, or `AGENTS.md` for Codex-only runtime rules), a quirk to
 `.claude/reference/pitfalls.md` and other durable project facts to their reference file
 (both through `$recall`), a repeatable procedure to a skill, or nowhere. Keep session events
 and discoverable code facts out.
+
+## Weekly mode
+
+`$refine weekly` runs the review above without the user present, usually from a scheduled
+task. Invoking it authorizes, for this repository only: reading the last 7 days of this
+project's threads, editing repository files on a fresh branch from `origin/main`, pushing
+that branch and opening one pull request. It does not authorize merging, editing anything
+outside the repository (such as `~/.codex/AGENTS.md` or another repo), installing
+anything, or another provider's paid review.
+
+1. **Collect.** Read the Codex threads described above whose files were modified in the
+   last 7 days and that match this repository by the `session_meta` rule. Skip `exec` and
+   subagent threads and earlier weekly runs (their first user turn invokes
+   `$refine weekly`): an agent typed those user turns, so they are not the user's words.
+2. **Measure.** Count the threads read; user turns that correct the agent or repeat an
+   instruction (the phrase grep above, plus "that's wrong", "not what I asked", "undo",
+   "revert"), per thread; and comments the user wrote on pull requests merged in the
+   window (`gh pr list --state merged --search "merged:>=<date>"`, then the review and issue
+   comments of each, excluding bot authors), per merged pull request. Append one dated row
+   to `~/.codex/refine-weekly/<repo folder name>.md` (`$CODEX_HOME` replaces `~/.codex`
+   when set), creating it with a header row if missing, and compare against the previous
+   four rows. A phrase match is not always a correction: report the direction of change,
+   not precise rates.
+3. **Find.** Apply the review above to the collected threads. Also note any task the user
+   asked for in three or more threads across this week and the previous row's notes: it is
+   a candidate for a playbook skill. Record such tasks, without quoting chat, in the new
+   row's notes so next week can count them.
+4. **Act.** Edit only what passes the evidence table's save row or the three failure checks,
+   and only repository files. Everything else goes in the report for the user: suggestions,
+   questions, contradictions, new skills, personal-rule changes, and any finding a project
+   or personal rule keeps out of a file. List findings that are not specific to this
+   repository in their own report section, as cross-project candidates.
+5. **Ship.** With edits: branch `refine/weekly-<date>`, commit, push, and open one pull
+   request whose body is the report. Without edits: no branch or pull request. Never merge.
+   The report holds counts and rule text only, under the privacy rule above, because the
+   pull request may be public. Final reply: the pull request URL or "no changes", this
+   week's metrics row with the trend, and the items that need the user.
 
 For skill authoring or installation, use addskill when available; Codex authoring uses
 built-in skill-creator. A standalone refinement can use the local evaluation resource
