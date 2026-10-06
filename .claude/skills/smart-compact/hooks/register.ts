@@ -16,10 +16,10 @@ Keep, in priority order:
 
 Tell the summarizer to drop resolved tangents, raw tool output, superseded plans, and anything re-readable from files or CLAUDE.md. Never invent a fact; if a state item is unknown, leave it out. Keep the block under about 300 words; cut from the bottom of the priority list first.
 
-Return exactly one fenced \`text\` block and nothing else. The first line of the block is always \`Always use caveman ultra.\`, whatever style the session is using.
+Return exactly one fenced \`text\` block and nothing else. When the session's replies follow a named style or output style (caveman ultra, for example), make the first line \`Always use <that style>.\` so it survives the compaction; otherwise leave that line out.
 
 \`\`\`text
-Always use caveman ultra.
+Always use <reply style>.
 Goal: <one line>.
 Keep: <standing user instructions>.
 State: <branch, worktree, PR, SHA, files>.
@@ -73,7 +73,9 @@ const compactWhenIdle = async ($: EngineInterface, instructions: string, triesLe
     await $.command.run({ command: 'compact', args: instructions })
     $.ui.status(undefined)
   } catch (err) {
-    if (triesLeft > 1) {
+    // Retry only the refusal for a command run from inside a hook that still
+    // holds the turn; a cancelled or interrupted /compact stays cancelled.
+    if (triesLeft > 1 && /hook/i.test(String(err))) {
       $.clock.after(1000, () => void compactWhenIdle($, instructions, triesLeft - 1))
       return
     }
