@@ -46,6 +46,21 @@ condensed.
   `writing-plans` as the handoff. Start it with `/deep-plan` in Claude Code, where
   the model can also load it when asked, or `$deep-plan` in Codex, which never
   starts it on its own; the Codex version is classified Adapted.
+- `/smart-compact` (Claude Code only): reviews the session, writes custom
+  `/compact` instructions from it, and runs `/compact` with them, in one command.
+  It is a Claude Code mod, not a skill: a plugin in
+  `.claude/skills/smart-compact/` whose hooks module registers the command,
+  writes the instructions in a fork of the session, then runs `/compact` from a
+  timer once the command finishes. It works in the terminal and in the desktop
+  app's Code tab. If the review fails, nothing is compacted. To use it in every
+  project, copy the folder to `~/.claude/skills/smart-compact/`: Claude Code
+  loads a plugin from a folder there in every session.
+
+### Removed
+
+- `compact-review` skill. `/smart-compact` replaces it with the same review
+  prompt and runs `/compact` itself, so there is no longer a way to get the
+  instructions without compacting. It was Claude-only, so Codex loses nothing.
 
 ### Changed
 
