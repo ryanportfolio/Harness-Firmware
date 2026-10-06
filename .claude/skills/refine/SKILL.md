@@ -63,13 +63,17 @@ session events and discoverable code facts out.
 `/refine weekly` runs the review above without the user present, usually from a scheduled
 task. Invoking it authorizes, for this repository only: reading the last 7 days of this
 project's sessions, editing repository files on a fresh branch from `origin/main`, pushing
-that branch and opening one pull request. It does not authorize merging, editing anything
-outside the repository (such as `~/.claude/CLAUDE.md` or another repo), installing
+that branch, opening one pull request, and appending to the metrics history file named in
+step 2. It does not authorize merging, editing anything else outside the repository (such
+as `~/.claude/CLAUDE.md` or another repo), installing
 anything, or another provider's paid review.
 
 1. **Collect.** Read `~/.claude/projects/*/*.jsonl` files modified in the last 7 days whose
-   `cwd` is this repository or one of its worktrees. A worktree may since have been removed;
-   then match the project folder name against this repository's folder name. Skip
+   `cwd` is this repository or one of its worktrees. For a worktree that has since been
+   removed, keep the project folder only when its name is the main checkout's full path with
+   every non-alphanumeric character replaced by `-`, followed by `--claude-worktrees-`, as
+   `.claude/scripts/memory-audit.mjs` matches it; never match by repository folder name
+   alone, since another repository can share it. Skip
    subagent transcripts and earlier weekly runs (their first user turn invokes
    `/refine weekly`): an agent typed those user turns, so they are not the user's words.
 2. **Measure.** Count the sessions read; user turns that correct the agent or repeat an

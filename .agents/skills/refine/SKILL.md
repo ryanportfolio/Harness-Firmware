@@ -72,8 +72,9 @@ and discoverable code facts out.
 `$refine weekly` runs the review above without the user present, usually from a scheduled
 task. Invoking it authorizes, for this repository only: reading the last 7 days of this
 project's threads, editing repository files on a fresh branch from `origin/main`, pushing
-that branch and opening one pull request. It does not authorize merging, editing anything
-outside the repository (such as `~/.codex/AGENTS.md` or another repo), installing
+that branch, opening one pull request, and appending to the metrics history file named in
+step 2. It does not authorize merging, editing anything else outside the repository (such
+as `~/.codex/AGENTS.md` or another repo), installing
 anything, or another provider's paid review.
 
 1. **Collect.** Read the Codex threads described above whose files were modified in the
