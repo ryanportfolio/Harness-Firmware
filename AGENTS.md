@@ -37,6 +37,15 @@ This is the Codex boundary for repositories using the Harness Firmware starter. 
 - Stage explicit paths, preserve unrelated changes, and verify before claiming completion.
 - If a skill causes a permission request, pause, or unfinished authorized work, link the exact `SKILL.md`, quote the blocking instruction, and explain why existing authorization does not cover the action. Distinguish an explicit requirement from an interpretation; user instructions take precedence over skill guidelines within system and developer constraints.
 
+## Claude review on every PR
+
+Nothing merges until the PR has been through `$claude-review` with the Opus model and its surviving findings are fixed or explicitly waived by the user. This applies to every merge path, including `gh pr merge` and squash-merges done by agents.
+
+- **Run it automatically.** Opening or updating a PR is itself the trigger: run `$claude-review` with `--model opus` at high effort, in the same turn, without asking and without waiting for a merge request. Naming it as a next step and stopping does not count. This standing rule is the user's request and model choice for that review.
+- Sequence: open PR → `$claude-review` (Opus) on the full PR diff against the default branch → verify each finding → fix confirmed BLOCKING and SHOULD-FIX findings → push → merge. Rerun only on the user's OK, because each run bills their Claude subscription.
+- If the Claude CLI is unavailable (not logged in, CLI broken, `opus` alias rejected), say so and stop before merging. Never substitute a self-review and call it done.
+- The review result goes in the handover: source attribution, findings that survived verification, and what was fixed.
+
 ## Shared Assets
 
 - `.claude/skills/` remains Claude’s library. Codex uses standalone native skills under `.agents/skills/`, registered in `.agents/skill-modes.json` as `native` or `disabled` (Claude-only). Read them directly and resolve resources from their Codex skill directory.

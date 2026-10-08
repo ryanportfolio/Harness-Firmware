@@ -58,6 +58,15 @@ Defaults until configured:
 - End commit messages with the standard `Co-Authored-By:` trailer.
 - PowerShell quoting trap: embedded `"` inside a here-string argument gets mangled en route to native exes (git/gh) and splits the argument. For multiline commit messages / PR bodies, write the text to a `.tmp/` file and use `git commit -F <file>` / `gh pr create --body-file <file>`, or keep the message free of double quotes.
 
+## Codex review on every PR
+
+Nothing merges until the PR has been through `/codex-review` and its surviving findings are fixed or explicitly waived by the user. This applies to every merge path: a manual merge, `/merge`, `gh pr merge`, and squash-merges done by agents.
+
+- **Run it automatically.** Opening or updating a PR is itself the trigger: run `/codex-review` in the same turn, without asking and without waiting for a merge request. Naming it as a next step and stopping does not count. In merge mode the `/merge` loop replaces this trigger; don't run a separate `/codex-review` on top of it.
+- Sequence: open PR → `/codex-review` on the full PR diff against the default branch → verify each finding → fix confirmed BLOCKING and SHOULD-FIX findings → push → merge. Rerun only on the user's OK, because each run bills their Codex subscription. Typing `/merge` is that OK for every PR in the rest of the session.
+- If Codex is unavailable (not logged in, CLI broken), say so and stop before merging. Never substitute a self-review and call it done.
+- The review result goes in the handover: source attribution, findings that survived verification, and what was fixed.
+
 ## Environment & deploy target
 
 <!-- FILL IN (via /init-project): where the app runs (host, DB, secrets); install policy (can sessions run npm/pip for app-runtime deps?); migration policy; anything that ALWAYS requires user action. -->
