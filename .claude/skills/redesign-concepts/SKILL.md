@@ -18,25 +18,36 @@ Script paths below are from the repository root; when this skill came from a plu
 
 ## 1. Capture
 
-Take real screenshots of the current build at desktop size (1440x900 unless the product targets another size) with the project's verification setup, following its browser rules. Cover each key screen and state, especially the busiest: first paint, an open menu or drawer, a filtered or search state, an admin or manager view, a detail page. Fresh verification captures can be reused; stale ones cannot.
+Take real screenshots of the current build at the size its users see: desktop (1440x900) for a desktop product, a phone viewport for a mobile-first one. Use the project's verification setup, following its browser rules. Cover each key screen and state, especially the busiest: first paint, an open menu or drawer, a filtered or search state, an admin or manager view, a detail page. Fresh verification captures can be reused; stale ones cannot.
 
 Keep the originals wherever the project or user keeps screenshots. Copy only the chosen references into `<scratch>/refs/`.
 
 ## 2. Critique, then concepts
 
-Read every capture yourself and list concrete problems: repetition, too many controls at once, jargon, weak hierarchy, important things pushed below the fold. Each concept should answer one of them.
+Read every capture yourself and list the concrete problems this product actually has, for example repetition, too many controls at once, jargon, weak hierarchy, or important things pushed below the fold. Don't assume clutter: a sparse screen can fail by hiding what matters, and a dense tool for experts may need more on screen, not less. From that list, write the design direction every concept shares and who the screens are for.
 
-Write the concepts. Each targets one screen and one idea. Vary them across composition, metaphor, hierarchy and interaction; recolors don't count as concepts. If the product has both user-facing and admin screens, mix them. Mark any concept that needs data or backend the product lacks.
+Write the concepts. Each targets one screen, names the problem it answers, and carries one idea. Vary them across composition, metaphor, hierarchy and interaction; recolors don't count as concepts. If the product has both user-facing and admin screens, mix them. Mark any concept that needs data or backend the product lacks.
 
 ## 3. Prompts
 
-Write `<scratch>/concepts.json` (format in the header of `scripts/make-prompts.mjs`): the product name, its audience, one identity line naming palette roles, type and card style as read from the screenshots, and per concept a name, the screen, the idea, its refs (the current screen first) and any new data it needs. Then:
+Write `<scratch>/concepts.json` (format in the header of `scripts/make-prompts.mjs`). Every field comes from this product and the step 2 critique; none has a default:
+
+- `product`, `audience`: what it is and who uses these screens.
+- `identity`: palette roles, type and card style as read from the screenshots.
+- `direction`: the design goals every concept shares.
+- `orientation`: `landscape` (1536x1024) or `portrait` (1024x1536), matching the captures.
+- `negatives` (optional): things this product must not get, beyond the built-in list.
+- per concept: `name`, `screen`, `problem`, `idea`, `refs` (the current screen first), and `needs` for data or backend the product lacks.
+
+Then:
 
 ```bash
 node .claude/skills/redesign-concepts/scripts/make-prompts.mjs <scratch>
 ```
 
-It writes `prompts/NN-name.txt`, `prompts/NN-name.refs` and `index.md`. The shared brief tells the model the screenshots show the current app, that it works but is busy, and to design a better version of the same screen: calmer, fewer controls visible, plain words, one obvious primary action per area, clear grouping, progressive disclosure, same identity and same real data. Its negatives include "a copy of the screenshot with small changes", device frames, a color theme different from the screenshots, marketing heroes, emoji, lorem ipsum, garbled text and more than one screen. Output is a 1536x1024 opaque PNG at an exact path. Add project-specific negatives through `negatives` rather than editing the script.
+It writes `prompts/NN-name.txt`, `prompts/NN-name.refs` and `index.md`. Each prompt tells the model the screenshots show the current product and asks for a better version of the same screen, stating the concept's problem and idea, the shared direction, the identity to keep and the real data to reuse. Built in are only the negatives that hold for every project: a near-copy of the screenshot, a different visual identity, device frames, placeholder or garbled text, and more than one screen. Output is an opaque PNG at an exact path.
+
+For example, a light-themed admin app for non-technical staff, whose captures showed too many controls at once, used this direction: "fewer controls visible at once, plain everyday words instead of jargon, one obvious primary action per area, clear grouping, progressive disclosure", with the negatives "dark mode", "a marketing hero" and "emoji". Those choices fit that product; write your own from step 2.
 
 ## 4. Generate
 
