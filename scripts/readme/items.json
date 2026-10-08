@@ -130,6 +130,21 @@
       "group": "specialist"
     },
     {
+      "name": "design-prototypes",
+      "label": "Design prototypes",
+      "group": "specialist"
+    },
+    {
+      "name": "redesign-concepts",
+      "label": "Redesign concepts",
+      "group": "specialist"
+    },
+    {
+      "name": "codex-image-gen",
+      "label": "Codex image gen",
+      "group": "specialist"
+    },
+    {
       "name": "arena",
       "label": "Arena",
       "group": "specialist"

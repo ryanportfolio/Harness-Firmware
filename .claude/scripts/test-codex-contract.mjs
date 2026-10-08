@@ -19,7 +19,7 @@ const failures = [];
 const warnings = [];
 // Skills deleted on purpose and listed in .agents/removed-skills.json.
 const removed = new Set(readRemovedSkills(root));
-const maxCatalogChars = 7000;
+const maxCatalogChars = 7500;
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
