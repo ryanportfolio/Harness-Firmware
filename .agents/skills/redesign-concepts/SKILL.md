@@ -7,7 +7,7 @@ description: "$redesign-concepts: built UI screenshots → image_gen → 10 rede
 
 Critique an existing build from real screenshots and get generated redesigns of it. The images are design targets, not implementation: do not edit the product, commit images, or deploy. Default to 10 concepts; honor a different count. Not for exploring directions from a brief before anything is built.
 
-Script paths are from the repository root; in a personal install, use the `scripts/` folder in this skill's directory.
+Script paths are from the repository root; in a personal install, use the `scripts/` folder in this skill's directory. Either way, run them from the workspace root, because every path they write is relative to it.
 
 ## 0. Preflight and cost
 

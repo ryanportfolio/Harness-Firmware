@@ -7,7 +7,7 @@ description: "Built UI → screenshots → Codex image_gen → 10 redesign conce
 
 Critique an existing build from real screenshots and get generated redesigns of it. The images are design targets, not implementation. This skill does not edit the product, commit images, or deploy. Default to 10 concepts; honor a different count the user asks for.
 
-Script paths below are from the repository root; when this skill came from a plugin, use the `scripts/` folder in this skill's base directory instead, and keep running from the checkout.
+Script paths below are from the repository root. When this skill came from a plugin or a personal skills folder, run the scripts from the `scripts/` folder in this skill's base directory instead. Either way, run them from the workspace root, because every path they write is relative to it.
 
 ## 0. Preflight and cost
 
