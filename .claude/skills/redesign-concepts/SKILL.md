@@ -36,7 +36,7 @@ Write `<scratch>/concepts.json` (format in the header of `scripts/make-prompts.m
 node .claude/skills/redesign-concepts/scripts/make-prompts.mjs <scratch>
 ```
 
-It writes `prompts/NN-name.txt`, `prompts/NN-name.refs` and `index.md`. The shared brief tells the model the screenshots show the current app, that it works but is busy, and to design a better version of the same screen: calmer, fewer controls visible, plain words, one obvious primary action per area, clear grouping, progressive disclosure, same identity and same real data. Its negatives include "a copy of the screenshot with small changes", device frames, dark mode, marketing heroes, emoji, lorem ipsum, garbled text and more than one screen. Output is a 1536x1024 opaque PNG at an exact path. Add project-specific negatives through `negatives` rather than editing the script.
+It writes `prompts/NN-name.txt`, `prompts/NN-name.refs` and `index.md`. The shared brief tells the model the screenshots show the current app, that it works but is busy, and to design a better version of the same screen: calmer, fewer controls visible, plain words, one obvious primary action per area, clear grouping, progressive disclosure, same identity and same real data. Its negatives include "a copy of the screenshot with small changes", device frames, a color theme different from the screenshots, marketing heroes, emoji, lorem ipsum, garbled text and more than one screen. Output is a 1536x1024 opaque PNG at an exact path. Add project-specific negatives through `negatives` rather than editing the script.
 
 ## 4. Generate
 
@@ -44,7 +44,7 @@ It writes `prompts/NN-name.txt`, `prompts/NN-name.refs` and `index.md`. The shar
 bash .claude/skills/redesign-concepts/scripts/run-batch.sh <scratch> 3
 ```
 
-It runs three `codex exec` jobs at a time (`-m gpt-6-astra`, medium reasoning, `-c model_provider=openai`, `-s workspace-write`, refs via `-i`, prompt on stdin), logs each to `logs/`, flags any image under 100 KB as probably drawn in code, and skips images that already exist, so rerunning resumes. If a log shows `401 Unauthorized: Incorrect API key provided` while login status says ChatGPT, check https://status.openai.com before debugging auth; report an outage and stop.
+It runs three `codex exec` jobs at a time (`-m gpt-6-astra`, medium reasoning, `-c model_provider=openai`, `-s workspace-write`, refs via `-i`, prompt on stdin), logs each to `logs/`, and accepts an output only if it is a PNG of 100 KB or more (smaller means drawn in code or cut short). Invalid outputs are moved to `out/NN-name.rejected.png`; valid ones are skipped on a rerun, so rerunning resumes and retries the failures. If a log shows `401 Unauthorized: Incorrect API key provided` while login status says ChatGPT, check https://status.openai.com before debugging auth; report an outage and stop.
 
 ## 5. Review and present
 

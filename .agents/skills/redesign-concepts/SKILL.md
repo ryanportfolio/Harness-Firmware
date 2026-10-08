@@ -26,11 +26,11 @@ Look at every capture and list concrete problems: repetition, too many controls,
 
 ## 3. Prompts
 
-Write `<scratch>/concepts.json` (format in the header of `scripts/make-prompts.mjs`), then run `node .agents/skills/redesign-concepts/scripts/make-prompts.mjs <scratch>`. It writes `prompts/NN-name.txt`, `prompts/NN-name.refs` (current screen first) and `index.md`. The shared brief asks for a calmer, plainer version of the same screen with the same identity and real data, a 1536x1024 opaque PNG at an exact path, and lists negatives such as "a copy of the screenshot with small changes", device frames, dark mode, marketing heroes, emoji, lorem ipsum, garbled text and more than one screen. Add project negatives through `negatives`.
+Write `<scratch>/concepts.json` (format in the header of `scripts/make-prompts.mjs`), then run `node .agents/skills/redesign-concepts/scripts/make-prompts.mjs <scratch>`. It writes `prompts/NN-name.txt`, `prompts/NN-name.refs` (current screen first) and `index.md`. The shared brief asks for a calmer, plainer version of the same screen with the same identity and real data, a 1536x1024 opaque PNG at an exact path, and lists negatives such as "a copy of the screenshot with small changes", device frames, a color theme different from the screenshots, marketing heroes, emoji, lorem ipsum, garbled text and more than one screen. Add project negatives through `negatives`.
 
 ## 4. Generate
 
-For each prompt without an existing `out/NN-name.png`, call the image tool with that prompt and its refs as input images, and save to the exact path. Skipping existing outputs lets a rerun resume. `scripts/run-batch.sh <scratch> 3` drives separate `codex exec` processes three at a time instead; use it only when nested Codex runs are permitted here. A generated screen is hundreds of KB or more; a few-KB file was drawn some other way and does not count.
+For each prompt without a valid `out/NN-name.png` (a PNG of 100 KB or more), call the image tool with that prompt and its refs as input images, and save to the exact path. Skipping valid outputs lets a rerun resume. `scripts/run-batch.sh <scratch> 3` drives separate `codex exec` processes three at a time instead; use it only when nested Codex runs are permitted here. A generated screen is hundreds of KB or more; a few-KB file was drawn some other way and does not count.
 
 ## 5. Review and present
 

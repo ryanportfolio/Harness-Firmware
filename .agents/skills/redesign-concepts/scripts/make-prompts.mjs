@@ -43,7 +43,7 @@ const audience = spec.audience || "non-technical users";
 const negatives = [
   "a copy of the screenshot with small changes",
   "device frames or laptop mockups",
-  "dark mode",
+  "a different color theme from the screenshots (light to dark or dark to light)",
   "a marketing hero",
   "emoji",
   "lorem ipsum",
