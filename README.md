@@ -4,7 +4,7 @@
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/boot-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/boot-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/boot-dark.svg">
-<img alt="Harness Firmware boots with 38 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
+<img alt="Harness Firmware boots with 39 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
 </picture>
 
 A repository starter for **Claude Code and Codex**. Harness Firmware gives both agents versioned instructions, durable project memory, reusable skills, and workflows for testing and independent review.
@@ -72,19 +72,19 @@ The dotted branch is separate: after human review, `sync-starter` can move a gen
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="38 Claude Code skills and 36 Codex skills share project memory. Codex has 36 native workflows." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="39 Claude Code skills and 37 Codex skills share project memory. Codex has 37 native workflows." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
-**38 Claude Code skills · 36 Codex skills · 36 native Codex workflows**
+**39 Claude Code skills · 37 Codex skills · 37 native Codex workflows**
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
 - **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows with explicit capability and safety boundaries; every Claude skill has a maintained native Codex version or is disabled for Codex. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
 Both runtimes read the committed project topics under `.claude/reference/`. Shared workflows live under `.claude/skills/`; standalone Codex workflows live under `.agents/skills/`.
 
-## 38 workflows, loaded when called
+## 39 workflows, loaded when called
 
-**7 core · 15 discipline · 16 specialist**
+**7 core · 15 discipline · 17 specialist**
 
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
@@ -95,13 +95,13 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/skills-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/skills-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/skills-dark.svg">
-<img alt="A memory map of 38 on-demand workflows grouped into 7 core, 15 discipline, and 16 specialist skills." src="assets/readme/skills-light.svg" width="100%">
+<img alt="A memory map of 39 on-demand workflows grouped into 7 core, 15 discipline, and 17 specialist skills." src="assets/readme/skills-light.svg" width="100%">
 </picture>
 
 </details>
 
 <details>
-<summary><strong>Click to browse all 38 skills</strong></summary>
+<summary><strong>Click to browse all 39 skills</strong></summary>
 
 <!-- skill-list:start -->
 ### core workflows · 7
@@ -111,7 +111,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`addskill`](.claude/skills/addskill/SKILL.md) · Create, import, update, or install repository or personal skills; includes runtime ownership, resources, and discovery validation.
 - [`sync-starter`](.claude/skills/sync-starter/SKILL.md) · Use when the user asks to pull template improvements into a spawned repo, compare starter drift, or push a generic improvement back to the starter.
 - [`optimize-context`](.claude/skills/optimize-context/SKILL.md) · Use when the user asks to reduce per-turn context or token load, trim kernels, skills, or connectors, or propagate a generic context optimization to the starter.
-- [`refine`](.claude/skills/refine/SKILL.md) · Use for an explicit workflow-improvement review, turning the user's preferences into rules or a skill, or recurring task friction that may justify a narrow change to skills or project references.
+- [`refine`](.claude/skills/refine/SKILL.md) · Use for an explicit workflow-improvement review, turning the user's preferences into rules or a skill, recurring task friction that may justify a narrow change to skills or project references, or the unattended weekly review (/refine weekly).
 - [`adopt-repo`](.claude/skills/adopt-repo/SKILL.md) · Mirror an existing external repo privately under the user's account and overlay the firmware: clone upstream, strip template-only files, privacy-sweep, run init-project. Use on /adopt-repo <url> or 'pull this repo into our firmware'.
 
 ### quality disciplines · 15
@@ -132,11 +132,12 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`claude-review`](.claude/skills/claude-review/SKILL.md) · Use when the user says /claude-review, asks Claude or Fable to review code written in Codex, or requests a cross-vendor review through Claude CLI.
 - [`dare`](.claude/skills/dare/SKILL.md) · Use for /dare, first principles, or questioning the problem: four fresh stages decompose, audit, recombine and test, preserving immutable goals and constraints.
 
-### specialist tools · 16
+### specialist tools · 17
 
 - [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Use for difficult multi-step work, uncertain diagnoses, repeated failures, 'did it work/is it fixed/prove it' questions, or tasks where verification and handoff need particular care. Skip routine changes.
 - [`wow-loop`](.claude/skills/wow-loop/SKILL.md) · Evidence-gated review and repair loop for one deliverable or a set of like items. Use on /wow-loop, requests for wow factor or dial it to 11, a target score to reach ("get it to 8/10", "bring everything under 6 up to 6+"), or substantial visual work (3D, animation, UI, rendered documents) that needs reference fidelity or repeated visual correction. Skip routine cosmetic edits and discussion of the skill itself.
-- [`showpiece`](.claude/skills/showpiece/SKILL.md) · Create distinctive, crafted artifacts in any medium. Use for /showpiece, ambitious creative direction, portfolio-quality work, or substantial cleanup of generic AI styling. Skip routine edits unless explicitly invoked.
+- [`showpiece`](.claude/skills/showpiece/SKILL.md) · Push an artifact past what people expect from its kind, in any medium. Use for /showpiece, ambitious creative direction, portfolio-quality work, or replacing generic AI styling. Not for quiet or faithful work such as forms, dashboards, exact recreations or brand matching; use frontend-design or the project's UI skill. Skip routine edits unless explicitly invoked.
+- [`redesign-concepts`](.claude/skills/redesign-concepts/SKILL.md) · Screenshot the current UI or site, have Codex image generation draw 10 redesign concepts from those screenshots, then fold the owner's picks into the build plan. Use on /redesign-concepts, "show what we have to Codex and get 10 better versions", or "prototype improvements to the current UI". Not for exploring directions from a brief before anything is built.
 - [`arena`](.claude/skills/arena/SKILL.md) · Builds parallel attempts at one task, judges them blind, and grafts the best ideas onto the strongest. Use for /arena, "try a few approaches", "build me options", bakeoffs, competing versions, or a stalled long-horizon or wow-loop step.
 - [`lab`](.claude/skills/lab/SKILL.md) · Use when the user explicitly asks to lab or prototype a visual, UI, motion, or game-feel element with live tuning before production implementation.
 - [`advocate`](.claude/skills/advocate/SKILL.md) · Use only when the user explicitly invokes /advocate to challenge a change just made before it lands. Do not trigger from natural-language requests.

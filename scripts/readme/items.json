@@ -130,6 +130,11 @@
       "group": "specialist"
     },
     {
+      "name": "redesign-concepts",
+      "label": "Redesign concepts",
+      "group": "specialist"
+    },
+    {
       "name": "arena",
       "label": "Arena",
       "group": "specialist"
