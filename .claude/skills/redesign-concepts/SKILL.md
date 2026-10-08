@@ -1,6 +1,6 @@
 ---
 name: redesign-concepts
-description: "Screenshot the current UI or site, have Codex image generation draw 10 redesign concepts from those screenshots, then fold the owner's picks into the build plan. Use on /redesign-concepts, \"show what we have to Codex and get 10 better versions\", or \"prototype improvements to the current UI\". Not for exploring directions from a brief before anything is built."
+description: "Built UI → screenshots → Codex image_gen → 10 redesign concepts → owner picks → build plan. Use: /redesign-concepts, \"show what we have to Codex, get 10 better versions\", \"prototype improvements to current UI\". Brief only, nothing built → design-prototypes."
 ---
 
 # Redesign concepts

@@ -4,7 +4,7 @@
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/boot-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/boot-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/boot-dark.svg">
-<img alt="Harness Firmware boots with 39 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
+<img alt="Harness Firmware boots with 41 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
 </picture>
 
 A repository starter for **Claude Code and Codex**. Harness Firmware gives both agents versioned instructions, durable project memory, reusable skills, and workflows for testing and independent review.
@@ -72,19 +72,19 @@ The dotted branch is separate: after human review, `sync-starter` can move a gen
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="39 Claude Code skills and 37 Codex skills share project memory. Codex has 37 native workflows." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="41 Claude Code skills and 38 Codex skills share project memory. Codex has 38 native workflows." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
-**39 Claude Code skills · 37 Codex skills · 37 native Codex workflows**
+**41 Claude Code skills · 38 Codex skills · 38 native Codex workflows**
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
 - **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows with explicit capability and safety boundaries; every Claude skill has a maintained native Codex version or is disabled for Codex. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
 Both runtimes read the committed project topics under `.claude/reference/`. Shared workflows live under `.claude/skills/`; standalone Codex workflows live under `.agents/skills/`.
 
-## 39 workflows, loaded when called
+## 41 workflows, loaded when called
 
-**7 core · 15 discipline · 17 specialist**
+**7 core · 15 discipline · 19 specialist**
 
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
@@ -95,13 +95,13 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/skills-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/skills-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/skills-dark.svg">
-<img alt="A memory map of 39 on-demand workflows grouped into 7 core, 15 discipline, and 17 specialist skills." src="assets/readme/skills-light.svg" width="100%">
+<img alt="A memory map of 41 on-demand workflows grouped into 7 core, 15 discipline, and 19 specialist skills." src="assets/readme/skills-light.svg" width="100%">
 </picture>
 
 </details>
 
 <details>
-<summary><strong>Click to browse all 39 skills</strong></summary>
+<summary><strong>Click to browse all 41 skills</strong></summary>
 
 <!-- skill-list:start -->
 ### core workflows · 7
@@ -132,12 +132,14 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`claude-review`](.claude/skills/claude-review/SKILL.md) · Use when the user says /claude-review, asks Claude or Fable to review code written in Codex, or requests a cross-vendor review through Claude CLI.
 - [`dare`](.claude/skills/dare/SKILL.md) · Use for /dare, first principles, or questioning the problem: four fresh stages decompose, audit, recombine and test, preserving immutable goals and constraints.
 
-### specialist tools · 17
+### specialist tools · 19
 
 - [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Use for difficult multi-step work, uncertain diagnoses, repeated failures, 'did it work/is it fixed/prove it' questions, or tasks where verification and handoff need particular care. Skip routine changes.
 - [`wow-loop`](.claude/skills/wow-loop/SKILL.md) · Evidence-gated review and repair loop for one deliverable or a set of like items. Use on /wow-loop, requests for wow factor or dial it to 11, a target score to reach ("get it to 8/10", "bring everything under 6 up to 6+"), or substantial visual work (3D, animation, UI, rendered documents) that needs reference fidelity or repeated visual correction. Skip routine cosmetic edits and discussion of the skill itself.
 - [`showpiece`](.claude/skills/showpiece/SKILL.md) · Push an artifact past what people expect from its kind, in any medium. Use for /showpiece, ambitious creative direction, portfolio-quality work, or replacing generic AI styling. Not for quiet or faithful work such as forms, dashboards, exact recreations or brand matching; use frontend-design or the project's UI skill. Skip routine edits unless explicitly invoked.
-- [`redesign-concepts`](.claude/skills/redesign-concepts/SKILL.md) · Screenshot the current UI or site, have Codex image generation draw 10 redesign concepts from those screenshots, then fold the owner's picks into the build plan. Use on /redesign-concepts, "show what we have to Codex and get 10 better versions", or "prototype improvements to the current UI". Not for exploring directions from a brief before anything is built.
+- [`design-prototypes`](.claude/skills/design-prototypes/SKILL.md) · Brief → distinct image concepts (sections, features, interactions, branding) → compare → refine pick, before build. Use: /design-prototypes, prototype visual directions, compare design options, refine chosen concept. Built UI → redesign-concepts.
+- [`redesign-concepts`](.claude/skills/redesign-concepts/SKILL.md) · Built UI → screenshots → Codex image_gen → 10 redesign concepts → owner picks → build plan. Use: /redesign-concepts, "show what we have to Codex, get 10 better versions", "prototype improvements to current UI". Brief only, nothing built → design-prototypes.
+- [`codex-image-gen`](.claude/skills/codex-image-gen/SKILL.md) · Image asset needed (icon, sprite, texture, splash, logo, marketing art, illustration) from inside Claude Code → drive Codex image_gen via codex exec. Use: "generate an image", "make an icon", "use gpt-image / my Codex sub", placeholder asset → real art.
 - [`arena`](.claude/skills/arena/SKILL.md) · Builds parallel attempts at one task, judges them blind, and grafts the best ideas onto the strongest. Use for /arena, "try a few approaches", "build me options", bakeoffs, competing versions, or a stalled long-horizon or wow-loop step.
 - [`lab`](.claude/skills/lab/SKILL.md) · Use when the user explicitly asks to lab or prototype a visual, UI, motion, or game-feel element with live tuning before production implementation.
 - [`advocate`](.claude/skills/advocate/SKILL.md) · Use only when the user explicitly invokes /advocate to challenge a change just made before it lands. Do not trigger from natural-language requests.

@@ -1,6 +1,6 @@
 ---
 name: redesign-concepts
-description: "Use on $redesign-concepts or for generated redesigns of a built UI from screenshots."
+description: "$redesign-concepts: built UI screenshots → image_gen → 10 redesigns → owner picks → build plan. Brief only → design-prototypes."
 ---
 
 # Redesign concepts
