@@ -13,6 +13,12 @@ condensed.
 
 ### Added
 
+- Review on every PR. `CLAUDE.md` now has Claude Code run `/codex-review`
+  in the same turn whenever it opens or updates a PR, and nothing merges until
+  the surviving findings are fixed or waived (the `/merge` loop replaces the
+  trigger in merge mode). `AGENTS.md` gives Codex the same rule the other way
+  round: `$claude-review` with the Opus model. Before this, the session-start
+  reminder only suggested a Codex review before merging.
 - `SubagentStart` hook (`.claude/hooks/subagent-start.sh`): every Claude Code
   subagent, including Explore and Plan, now gets terse writing rules for all its prose, reasoning and notes included: result
   first, shortest text that keeps every fact, paths, code and errors kept exact,
