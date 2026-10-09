@@ -31,8 +31,10 @@ If a non-pitfall capture lacks authorization, finish useful lookup and propose t
 note. Existing authorization to save a fact does not require another confirmation. Read the
 target first. Amend stale entries instead of stacking contradictory notes; when the new
 fact contradicts the old one, keep one line `retired YYYY-MM-DD: <old claim>; reason: <what
-changed>` at the end of the entry so a later reader sees the flip. Keep entries short,
-dated, topic-specific, and linked to evidence. Preserve unrelated content.
+changed>` at the end of the entry so a later reader sees the flip. Keep entries short and
+topic-specific. Every saved rule or pitfall carries its date and a source the reader can
+check: a pull request number, a commit, or the skill run or check that produced it. Never a
+chat quote or a path to a session file. Preserve unrelated content.
 
 For a new topic, update the index Codex actually reads if the project has one; otherwise
 directory discovery is sufficient. Do not duplicate cross-cutting AGENTS.md rules or
