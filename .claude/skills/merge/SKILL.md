@@ -39,7 +39,7 @@ Review skills' "review ≠ fix authority" rule lifted for in-scope fixes only. S
 ## Step 1: Integrate
 
 1. Inspect repo, remote, branch, working changes, existing PR. Target = task's or repo default. Keep unrelated work. Detached HEAD / on target → task branch before commit; respect user-chosen branch. Don't touch other checkouts w/o authorization.
-2. Run relevant local checks. Stage explicit paths, inspect staged diff, commit, push. Never bypass hooks. Reuse branch's open PR (`gh pr list --head <branch>`); else create one, description = final behavior + validation. Multiline bodies via file. Verify PR base, head, remote.
+2. Run relevant local checks. Stage explicit paths, inspect staged diff, commit, push. Never bypass hooks. Reuse branch's open PR (`gh pr list --head <branch>`); else create one, description = final behavior + validation. PR changes flows, boundaries, data model or state → description adds short Mermaid diagram of changed structure (GitHub renders it), so owner reads diagram instead of diff; repo keeps `.claude/reference/architecture.md` → same diagram there, same PR. No structural change (copy, styling, docs, config) → no diagram. Multiline bodies via file. Verify PR base, head, remote.
 3. Fetch target, check mergeability. Resolve unambiguous conflicts, keep both sides' intent. Semantic conflicts → investigate; ask only if resolution needs user decision not yet made. Reverify affected behavior, push.
 
 Record PR number, target, head SHA.
