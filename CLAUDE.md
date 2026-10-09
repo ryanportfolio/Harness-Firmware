@@ -46,7 +46,11 @@ Defaults until configured:
 ## Subagents
 
 - Run independent work in parallel: when parts don't depend on each other's results or edit the same files (research across areas, separate reviews, changes to separate modules), start their subagents in one message instead of one after another. Keep dependent or overlapping work sequential, and give parallel writers separate files or worktrees.
-- Omit `model` on subagent calls unless the user names one. The default is `CLAUDE_CODE_SUBAGENT_MODEL` when set, else the session model.
+- Pick the subagent model by task. A model the user names overrides this list.
+  - Default: omit `model`. The subagent runs on `CLAUDE_CODE_SUBAGENT_MODEL` when set, else the session model, which is always the latest Opus. Use it for code changes that need design decisions, debugging, reviews, verification, browser or visual checks, security work, plans, and writing for people. When unsure, use this.
+  - `sonnet`: scoped work that needs some reasoning and is easy to check. Web research and digests, triage of logs or test output, edits that repeat an existing pattern across files.
+  - `haiku`: mechanical work with an exact spec. File and code searches, bulk renames and reformats, summaries of long output, extraction into a fixed format, counts and inventories. Haiku does what the prompt literally says, so spell out the scope.
+  - A Sonnet or Haiku result that looks incomplete or wrong gets rerun with `model` omitted, not patched by hand.
 
 ## Git: push on completion
 
