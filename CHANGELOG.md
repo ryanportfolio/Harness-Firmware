@@ -66,6 +66,16 @@ condensed.
   there in every session), or install it from this repo's marketplace as
   `smart-compact@claude-starter`; installing `claude-starter` alone does not
   include it.
+- `apply-firmware` skill: brings the folder you are in up to the full firmware
+  in place, whether it is a plain folder, an existing repository, or a project
+  with an older or partial copy. Its read-only `scripts/detect.mjs` compares the
+  folder with a fresh template clone and sorts every firmware file into add,
+  refresh an unedited older copy, merge, conflict, retired, skipped, or keep;
+  the skill then shows one preview, asks about each file the user edited, and
+  backs up anything it replaces. It never commits, pushes, or touches app code.
+  `adopt-repo` remains the way to mirror an external repository. Start it with
+  `/apply-firmware` in Claude Code or `$apply-firmware` in Codex; the Codex
+  version is classified Adapted.
 
 ### Removed
 
