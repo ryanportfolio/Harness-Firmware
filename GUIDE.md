@@ -97,7 +97,7 @@ The record is informational. A missing skill listed in it produces no warning; a
 
 `.agents/template-manifest.json` describes the template's intent. `skills.required` names the skills the template expects every project to keep: `init-project` and `external-review`. `skills.dependencies` names skills that need others; for example `astra-review` reads `codex-review`. `.claude/scripts/removed-skills.mjs` warns when a project breaks either; it never fails. A project created before the manifest existed has no such file, and then neither rule applies.
 
-Removing `addskill` leaves `.claude/skills/writing-skills/` and `.agents/skills/writing-skills/`. They hold licensed reference files from the retired `writing-skills` skill and have no `SKILL.md`, so no runtime loads them and no check requires them. Delete them by hand if you do not want them.
+A project created from an older template may still hold `.claude/skills/writing-skills/`, `.agents/skills/writing-skills/` and `.agents/skills/humanizer/`. They are reference files left behind by the retired `writing-skills` and `humanizer` skills and have no `SKILL.md`, so no runtime loads them and no check requires them. The template no longer ships them; delete them by hand if you do not want them.
 
 To bring a skill back, restore its folders from the template, for example `git checkout starter/main -- .claude/skills/<name> .agents/skills/<name>` (only the paths that exist upstream), then delete its name from the record and its `skillOverrides` entry. When you pull other template updates with `sync-starter`, skip paths under removed skills; the session-start drift notice already ignores them.
 

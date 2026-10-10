@@ -37,6 +37,6 @@ for comparison, backup, reconciliation, and discovery checks.
 `node .claude/scripts/test-codex-contract.mjs` verifies that every active skill has exactly one classification and that Codex routing metadata stays within its context budget.
 
 `unslop` and `writing-skills` are retired from both discovery catalogs. Route cleanup to
-Caveman/Writing and authoring to addskill. Legacy licensed writing-skills resources remain.
+Caveman/Writing and authoring to addskill. Their leftover resource folders are no longer shipped.
 `node .claude/scripts/sync-codex-skills.mjs --check` warns when a retired name regains a
 `SKILL.md`.

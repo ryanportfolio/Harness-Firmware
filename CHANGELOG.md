@@ -86,6 +86,13 @@ condensed.
   variant. Caveman is now ultra only; `/init-project` offers normal prose as the
   only alternative. `/why` and `/advocate` reviews, which used `full`, now ask
   for terse fragments without abbreviations or arrows, the style `full` described.
+- Leftover folders of retired skills: `.claude/skills/writing-skills/` and
+  `.agents/skills/writing-skills/` (the old manuals, examples and scripts, with
+  no `SKILL.md`) and `.agents/skills/humanizer/` (one `patterns.md`, superseded
+  by the `writing` skill's own catalog). No runtime loaded them, but every new
+  project still received them. The `addskill` authoring reference keeps its own
+  copy of the MIT license and now points to the upstream originals. Existing
+  projects keep their copies until deleted by hand.
 
 ### Changed
 
