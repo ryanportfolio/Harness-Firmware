@@ -137,12 +137,20 @@ const sections = (text) =>
   new Map(text.replace(/\r\n/g, '\n').split(/^(?=## )/m).filter((s) => s.startsWith('## '))
     .map((s) => [s.split('\n')[0].slice(3).trim(), s.trim()]));
 
-function jsonDiff(a, b, path = '', out = { add: [], conflict: [], arrayAdds: [] }) {
+// Hook commands in a hooks.<Event> array of matcher groups.
+const hookCommands = (groups) => groups.flatMap((g) => g?.hooks ?? []).map((h) => h?.command).filter(Boolean);
+
+function jsonDiff(a, b, path = '', out = { add: [], conflict: [], arrayAdds: [], hookAdds: [] }) {
   for (const [k, tv] of Object.entries(b)) {
     const p = path ? `${path}.${k}` : k;
     if (!(k in a)) { out.add.push(p); continue; }
     const av = a[k];
-    if (Array.isArray(tv) && Array.isArray(av)) {
+    if (path === 'hooks' && Array.isArray(tv) && Array.isArray(av)) {
+      // A template hook is present when its command is, whatever its matcher, timeout or other fields.
+      const have = new Set(hookCommands(av));
+      const missing = hookCommands(tv).filter((c) => !have.has(c));
+      if (missing.length) out.hookAdds.push({ path: p, commands: missing });
+    } else if (Array.isArray(tv) && Array.isArray(av)) {
       const have = new Set(av.map((x) => JSON.stringify(x)));
       const missing = tv.filter((x) => !have.has(JSON.stringify(x)));
       if (missing.length) out.arrayAdds.push({ path: p, count: missing.length });
@@ -289,7 +297,9 @@ for (const m of report.merge) {
   if (m.kind === 'sections') {
     line(`${m.path}: missing sections [${list(m.missing)}]; differing [${list(m.differs)}]; project-only [${list(m.localOnly)}]; FILL IN markers ${m.fillIn}`);
   } else if (m.kind === 'json') {
-    line(`${m.path}: add keys [${list(m.add)}]; array additions [${list(m.arrayAdds.map((a) => `${a.path} +${a.count}`))}]; scalar conflicts [${list(m.conflict.map((c) => c.path))}]`);
+    line(`${m.path}: add keys [${list(m.add)}]; array additions [${list(m.arrayAdds.map((a) => `${a.path} +${a.count}`))}]; ` +
+      (m.path === '.claude/settings.json' ? `hook additions [${list(m.hookAdds.flatMap((h) => h.commands.map((c) => `${h.path}: ${c}`)))}]; ` : '') +
+      `scalar conflicts [${list(m.conflict.map((c) => c.path))}]`);
   } else {
     line(`${m.path}: append ${m.missing.length} line(s) [${list(m.missing)}]`);
   }
