@@ -46,7 +46,7 @@ node <this-skill-dir>/scripts/detect.mjs --target <folder> --template <short-scr
 | Class | Meaning | Default action |
 |---|---|---|
 | ADD | Absent locally | Copy from template |
-| UPDATE-STALE | Byte-identical to an older template version, so the user never edited it | Refresh to current template |
+| UPDATE-STALE | Byte-identical to an older template version on `main` (unmerged branches do not count), so the user never edited it | Refresh to current template |
 | MERGE | Kernel sections, JSON keys, ignore lines | Additive merge (rules below) |
 | CONFLICT | Differs from every template version: the user edited it | Ask per file |
 | OK | Identical, or existing `.claude/reference/*` project knowledge | Nothing |

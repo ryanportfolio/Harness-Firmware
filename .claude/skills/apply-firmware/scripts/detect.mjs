@@ -85,11 +85,12 @@ const hashes = (file) => {
   return new Set([blob(b), blob(lf(b))]);
 };
 
-// Every blob hash each path has ever had in template history.
+// Every blob hash each path has ever had on the template's default branch (the clone's HEAD).
+// Unmerged branches do not count: a copy of an experimental file is not an unedited release.
 const history = new Map();
 try {
   const raw = execFileSync('git',
-    ['-C', template, 'log', '--all', '--format=', '--raw', '--no-abbrev', '--no-renames'],
+    ['-C', template, 'log', 'HEAD', '--format=', '--raw', '--no-abbrev', '--no-renames'],
     { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
   for (const line of raw.split('\n')) {
     const m = line.match(/^:\d+ \d+ [0-9a-f]+ ([0-9a-f]+) \w+\t(.+)$/);
