@@ -72,9 +72,19 @@ condensed.
 - `compact-review` skill. `/smart-compact` replaces it with the same review
   prompt and runs `/compact` itself, so there is no longer a way to get the
   instructions without compacting. It was Claude-only, so Codex loses nothing.
+- Caveman `lite` and `full` levels, and the unused Wenyan (classical Chinese)
+  variant. Caveman is now ultra only; `/init-project` offers normal prose as the
+  only alternative. `/why` and `/advocate` reviews, which used `full`, now ask
+  for terse fragments without abbreviations or arrows, the style `full` described.
 
 ### Changed
 
+- The `caveman` skill body now matches the caveman output style line for line,
+  so Codex, which has no output style, follows the same rules as Claude Code,
+  including no em dashes and one-line process summaries. It keeps its
+  recommendation rules (lead with the pick, make the question line
+  self-contained, run `why` on weighty picks) and its pointer to the code-diff
+  cleanup guide.
 - `merge-ready` and the personal `/merge` skill are now one `merge` skill, shipped
   in the template and installed as the same file at `~/.claude/skills/merge`.
   Typing `/merge` commits, pushes and opens or reuses the PR, then runs the review

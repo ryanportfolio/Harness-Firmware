@@ -18,7 +18,7 @@ Keep the extracted Windows launcher, PowerShell module, and `template/` folder t
 
 Two setup choices affect every later session:
 
-- **Prose mode:** `caveman ultra` is the template default. Choose `normal`, `lite`, or `full` during setup to change it.
+- **Prose mode:** `caveman ultra` is the template default. Choose `normal` during setup to turn it off.
 - **Skill preset:** `full` keeps every skill. `minimal` keeps the core loop and quality disciplines, then asks before removing situational tools.
 
 Git writes still follow the active runtime's safety rules and the user's authorization.
@@ -42,7 +42,7 @@ Two files assert the default and must agree:
 - `CLAUDE.md`, under `## Default prose mode: caveman ultra`.
 - `.claude/hooks/session-start.sh`, in the three marked caveman blocks.
 
-To change the default later, replace `ultra` with `lite` or `full` in both files. To remove the default, delete the marked section and hook blocks. Subagents get their own terse rules from `.claude/hooks/subagent-start.sh`; edit that text to match, or delete the script and its `SubagentStart` entry in `.claude/settings.json` to remove it. Deleting the script also drops its rule that subagents collect their own helpers' results before stopping; to keep only that rule, delete the writing-rule lines from the script instead. The `caveman` skill remains available on demand.
+To remove the default later, delete the marked section and hook blocks. Subagents get their own terse rules from `.claude/hooks/subagent-start.sh`; edit that text to match, or delete the script and its `SubagentStart` entry in `.claude/settings.json` to remove it. Deleting the script also drops its rule that subagents collect their own helpers' results before stopping; to keep only that rule, delete the writing-rule lines from the script instead. The `caveman` skill remains available on demand.
 
 For one session, say `stop caveman` or `normal mode`.
 
@@ -52,7 +52,7 @@ Check both files afterward:
 grep -rn caveman CLAUDE.md .claude/hooks/session-start.sh
 ```
 
-Either nothing returns or the same level appears everywhere.
+Either nothing returns or `ultra` appears everywhere.
 
 ## check the installation
 
