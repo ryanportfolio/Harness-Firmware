@@ -4,7 +4,7 @@
 
 Tie scenario to representative scene complexity, input, viewport, device pixel ratio, quality settings, duration. Include startup effects, steady state, transitions, heavy scene relevant to complaint.
 
-- Frame times in ms: distribution w/ supported percentiles + longest gap + hitch count vs declared threshold. Avg FPS alone hides stutter. Low-FPS stat → record tool's definition. Separate initial and steady-state intervals.
+- Frame times in ms: distribution w/ supported percentiles + longest gap + hitch count vs declared threshold. Avg FPS alone hides stutter. Low-FPS stat → record tool's definition.
 - Frame-time budget from requested refresh target: `1000 / target FPS`. VSync + frame caps can hide headroom → inspect frame cost as well as presented FPS.
 - Measure input-to-visible-response separately from render throughput. Faster loop can still defer input handling.
 - Split CPU vs GPU work w/ available profilers. Record main-thread tasks, draw calls, shader compilation, uploads, allocations, GC only where they explain observed bottleneck.

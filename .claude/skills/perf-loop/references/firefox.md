@@ -6,13 +6,15 @@ Read this when Firefox is a target or behaves differently from another browser. 
 
 Record the exact Firefox version/channel, OS, GPU/driver and graphics configuration, viewport, actual device pixel ratio, display refresh rate, profile/extensions, cache state and build identifier. Reproduce the reported configuration first. A clean profile can isolate extensions or preferences, but is a separate diagnostic condition. Do not silently disable hardware acceleration or change graphics preferences to obtain a passing result.
 
-Check the exposed browser/automation tools. A Chromium browser panel, Chromium-specific protocol command or mobile-sized viewport cannot establish Firefox or physical-device performance. Probe the required method with one real capture. Report a bridge's unsupported command as a tool limitation, not evidence that Firefox lacks the capability. If direct control is unavailable, prepare the exact scenario and request one bounded user capture with its build identity; continue source diagnosis without claiming Firefox acceptance.
+Check the exposed browser/automation tools. A Chromium browser panel, Chromium-specific protocol command or mobile-sized viewport cannot establish Firefox or physical-device performance. Probe the required method with one real capture. Report a bridge's unsupported command as a tool limitation, not evidence that Firefox lacks the capability. If direct control is unavailable, prepare the exact scenario and request one bounded user capture with its build identity when interactive; an unattended run records Firefox as not measured. Continue source diagnosis without claiming Firefox acceptance.
+
+Check observed timestamp precision and `crossOriginIsolated`; record relevant timer-precision or fingerprinting-resistance settings when they affect the measurements. Treat in-page intervals as quantized at that precision. If a budget needs finer timing, use suitable native profiler evidence or mark the result inconclusive. Do not weaken privacy settings to obtain passing numbers; an authorized settings change is a separate diagnostic condition.
 
 ## Capture the failing interval
 
 Use Firefox Profiler through its available UI or automation. Select a preset suited to the complaint and verify that the capture includes the relevant content process, workers and graphics activity where supported. Start before the triggering navigation or interaction and capture promptly after the hitch. Its rolling buffer can discard the initial stall if recording continues too long.
 
-Add sparse UserTiming markers with `performance.mark()` / `performance.measure()` around useful application phases: initialization, asset readiness, scene creation, loader exit, first interaction and teardown. These appear in the profiler's UserTiming track. Markers describe application events; an upload/submission marker does not prove a frame was presented.
+Add sparse UserTiming markers with `performance.mark()` / `performance.measure()` around useful application phases: initialization, asset readiness, scene creation, loader exit, first interaction and teardown. These appear as UserTiming markers in the profiler. Markers describe application events; an upload/submission marker does not prove a frame was presented.
 
 Locate the worst interval, then test the explanation: application execution, style/layout/paint, image decode, upload/shader work, GC/CC or another competing component. Availability of a track or counter varies; state what the recording actually supports. Inspect other processes/threads when the content main thread does not explain the symptom. A worker's steady callback rate alone cannot rule out graphics contention.
 
@@ -29,6 +31,8 @@ Use `about:memory` for broader process memory reports and GC/CC controls. Save b
 Consult current official documentation when UI, preset names or supported APIs differ from this guidance:
 
 - [Record and capture a Firefox profile](https://firefox-source-docs.mozilla.org/performance/reporting_a_performance_problem.html)
+- [Timestamp precision and isolation](https://developer.mozilla.org/en-US/docs/Web/API/Performance/now#security_requirements)
+- [Animation callback timestamps](https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame#parameters)
 - [UserTiming markers in page code](https://firefox-source-docs.mozilla.org/tools/profiler/instrumenting-javascript.html)
 - [Memory snapshots](https://firefox-source-docs.mozilla.org/devtools-user/memory/index.html)
 - [Dominators and retaining paths](https://firefox-source-docs.mozilla.org/devtools-user/memory/dominators_view/index.html)

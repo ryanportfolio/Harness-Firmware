@@ -14,7 +14,7 @@ Record connection + throttling settings, CPU conditions, service-worker state, o
 
 ## Critical path
 
-Waterfall or trace → find blocking requests, serial deps, unused payload, excessive startup execution, contention. Judge asset changes, lazy loading, preload hints, caching, code splitting vs measured readiness. Extra requests + preloads can compete w/ critical work. If a loader and page graphics initialize together, test them independently and staggered before assuming either renderer alone is too expensive.
+Waterfall or trace → find blocking requests, serial deps, unused payload, excessive startup execution, contention. Judge asset changes, lazy loading, preload hints, caching, code splitting vs measured readiness. Extra requests + preloads can compete w/ critical work.
 
 After deferring work → check first interaction + a later transition. After caching changes → check repeat visits + cache invalidation. Preserve content completeness, image quality, text stability, navigation, auth behavior, accessible loading/error states.
 

@@ -18,7 +18,7 @@ Load only relevant guidance:
 - [Rendering and interaction](references/rendering.md): FPS, frame pacing, games, animation, responsiveness, visual quality.
 - [Loading and delivery](references/loading.md): startup, page loads, assets, bundles, network requests, readiness.
 - [Services and resources](references/services.md): APIs, DBs, throughput, memory, CPU, disk, sustained workloads.
-- [Firefox](references/firefox.md): Firefox-specific capture, graphics diagnosis and memory tools when Firefox is a target.
+- [Firefox](references/firefox.md): Firefox-specific capture, graphics diagnosis and memory tools when Firefox is a target or behaves differently from another browser.
 
 Experiment evidence + before/after presentation → packaged [evidence report](references/evidence-report.md); measurement + review gates below still apply.
 
@@ -36,7 +36,7 @@ User names target → skip triage, mention it's available, go to baseline. Triag
 
 Capture current working state incl. relevant uncommitted changes → baseline + candidate rebuildable w/o discarding user work. Record source state, build mode, commands, dep versions, device/runtime, dataset, scenario, sampling duration. Acceptance → representative optimized build; label diagnostic dev runs separately.
 
-Control cache state, warmup, resolution, quality settings, concurrency, random seeds where useful, power/thermal. Cold + warm runs separate. Confirm intended build running. Record unavoidable diffs + their limits. Diagnostics and copy/export controls include URL, served build identity, browser, renderer mode, phase and sample duration; a port alone is not build identity.
+Control cache state, warmup, resolution, quality settings, concurrency, random seeds where useful, power/thermal. Cold + warm runs separate. Confirm intended build running. Record unavoidable diffs + their limits. Each run record identifies build, runtime, phase and sample duration; include URL/origin and renderer mode where relevant. A port alone is not build identity. Use existing diagnostics or a saved record; do not add product UI solely for this.
 
 Separate relevant phases: initial startup, first action, steady animation, settled idle, hidden/resumed state and repeated navigation. Keep initial stalls in their own window; a rolling steady-state average must not erase them. Protect adjacent phases affected by a fix without expanding a narrow request into an unrelated audit.
 
@@ -52,7 +52,7 @@ Before editing, define: primary outcome metric, practical success threshold, pro
 
 Profile actual slow scenario. Rank bottlenecks by measured contribution, user impact, confidence, fix cost. Suspected bottlenecks = hypotheses. Prefer end-to-end wins over proxy wins (smaller bundle w/ unchanged readiness; higher FPS w/ worse input latency).
 
-When expensive components overlap, isolate them before an architectural rewrite: reproduce each alone, together, and with startup staggered as relevant. Use the smallest reversible experiment that distinguishes competing explanations. Workers can relieve main-thread contention while still competing for graphics resources.
+When expensive components overlap, isolate them before an architectural rewrite: reproduce each alone, together, and with startup staggered as relevant. Use the smallest reversible experiment that distinguishes competing explanations. Workers can relieve main-thread contention while still competing for graphics resources. Isolation runs are diagnostic: prefer existing controls; record temporary edits and restore the source before acceptance runs. A retained change needs its own candidate comparison. Audit-only requests use existing controls unless code edits are authorized.
 
 ## Bounded experiments
 
