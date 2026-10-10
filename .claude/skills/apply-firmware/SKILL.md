@@ -77,7 +77,7 @@ Before replacing or rewriting any existing file, copy it to `.tmp/apply-firmware
 - **AGENTS.md**: same section merge; it owns Codex runtime safety, so missing sections matter.
 - **`.claude/settings.json`**: deep merge. Add missing keys, union arrays (`permissions.allow`, `permissions.deny`), keep project hooks and add template hooks whose `command` is absent. Keep the project value on scalar conflicts unless approved.
 - **`.mcp.json`**: add missing `mcpServers` entries; a same-name server with a different config is a CONFLICT.
-- **`.agents/skill-modes.json`**: add missing entries; keep project entries, including deliberate `disabled` choices. Leave out entries for SKIPPED skills.
+- **`.agents/skill-modes.json`**: add missing entries; keep project entries, including deliberate `disabled` choices. Leave out entries for SKIPPED skills; detect already drops them from the keys to add.
 - **`.agents/removed-skills.json`**: the project's record; keep it as is. Copy the template's empty record only when the file is missing.
 - **RETIRED**: delete only the files the user approved; back them up first like any replaced file.
 - **`.gitignore` / `.gitattributes`**: append missing lines under a `# Harness` comment; never reorder or drop existing lines.

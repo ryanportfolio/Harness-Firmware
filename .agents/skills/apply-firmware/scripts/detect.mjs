@@ -211,6 +211,8 @@ for (const p of tplFiles) {
   } else if (JSON_MERGE.has(p)) {
     try {
       const d = jsonDiff(JSON.parse(readFileSync(l, 'utf8')), JSON.parse(readFileSync(t, 'utf8')));
+      // A SKIPPED skill gets no registry entry.
+      if (p === '.agents/skill-modes.json') d.add = d.add.filter((k) => !removedSkills.has(k.replace(/^skills\./, '')));
       report.merge.push({ path: p, kind: 'json', ...d });
     } catch (e) {
       report.edited.push({ path: p, note: `unparseable local JSON: ${e.message}` });
