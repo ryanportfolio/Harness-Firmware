@@ -36,7 +36,7 @@ LICENSE/NOTICE files in the skill folder.
 
 ## Homegrown (this repo)
 
-`addskill`, `adopt-repo`, `advocate`, `astra-fullreview`, `astra-review`,
+`addskill`, `adopt-repo`, `advocate`, `apply-firmware`, `astra-fullreview`, `astra-review`,
 `claude-review`, `codex-fullreview`, `codex-review`, `dare`, `enhance-prompt`,
 `external-review`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`,
 `impartial-review`, `init-project`, `lab`, `merge`, `optimize-context`, `perf-loop`,
