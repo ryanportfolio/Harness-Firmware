@@ -1,7 +1,7 @@
 {
   "name": "claude-starter",
   "displayName": "Harness Firmware Skills",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "The Harness Firmware skill set for Claude Code without cloning the full template: project memory, context trimming, cross-vendor and multi-agent code review, CI repair, planning, long multi-round tasks, performance tuning, UI and visual design, writing, and terse replies.",
   "author": {
     "name": "ryanportfolio",

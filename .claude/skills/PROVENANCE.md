@@ -4,9 +4,8 @@ Where each skill came from, its license, and what this repo changed. Not loaded
 into context; it is reference for maintainers and public users.
 
 **License terms:** third-party material keeps its own license: the LICENSE or
-NOTICE file in its skill folder, or the license this document names for it, as
-for `.agents/skills/humanizer/patterns.md` below. Homegrown skills are MIT under
-the root `LICENSE`.
+NOTICE file in its skill folder, or the license this document names for it.
+Homegrown skills are MIT under the root `LICENSE`.
 
 **Maintenance rule:** when you materially change a forked skill, update its
 "Our deltas" cell here. When adding a third-party skill, add a row and keep its
@@ -18,7 +17,7 @@ LICENSE/NOTICE files in the skill folder.
 |---|---|---|---|
 | `brainstorming` | [obra/superpowers](https://github.com/obra/superpowers) (Jesse Vincent) | MIT (in folder) | Two-lane scope calibration, authorization-safe artifacts, optional visual companion; added an original shared-code refactoring reference for caller compatibility and scoped design decisions. |
 | `writing-plans` | obra/superpowers | MIT (in folder) | Proportionate plans, useful interfaces and checks, authorized continuation; removed mandatory complete-code duplication and execution-choice gate. Native Codex implementation retained. Added an original shared-code refactoring reference for staged changes and caller verification. |
-| `writing-skills` (retired entrypoint) | obra/superpowers | MIT (in both legacy folders) | SKILL.md retired; legacy manuals, examples and scripts retained outside discovery in both runtime folders. Condensed authoring/evaluation guidance moved into addskill with copied MIT license; universal failure-first and automatic publication requirements removed. |
+| `writing-skills` (retired) | obra/superpowers | MIT (`addskill/references/LICENSE`) | SKILL.md retired; the legacy manuals, examples and scripts are no longer shipped (originals upstream). Condensed authoring/evaluation guidance moved into addskill with copied MIT license; universal failure-first and automatic publication requirements removed. |
 | `addskill` authoring resource | obra/superpowers writing-skills | MIT (`references/LICENSE` in both runtime folders) | Adapted discovery, structure and behavioral evaluation guidance into optional local authoring references; end-to-end addskill workflow remains homegrown. |
 | `caveman` | Community token-compression pattern (viral skill, author attribution unclear) | Reimplemented here | Ultra-only (intensity tiers removed), clarity carve-outs, persistence and built-in session cleanup; removed unsupported savings claim and duplicated kernel digest. Explicit prose and scoped code-diff cleanup remain available through existing routes. |
 | `writing` | Wikipedia "Signs of AI writing" tell catalog (CC BY-SA 4.0); `unslop` in [cursor/plugins pstack](https://github.com/cursor/plugins/tree/main/pstack) (Lauren Tan, MIT); Hermes Agent `purposeful-writing` (Nous Research, MIT); [petergyang/no-ai-slop](https://github.com/petergyang/no-ai-slop) (Peter Yang, MIT); [ItsssssJack/SlopMonster](https://github.com/ItsssssJack/SlopMonster) (MIT) | Notices in `NOTICE.md` and MIT `LICENSE` in both runtime folders; our text MIT | Consolidated outward-facing prose and explicit cleanup, preserving optional pattern/provenance resources; patterns 35-45 and edit restraint from no-ai-slop, pattern 31 rulings from Corewise.Academy plain-words (2026-07-18). User voice overrides style defaults; ordinary chat uses Caveman, drafting needs no review verdict. Kernel now routes to skills instead of duplicating the digest. Both runtime packages are standalone; added evidence checks, reader restatement, scoped review verdicts, and purpose-dependent explanation length. |
@@ -72,7 +71,7 @@ template, later restored), `automate-me` and `verify-this` (retired 2026-09-23),
 third-party sources as untrusted inputs but does not vendor their skill text,
 scripts, datasets, licenses, or configuration.
 
-`.agents/skills/humanizer/patterns.md` is not a skill: it has no SKILL.md and no
-manifest entry. It is left over from the `humanizer` skill that #103 merged into
-`writing`, and its catalog derives from the Wikipedia "Signs of AI writing" guide
-(CC BY-SA 4.0), the source already credited in the `writing` notice.
+The `humanizer` skill was merged into `writing` in #103. Its leftover
+`.agents/skills/humanizer/patterns.md`, a catalog derived from the Wikipedia "Signs of
+AI writing" guide (CC BY-SA 4.0, the source already credited in the `writing`
+notice), is no longer shipped.
