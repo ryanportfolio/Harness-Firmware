@@ -39,6 +39,11 @@ For this repository:
 4. Run `node .claude/scripts/sync-codex-skills.mjs --write`, its `--check` mode, and
    `node .claude/scripts/test-codex-contract.mjs`. Run relevant sync regression cases after
    changing registration logic. Preserve the catalog budget.
+5. When editing Harness-Firmware itself, add each new skill to exactly one `skills.groups`
+   entry in `.agents/template-manifest.json` and run
+   `node bootstrap/tests/check-template-manifest.mjs`. These groups supply the skill choices
+   in new-project setup; the check catches missing or duplicate entries. Skip this
+   template-only step in generated projects.
 
 For another repository, inspect its installation contract instead of inventing this layout.
 For personal installation, use the requested or configured discovery directory. Do not
