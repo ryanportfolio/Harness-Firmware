@@ -103,6 +103,17 @@ const modes = (() => {
   try { return JSON.parse(readFileSync(join(template, '.agents/skill-modes.json'), 'utf8')).skills ?? {}; }
   catch { return {}; }
 })();
+// A template folder under a skills root with no SKILL.md, no plugin manifest (smart-compact is a
+// mod, not a skill) and no skill-modes entry is a leftover of a retired skill, such as
+// writing-skills or humanizer. It is never added; a project copy of it is retired.
+const leftovers = ['.claude/skills', '.agents/skills'].flatMap((r) => {
+  const abs = join(template, r);
+  if (!existsSync(abs)) return [];
+  return readdirSync(abs, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !Object.hasOwn(modes, d.name) &&
+      !['SKILL.md', '.claude-plugin/plugin.json'].some((f) => existsSync(join(abs, d.name, f))))
+    .map((d) => `${r}/${d.name}/`);
+});
 
 const sections = (text) =>
   new Map(text.replace(/\r\n/g, '\n').split(/^(?=## )/m).filter((s) => s.startsWith('## '))
@@ -146,23 +157,27 @@ const env = {
 env.isTemplateItself = /ryanportfolio\/(Harness-Firmware|claude-starter)(\.git)?$/i.test(env.origin ?? '');
 
 // ---- classify ----
-const report = { env, add: [], regen: [], stale: [], merge: [], edited: [], ok: [], localOnly: [], removed: [], retired: [] };
+const report = { env, leftovers, add: [], stale: [], merge: [], edited: [], ok: [], localOnly: [], removed: [], retired: [] };
 const tplFiles = layerFiles(template);
 const tplSet = new Set(tplFiles);
 
 for (const p of tplFiles) {
   const t = join(template, p);
   const l = join(target, p);
-  const skill = p.match(/^\.agents\/skills\/([^/]+)\//)?.[1];
   const anySkill = p.match(/^\.(?:claude|agents)\/skills\/([^/]+)\//)?.[1];
-  const generated = Boolean(skill) && modes[skill] !== 'native';
 
+  if (leftovers.some((d) => p.startsWith(d))) {
+    if (!existsSync(l)) continue;
+    const lh = hashes(l);
+    const known = [...hashes(t)].some((h) => lh.has(h)) || [...lh].some((h) => history.get(p)?.has(h));
+    (known ? report.retired : report.localOnly).push(p); // an edited copy is the project's own
+    continue;
+  }
   if (!existsSync(l) && removedSkills.has(anySkill)) { report.removed.push(p); continue; }
-  if (!existsSync(l)) { (generated ? report.regen : report.add).push(p); continue; }
+  if (!existsSync(l)) { report.add.push(p); continue; }
   if (PROJECT_OWNED.has(p)) { report.ok.push(p); continue; }
   const lh = hashes(l);
   if ([...hashes(t)].some((h) => lh.has(h))) { report.ok.push(p); continue; }
-  if (generated) { report.regen.push(p); continue; }
 
   if (KERNEL.has(p)) {
     const text = readFileSync(l, 'utf8');
@@ -229,8 +244,7 @@ console.log(`starter     ${env.starterRemote ?? '-'}`);
 console.log(`template    ${env.templateHead.slice(0, 12)}`);
 console.log(`\nADD (missing, copy as-is): ${report.add.length}`);
 bySkill(report.add).forEach(line);
-console.log(`\nREGENERATE (Codex adapters, via sync-codex-skills --write): ${report.regen.length}`);
-bySkill(report.regen).forEach(line);
+if (leftovers.length) console.log(`template leftovers ignored (retired skill folders, never added): ${leftovers.join(' ')}`);
 console.log(`\nUPDATE-STALE (unmodified older template copy, safe to refresh): ${report.stale.length}`);
 bySkill(report.stale).forEach(line);
 console.log(`\nMERGE (structured, additive): ${report.merge.length}`);
@@ -245,7 +259,7 @@ for (const m of report.merge) {
 }
 console.log(`\nCONFLICT (differs from every template version, ask): ${report.edited.length}`);
 report.edited.forEach((e) => line(e.note ? `${e.path}: ${e.note}` : e.path));
-console.log(`\nRETIRED (unedited copy of a file the template has since deleted, offer removal): ${report.retired.length}`);
+console.log(`\nRETIRED (unedited copy of a file the template deleted or keeps only as a leftover, offer removal): ${report.retired.length}`);
 bySkill(report.retired).forEach(line);
 console.log(`\nSKIPPED (skill recorded in .agents/removed-skills.json): ${report.removed.length}`);
 bySkill(report.removed).forEach(line);

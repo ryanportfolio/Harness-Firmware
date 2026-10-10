@@ -46,16 +46,17 @@ node <this-skill-dir>/scripts/detect.mjs --target <folder> --template <short-scr
 | Class | Meaning | Default action |
 |---|---|---|
 | ADD | Absent locally | Copy from template |
-| REGENERATE | Codex adapter under `.agents/skills/` that the template generates | Leave to `sync-codex-skills.mjs --write` |
 | UPDATE-STALE | Byte-identical to an older template version, so the user never edited it | Refresh to current template |
 | MERGE | Kernel sections, JSON keys, ignore lines | Additive merge (rules below) |
 | CONFLICT | Differs from every template version: the user edited it | Ask per file |
 | OK | Identical, or existing `.claude/reference/*` project knowledge | Nothing |
-| RETIRED | Unedited copy of a file the template once shipped and has since deleted (for example `.agents/skill-capabilities.json` and its checker) | Offer removal; keep on no |
+| RETIRED | Unedited copy of a file the template once shipped and has since deleted (for example `.agents/skill-capabilities.json` and its checker), or of a template leftover | Offer removal; keep on no |
 | SKIPPED | Skill the project listed in `.agents/removed-skills.json` (required skills excepted) | Do not re-add |
 | PROJECT-ONLY | Local firmware-layer file the template lacks (custom skill, extra reference) | Keep |
 
 Skill folders are summarized as `n/total files`, so a partial skill shows up as partial.
+
+A template leftover is a folder under `.claude/skills/` or `.agents/skills/` with no `SKILL.md`, no `.claude-plugin/plugin.json`, and no `.agents/skill-modes.json` entry: files a retired skill left behind, such as `writing-skills`. Leftovers are never added; detect names the ones the template still carries on one `template leftovers ignored` line, and an edited project copy counts as PROJECT-ONLY. Every other `.agents/skills/` file is classified like any other file; the template ships no generated adapters.
 
 Skill dependencies: when ADD brings a skill, or the project keeps one, whose `skills.dependencies` entry names a skill the project lacks or recorded as removed, say so in the preview. Adding the dependency is the default; leaving it out means the dependent skill cannot run.
 
@@ -83,7 +84,7 @@ Before replacing or rewriting any existing file, copy it to `.tmp/apply-firmware
 - **RETIRED**: delete only the files the user approved; back them up first like any replaced file.
 - **`.gitignore` / `.gitattributes`**: append missing lines under a `# Harness` comment; never reorder or drop existing lines.
 - **`.claude/reference/*`**: add missing skeleton files only. Existing files are project knowledge.
-- **Codex adapters**: after skills and registries are in place, run `node .claude/scripts/sync-codex-skills.mjs --write`, then `--check`, `node .claude/scripts/test-codex-contract.mjs`, and `node .claude/scripts/removed-skills.mjs` (warns on a missing skill not recorded as removed, and on a skill whose dependency is missing). Never hand-edit generated adapters.
+- **Codex skills**: after skills and registries are in place, run `node .claude/scripts/sync-codex-skills.mjs --write` (it generates nothing; it deletes old generated adapters), then `--check`, `node .claude/scripts/test-codex-contract.mjs`, and `node .claude/scripts/removed-skills.mjs` (warns on a missing skill not recorded as removed, and on a skill whose dependency is missing). Never add a generated adapter.
 
 ## Step 5: configure
 
@@ -91,7 +92,7 @@ If the kernel has FILL IN markers after merging, or the project has no `.github/
 
 ## Step 6: verify and report
 
-Rerun `detect.mjs`. Expected result: ADD, REGENERATE, and UPDATE-STALE are empty; MERGE lists only items the user chose to keep; CONFLICT and RETIRED list only declined items. Validate every JSON file parses, `bash -n .claude/hooks/*.sh`, and that the skill folder names match their frontmatter `name`.
+Rerun `detect.mjs`. Expected result: ADD and UPDATE-STALE are empty; MERGE lists only items the user chose to keep; CONFLICT and RETIRED list only declined items. Validate every JSON file parses, `bash -n .claude/hooks/*.sh`, and that the skill folder names match their frontmatter `name`.
 
 Report: files added, refreshed, merged (with the keys and sections), conflicts kept or replaced, backup path, validation output, remaining FILL IN markers, and that new skills and settings load only in a new session: a new Codex session discovers the added `.agents/skills/`, and Claude Code needs a restart.
 
