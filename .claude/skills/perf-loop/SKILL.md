@@ -11,13 +11,14 @@ Goal: faster user-facing perf via reproducible experiments + independent review.
 
 ID key user journeys, workload, target devices, existing perf budgets. Infer sane defaults from project; state them. Ask only when missing info changes goal or needs user-owned tradeoff. Audit request → stop at findings + recommendations.
 
-Check exposed tools before promising profiling, browser capture, or independent review. Preflight chosen measurement method w/ 1 real run; inspect output. Missing capability → narrower claim: code inspection yields hypotheses, never proof of runtime gain. Report gap; finish useful authorized work w/o claiming full gate passed.
+Check exposed tools before promising profiling, browser capture, or independent review. Preflight chosen measurement method w/ 1 real run; inspect output. Missing capability → narrower claim: code inspection yields hypotheses, never proof of runtime gain. Report gap; finish useful authorized work w/o claiming full gate passed. For a named browser/device, preflight that target; another engine or emulated viewport supports only a separately labeled diagnostic. Record which timing, trace and memory methods actually work.
 
 Load only relevant guidance:
 
 - [Rendering and interaction](references/rendering.md): FPS, frame pacing, games, animation, responsiveness, visual quality.
 - [Loading and delivery](references/loading.md): startup, page loads, assets, bundles, network requests, readiness.
 - [Services and resources](references/services.md): APIs, DBs, throughput, memory, CPU, disk, sustained workloads.
+- [Firefox](references/firefox.md): Firefox-specific capture, graphics diagnosis and memory tools when Firefox is a target.
 
 Experiment evidence + before/after presentation → packaged [evidence report](references/evidence-report.md); measurement + review gates below still apply.
 
@@ -35,7 +36,11 @@ User names target → skip triage, mention it's available, go to baseline. Triag
 
 Capture current working state incl. relevant uncommitted changes → baseline + candidate rebuildable w/o discarding user work. Record source state, build mode, commands, dep versions, device/runtime, dataset, scenario, sampling duration. Acceptance → representative optimized build; label diagnostic dev runs separately.
 
-Control cache state, warmup, resolution, quality settings, concurrency, random seeds where useful, power/thermal. Cold + warm runs separate. Confirm intended build running. Record unavoidable diffs + their limits.
+Control cache state, warmup, resolution, quality settings, concurrency, random seeds where useful, power/thermal. Cold + warm runs separate. Confirm intended build running. Record unavoidable diffs + their limits. Diagnostics and copy/export controls include URL, served build identity, browser, renderer mode, phase and sample duration; a port alone is not build identity.
+
+Separate relevant phases: initial startup, first action, steady animation, settled idle, hidden/resumed state and repeated navigation. Keep initial stalls in their own window; a rolling steady-state average must not erase them. Protect adjacent phases affected by a fix without expanding a narrow request into an unrelated audit.
+
+Save the scenario, protocol and run identities before long runs. Pilot enough of the real journey to validate collection and settled-state signals, then expand for repeatability or suspected accumulation. If extra cycles cannot answer the question with available tools, change the measurement path instead of extending the run.
 
 Repeat baseline enough to expose variation. Quick deterministic scenarios: ≥3 runs to start; expensive/noisy workloads need justified sample plan. Keep raw measurements, sample counts, units, distributions. Tiny sample ≠ reliable tail percentile. Fix measurement window + exclusion rules before evaluating candidates; keep + explain invalid runs, never silently drop inconvenient results.
 
@@ -46,6 +51,8 @@ Benchmarks serial on shared hw. Pause agent builds, tests, other benchmarks, pro
 Before editing, define: primary outcome metric, practical success threshold, protected scenarios, regression tolerances. Existing budgets, else derive target from request + baseline; label inferred targets. No universal score targets or unsupported all-device promises.
 
 Profile actual slow scenario. Rank bottlenecks by measured contribution, user impact, confidence, fix cost. Suspected bottlenecks = hypotheses. Prefer end-to-end wins over proxy wins (smaller bundle w/ unchanged readiness; higher FPS w/ worse input latency).
+
+When expensive components overlap, isolate them before an architectural rewrite: reproduce each alone, together, and with startup staggered as relevant. Use the smallest reversible experiment that distinguishes competing explanations. Workers can relieve main-thread contention while still competing for graphics resources.
 
 ## Bounded experiments
 
@@ -83,7 +90,7 @@ Each reviewer → confirmed / refuted / unresolved findings w/ evidence paths + 
 
 Default ≤5 implementation rounds; fewer when target reached or further gains not worth cost. Stop early: 2 consecutive rounds w/o retained meaningful gain, or progress needs missing capability / user-owned tradeoff. Respect tighter user time/cost budget.
 
-Orchestrator checks final combined state w/ decisive benchmark + appropriate project verification. Attribute gains vs original baseline and, where useful, per round. Independent wins ≠ guaranteed combined speedup.
+Orchestrator checks final combined state w/ decisive benchmark + appropriate project verification. Recheck affected first-use, idle and navigation behavior; delayed work must not simply move a stall into the next action. Attribute gains vs original baseline and, where useful, per round. Independent wins ≠ guaranteed combined speedup.
 
 Report one outcome:
 
