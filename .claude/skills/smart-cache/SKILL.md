@@ -1,6 +1,6 @@
 ---
 name: smart-cache
-description: Audit and improve website caching.
+description: Use for caching or stale content
 ---
 
 # Smart cache
@@ -52,7 +52,7 @@ Cover the changed behavior:
 
 1. Cold load with a fresh browser context. Record transferred bytes and requests without assuming the CDN is cold.
 2. Normal revisit in that same context with caching enabled. Distinguish memory cache, disk cache, 304 validation, service worker, and CDN responses. A CDN HIT can still transfer the full body to the browser.
-3. A new release with a representative asset change. Confirm fresh HTML requests the new URL and old open pages still work. If deployment is not authorized, exercise two local builds and report production freshness as unverified.
+3. A new release with a representative asset change. Reuse the warmed browser context from step 2 and navigate normally, without a hard reload or cache disabling. Verify HTML is revalidated or refetched and requests the new asset URL. If a service worker exists, exercise its update/activation path with the previous worker already controlling the page. Separately keep an old page open and verify its lazy resources still work. If deployment is not authorized, exercise two local builds and report production freshness as unverified.
 4. Missing or obsolete asset URLs, errors, private routes, and safe session checks. Verify broad header rules do not override their policy. Check two isolated sessions if response sharing is in scope.
 5. Video byte ranges and conditional requests when affected. Check bytes and status, not just header presence.
 

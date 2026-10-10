@@ -14,6 +14,7 @@ Use browser `Cache-Control` for browser freshness and a targeted CDN header for 
 - Inspect generated deployment configuration as well as `vercel.json`. Rewrites, clean URLs, and function responses may change the effective result.
 - Give HTML and mutable aliases a freshness policy separate from versioned assets. Verify headers on a real missing asset, a private route, and relevant redirects after wildcard rules apply.
 - Package the generated manifest with fallback functions. Check static and dynamic pages emit the identical asset prefix; do not recalculate it from packaged files.
+- For old tabs loading lazy chunks after a deploy, inspect [Skew Protection](https://vercel.com/docs/skew-protection) before inventing asset-retention machinery. Verify current plan/framework support, effective settings, and which requests carry the deployment ID. Custom fetches and raw asset paths may need explicit handling. If unavailable or incomplete, test a compatible retention/recovery approach and report the remaining gap. Do not upgrade a paid plan without authorization.
 - Confirm the runtime/build public origin and canonical host. Verify HTTPS and WWW redirects without confusing a redirect cache hit with an asset cache hit.
 - Upload success does not prove readiness. Wait for Ready, verify aliases, and check live bodies, MIME types, range requests, and final headers.
 - Preview authentication can interfere with cache measurements. Label authenticated preview evidence and verify the public target separately when authorized.

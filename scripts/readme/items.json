@@ -200,6 +200,11 @@
       "group": "specialist"
     },
     {
+      "name": "smart-cache",
+      "label": "Smart cache",
+      "group": "specialist"
+    },
+    {
       "name": "adopt-repo",
       "label": "Adopt repo",
       "group": "core"
