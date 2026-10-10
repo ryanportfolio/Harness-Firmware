@@ -39,6 +39,7 @@
     "servers": "native",
     "session-hub": "native",
     "showpiece": "native",
+    "smart-cache": "native",
     "sync-starter": "native",
     "why": "native",
     "wow-loop": "native",

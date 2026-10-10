@@ -13,6 +13,9 @@ condensed.
 
 ### Added
 
+- `smart-cache` for Codex and Claude: browser/CDN cache policies, asset versioning,
+  release freshness, private-response isolation, and repeat-visit verification.
+
 - Review on every PR. `CLAUDE.md` now has Claude Code run `/codex-review`
   in the same turn whenever it opens or updates a PR, and nothing merges until
   the surviving findings are fixed or waived (the `/merge` loop replaces the

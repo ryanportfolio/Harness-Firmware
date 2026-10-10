@@ -24,7 +24,7 @@ for comparison, backup, reconciliation, and discovery checks.
 |---|---|
 | Native | `addskill`, `babysit-ci`, `brainstorming`, `bro`, `caveman`, `enhance-prompt`, `external-review`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `recall`, `refine`, `servers`, `session-hub`, `showpiece`, `wrapup`, `writing`, `writing-plans` |
 | Adapted | `apply-firmware`, `astra-review`, `claude-review`, `codex-review`, `deep-plan`, `init-project`, `lab`, `optimize-context`, `opus-fullreview`, `sync-starter` |
-| Capability-gated | `advocate`, `arena`, `dare`, `design-prototypes`, `impartial-review`, `long-horizon`, `perf-loop`, `redesign-concepts`, `why`, `wow-loop` |
+| Capability-gated | `advocate`, `arena`, `dare`, `design-prototypes`, `impartial-review`, `long-horizon`, `perf-loop`, `redesign-concepts`, `smart-cache`, `why`, `wow-loop` |
 | Dangerous | `adopt-repo` |
 | Claude-only | `astra-fullreview`, `codex-fullreview`, `codex-image-gen`, `long-horizon-workflows`, `merge` |
 
@@ -33,6 +33,8 @@ for comparison, backup, reconciliation, and discovery checks.
 `design-prototypes` and `redesign-concepts` need an exposed image generation tool; without one, say so and offer the prompts instead of drawing images in code. `codex-image-gen` is Claude-only: it drives Codex's image tool through `codex exec` from Claude Code, while a Codex session calls its built-in image tool directly.
 
 `perf-loop` is a standalone Codex skill requiring fresh independent measurement and regression reviewers, plus a working measurement path for each performance claim. Benchmarks and competing resource-heavy work run serially on shared hardware. Missing capabilities permit scoped progress but leave the full verification gate incomplete.
+
+`smart-cache` can inspect build output and HTTP responses without a browser. Claims about browser reuse require a working measurement method for the stated browser. It keeps browser and CDN evidence separate and does not authorize publishing, deployment, or destructive cache purges.
 
 `node .claude/scripts/test-codex-contract.mjs` verifies that every active skill has exactly one classification and that Codex routing metadata stays within its context budget.
 
