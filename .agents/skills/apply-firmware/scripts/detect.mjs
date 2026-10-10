@@ -6,6 +6,7 @@
 // usage: node detect.mjs --target <dir> --template <template-clone> [--json]
 // exit 2: no usable template: not a clone, or a manifest that is unreadable, not version 1,
 // or has an unknown top-level key.
+// exit 3: the target's origin is the template itself (preflight stop); the report still prints.
 // Clone the template with `git clone --filter=blob:none` (full history, no
 // blobs) so stale-copy detection can see every historical blob hash.
 
@@ -278,7 +279,8 @@ report.dependencyGaps = {
 };
 
 // ---- output ----
-if (asJson) { console.log(JSON.stringify(report, null, 2)); process.exit(0); }
+const code = env.isTemplateItself ? 3 : 0;
+if (asJson) { console.log(JSON.stringify(report, null, 2)); process.exit(code); }
 
 const bySkill = (list) => {
   const groups = new Map();
@@ -334,3 +336,4 @@ console.log(`PROJECT-ONLY firmware-layer files (keep): ${report.localOnly.length
 bySkill(report.localOnly).forEach(line);
 console.log(`SYMLINKS (not followed, check by hand): ${links.length}`);
 links.forEach((s) => line(`${s.in}: ${s.path}`));
+process.exitCode = code;

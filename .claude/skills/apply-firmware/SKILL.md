@@ -18,7 +18,7 @@ Out of scope unless the user asks: everything in `templateOnly`. Never touch `.c
 ## Preflight (stop conditions)
 
 1. Target is the session working directory unless the user named another. Stop if it is a drive root, the home directory, or `~/.claude`.
-2. Stop if `origin` is the template itself (`ryanportfolio/Harness-Firmware` or `claude-starter`); that is template maintenance, not a project.
+2. Stop if `origin` is the template itself (`ryanportfolio/Harness-Firmware` or `claude-starter`); that is template maintenance, not a project. `detect.mjs` exits with code 3 in that case, so a script can gate on it.
 3. If the folder sits inside a larger git repo (`git rev-parse --show-toplevel` differs from the folder), confirm the user wants firmware at this subfolder rather than the repo root.
 4. Non-git folder: offer `git init` first so every change is reviewable and reversible. Proceed without git only if the user declines; backups below still apply.
 5. Dirty git tree: fine, but touch only firmware-layer paths, and name any dirty firmware file in the preview so its uncommitted edits are treated as user content.
