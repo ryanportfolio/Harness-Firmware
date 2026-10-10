@@ -79,9 +79,11 @@ condensed.
 
 ### Changed
 
-- The `caveman` skill body now matches the caveman output style line for line,
-  so Codex, which has no output style, follows the same rules as Claude Code,
-  including no em dashes and one-line process summaries. It keeps its
+- The `caveman` skill body now uses the caveman output style's rules, so Codex,
+  which has no output style, follows the same rules as Claude Code, including
+  no em dashes and one-line process summaries. It leaves out the output style's
+  `stop caveman` line and its rule to switch to full sentences when compression
+  obscures meaning. It keeps its
   recommendation rules (lead with the pick, make the question line
   self-contained, run `why` on weighty picks) and its pointer to the code-diff
   cleanup guide.
