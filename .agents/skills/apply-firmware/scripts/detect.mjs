@@ -11,7 +11,7 @@
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 
 const args = process.argv.slice(2);
@@ -77,10 +77,16 @@ const excluded = (p) =>
   templateOnly.some((t) => p === t || p.startsWith(t + '/'));
 
 const posix = (p) => p.split(sep).join('/');
+// Links are reported, never followed: a link loop cannot recurse, and a linked folder may lie
+// outside the firmware layer.
+const links = [];
 function walk(root, rel) {
   const abs = join(root, rel);
-  if (!existsSync(abs)) return [];
-  if (statSync(abs).isFile()) return [posix(rel)];
+  let st;
+  try { st = lstatSync(abs); } catch { return []; }
+  if (st.isSymbolicLink()) { links.push({ in: root === template ? 'template' : 'target', path: posix(rel) }); return []; }
+  if (st.isFile()) return [posix(rel)];
+  if (!st.isDirectory()) return [];
   return readdirSync(abs).flatMap((n) => {
     const r = `${rel}/${n}`;
     if (n === '.git' || excluded(posix(r))) return [];
@@ -104,7 +110,7 @@ const history = new Map();
 try {
   const raw = execFileSync('git',
     ['-C', template, 'log', 'HEAD', '-z', '--format=', '--raw', '--no-abbrev', '--no-renames'],
-    { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+    { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
   // -z keeps paths unquoted (non-ASCII, quotes): each entry is ":<modes> <old> <new> <status>\0<path>\0".
   const parts = raw.split('\0');
   for (let i = 0; i < parts.length - 1; i++) {
@@ -178,12 +184,20 @@ const env = {
   origin: isRepo ? git('remote', 'get-url', 'origin') : null,
   starterRemote: isRepo ? git('remote', 'get-url', 'starter') : null,
   dirtyEntries: isRepo ? (git('status', '--porcelain') ?? '').split('\n').filter(Boolean).length : null,
-  templateHead: execFileSync('git', ['-C', template, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
 };
+// A non-git template has no HEAD; a shallow clone has partial history, so stale detection degrades.
+const tgit = (...a) => {
+  try {
+    return execFileSync('git', ['-C', template, ...a],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch { return null; }
+};
+env.templateHead = tgit('rev-parse', 'HEAD');
+env.templateShallow = tgit('rev-parse', '--is-shallow-repository') === 'true';
 env.isTemplateItself = /ryanportfolio\/(Harness-Firmware|claude-starter)(\.git)?$/i.test(env.origin ?? '');
 
 // ---- classify ----
-const report = { env, leftovers, add: [], stale: [], merge: [], edited: [], ok: [], localOnly: [], removed: [], retired: [] };
+const report = { env, leftovers, add: [], stale: [], merge: [], edited: [], ok: [], localOnly: [], removed: [], retired: [], symlinks: links };
 const tplFiles = layerFiles(template);
 const tplSet = new Set(tplFiles);
 
@@ -286,7 +300,8 @@ console.log(`target      ${env.target}`);
 console.log(`git         ${env.isGitRepo ? `yes, top ${env.gitTopLevel}, ${env.dirtyEntries} dirty entries` : 'no'}`);
 console.log(`origin      ${env.origin ?? '-'}${env.isTemplateItself ? '  <-- THIS IS THE TEMPLATE, STOP' : ''}`);
 console.log(`starter     ${env.starterRemote ?? '-'}`);
-console.log(`template    ${env.templateHead.slice(0, 12)}`);
+console.log(`template    ${env.templateHead?.slice(0, 12) ?? 'not a git clone, so every edited file reads as CONFLICT'}`);
+if (env.templateShallow) console.log('WARNING     template clone is shallow: old copies may read as CONFLICT; re-clone with --filter=blob:none and no --depth');
 console.log(`\nADD (missing, copy as-is): ${report.add.length}`);
 bySkill(report.add).forEach(line);
 if (leftovers.length) console.log(`template leftovers ignored (retired skill folders, never added): ${leftovers.join(' ')}`);
@@ -317,3 +332,5 @@ gaps.requiredRemoved.forEach((n) => line(`${n} is required but recorded in .agen
 console.log(`\nOK (identical, or kept project knowledge): ${report.ok.length}`);
 console.log(`PROJECT-ONLY firmware-layer files (keep): ${report.localOnly.length}`);
 bySkill(report.localOnly).forEach(line);
+console.log(`SYMLINKS (not followed, check by hand): ${links.length}`);
+links.forEach((s) => line(`${s.in}: ${s.path}`));

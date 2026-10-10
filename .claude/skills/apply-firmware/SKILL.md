@@ -56,6 +56,8 @@ Skill folders are summarized as `n/total files`, so a partial skill shows up as 
 
 A template leftover is a folder under `.claude/skills/` or `.agents/skills/` with no `SKILL.md`, no `.claude-plugin/plugin.json`, and no `.agents/skill-modes.json` entry: files a retired skill left behind, such as `writing-skills`. Leftovers are never added; detect names the ones the template still carries on one `template leftovers ignored` line, and an edited project copy counts as PROJECT-ONLY. Every other `.agents/skills/` file is classified like any other file; the template ships no generated adapters.
 
+Links in the firmware layer are listed under SYMLINKS and never followed; a copy through one can land outside the folder, so decide each by hand. A shallow template clone gets a WARNING line: stale detection then sees only part of the history, so re-clone as in Step 1.
+
 Skill dependencies: detect lists DEPENDENCY GAPS, computed over the skills the project will have (present, plus ADD, minus SKIPPED): each `skills.dependencies` need missing from that set, marked when the project recorded it as removed, and each `skills.required` skill the project recorded as removed (it is kept or added anyway, so the record needs fixing). Say so in the preview. Adding the dependency is the default; leaving it out means the dependent skill cannot run.
 
 ## Step 3: preview and ask
