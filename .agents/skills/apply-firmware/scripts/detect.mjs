@@ -90,13 +90,17 @@ const hashes = (file) => {
 const history = new Map();
 try {
   const raw = execFileSync('git',
-    ['-C', template, 'log', 'HEAD', '--format=', '--raw', '--no-abbrev', '--no-renames'],
+    ['-C', template, 'log', 'HEAD', '-z', '--format=', '--raw', '--no-abbrev', '--no-renames'],
     { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-  for (const line of raw.split('\n')) {
-    const m = line.match(/^:\d+ \d+ [0-9a-f]+ ([0-9a-f]+) \w+\t(.+)$/);
-    if (!m || /^0+$/.test(m[1])) continue; // an all-zero hash is a deletion
-    if (!history.has(m[2])) history.set(m[2], new Set());
-    history.get(m[2]).add(m[1]);
+  // -z keeps paths unquoted (non-ASCII, quotes): each entry is ":<modes> <old> <new> <status>\0<path>\0".
+  const parts = raw.split('\0');
+  for (let i = 0; i < parts.length - 1; i++) {
+    const m = parts[i].trim().match(/^:\d+ \d+ [0-9a-f]+ ([0-9a-f]+) \w+$/);
+    if (!m) continue;
+    const path = parts[++i];
+    if (/^0+$/.test(m[1])) continue; // an all-zero hash is a deletion
+    if (!history.has(path)) history.set(path, new Set());
+    history.get(path).add(m[1]);
   }
 } catch { /* non-git template: stale detection degrades to CONFLICT */ }
 
