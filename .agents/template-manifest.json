@@ -44,7 +44,7 @@
         "id": "core",
         "label": "Core workflows",
         "description": "Setup, memory, maintenance, and everyday project control",
-        "skills": ["init-project", "recall", "addskill", "sync-starter", "optimize-context", "refine", "adopt-repo", "wrapup", "servers"]
+        "skills": ["init-project", "recall", "addskill", "sync-starter", "optimize-context", "refine", "adopt-repo", "apply-firmware", "wrapup", "servers"]
       },
       {
         "id": "discipline",
