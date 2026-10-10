@@ -70,8 +70,8 @@ const templateOnly = manifest?.templateOnly ?? (() => {
 // Skills the project recorded as removed are not re-added, except ones the template
 // requires.
 const required = new Set(manifest?.skills?.required ?? []);
-const removedSkills = new Set(
-  (readJson(join(target, '.agents/removed-skills.json'))?.removed ?? []).filter((n) => !required.has(n)));
+const recorded = readJson(join(target, '.agents/removed-skills.json'))?.removed ?? [];
+const removedSkills = new Set(recorded.filter((n) => !required.has(n)));
 const excluded = (p) =>
   NEVER.some((re) => re.test(p)) ||
   templateOnly.some((t) => p === t || p.startsWith(t + '/'));
@@ -236,6 +236,23 @@ for (const p of layerFiles(target).filter((f) => !tplSet.has(f))) {
   else report.localOnly.push(p);
 }
 
+// ---- skill dependencies ----
+// The project's skills once applied: present, plus ADD, minus SKIPPED. Each skills.dependencies
+// need missing from that set is a gap, and so is a required skill the project recorded as removed
+// (it is kept or added anyway, so the record is wrong).
+const SKILL_MD = /^\.(?:claude|agents)\/skills\/([^/]+)\/SKILL\.md$/;
+const present = ['.claude/skills', '.agents/skills'].flatMap((r) =>
+  existsSync(join(target, r)) ? readdirSync(join(target, r)).filter((n) => existsSync(join(target, r, n, 'SKILL.md'))) : []);
+const skipped = new Set(report.removed.map((p) => p.split('/')[2]));
+const finalSkills = new Set([...present, ...report.add.map((p) => p.match(SKILL_MD)?.[1]).filter(Boolean)]
+  .filter((n) => !skipped.has(n)));
+report.dependencyGaps = {
+  missing: Object.entries(manifest?.skills?.dependencies ?? {}).filter(([s]) => finalSkills.has(s))
+    .flatMap(([skill, needs]) => needs.filter((n) => !finalSkills.has(n))
+      .map((need) => ({ skill, need, recordedRemoved: recorded.includes(need) }))),
+  requiredRemoved: [...required].filter((n) => recorded.includes(n)),
+};
+
 // ---- output ----
 if (asJson) { console.log(JSON.stringify(report, null, 2)); process.exit(0); }
 
@@ -281,6 +298,10 @@ console.log(`\nRETIRED (unedited copy of a file the template deleted or keeps on
 bySkill(report.retired).forEach(line);
 console.log(`\nSKIPPED (skill recorded in .agents/removed-skills.json): ${report.removed.length}`);
 bySkill(report.removed).forEach(line);
+const gaps = report.dependencyGaps;
+console.log(`\nDEPENDENCY GAPS (a skill the project will have needs one it will not): ${gaps.missing.length + gaps.requiredRemoved.length}`);
+gaps.missing.forEach((g) => line(`${g.skill} needs ${g.need}${g.recordedRemoved ? ' (recorded as removed)' : ''}`));
+gaps.requiredRemoved.forEach((n) => line(`${n} is required but recorded in .agents/removed-skills.json; it is kept or added anyway, so drop it from the record`));
 console.log(`\nOK (identical, or kept project knowledge): ${report.ok.length}`);
 console.log(`PROJECT-ONLY firmware-layer files (keep): ${report.localOnly.length}`);
 bySkill(report.localOnly).forEach(line);

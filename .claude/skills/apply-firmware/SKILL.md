@@ -56,11 +56,11 @@ Skill folders are summarized as `n/total files`, so a partial skill shows up as 
 
 A template leftover is a folder under `.claude/skills/` or `.agents/skills/` with no `SKILL.md`, no `.claude-plugin/plugin.json`, and no `.agents/skill-modes.json` entry: files a retired skill left behind, such as `writing-skills`. Leftovers are never added; detect names the ones the template still carries on one `template leftovers ignored` line, and an edited project copy counts as PROJECT-ONLY. Every other `.agents/skills/` file is classified like any other file; the template ships no generated adapters.
 
-Skill dependencies: when ADD brings a skill, or the project keeps one, whose `skills.dependencies` entry names a skill the project lacks or recorded as removed, say so in the preview. Adding the dependency is the default; leaving it out means the dependent skill cannot run.
+Skill dependencies: detect lists DEPENDENCY GAPS, computed over the skills the project will have (present, plus ADD, minus SKIPPED): each `skills.dependencies` need missing from that set, marked when the project recorded it as removed, and each `skills.required` skill the project recorded as removed (it is kept or added anyway, so the record needs fixing). Say so in the preview. Adding the dependency is the default; leaving it out means the dependent skill cannot run.
 
 ## Step 3: preview and ask
 
-Show one grouped preview before writing anything: additions (counts plus skill names), stale refreshes, each MERGE with its concrete additions, each CONFLICT with a short diff summary read from the actual files, and anything skipped. Ask in plain chat, numbered, for:
+Show one grouped preview before writing anything: additions (counts plus skill names), stale refreshes, each MERGE with its concrete additions, each CONFLICT with a short diff summary read from the actual files, anything skipped, and every dependency gap. Ask in plain chat, numbered, for:
 
 - each CONFLICT: keep mine (default), take template, or hand-merge;
 - each kernel section present in both but differing: keep mine (default) or show the template text so the user can adopt parts;
