@@ -41,7 +41,7 @@ git clone --filter=blob:none https://github.com/ryanportfolio/Harness-Firmware <
 node <this-skill-dir>/scripts/detect.mjs --target <folder> --template <short-scratch>/hf
 ```
 
-`<this-skill-dir>` is this Codex skill's directory (`.agents/skills/apply-firmware` in a repository, or the personal install). Add `--json` for machine-readable output. It classifies every firmware-layer file:
+`<this-skill-dir>` is this Codex skill's directory (`.agents/skills/apply-firmware` in a repository, or the personal install). Add `--json` for machine-readable output. It stops with exit code 2 when the template manifest is unreadable, has a `version` other than 1, or has a top-level key it does not know; the template is then newer than this skill, so update the skill from the template before going on. It classifies every firmware-layer file:
 
 | Class | Meaning | Default action |
 |---|---|---|

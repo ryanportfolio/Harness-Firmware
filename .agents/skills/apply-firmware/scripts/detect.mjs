@@ -4,6 +4,8 @@
 // classifies every firmware-layer path. Writes nothing.
 //
 // usage: node detect.mjs --target <dir> --template <template-clone> [--json]
+// exit 2: no usable template: not a clone, or a manifest that is unreadable, not version 1,
+// or has an unknown top-level key.
 // Clone the template with `git clone --filter=blob:none` (full history, no
 // blobs) so stale-copy detection can see every historical blob hash.
 
@@ -32,7 +34,18 @@ const readJson = (file) => {
 // The template's .agents/template-manifest.json is the source of truth for which paths
 // a project gets (projectPaths) and which stay in the template (templateOnly). Templates
 // from before the manifest fall back to the old fixed list and the generator script.
-const manifest = readJson(join(template, '.agents/template-manifest.json'));
+// Its spec (docs/specs/2026-10-01-template-manifest-design.md) stops every consumer on an
+// unreadable manifest, a version other than 1, or an unknown top-level key.
+const MANIFEST_KEYS = ['version', 'template', 'requiredFiles', 'projectPaths', 'templateOnly', 'readmeStub', 'skills'];
+const manifestFile = join(template, '.agents/template-manifest.json');
+const manifest = existsSync(manifestFile) ? readJson(manifestFile) : null;
+if (existsSync(manifestFile)) {
+  const stop = (why) => { console.error(`detect.mjs: ${manifestFile}: ${why}`); process.exit(2); };
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) stop('not a readable JSON object');
+  if (manifest.version !== 1) stop(`version ${JSON.stringify(manifest.version)} is not supported; expected 1`);
+  const unknown = Object.keys(manifest).filter((k) => !MANIFEST_KEYS.includes(k));
+  if (unknown.length) stop(`unknown top-level key ${unknown.join(', ')}; this detect.mjs is older than the template`);
+}
 const LAYER_ROOTS = manifest?.projectPaths ?? [
   'CLAUDE.md', 'AGENTS.md', '.mcp.json', '.gitattributes', '.gitignore',
   '.claude', '.agents', '.codex', 'scripts/lib',
