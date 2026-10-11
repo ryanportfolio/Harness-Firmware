@@ -17,6 +17,7 @@
     "codex-fullreview": "disabled",
     "codex-image-gen": "disabled",
     "codex-review": "native",
+    "coordinate": "disabled",
     "dare": "native",
     "deep-plan": "native",
     "design-prototypes": "native",
