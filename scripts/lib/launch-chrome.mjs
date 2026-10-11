@@ -33,6 +33,8 @@ const BACKGROUNDING_ARGS = [
   '--disable-background-timer-throttling',
   '--disable-backgrounding-occluded-windows',
   '--disable-renderer-backgrounding',
+  // verification windows stay silent: pages with music or effects would play to the operator
+  '--mute-audio',
 ];
 
 async function loadChromium() {
