@@ -16,7 +16,7 @@ condensed.
 - `addskill` now reminds template maintainers to register new skills in a setup-menu
   group and run the template manifest check. Generated projects skip this step.
 
-- `smart-cache` for Codex and Claude: browser/CDN cache policies, asset versioning,
+- `cache-loop` for Codex and Claude: browser/CDN cache policies, asset versioning,
   release freshness, private-response isolation, and repeat-visit verification.
 
 - Review on every PR. `CLAUDE.md` now has Claude Code run `/codex-review`

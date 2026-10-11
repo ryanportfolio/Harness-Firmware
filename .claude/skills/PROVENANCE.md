@@ -37,10 +37,10 @@ LICENSE/NOTICE files in the skill folder.
 ## Homegrown (this repo)
 
 `addskill`, `adopt-repo`, `advocate`, `apply-firmware`, `astra-fullreview`, `astra-review`,
-`claude-review`, `codex-fullreview`, `codex-review`, `dare`, `enhance-prompt`,
+`cache-loop`, `claude-review`, `codex-fullreview`, `codex-review`, `dare`, `enhance-prompt`,
 `external-review`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`,
 `impartial-review`, `init-project`, `lab`, `merge`, `optimize-context`, `perf-loop`,
-`recall`, `session-hub`, `showpiece`, `smart-cache`, `sync-starter`, `why`, `wow-loop`.
+`recall`, `session-hub`, `showpiece`, `sync-starter`, `why`, `wow-loop`.
 
 Homegrown skills are MIT, same as the template (see its [`LICENSE`](https://github.com/ryanportfolio/Harness-Firmware/blob/main/LICENSE)).
 

@@ -200,8 +200,8 @@
       "group": "specialist"
     },
     {
-      "name": "smart-cache",
-      "label": "Smart cache",
+      "name": "cache-loop",
+      "label": "Cache loop",
       "group": "specialist"
     },
     {

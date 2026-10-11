@@ -1,9 +1,9 @@
 ---
-name: smart-cache
+name: cache-loop
 description: Use for caching or stale content
 ---
 
-# Smart cache
+# Cache loop
 
 Make reusable responses cheap to load again while ensuring changed content reaches users. Work within the existing framework and host. Prefer built-in asset hashing and invalidation before adding custom machinery.
 
