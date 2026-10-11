@@ -32,32 +32,34 @@ Create a unique `.tmp/opus-fullreview-*` directory atomically and exclude it fro
 
 **Author brief.** By default write `$RUN/brief.md`. Its first line is exactly `Author brief <run directory name>`, a marker Step 4 uses to confirm which sub-reviewers received it. The rest is facts only: the goal in one or two sentences, the files or behaviors most likely to break, related work in flight (other PRs, merge order), and checks already run with their results. No verdicts or opinions. Skip it when the user asks for a fully blind review; the run then has no intent reviewer.
 
+Disable Claude CLI's internal background-task wait ceiling for the review child by setting `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` in its environment. Otherwise print mode can terminate unfinished Agent tasks after 600 seconds and still exit 0 with only a progress message. Apply this to the spawned child, not machine-wide settings.
+
 Prompt, for a branch diff (adapt the scope sentence for a commit or uncommitted work as in Step 2):
 
-`Read .claude/skills/impartial-review/SKILL.md completely with the Read tool and act as its Manager on the branch diff: base <base>, head <head>. Read the diff with git diff <base> <head>. Dispatch every reviewer with the Agent tool, subagent_type general-purpose, model opus, in fresh context, as the skill directs; each is a leaf reviewer that spawns no agents and loads no skills. Author brief: <path to brief.md>; give it only to the Bucket F intent reviewer, as the skill directs; every other reviewer gets the diff without it. No file edits, no Git writes, no publication. Verify the reviewers' findings and write the final verified report. First line: Scope: base <base>, head <head>. Second line: Sub-reviewers: <number spawned>.`
+`Read .claude/skills/impartial-review/SKILL.md completely with the Read tool and act as its Manager on the branch diff: base <base>, head <head>. Read the diff with git diff <base> <head>. Dispatch every reviewer with the Agent tool, subagent_type general-purpose, model opus, in fresh context, as the skill directs; each is a leaf reviewer that spawns no agents and loads no skills. Prefer foreground Agent calls in bounded parallel batches. If any agents run in the background, wait for their actual results before returning; never finish with a progress-only message while reviewers remain active. Author brief: <path to brief.md>; give it only to the Bucket F intent reviewer, as the skill directs; every other reviewer gets the diff without it. No file edits, no Git writes, no publication. Verify the reviewers' findings and write the final verified report. First line: Scope: base <base>, head <head>. Second line: Sub-reviewers: <number spawned>.`
 
 Drop the author-brief sentence for a fully blind review. Write the prompt to `$RUN/prompt.txt` and pass it on stdin, never as a positional argument: options that take a list of values, such as `--tools` or `--add-dir`, consume a prompt that follows them, and the run exits before any reviewer starts. Run from the repository root:
 
 ```bash
-claude -p --model opus --effort high --session-id "$SESSION" \
+CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 claude -p --model opus --effort high --session-id "$SESSION" \
   --permission-mode plan --permission-prompts none --restricted \
   --tools "Read,Glob,Grep,Bash,Agent" --disable-slash-commands --strict-mcp-config \
   --no-chrome --output-format json \
   < "$RUN/prompt.txt" > "$RUN/result.json" 2> "$RUN/run.log"
 ```
 
-On native Windows, replace `Bash` in `--tools` with `PowerShell`. `--disable-slash-commands` keeps the child from invoking skills, including a Claude review skill that would recurse; the Manager loads `impartial-review` by reading the file. Do not pass `--no-session-persistence`: Step 4 reads the saved transcripts. `--restricted` ignores user and project settings files, so a `CLAUDE_CODE_SUBAGENT_MODEL` set there does not apply; the prompt names the sub-reviewer model instead.
+On native Windows, replace `Bash` in `--tools` with `PowerShell` and set the wait-ceiling variable in the child environment rather than using the POSIX assignment syntax above. For a Node launcher, use `env: { ...process.env, CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '0' }`. `--disable-slash-commands` keeps the child from invoking skills, including a Claude review skill that would recurse; the Manager loads `impartial-review` by reading the file. Do not pass `--no-session-persistence`: Step 4 reads the saved transcripts. `--restricted` ignores user and project settings files, so a `CLAUDE_CODE_SUBAGENT_MODEL` set there does not apply; the prompt names the sub-reviewer model instead.
 
-Run it in the background and poll its process and log with bounded waits; a full review takes longer than `claude-review`. On a stall or timeout, stop only this process, keep partial output, and report the failed attempt.
+Run it in the background and poll its process and log with bounded waits; a full review takes longer than `claude-review`. Bounded polling is not a review deadline. Let the review run as long as needed unless the user requests a cutoff. Elapsed time or quiet logs alone do not prove a stall. On a confirmed failure or stall, stop only this process, keep partial output, and report the failed attempt.
 
 ## 4. Collect and bind evidence
 
-Accept the result only after the process exits 0, `result.json` parses, its `is_error` is false, its `session_id` equals the recorded UUID, and the reviewed source is unchanged. Write its `result` field to `$RUN/report.md` and record the report hash. Take the resolved models from `modelUsage` in `result.json` and from the transcripts below, never from the alias.
+Accept the result only after the process exits 0, `result.json` parses, its `is_error` is false, its `session_id` equals the recorded UUID, the reviewed source is unchanged, and the required reviewers returned completed results which the Manager verified. A progress-only result or terminated unfinished reviewers makes the review incomplete even with exit 0 and `is_error: false`; retain the artifacts but do not accept or present it as a completed full review. Write its `result` field to `$RUN/report.md` and record the report hash. Take the resolved models from `modelUsage` in `result.json` and from the transcripts below, never from the alias.
 
 The transcripts live under `~/.claude/projects/<workspace slug>/`: the Manager in `<session>.jsonl`, and each sub-reviewer in `<session>/subagents/agent-<id>.jsonl` with a sibling `agent-<id>.meta.json` holding `agentType` and `spawnDepth`. Find the Manager file by globbing `~/.claude/projects/*/<session>.jsonl`. Then check:
 
 - **Skill load:** a Manager `tool_use` of `Read` whose `file_path` ends in `.claude/skills/impartial-review/SKILL.md` in the reviewed repository. Without it, attribute the run as a plain custom-prompt review, never as impartial-review.
-- **Sub-reviewers that ran:** the `agent-*.meta.json` files with `spawnDepth` 1. Any `spawnDepth` above 1 means a reviewer spawned its own agent, against the leaf rule: disclose it. No subagent files in a readable session means no sub-reviewers ran.
+- **Sub-reviewers that ran and completed:** the `agent-*.meta.json` files with `spawnDepth` 1 establish which reviewers started, not which finished. Check their result/transcript completion separately and report both counts if they differ. Any `spawnDepth` above 1 means a reviewer spawned its own agent, against the leaf rule: disclose it. No subagent files in a readable session means no sub-reviewers ran.
 - **Models:** the `message.model` values on assistant records in each sub-reviewer transcript. Disclose any reviewer that did not run on the requested model.
 - **Intent reviewer:** the sub-reviewer transcripts that contain the brief's first line, trimmed. Exactly one means it ran; zero with a brief means `brief supplied, intent reviewer not run`; more than one means the brief reached a diff-only reviewer, so disclose it.
 - **Scope identity:** the report's `Scope:` line matches the recorded base and head.
@@ -80,5 +82,7 @@ Order confirmed findings as BLOCKING, SHOULD-FIX, then NITPICK, each with `path:
 | `--no-session-persistence` or `--bare` | Evidence or subscription auth is lost; do not use them |
 | Invoking impartial-review as a skill | Skills are disabled on purpose; the Manager reads the file |
 | Counting Agent calls in the Manager transcript as reviewers | Count sub-reviewer transcripts with `spawnDepth` 1 |
+| Internal 600-second background wait ceiling | Set `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` for the child; wait for completed reviewer results |
+| Exit 0 and a progress-only result | Incomplete review; preserve output and disclose missing coverage |
 | Prompt passed as a trailing argument | A list-valued option such as `--add-dir` swallows it; pass the prompt on stdin |
 | Failed or stalled run | Report once; ask before retrying |
