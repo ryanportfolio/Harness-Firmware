@@ -18,6 +18,7 @@ Load only relevant guidance:
 - [Rendering and interaction](references/rendering.md): FPS, frame pacing, games, animation, responsiveness, visual quality.
 - [Loading and delivery](references/loading.md): startup, page loads, assets, bundles, network requests, readiness.
 - [Services and resources](references/services.md): APIs, DBs, throughput, memory, CPU, disk, sustained workloads.
+- [Chromium](references/chromium.md): Chrome/Edge traces, DevTools insights, CDP counters, CPU + network throttling, CPU profiles via Playwright; no DevTools MCP needed.
 - [Firefox](references/firefox.md): Firefox-specific capture, graphics diagnosis and memory tools when Firefox is a target or behaves differently from another browser.
 
 Experiment evidence + before/after presentation → packaged [evidence report](references/evidence-report.md); measurement + review gates below still apply.
