@@ -46,15 +46,20 @@ import { analyzeTrace } from '@paulirish/trace_engine/analyze-trace.mjs';
 const { parsedTrace } = await analyzeTrace(tracePath);
 for (const [navId, set] of parsedTrace.insights) {
   for (const [name, insight] of Object.entries(set.model)) {
-    if (insight instanceof Error) continue; // an insight that failed to compute
     console.log(navId, name, insight.state, insight.metricSavings);
+  }
+  // an insight that throws is left out of set.model and lands here instead
+  for (const [name, err] of Object.entries(set.modelErrors ?? {})) {
+    console.log(navId, name, 'not computed:', err.message);
   }
 }
 ```
 
+Report anything in `modelErrors` as not measured. A missing insight is not a pass.
+
 The insight names match the DevTools Performance panel: `LCPBreakdown`, `LCPDiscovery`, `RenderBlocking`, `NetworkDependencyTree`, `CLSCulprits`, `INPBreakdown`, `DocumentLatency`, `Cache`, `ImageDelivery`, `FontDisplay`, `ThirdParties`, `DOMSize`, `ForcedReflow`, `DuplicatedJavaScript`, `LegacyJavaScript`, `ModernHTTP`, `SlowCSSSelector`, `Viewport` and `CharacterSet`. Each has a `state` (`pass`, `fail` or `informative`), `metricSavings`, and its own detail fields, for example `RenderBlocking.renderBlockingRequests` and `Cache.requests` with a `ttl` per request. `LCPBreakdown` gives `lcpMs` plus `subparts` such as `ttfb` and `renderDelay`, each with a `range` in microseconds.
 
-Insights exist only for traces that contain a navigation. A trace of steady animation or of an interaction on an already loaded page returns zero insight sets; use the parsed data below instead. `INPBreakdown` needs real input during the trace.
+Each navigation gets its own insight set. The period before the first navigation, or the whole trace when there is none, gets a `NO_NAVIGATION` set, which the engine drops when it is shorter than 5 seconds, every insight passes, and it has no LCP, interaction or layout shift. A 3-second trace of steady animation on a loaded page was dropped this way and returned zero insight sets. To get insights such as `INPBreakdown` and `ForcedReflow` without a navigation, perform the real input during the trace or record for at least 5 seconds. Frame and long-task data below does not depend on insight sets.
 
 ## Frames, long tasks and user timing
 
