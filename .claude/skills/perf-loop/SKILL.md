@@ -47,6 +47,8 @@ Repeat baseline enough to expose variation. Quick deterministic scenarios: ≥3 
 
 Benchmarks serial on shared hw. Pause agent builds, tests, other benchmarks, profiling that compete for measured resources. Shared browser control: 1 owner at a time. Separate build outputs + ports when multiple envs needed. Never kill unrelated user processes to clean up a measurement.
 
+Per-run scratch (browser profiles, user-data dirs, temp builds, raw dumps) → delete as each run ends, pass or fail, once the process using it has exited. Do it in harness code (`try/finally`, Node `fs.rm`), not a later shell step: agent command policies can refuse recursive shell deletes. Reuse 1 prepared template profile when the scenario needs no fresh state. Keep only artifacts the analysis needs: results, logs, captures. Long loop → check scratch size between rounds. Delete fails or is blocked → report path + size right away; never leave it silent.
+
 ## Set bar + profile
 
 Before editing, define: primary outcome metric, practical success threshold, protected scenarios, regression tolerances. Existing budgets, else derive target from request + baseline; label inferred targets. No universal score targets or unsupported all-device promises.
@@ -100,4 +102,4 @@ Report one outcome:
 - **Inconclusive:** evidence can't support reliable perf conclusion, or required verification missing.
 - **No retained improvement:** tested candidates failed, regressed, or gave no meaningful gain.
 
-Include compact before/after table, tested conditions, kept + discarded changes, evidence paths, unresolved limits. Claim only devices, workloads, envs actually tested. Clean up only processes + temp resources this task created.
+Include compact before/after table, tested conditions, kept + discarded changes, evidence paths, unresolved limits. Claim only devices, workloads, envs actually tested. Clean up only processes + temp resources this task created; report any scratch still on disk w/ path + size.

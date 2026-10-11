@@ -8,6 +8,8 @@ Launch through `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`): headed 
 
 This workflow grants no permission to install tools. If a package is missing, ask; with approval, `npm i --no-save playwright-core @paulirish/trace_engine` keeps them out of `package.json`. In an unattended run without them, record insights as not measured and work from raw trace events or the CDP calls below.
 
+Playwright launches Chromium with a temporary profile and removes it on `browser.close()`. Close in a `finally` block so failed runs clean up too; a crashed or killed run leaves a `playwright_chromiumdev_profile-*` folder in Temp. A persistent `--user-data-dir` follows the per-run scratch rule in SKILL.md: delete it when the run ends.
+
 Preflight each method with one real capture and inspect its output before relying on it.
 
 ## Capture a trace
