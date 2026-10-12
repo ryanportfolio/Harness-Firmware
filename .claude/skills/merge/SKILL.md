@@ -49,6 +49,7 @@ Review skills' "review ≠ fix authority" rule lifted for in-scope fixes only. S
 - Destination: `gh repo view --json nameWithOwner,visibility,viewerPermission,url`.
 - Push remote must normalize to returned `nameWithOwner`; `viewerPermission` must be `WRITE`, `MAINTAIN`, or `ADMIN`.
 - Include verified login, repo, visibility, permission, URL in every `git push` approval justification. Generic "push the branch" not enough: automatic reviewer can't infer destination owner or privacy.
+- Every push names the checked remote: `git push -u origin HEAD`. Bare `git push` can follow `remote.pushDefault` or `branch.<name>.pushRemote` to an unchecked remote.
 - Later pushes this session reuse the evidence only while push URL list unchanged.
 - Remote not GitHub, queried repo does not match push remote, write permission absent, or check can't run → stop, ask user. Never weaken permissions, add global push allow-rule, or route around denial.
 
