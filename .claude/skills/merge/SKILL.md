@@ -42,6 +42,16 @@ Review skills' "review ≠ fix authority" rule lifted for in-scope fixes only. S
 2. Run relevant local checks. Stage explicit paths, inspect staged diff, commit, push. Never bypass hooks. Reuse branch's open PR (`gh pr list --head <branch>`); else create one, description = final behavior + validation. PR changes flows, boundaries, data model or state → description adds short Mermaid diagram of changed structure (GitHub renders it), so owner reads diagram instead of diff; repo keeps `.claude/reference/architecture.md` → same diagram there, same PR. No structural change (copy, styling, docs, config) → no diagram. Multiline bodies via file. Verify PR base, head, remote.
 3. Fetch target, check mergeability. Resolve unambiguous conflicts, keep both sides' intent. Semantic conflicts → investigate; ask only if resolution needs user decision not yet made. Reverify affected behavior, push.
 
+**Destination trust**, before session's first push to this repo. Print no credentials:
+
+- Push remote: `git remote get-url --push origin`.
+- Active GitHub login only: `gh api user --jq .login`.
+- Destination: `gh repo view --json nameWithOwner,visibility,viewerPermission,url`.
+- Push remote must normalize to returned `nameWithOwner`; `viewerPermission` must be `WRITE`, `MAINTAIN`, or `ADMIN`.
+- Include verified login, repo, visibility, permission, URL in every `git push` approval justification. Generic "push the branch" not enough: automatic reviewer can't infer destination owner or privacy.
+- Later pushes this session reuse the evidence only while push remote unchanged.
+- Remote not GitHub, queried repo does not match push remote, write permission absent, or check can't run → stop, ask user. Never weaken permissions, add global push allow-rule, or route around denial.
+
 Record PR number, target, head SHA.
 
 ## Step 2: Review loop
