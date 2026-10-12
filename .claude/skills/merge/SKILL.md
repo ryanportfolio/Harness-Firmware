@@ -44,7 +44,7 @@ Review skills' "review ≠ fix authority" rule lifted for in-scope fixes only. S
 
 **Destination trust**, before session's first push to this repo. Print no credentials:
 
-- Push remote: `git remote get-url --push --all origin`. More than 1 URL → stop, ask: `git push origin` sends to every URL, check covers only one. URL can embed a token (`https://<token>@github.com/...`): strip `user:password@` before showing it anywhere.
+- Push remote: `git remote get-url --push --all origin | sed -E 's#://[^/@]*@#://#'`. Pipe strips a token embedded as `https://<token>@github.com/...` before output reaches transcript; never run it unpiped. More than 1 URL → stop, ask: `git push origin` sends to every URL, check covers only one.
 - Active GitHub login only: `gh api user --jq .login`.
 - Destination: `gh repo view --json nameWithOwner,visibility,viewerPermission,url`.
 - Push remote must normalize to returned `nameWithOwner`; `viewerPermission` must be `WRITE`, `MAINTAIN`, or `ADMIN`.
