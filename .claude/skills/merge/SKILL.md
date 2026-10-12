@@ -44,12 +44,12 @@ Review skills' "review ≠ fix authority" rule lifted for in-scope fixes only. S
 
 **Destination trust**, before session's first push to this repo. Print no credentials:
 
-- Push remote: `git remote get-url --push origin`.
+- Push remote: `git remote get-url --push --all origin`. More than 1 URL → stop, ask: `git push origin` sends to every URL, check covers only one.
 - Active GitHub login only: `gh api user --jq .login`.
 - Destination: `gh repo view --json nameWithOwner,visibility,viewerPermission,url`.
 - Push remote must normalize to returned `nameWithOwner`; `viewerPermission` must be `WRITE`, `MAINTAIN`, or `ADMIN`.
 - Include verified login, repo, visibility, permission, URL in every `git push` approval justification. Generic "push the branch" not enough: automatic reviewer can't infer destination owner or privacy.
-- Later pushes this session reuse the evidence only while push remote unchanged.
+- Later pushes this session reuse the evidence only while push URL list unchanged.
 - Remote not GitHub, queried repo does not match push remote, write permission absent, or check can't run → stop, ask user. Never weaken permissions, add global push allow-rule, or route around denial.
 
 Record PR number, target, head SHA.
