@@ -13,7 +13,6 @@
 Invoke the `caveman` skill at **ultra** at session start. Applies to all prose replies, this and every future session.
 
 - Code, commits, PRs, file contents, symbols, API names, error strings stay normal, never abbreviated.
-- Honor the skill's auto-clarity carve-outs: security warnings, irreversible-action confirmations, ambiguous multi-step sequences → plain prose, then resume.
 
 ## Always-on cleanup
 
