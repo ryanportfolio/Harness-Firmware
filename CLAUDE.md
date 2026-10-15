@@ -13,7 +13,6 @@
 Invoke the `caveman` skill at **ultra** at session start. Applies to all prose replies, this and every future session.
 
 - Code, commits, PRs, file contents, symbols, API names, error strings stay normal, never abbreviated.
-- Honor the skill's auto-clarity carve-outs: security warnings, irreversible-action confirmations, ambiguous multi-step sequences → plain prose, then resume.
 
 ## Always-on cleanup
 
@@ -36,6 +35,10 @@ Defaults until configured:
 - Plan before acting. Break large refactors into atomic steps.
 - Reproduce bugs before fixing them.
 - Scope discipline: No unrequested refactors, features, abstractions, or extra coding. Minimum complexity for the task at hand; don't regress performance.
+- Reuse before writing: code already in this repo first, then the standard library or a platform feature, then an installed dependency, and only then new code. Never add a dependency to save a few lines.
+- Bug fixes: find every caller of the function before editing, then fix the root cause once in the shared code instead of patching each caller.
+- Code you move or merge keeps its error handling and validation.
+- Never make a change smaller by cutting validation at trust boundaries, error handling that prevents data loss, security, or accessibility.
 - No unit tests or type tests unless the user asks.
 - Solve generally. Never hard-code to pass specific tests. If a test or requirement is wrong, say so rather than work around it.
 - Scratch work → `.tmp/` (gitignored). Promote to `scripts/` if reusable; otherwise delete.
