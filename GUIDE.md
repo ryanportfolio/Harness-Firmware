@@ -181,6 +181,21 @@ Files under `~/.claude` do not travel with a repository. Keep personal bootstrap
 
 The script copies missing files. `-Force` overwrites. `-DryRun` previews.
 
+## optional: RTK
+
+[RTK](https://github.com/rtk-ai/rtk) is a separate command-line tool that shortens the output of common commands, such as `git status`, `git diff`, and test runners, before an agent reads it. Harness Firmware does not install it or ship its hook. Codex sessions use `rtk` when it is on the PATH, as `AGENTS.md` directs. Claude Code sessions use it only after you install its hook.
+
+To use it with Claude Code:
+
+1. Install it: `brew install rtk` on macOS or Linux, or `winget install rtk-ai.rtk` on Windows. The [installation guide](https://www.rtk-ai.app/guide/getting-started/installation) lists other methods.
+2. Run `rtk init -g`. It adds a PreToolUse hook to your user-level `~/.claude/settings.json` that rewrites commands such as `git status` to `rtk git status` in every project on the machine.
+
+Know the costs before you install it:
+
+- Claude Code refuses most git commands that run through RTK inside an agent started with `isolation: "worktree"`. The `arena` skill creates its own worktrees for this reason. Any other prompt or skill that uses that option loses git.
+- Filtered output can leave out detail; some `rtk git log` views omit merge commits. Run `rtk proxy <command>` when you need the raw output.
+- The default download is licensed under Apache-2.0 and BUSL-1.1. An Apache-2.0-only edition leaves out the compression engine. See [editions and licensing](https://www.rtk-ai.app/guide/resources/editions).
+
 ## requirements
 
 - Claude Code for the plugin workflow. The full template supports Claude Code or Codex.
