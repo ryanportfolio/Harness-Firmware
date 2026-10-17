@@ -30,7 +30,9 @@ No two workers share a writable path. The parent holds the letter-to-candidate m
 
 ## Workers
 
-**Candidates.** Three by default; more on request or when the options are many. Each brief names a different angle, such as minimal change, failure-proof, or end-user-first. Agent workers run with `isolation: "worktree"` on Opus, the latest Fable, or higher, never `sonnet` or `haiku`. A user-chosen model that meets that floor wins.
+**Candidates.** Three by default; more on request or when the options are many. Each brief names a different angle, such as minimal change, failure-proof, or end-user-first. Agent workers run on Opus, the latest Fable, or higher, never `sonnet` or `haiku`. A user-chosen model that meets that floor wins.
+
+Never start a worker with `isolation: "worktree"`: where a hook rewrites `git` to `rtk git`, Claude Code refuses nearly every git command in an isolated agent. A candidate that needs no git writes only in its `cN/` folder. For one that needs git, the parent runs `git worktree add <main checkout>/../_wt/<repo>/arena-<slug>-cN` before starting it, outside the repo folder because the desktop app refuses writes to other worktrees inside it. The brief gives that absolute path and says to use it on every call (`git -C <path>`, `cd <path> && ...`), because the Bash working directory resets between calls. A new worktree has no `node_modules`; the brief says to install them. After the verdict, the parent copies what it keeps and removes these worktrees.
 
 Mix vendors without asking. If Codex has an accepted route (a ChatGPT login or a `model_provider` gateway, as the `codex-review` preflight defines), one candidate and the judge run through `codex exec` with the Sol model id that `codex-review` pins. Take flags from local `codex exec --help`, and never bypass approvals or the sandbox. Only the user's explicit request skips Codex. No accepted route: all workers run on Claude, noted; never switch Codex to an API key or paid credits.
 
