@@ -15,8 +15,16 @@ Run `node .claude/scripts/memory-audit.mjs` for the read-side view of reference 
 memory files, and skills: never-read files, dated entries older than six months, and retired
 lines old enough to prune are candidates to check, not verdicts.
 For each recurring problem, identify the smallest change that would have prevented it.
-Prefer an in-scope tool fix over documenting a workaround. A description change needs
-evidence that the trigger is wrong; an isolated misread can require no edit.
+Prefer an in-scope tool fix over documenting a workaround. For new guidance, use the first
+form that fits, cheapest first: a script for a deterministic step the agent got wrong or did
+slowly; a skill for a procedure with a recognizable trigger; a subagent for a bounded job
+whose input is large and whose answer is small; a hook only when the evidence shows a rule
+skipped more than once and a command can check it, because a hook also fires when it should
+not; always-on text (kernel, `CLAUDE.md`, `AGENTS.md`) last, for a short rule every session
+needs. Always-on text loads every turn, so adding lines to it means removing at least as many
+from the same file, or saying in the report why the file should grow. Codex can disable
+project hooks, so a rule a hook enforces keeps its wording in `AGENTS.md`. A description
+change needs evidence that the trigger is wrong; an isolated misread can require no edit.
 
 Only the user's own words count as evidence of a preference. Before reading deeply, grep
 the user's turns case-insensitively for phrases that set or repeat a standing rule:
@@ -64,7 +72,8 @@ work and a backup or diff for non-Git files. Route each confirmed change to one 
 cross-project personal rule to `~/.codex/AGENTS.md`, a project-wide rule to the project
 kernel (`CLAUDE.md`, or `AGENTS.md` for Codex-only runtime rules), a quirk to
 `.claude/reference/pitfalls.md` and other durable project facts to their reference file
-(both through `$recall`), a repeatable procedure to a skill, or nowhere. Keep session events
+(both through `$recall`), a procedure or check to the form chosen above, or nowhere. Keep
+session events
 and discoverable code facts out.
 
 ## Weekly mode
