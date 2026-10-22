@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Scan every commit reachable from any ref for credential-shaped values and committed key or env
+// Scan every commit reachable from any ref (merges diffed against their first parent, so
+// conflict resolutions are included) for credential-shaped values and committed key or env
 // files. Prints a JSON report that never contains a matched value: only the pattern, location,
 // a redacted preview and a short hash, so the report can enter an agent's context safely.
 // Read-only; zero dependencies.
@@ -49,7 +50,7 @@ const redact = (value) => `${value.slice(0, 4)}... (${value.length} chars)`;
 
 async function scanHistory(repo) {
   const found = new Map();
-  const child = spawn("git", ["-C", repo, "log", "--all", "-p", "--no-color", "--no-ext-diff", "--no-textconv", "-U0", "--format=commit %H"], {
+  const child = spawn("git", ["-C", repo, "log", "--all", "-p", "--diff-merges=first-parent", "--no-color", "--no-ext-diff", "--no-textconv", "-U0", "--format=commit %H"], {
     stdio: ["ignore", "pipe", "pipe"],
   });
   let stderr = "";
@@ -107,7 +108,7 @@ async function main() {
   });
   findings.sort((a, b) => Number(a.likely_placeholder) - Number(b.likely_placeholder) || Number(b.in_head) - Number(a.in_head) || a.pattern.localeCompare(b.pattern));
 
-  const everTracked = new Set(git(repo, ["log", "--all", "--name-only", "--format="]).stdout.split(/\r?\n/).filter(Boolean));
+  const everTracked = new Set(git(repo, ["log", "--all", "--name-only", "--diff-merges=first-parent", "--format="]).stdout.split(/\r?\n/).filter(Boolean));
   const headTracked = new Set(git(repo, ["ls-tree", "-r", "--name-only", "HEAD"]).stdout.split(/\r?\n/).filter(Boolean));
   const sensitiveFiles = [...everTracked]
     .filter((file) => SENSITIVE_FILE.test(file) && !SENSITIVE_FILE_ALLOWED.test(file))

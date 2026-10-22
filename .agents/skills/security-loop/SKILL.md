@@ -34,7 +34,7 @@ Not for one diff or one question: use an ordinary code review, or answer directl
 
 ## How checks run on this machine
 
-This box has no container runtime or WSL distro, so upstream's OS-sandbox requirement would turn every reproduction into `needs_validation`. Pick a tier per code path instead, and record it at the start of every local check's `result` text (`[owner-local]` or `[source-only]`).
+Upstream requires an OS sandbox before running any target code. On a Windows machine without one (check `where.exe docker podman` and `wsl -l -q`), that turns every reproduction into `needs_validation`. Pick a tier per code path instead, and record it at the start of every local check's `result` text (`[owner-local]` or `[source-only]`).
 
 - **Owner-local**: first-party code in a repository the user owns. Run the project's own tests, a minimal harness, or a small fixture, with these limits:
   - Only in the run's exec tree (Layout below), a fresh checkout with no `.env` files. Never in the user's checkout: it may hold real keys, for example the `.env.local` that `vercel link` writes.
@@ -52,9 +52,9 @@ Evidence files move from `scratch/` to `artifacts/` only through `scripts/promot
 
 ## Layout
 
-- **Output directory**: `C:\Users\Home\security-loop\<repo>\run-<N>\` (next unused N). Never inside the repository, because findings in a public repo are a disclosure, and never on D:, a removable drive. Do not upload or paste its contents anywhere.
-- **Audit tree**: `git worktree add --detach C:\Users\Home\CoreWise\_wt\<repo>\security-run-<N> <ref>` after `git fetch origin`. `<ref>` is `origin/<default>` unless the user names one, or the fix branch head when the previous run's fixes are not merged yet. Agents read source here. Never audit the local checkout: it is often stale and dirty.
-- **Exec tree**: created only when a unit needs a local check: a second detached worktree at the same ref (`...\security-exec-<N>`), with dependencies installed from the lockfile (`npm ci` or the project's equivalent). Never add or upgrade a package. No lockfile means no install; checks that need dependencies become `needs_validation`.
+- **Output directory**: `~/security-loop/<repo>/run-<N>/` in the current user's home folder (next unused N). Never inside the repository, because findings in a public repo are a disclosure, and never on a removable drive. Do not upload or paste its contents anywhere.
+- **Audit tree**: `git worktree add --detach <worktree root>/security-run-<N> <ref>` after `git fetch origin`. `<worktree root>` is `_wt/<repo>/` beside the folder that holds the repository (outside the repository folder, where the desktop app refuses writes to other worktrees), or wherever the user's instructions put extra worktrees. `<ref>` is `origin/<default>` unless the user names one, or the fix branch head when the previous run's fixes are not merged yet. Agents read source here. Never audit the local checkout: it is often stale and dirty.
+- **Exec tree**: created only when a unit needs a local check: a second detached worktree at the same ref (`...\security-exec-<N>`), with dependencies installed from the lockfile with install scripts disabled, inside the empty-environment template (`npm ci --ignore-scripts`, or the project's equivalent). Dependency install hooks are third-party code, so they never run. If a check fails because a hook did not run, record `needs_validation` with that blocker; never rerun the install with scripts enabled. Never add or upgrade a package. No lockfile means no install; checks that need dependencies become `needs_validation`.
 - **Agent roots**: `<output>/agents/<agent-id>/` with `scratch/`, `artifacts/`, and `result.json`. IDs match `^[a-z0-9][a-z0-9_-]{0,63}$` and are not Windows device names (`con`, `nul`, `com1` and the like).
 - **Shared files**, written only by the parent: `run-metadata.json`, `signals.json`, `architecture.md`, `coverage-ledger.json`, `findings.json`, `fixes.json`, `REPORT.md`, `FINDINGS-DETAIL.md`, `NEEDS-VALIDATION.md`.
 
@@ -69,7 +69,7 @@ Codex: inspect the current tools and use the exposed multi-agent tools; spawn ea
 - the agent's role, its assigned work, and the exact files to read;
 - rules 1 to 7 above and the tier rules that apply to it;
 - absolute paths only: every command uses `cd <path> && ...` or `git -C <path>`, because a relative path can resolve against the wrong worktree with no error;
-- for browser checks: headed Chrome through `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`) where the repo has it, else `--window-position=-2400,-2400`; always `--mute-audio`; a fresh profile; a local server with dummy data; screenshots under `D:\screenshots\<repo>\security-loop\run-<N>\`;
+- for browser checks: headed Chrome through `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`) where the repo has it, else `--window-position=-2400,-2400`; always `--mute-audio`; a fresh profile; a local server with dummy data; screenshots where the user's instructions put them, else under `<output>/screenshots/`;
 - the result contract: write exactly one JSON object to `<agent root>/result.json` and reply with only that path and one line of status.
 
 The parent parses `result.json`. A missing, malformed, or prose-wrapped result is discarded without repair, and the work goes to a fresh agent if the budget allows.

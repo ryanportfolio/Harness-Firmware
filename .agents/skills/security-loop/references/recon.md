@@ -6,23 +6,23 @@ Steps 1 and 2 of the loop. Adapted from upstream `RECONNAISSANCE.md` and `SKILL.
 
 1. `git -C <repo> fetch origin`, resolve the source ref, and create the audit tree (SKILL.md, Layout). Record the full SHA in `run-metadata.json`.
 2. Create the output directory and write `run-metadata.json` with `run_status: "in_progress"`.
-3. Read every prior run for this repository under `C:\Users\Home\security-loop\<repo>\` (see Prior runs below). No prior run: say so in the final coverage statement.
+3. Read every prior run for this repository under `~/security-loop/<repo>/` (see Prior runs below). No prior run: say so in the final coverage statement.
 4. Collect signals (below) into `signals.json`.
 5. Apply the budget gate (SKILL.md, Profiles and cost) before launching any agent.
 
 ## Signals
 
-Cheap evidence that already exists. Collect it in the parent before reconnaissance. Install nothing. Each command either works or records why it did not; a 403 or 404 from GitHub means the feature is off or not visible to this token, which goes in `signals.json` as "unavailable" rather than "clean".
+Cheap evidence that already exists. Collect it in the parent before reconnaissance. Install nothing. Every command writes to a file in the output directory and filters fields before anything reaches stdout: a GitHub secret-scanning alert carries the raw secret in its `secret` field, and anything printed lands in the session transcript. Each command either works or records why it did not; a 403 or 404 from GitHub means the feature is off or not visible to this token, which goes in `signals.json` as "unavailable" rather than "clean".
 
 ```bash
-gh api "repos/<owner>/<repo>/dependabot/alerts?state=open&per_page=100" --paginate
-gh api "repos/<owner>/<repo>/code-scanning/alerts?state=open&per_page=100" --paginate
-gh api "repos/<owner>/<repo>/secret-scanning/alerts?state=open&per_page=100" --paginate
+gh api "repos/<owner>/<repo>/dependabot/alerts?state=open&per_page=100" --paginate --jq '.[] | {number, severity: .security_advisory.severity, ghsa: .security_advisory.ghsa_id, package: .dependency.package.name, manifest: .dependency.manifest_path, scope: .dependency.scope}' > <output>/dependabot.jsonl
+gh api "repos/<owner>/<repo>/code-scanning/alerts?state=open&per_page=100" --paginate --jq '.[] | {number, rule: .rule.id, severity: .rule.security_severity_level, path: .most_recent_instance.location.path, line: .most_recent_instance.location.start_line}' > <output>/code-scanning.jsonl
+gh api "repos/<owner>/<repo>/secret-scanning/alerts?state=open&per_page=100" --paginate --jq '.[] | {number, secret_type, created_at, validity}' > <output>/secret-scanning.jsonl
 cd <audit tree> && npm audit --package-lock-only --json > <output>/npm-audit.json
 node <skill>/scripts/secret-sweep.mjs --repo <audit tree> --out <output>/secret-sweep.json
 ```
 
-- From GitHub alerts keep only rule or advisory ID, package or file path, line, and severity. Secret-scanning alerts carry the secret value in the `secret` field: never copy that field anywhere.
+- The `--jq` filters keep only IDs, types, paths, lines, and severity. Never drop the secret-scanning filter or request that alert's `secret` field. For a secret-scanning alert's location, use `gh api repos/<owner>/<repo>/secret-scanning/alerts/<number>/locations --jq '.[] | {path: .details.path, line: .details.start_line, commit: .details.commit_sha}'`.
 - `npm audit --package-lock-only` reads the lockfile without installing anything. Other ecosystems: use an audit command the project already has; never install a scanner.
 - `where.exe gitleaks semgrep osv-scanner`: run one only if it is already installed, with output written to the output directory.
 - `secret-sweep.mjs` scans every commit on every ref for credential-shaped values and for key or env files that were ever tracked. It prints only redacted previews and short hashes. It takes seconds on a repository of this template's size.
