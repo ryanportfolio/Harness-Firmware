@@ -46,6 +46,25 @@ function parseArgs(argv) {
 const git = (repo, args) => spawnSync("git", ["-C", repo, ...args], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
 const shortHash = (value) => crypto.createHash("sha256").update(value).digest("hex").slice(0, 12);
 const redact = (value) => `${value.slice(0, 4)}... (${value.length} chars)`;
+const nulList = (text) => text.split("\0").map((entry) => entry.replace(/^\r?\n+/, "")).filter(Boolean);
+
+// Git C-quotes a patch path that holds non-ASCII bytes, quotes, backslashes, or control characters.
+function unquoteGitPath(raw) {
+  if (!raw.startsWith('"') || !raw.endsWith('"') || raw.length < 2) return raw;
+  const simple = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, "\\": 92 };
+  const bytes = [];
+  const body = raw.slice(1, -1);
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch !== "\\") { bytes.push(...Buffer.from(ch, "utf8")); continue; }
+    const next = body[i + 1];
+    if (next === undefined) { bytes.push(92); break; }
+    if (/[0-7]/.test(next ?? "")) { bytes.push(parseInt(body.slice(i + 1, i + 4), 8)); i += 3; continue; }
+    bytes.push(simple[next] ?? next.charCodeAt(0));
+    i += 1;
+  }
+  return Buffer.from(bytes).toString("utf8");
+}
 
 async function scanHistory(repo) {
   const found = new Map();
@@ -56,10 +75,21 @@ async function scanHistory(repo) {
   child.stderr.on("data", (chunk) => { stderr += chunk; });
   let commit = null;
   let file = null;
+  // File headers sit between a "diff --git" line and the first hunk; an added line such as
+  // "++ retries;" also starts with "+++ " inside a hunk.
+  let inHeader = false;
   const lines = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
   for await (const line of lines) {
-    if (line.startsWith("commit ")) { commit = line.slice(7, 47); continue; }
-    if (line.startsWith("+++ ")) { file = line === "+++ /dev/null" ? null : line.replace(/^\+\+\+ b\//, ""); continue; }
+    if (line.startsWith("commit ")) { commit = line.slice(7, 47); inHeader = false; continue; }
+    if (line.startsWith("diff --git ")) { inHeader = true; file = null; continue; }
+    if (line.startsWith("@@")) { inHeader = false; continue; }
+    if (inHeader) {
+      if (line.startsWith("+++ ")) {
+        const target = unquoteGitPath(line.slice(4));
+        file = target === "/dev/null" ? null : target.replace(/^b\//, "");
+      }
+      continue;
+    }
     if (!line.startsWith("+") || file === null) continue;
     const text = line.slice(1);
     for (const [name, regex, group] of PATTERNS) {
@@ -107,8 +137,9 @@ async function main() {
   });
   findings.sort((a, b) => Number(a.likely_placeholder) - Number(b.likely_placeholder) || Number(b.in_head) - Number(a.in_head) || a.pattern.localeCompare(b.pattern));
 
-  const everTracked = new Set(git(repo, ["log", "--all", "--name-only", "--diff-merges=first-parent", "--format="]).stdout.split(/\r?\n/).filter(Boolean));
-  const headTracked = new Set(git(repo, ["ls-tree", "-r", "--name-only", "HEAD"]).stdout.split(/\r?\n/).filter(Boolean));
+  // -z turns off path quoting, so non-ASCII and unusual names arrive as written.
+  const everTracked = new Set(nulList(git(repo, ["log", "--all", "--name-only", "-z", "--diff-merges=first-parent", "--format="]).stdout));
+  const headTracked = new Set(nulList(git(repo, ["ls-tree", "-r", "--name-only", "-z", "HEAD"]).stdout));
   const sensitiveFiles = [...everTracked]
     .filter((file) => SENSITIVE_FILE.test(file) && !SENSITIVE_FILE_ALLOWED.test(file))
     .sort()
