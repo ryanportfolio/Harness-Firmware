@@ -111,6 +111,11 @@ condensed.
 
 ### Changed
 
+- Every skill description in both runtimes is rewritten in caveman-ultra style,
+  keeping each trigger command, quoted user phrase, and gating limit word for
+  word. The Codex skill catalog drops from 7,625 to 6,510 characters, back
+  inside its 7,500 budget. `addskill` now requires the same style for new and
+  edited descriptions and names the budget check.
 - The `caveman` skill body now uses the caveman output style's rules, so Codex,
   which has no output style, follows the same rules as Claude Code, including
   no em dashes and one-line process summaries. It leaves out the output style's

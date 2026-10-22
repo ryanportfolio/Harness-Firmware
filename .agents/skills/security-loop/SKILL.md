@@ -1,6 +1,6 @@
 ---
 name: security-loop
-description: "Security-audit or pen-test a whole repository in verified runs, then fix the owner's picks. Use for $security-loop."
+description: "Whole-repo security audit or pen-test in verified runs → fix owner's picks. Use: $security-loop."
 ---
 
 # Security loop

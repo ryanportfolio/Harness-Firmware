@@ -1,6 +1,6 @@
 ---
 name: security-loop
-description: "Audit a whole repository for security vulnerabilities in independently verified runs, then fix the findings the owner picks and rerun until nothing new turns up. Use for /security-loop or a request to security-audit or pen-test a codebase. One diff or one question: use security-review instead."
+description: "Whole-repo security audit or pen-test in independently verified runs → fix owner's picks → rerun until nothing new. Use: /security-loop, 'security-audit / pen-test this codebase'. One diff or question → security-review."
 ---
 
 # Security loop
