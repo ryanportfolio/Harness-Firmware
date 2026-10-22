@@ -13,6 +13,15 @@ condensed.
 
 ### Added
 
+- `security-loop` for Claude and Codex: whole-repository security audits built on
+  Cloudflare's `security-audit` skill (MIT), with independently verified findings,
+  a coverage ledger, and reruns that pick up the previous run's gaps. Checks on the
+  owner's own code run in a fresh worktree with an empty environment; untrusted code
+  stays source-only. Adds a history secret sweep that never prints values, existing
+  GitHub alerts and `npm audit` as leads, one cross-vendor check on confirmed high
+  and critical findings, and fix rounds for the findings the owner picks. The bundled
+  validators carry a fix for upstream's copies, which reject every input on Windows.
+
 - `addskill` now reminds template maintainers to register new skills in a setup-menu
   group and run the template manifest check. Generated projects skip this step.
 

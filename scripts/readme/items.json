@@ -70,6 +70,11 @@
       "group": "discipline"
     },
     {
+      "name": "security-loop",
+      "label": "Security loop",
+      "group": "discipline"
+    },
+    {
       "name": "long-horizon",
       "label": "Long horizon",
       "group": "discipline"
