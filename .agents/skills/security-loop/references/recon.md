@@ -18,12 +18,13 @@ Cheap evidence that already exists. Collect it in the parent before reconnaissan
 gh api "repos/<owner>/<repo>/dependabot/alerts?state=open&per_page=100" --paginate --jq '.[] | {number, severity: .security_advisory.severity, ghsa: .security_advisory.ghsa_id, package: .dependency.package.name, manifest: .dependency.manifest_path, scope: .dependency.scope}' > <output>/dependabot.jsonl
 gh api "repos/<owner>/<repo>/code-scanning/alerts?state=open&per_page=100" --paginate --jq '.[] | {number, rule: .rule.id, severity: .rule.security_severity_level, path: .most_recent_instance.location.path, line: .most_recent_instance.location.start_line}' > <output>/code-scanning.jsonl
 gh api "repos/<owner>/<repo>/secret-scanning/alerts?state=open&per_page=100" --paginate --jq '.[] | {number, secret_type, created_at, validity}' > <output>/secret-scanning.jsonl
-cd <audit tree> && npm audit --package-lock-only --json > <output>/npm-audit.json
+A=<output>/npm-audit; mkdir -p "$A" && cp <audit tree>/package.json <audit tree>/package-lock.json "$A"/ && : > "$A/user-npmrc" && : > "$A/global-npmrc"
+cd "$A" && env -i PATH="$PATH" SYSTEMROOT="$SYSTEMROOT" COMSPEC="$COMSPEC" HOME="$A" USERPROFILE="$A" APPDATA="$A" LOCALAPPDATA="$A" npm_config_userconfig="$A/user-npmrc" npm_config_globalconfig="$A/global-npmrc" npm audit --package-lock-only --json --registry=https://registry.npmjs.org/ > <output>/npm-audit.json
 node <skill>/scripts/secret-sweep.mjs --repo <audit tree> --out <output>/secret-sweep.json
 ```
 
 - The `--jq` filters keep only IDs, types, paths, lines, and severity. Never drop the secret-scanning filter or request that alert's `secret` field. For a secret-scanning alert's location, use `gh api repos/<owner>/<repo>/secret-scanning/alerts/<number>/locations --jq '.[] | {path: .details.path, line: .details.start_line, commit: .details.commit_sha}'`.
-- `npm audit --package-lock-only` reads the lockfile without installing anything. Other ecosystems: use an audit command the project already has; never install a scanner.
+- `npm audit --package-lock-only` reads the lockfile without installing anything. It runs on a copy of `package.json` and `package-lock.json` only, with an empty environment, empty npm config files, and the public registry named explicitly: the repository's own `.npmrc` could otherwise pick a registry and send it a token such as `${NPM_TOKEN}` from your environment. Exit code 1 means vulnerabilities were found, not that the command failed. A workspace lockfile that needs more files than these two is recorded as unavailable. Other ecosystems: use an audit command the project already has, under the same isolation; never install a scanner.
 - `where.exe gitleaks semgrep osv-scanner`: run one only if it is already installed, with output written to the output directory.
 - `secret-sweep.mjs` scans every commit on every ref for credential-shaped values and for key or env files that were ever tracked. It prints only redacted previews and short hashes. It takes seconds on a repository of this template's size.
 
