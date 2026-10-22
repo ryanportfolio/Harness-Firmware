@@ -190,15 +190,15 @@ Right after each wave, launch one fresh post-wave critic. It receives `architect
       "reason": "source-backed coverage gap"
     }
   ],
-  "reassign_ids": ["existing-id-that-did-not-close"],
-  "resolved_prior_leads": ["fingerprint"],
+  "reassign": [{"coverage_id": "existing-id-that-did-not-close", "reason": "source-backed reason it did not close"}],
+  "resolved_prior_leads": [{"fingerprint": "...", "reason": "source-backed reason it is resolved"}],
   "stop": false
 }
 ```
 
-The critic looks for unmapped entry points, unchecked parallel paths, missing lifecycle modes, selected classes with no unit, unjustified exclusions, units closed without paths or checks, signals no unit addresses, and prior `needs_validation` or changed-source gaps. It proposes coverage, not findings. `stop` is `true` only when it accepts no missing units and no reassignments; the parent's loop condition decides whether another wave runs.
+The critic looks for unmapped entry points, unchecked parallel paths, missing lifecycle modes, selected classes with no unit, unjustified exclusions, units closed without paths or checks, signals no unit addresses, and prior `needs_validation` or changed-source gaps. It proposes coverage, not findings. Every reassignment and resolved lead carries its own reason, because the ledger archive requires a `reassignment_reason`. `stop` is `true` only when it accepts no missing units and no reassignments; the parent's loop condition decides whether another wave runs.
 
-The parent rejects proposals outside the scope or the execution rules, derives canonical IDs, and deduplicates against current units; fail rather than merge an ID collision. For each legitimate `reassign_id` with live evidence, archive the live state in `attempts` with the critic's reason, increment `wave`, and give the unit to a fresh hunter with empty live evidence. For each fingerprint in `resolved_prior_leads`, mark the linked prior lead resolved with the critic's reason.
+The parent rejects proposals outside the scope or the execution rules, derives canonical IDs, and deduplicates against current units; fail rather than merge an ID collision. For each legitimate `reassign` entry with live evidence, archive the live state in `attempts` with that entry's `reason` as `reassignment_reason`, increment `wave`, and give the unit to a fresh hunter with empty live evidence. For each `resolved_prior_leads` entry, mark the linked prior lead resolved with its `reason`. An entry without a reason is rejected, not filled in by the parent.
 
 - **quick**: exactly one wave and one critic. Accepted missing units are added as `deferred` with reason `quick_profile_final_critic`; legitimate reassignments are archived and set to `deferred` with the same reason. The next run picks them up.
 - **standard** and **deep**: when the post-wave critic accepts nothing and no `planned` units remain, launch a separate final-clean critic. Coverage is complete only when it also accepts nothing; otherwise queue its work and repeat wave, critic, and final-clean critic.

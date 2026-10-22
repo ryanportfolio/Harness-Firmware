@@ -126,12 +126,21 @@ function writeDestination(artifactsRoot, parts, data) {
   const leaf = path.join(current, parts.at(-1));
   const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | posixNoFollow;
   const fd = fs.openSync(leaf, flags, 0o600);
+  let complete = false;
   try {
     const stat = fs.fstatSync(fd);
     if (!stat.isFile() || stat.nlink !== 1) throw new Error("destination is not a fresh regular file");
-    fs.writeSync(fd, data, 0, data.length, 0);
+    let written = 0;
+    while (written < data.length) {
+      const count = fs.writeSync(fd, data, written, data.length - written, written);
+      if (count <= 0) throw new Error("destination write made no progress");
+      written += count;
+    }
+    complete = true;
   } finally {
     fs.closeSync(fd);
+    // This call created the file exclusively, so removing a partial copy cannot touch anything else.
+    if (!complete) fs.rmSync(leaf, { force: true });
   }
 }
 

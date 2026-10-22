@@ -30,7 +30,6 @@ const PATTERNS = [
 const PLACEHOLDER = /example|sample|dummy|placeholder|changeme|your[_-]|xxxx|\*\*\*\*|<[^>]*>|\$\{|process\.env|test/i;
 const SENSITIVE_FILE = /(^|\/)(\.env(\.[^/]+)?|id_(rsa|dsa|ecdsa|ed25519)|[^/]+\.(pem|p12|pfx|key|keystore|jks)|credentials\.json|service-account[^/]*\.json)$/i;
 const SENSITIVE_FILE_ALLOWED = /\.(example|sample|template|dist)$|(^|\/)\.env\.(example|sample|template)$/i;
-const MAX_LINE = 20000;
 const MAX_UNIQUE = 500;
 
 function parseArgs(argv) {
@@ -62,7 +61,7 @@ async function scanHistory(repo) {
     if (line.startsWith("commit ")) { commit = line.slice(7, 47); continue; }
     if (line.startsWith("+++ ")) { file = line === "+++ /dev/null" ? null : line.replace(/^\+\+\+ b\//, ""); continue; }
     if (!line.startsWith("+") || file === null) continue;
-    const text = line.slice(1, MAX_LINE + 1);
+    const text = line.slice(1);
     for (const [name, regex, group] of PATTERNS) {
       regex.lastIndex = 0;
       for (const match of text.matchAll(regex)) {
