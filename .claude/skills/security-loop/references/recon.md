@@ -27,7 +27,7 @@ node <skill>/scripts/secret-sweep.mjs --repo <audit tree> --out <output>/secret-
 - `where.exe gitleaks semgrep osv-scanner`: run one only if it is already installed, with output written to the output directory.
 - `secret-sweep.mjs` scans every commit on every ref for credential-shaped values and for key or env files that were ever tracked. It prints only redacted previews and short hashes. It takes seconds on a repository of this template's size.
 
-Signals are leads, never findings. Each one seeds or prioritizes a ledger unit, and hunters and verifiers apply the normal gate: a vulnerable dependency needs a reachable call path from a lower-trust input; a scanner rule hit needs a real boundary and result. For a committed credential in history (not a placeholder):
+Signals are leads, never findings. Each one seeds or prioritizes a ledger unit, and hunters and verifiers apply the normal gate: a vulnerable dependency needs a reachable call path from a lower-trust input; a scanner rule hit needs a real boundary and result. For a committed credential in history (`likely_placeholder` is only a hint from the value's wording, such as "example" or "changeme"; a verifier decides):
 
 - The boundary is "anyone who can read this repository's history"; a public repository makes that everyone.
 - Whether the credential is still valid is an owner fact, so the record is `needs_validation` with the owner check "rotate it, or confirm in the provider dashboard that it is revoked". It becomes `confirmed` only if the owner reports it was valid.

@@ -85,7 +85,8 @@ async function scanHistory(repo) {
     if (line.startsWith("@@")) { inHeader = false; continue; }
     if (inHeader) {
       if (line.startsWith("+++ ")) {
-        const target = unquoteGitPath(line.slice(4));
+        // Git ends the header with a tab when an unquoted path contains a space.
+        const target = unquoteGitPath(line.slice(4).replace(/\t$/, ""));
         file = target === "/dev/null" ? null : target.replace(/^b\//, "");
       }
       continue;
@@ -101,7 +102,7 @@ async function scanHistory(repo) {
         let entry = found.get(key);
         if (!entry) {
           if (found.size >= MAX_UNIQUE) continue;
-          entry = { pattern: name, value, files: new Set(), commits: new Set(), likely_placeholder: PLACEHOLDER.test(value) || PLACEHOLDER.test(file) };
+          entry = { pattern: name, value, files: new Set(), commits: new Set(), likely_placeholder: PLACEHOLDER.test(value) };
           found.set(key, entry);
         }
         entry.files.add(file);
