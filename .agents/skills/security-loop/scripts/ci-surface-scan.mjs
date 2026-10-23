@@ -71,17 +71,22 @@ const git = (tree, args, extra = {}) => spawnSync("git", ["-c", "core.fsmonitor=
 // token-shaped runs (letters and digits mixed, 24+ chars) are replaced. Environment
 // references such as ${NPM_TOKEN} or $NPM_TOKEN are kept.
 const SECRET_WORD = "(?:token|secret|passw(?:or)?d|pwd|key|credential|auth)";
-const SECRET_ASSIGNMENT = new RegExp(`((?:\\b|-)[\\w.-]*${SECRET_WORD}[\\w.-]*["']?\\s*[=:]\\s*["']?)(?!\\$)[^\\s"',;&|)}]+`, "gi");
-const SECRET_FLAG_SPLIT = new RegExp(`(\\s--?[\\w-]*${SECRET_WORD}[\\w-]*\\s+["']?)(?![-$])[^\\s"',;&|)}]+`, "gi");
+// A secret value: a whole quoted string (spaces included), or an unquoted run. Values that
+// start with "$" are environment references and are kept.
+const SECRET_VALUE = `("(?!\\$)[^"\\n]*"|'(?!\\$)[^'\\n]*'|(?![-"'$])[^\\s"',;&|)}]+)`;
+const SECRET_ASSIGNMENT = new RegExp(`((?:\\b|-)[\\w.-]*${SECRET_WORD}[\\w.-]*["']?\\s*[=:]\\s*)${SECRET_VALUE}`, "gi");
+const SECRET_FLAG_SPLIT = new RegExp(`(\\s--?[\\w-]*${SECRET_WORD}[\\w-]*\\s+)${SECRET_VALUE}`, "gi");
+const AUTHORIZATION = /(\bauthorization["']?\s*[:=]\s*)("(?!\$)[^"\n]*"|'(?!\$)[^'\n]*'|(?:(?:bearer|basic|token|digest)\s+)?(?![-"'$])[^\s"',;&|)}]+)/gi;
+const maskValue = (match, prefix, value) => `${prefix}${value[0] === '"' || value[0] === "'" ? `${value[0]}<redacted>${value[0]}` : "<redacted>"}`;
 function redact(text, max = 240) {
   // Only the first `max` characters are ever returned, so the masking regexes (which can
   // backtrack quadratically on long hyphen runs) see a bounded prefix.
   let out = String(text).slice(0, Math.max(max * 4, 1024))
     .replace(/(:\/\/)(?!git@)[^/\s@]+@/g, "$1<redacted>@")
-    .replace(/(\bauthorization["']?\s*[:=]\s*["']?)(?:(?:bearer|basic|token|digest)\s+)?(?!\$)[^\s"',;&|)}]+/gi, "$1<redacted>")
+    .replace(AUTHORIZATION, maskValue)
     .replace(/\b(bearer|basic)\s+(?!\$|<redacted)[A-Za-z0-9._~+/=-]{8,}/gi, "$1 <redacted>")
-    .replace(SECRET_ASSIGNMENT, "$1<redacted>")
-    .replace(SECRET_FLAG_SPLIT, "$1<redacted>")
+    .replace(SECRET_ASSIGNMENT, maskValue)
+    .replace(SECRET_FLAG_SPLIT, maskValue)
     .replace(/[A-Za-z0-9_+/=-]{24,}/g, (run) => (/[A-Za-z]/.test(run) && /[0-9]/.test(run) && !/^[a-f0-9]{40}$/.test(run) && !run.includes("/") ? `<redacted ${run.length} chars>` : run))
     .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "?");
   if (out.length > max) out = `${out.slice(0, max)}...`;
@@ -180,7 +185,13 @@ function walkYaml(text) {
     let indent = raw.match(/^ */)[0].length;
     let rest = raw.slice(indent);
     while (rest === "-" || rest.startsWith("- ")) {
-      while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+      // An indentless sequence ("steps:" then "- run:" at the same column) belongs to the
+      // key above it, so a same-column key that opened a nested block stays on the stack.
+      while (stack.length) {
+        const top = stack[stack.length - 1];
+        if (top.indent > indent || (top.indent === indent && !top.open)) stack.pop();
+        else break;
+      }
       stack.push({ indent, key: `-@${n}` });
       const step = rest === "-" ? 1 : 1 + rest.slice(1).match(/^ */)[0].length;
       indent += step;
@@ -198,7 +209,7 @@ function walkYaml(text) {
     const key = (match[1] ?? match[2] ?? match[3]).trim();
     const value = stripComment(match[4] ?? "");
     out.push({ n, path: parent, key, value });
-    stack.push({ indent, key });
+    stack.push({ indent, key, open: value === "" });
     if (/^[|>][-+0-9]*\s*(#.*)?$/.test(value)) block = { indent, path: parent, key };
   }
   return out;
@@ -247,6 +258,8 @@ function scanWorkflow(file, text, isAction) {
     secrets_to_third_party_actions: [], persisted_token_uploaded: [], agent_steps: [], install_commands: [],
   };
   const jobs = new Map();
+  // Workflow-level env reaches every job, so its secrets count as in scope for each one.
+  const workflowEnvSecrets = !isAction && nodes.some((node) => node.path[0] === "env" && /\bsecrets\./.test(node.value));
   const stepOf = (node) => {
     const index = node.path.findIndex((part, i) => part === "steps" && i >= 2 && node.path[i + 1]?.startsWith("-@"));
     const job = node.path[0] === "jobs" ? node.path[1] : isAction ? "(action)" : null;
@@ -261,9 +274,10 @@ function scanWorkflow(file, text, isAction) {
 
   for (const node of nodes) {
     const { job, step, rel } = stepOf(node);
-    if (job && !jobs.has(job)) jobs.set(job, { secrets: false, steps: new Map() });
+    if (job && !jobs.has(job)) jobs.set(job, { secrets: workflowEnvSecrets, steps: new Map() });
     const jobState = job ? jobs.get(job) : null;
-    if (jobState && /\bsecrets\./.test(node.value)) jobState.secrets = true;
+    // "secrets: inherit" on a reusable-workflow call passes every secret to it.
+    if (jobState && (/\bsecrets\./.test(node.value) || (node.key === "secrets" && node.value === "inherit"))) jobState.secrets = true;
     let stepState = null;
     if (jobState && step) {
       if (!jobState.steps.has(step)) jobState.steps.set(step, { line: Number(step.slice(2)), uses: null, with: [], run: [], script: [] });
