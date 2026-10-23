@@ -44,7 +44,9 @@ const SECRET_ASSIGNMENT = new RegExp(`((?:\\b|-)[\\w.-]*${SECRET_WORD}[\\w.-]*["
 const SECRET_FLAG_SPLIT = new RegExp(`(\\s--?[\\w-]*${SECRET_WORD}[\\w-]*\\s+["']?)(?![-$])[^\\s"',;&|)}]+`, "gi");
 
 function clean(text, max = 120) {
-  let out = text
+  // Bounded prefix: only `max` characters are returned, and the masking regexes can
+  // backtrack quadratically on long hyphen runs.
+  let out = text.slice(0, Math.max(max * 4, 1024))
     .replace(/(:\/\/)(?!git@)[^/\s@]+@/g, "$1<redacted>@")
     .replace(SECRET_ASSIGNMENT, "$1<redacted>")
     .replace(SECRET_FLAG_SPLIT, "$1<redacted>")

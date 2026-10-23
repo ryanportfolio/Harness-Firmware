@@ -74,7 +74,9 @@ const SECRET_WORD = "(?:token|secret|passw(?:or)?d|pwd|key|credential|auth)";
 const SECRET_ASSIGNMENT = new RegExp(`((?:\\b|-)[\\w.-]*${SECRET_WORD}[\\w.-]*["']?\\s*[=:]\\s*["']?)(?!\\$)[^\\s"',;&|)}]+`, "gi");
 const SECRET_FLAG_SPLIT = new RegExp(`(\\s--?[\\w-]*${SECRET_WORD}[\\w-]*\\s+["']?)(?![-$])[^\\s"',;&|)}]+`, "gi");
 function redact(text, max = 240) {
-  let out = String(text)
+  // Only the first `max` characters are ever returned, so the masking regexes (which can
+  // backtrack quadratically on long hyphen runs) see a bounded prefix.
+  let out = String(text).slice(0, Math.max(max * 4, 1024))
     .replace(/(:\/\/)(?!git@)[^/\s@]+@/g, "$1<redacted>@")
     .replace(/(\bauthorization["']?\s*[:=]\s*["']?)(?:(?:bearer|basic|token|digest)\s+)?(?!\$)[^\s"',;&|)}]+/gi, "$1<redacted>")
     .replace(/\b(bearer|basic)\s+(?!\$|<redacted)[A-Za-z0-9._~+/=-]{8,}/gi, "$1 <redacted>")
@@ -533,6 +535,8 @@ function scanClaudeSettings(file, text) {
   return Object.keys(report).length > 1 ? report : null;
 }
 
+const SECRET_ARG_FLAG = /^--?[\w-]*(token|key|secret|passw(or)?d|pwd|credential|auth)[\w-]*(=|$)/i;
+
 function scanMcpJson(file, text) {
   const data = parseObject(text);
   if (!data) return [{ path: file, error: "unparseable JSON or not an object" }];
@@ -544,14 +548,21 @@ function scanMcpJson(file, text) {
     }
     if (typeof server?.command === "string") {
       const args = Array.isArray(server.args) ? server.args.filter((a) => typeof a === "string") : [];
-      entry.command = redact([server.command, ...args].join(" "), 200);
+      // Mask whole secret argument values before joining: a value with spaces would
+      // otherwise lose its boundaries and be only partly masked.
+      const masked = args.map((arg, i) => {
+        if (SECRET_ARG_FLAG.test(arg) && arg.includes("=")) return arg.replace(/=.*$/s, (v) => (/^=\$/.test(v) ? v : "=<redacted>"));
+        if (i > 0 && SECRET_ARG_FLAG.test(args[i - 1]) && !args[i - 1].includes("=") && !arg.startsWith("-") && !arg.startsWith("$")) return "<redacted>";
+        return arg;
+      });
+      entry.command = redact([server.command, ...masked].join(" "), 200);
       const python = /(^|[\\/])(uvx|pipx)(\.cmd|\.exe)?$/i.test(server.command);
       const runner = python || /(^|[\\/])(npx|bunx)(\.cmd|\.exe)?$/i.test(server.command) || (/(^|[\\/])pnpm(\.cmd)?$/i.test(server.command) && args[0] === "dlx");
       if (runner) {
         entry.package_runner = true;
         entry.package_version_exact = runnerPackagePinned(args, python);
       }
-      const secretArgs = args.filter((a) => /^--?[\w-]*(token|key|secret|passw(or)?d|pwd|credential|auth)[\w-]*(=|$)/i.test(a)).map((a) => a.split("=")[0]);
+      const secretArgs = args.filter((a) => SECRET_ARG_FLAG.test(a)).map((a) => a.split("=")[0]);
       if (secretArgs.length) entry.secret_named_args = secretArgs;
     }
     const env = server?.env && typeof server.env === "object" ? server.env : {};
