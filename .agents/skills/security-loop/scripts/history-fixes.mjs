@@ -36,8 +36,18 @@ function parseArgs(argv) {
 
 const git = (repo, args) => spawnSync("git", ["-c", "core.fsmonitor=false", "-c", "core.quotepath=off", "-C", repo, ...args], { encoding: "utf8", maxBuffer: 512 * 1024 * 1024 });
 
+// Same masking as ci-surface-scan.mjs (secret-named assignments and flags, URL userinfo, long
+// token-shaped runs), except that only "=" counts as an assignment: subjects such as
+// "auth: fix login" use a colon as a prefix.
+const SECRET_WORD = "(?:token|secret|passw(?:or)?d|pwd|key|credential|auth)";
+const SECRET_ASSIGNMENT = new RegExp(`((?:\\b|-)[\\w.-]*${SECRET_WORD}[\\w.-]*["']?\\s*=\\s*["']?)(?!\\$)[^\\s"',;&|)}]+`, "gi");
+const SECRET_FLAG_SPLIT = new RegExp(`(\\s--?[\\w-]*${SECRET_WORD}[\\w-]*\\s+["']?)(?![-$])[^\\s"',;&|)}]+`, "gi");
+
 function clean(text, max = 120) {
   let out = text
+    .replace(/(:\/\/)(?!git@)[^/\s@]+@/g, "$1<redacted>@")
+    .replace(SECRET_ASSIGNMENT, "$1<redacted>")
+    .replace(SECRET_FLAG_SPLIT, "$1<redacted>")
     .replace(/[A-Za-z0-9_+/=-]{24,}/g, (run) => (/[A-Za-z]/.test(run) && /[0-9]/.test(run) && !/^[a-f0-9]{40}$/.test(run) && !run.includes("/") ? `<redacted ${run.length} chars>` : run))
     .replace(/[\u0000-\u001f\u007f]/g, " ")
     .trim();

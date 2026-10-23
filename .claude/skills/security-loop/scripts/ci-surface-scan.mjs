@@ -66,15 +66,16 @@ function parseArgs(argv) {
 // core.fsmonitor off: a repository-configured monitor is a program, and this scan runs none.
 const git = (tree, args, extra = {}) => spawnSync("git", ["-c", "core.fsmonitor=false", "-C", tree, ...args], { maxBuffer: 512 * 1024 * 1024, ...extra });
 
-// Values of secret-named assignments and flags (API_KEY=x, --token=x, --password x), URL
-// passwords, and long token-shaped runs (letters and digits mixed, 24+ chars) are replaced.
-// Environment references such as ${NPM_TOKEN} or $NPM_TOKEN are kept.
-const SECRET_WORD = "(?:token|secret|passw(?:or)?d|pwd|api[_-]?key|private[_-]?key|access[_-]?key|credential|auth)";
+// Values of secret-named assignments and flags (API_KEY=x, --token=x, --key x), URL userinfo
+// (https://token@host, https://user:pass@host; the plain git@ user is kept), and long
+// token-shaped runs (letters and digits mixed, 24+ chars) are replaced. Environment
+// references such as ${NPM_TOKEN} or $NPM_TOKEN are kept.
+const SECRET_WORD = "(?:token|secret|passw(?:or)?d|pwd|key|credential|auth)";
 const SECRET_ASSIGNMENT = new RegExp(`((?:\\b|-)[\\w.-]*${SECRET_WORD}[\\w.-]*["']?\\s*[=:]\\s*["']?)(?!\\$)[^\\s"',;&|)}]+`, "gi");
 const SECRET_FLAG_SPLIT = new RegExp(`(\\s--?[\\w-]*${SECRET_WORD}[\\w-]*\\s+["']?)(?![-$])[^\\s"',;&|)}]+`, "gi");
 function redact(text, max = 240) {
   let out = String(text)
-    .replace(/(:\/\/[^:/\s@]+:)[^@\s]+@/g, "$1<redacted>@")
+    .replace(/(:\/\/)(?!git@)[^/\s@]+@/g, "$1<redacted>@")
     .replace(SECRET_ASSIGNMENT, "$1<redacted>")
     .replace(SECRET_FLAG_SPLIT, "$1<redacted>")
     .replace(/[A-Za-z0-9_+/=-]{24,}/g, (run) => (/[A-Za-z]/.test(run) && /[0-9]/.test(run) && !/^[a-f0-9]{40}$/.test(run) && !run.includes("/") ? `<redacted ${run.length} chars>` : run))
@@ -204,6 +205,8 @@ function scanWorkflow(file, text, isAction) {
       if (node.key) triggers.add(node.key);
       else if (node.value) triggers.add(node.value.replace(/["']/g, ""));
     }
+    // Block sequence: "on:" followed by "- pull_request_target" items.
+    if (top === "on" && node.path.length === 2 && node.path[1].startsWith("-@")) triggers.add((node.key ?? node.value).replace(/["']/g, ""));
   }
   const triggerList = [...triggers].sort();
   const privileged = triggerList.filter((t) => PRIVILEGED_TRIGGERS.has(t));
