@@ -26,7 +26,8 @@ agents/<your id>/artifacts/<path>; the parent promotes it. Never write a credent
 3. For a proposed confirmed candidate, independently reproduce the minimum observed
    result when the tier allows. Verify inputs, interface shape, conditions, and the
    affected dummy principal or resource. Do not infer a stronger result or continue
-   after it.
+   after it. For a race, rerun with the recorded schedule or barrier and record your own
+   attempts versus successes and the state change in execution.observed_result.
 4. Check that likelihood, impact, confidence, and the proposed fix match only what the
    evidence establishes.
 5. For a proposed needs_validation candidate, decide whether the blocker is genuinely
@@ -104,9 +105,11 @@ Only after Step 6 passes for every retained record, derive prose from the final 
 3. One short security posture summary.
 4. Confirmed findings table: severity, title, affected boundary, one-line observed result, cross-vendor result.
 5. Each confirmed finding: source location, lower-trust principal, native bounded reproduction, conditions, actual result, impact, priority rationale, and the smallest source fix.
-6. A separate `NEEDS VALIDATION` table: title, trace, exact blocker, and the question the owner can answer. No severity.
-7. Hardening notes and positive patterns.
-8. Coverage from the ledger: covered, candidate, blocked, and deferred counts, important exclusions, and the final critic result. Never imply one run exhausts the target.
+6. Chains: records where one record's `observed_result` is a proven prerequisite of another's (a disclosed ID that another record needs as input, a role gained that another record requires). List each chain's fingerprints in order and the link between each pair. A chain gets a severity of its own only when one verifier reproduced the whole chain end to end; otherwise it is listed without one and each record keeps its own severity. Chains exist only in the report: `findings.json`, `report-schema.json`, and the validators do not change.
+7. Grouped fixes: 3 to 5 source-level changes, each naming the fingerprints it closes and the file or function where the change goes (one shared helper, middleware, or parser fix often closes several records). Omit the section when no change closes more than one record.
+8. A separate `NEEDS VALIDATION` table: title, trace, exact blocker, and the question the owner can answer. No severity.
+9. Hardening notes and positive patterns.
+10. Coverage from the ledger: covered, candidate, blocked, and deferred counts, important exclusions, and the final critic result. Never imply one run exhausts the target.
 
 Rejected records appear only where they explain a prior disagreement or coverage decision.
 
