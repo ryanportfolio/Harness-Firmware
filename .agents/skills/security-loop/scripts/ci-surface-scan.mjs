@@ -66,10 +66,17 @@ function parseArgs(argv) {
 // core.fsmonitor off: a repository-configured monitor is a program, and this scan runs none.
 const git = (tree, args, extra = {}) => spawnSync("git", ["-c", "core.fsmonitor=false", "-C", tree, ...args], { maxBuffer: 512 * 1024 * 1024, ...extra });
 
-// Long token-shaped runs (letters and digits mixed, 24+ chars) and URL passwords are replaced.
+// Values of secret-named assignments and flags (API_KEY=x, --token=x, --password x), URL
+// passwords, and long token-shaped runs (letters and digits mixed, 24+ chars) are replaced.
+// Environment references such as ${NPM_TOKEN} or $NPM_TOKEN are kept.
+const SECRET_WORD = "(?:token|secret|passw(?:or)?d|pwd|api[_-]?key|private[_-]?key|access[_-]?key|credential|auth)";
+const SECRET_ASSIGNMENT = new RegExp(`((?:\\b|-)[\\w.-]*${SECRET_WORD}[\\w.-]*["']?\\s*[=:]\\s*["']?)(?!\\$)[^\\s"',;&|)}]+`, "gi");
+const SECRET_FLAG_SPLIT = new RegExp(`(\\s--?[\\w-]*${SECRET_WORD}[\\w-]*\\s+["']?)(?![-$])[^\\s"',;&|)}]+`, "gi");
 function redact(text, max = 240) {
   let out = String(text)
     .replace(/(:\/\/[^:/\s@]+:)[^@\s]+@/g, "$1<redacted>@")
+    .replace(SECRET_ASSIGNMENT, "$1<redacted>")
+    .replace(SECRET_FLAG_SPLIT, "$1<redacted>")
     .replace(/[A-Za-z0-9_+/=-]{24,}/g, (run) => (/[A-Za-z]/.test(run) && /[0-9]/.test(run) && !/^[a-f0-9]{40}$/.test(run) && !run.includes("/") ? `<redacted ${run.length} chars>` : run))
     .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "?");
   if (out.length > max) out = `${out.slice(0, max)}...`;
@@ -374,12 +381,25 @@ function scanLockfile(file, text) {
   if (/package-lock\.json$|npm-shrinkwrap\.json$/.test(file)) {
     let data;
     try { data = JSON.parse(text); } catch { return { path: file, error: "unparseable JSON" }; }
-    for (const [key, entry] of Object.entries(data.packages ?? {})) {
-      if (key === "" || entry.link || entry.inBundle) continue;
+    const check = (name, entry) => {
+      if (!entry || typeof entry !== "object" || entry.link || entry.inBundle || entry.bundled) return;
       entries += 1;
-      const name = key.replace(/^.*node_modules\//, "");
-      if (entry.resolved) note(name, entry.resolved);
+      if (typeof entry.resolved === "string") note(name, entry.resolved);
+      // Version 1 records a git or path source in `version` and has no `resolved`.
+      else if (typeof entry.version === "string" && /^(git\+|git:|github:|file:|https?:)/.test(entry.version)) note(name, entry.version);
       if (!entry.integrity) missingIntegrity += 1;
+    };
+    if (data.packages && typeof data.packages === "object") {
+      for (const [key, entry] of Object.entries(data.packages)) if (key !== "") check(key.replace(/^.*node_modules\//, ""), entry);
+    } else {
+      // lockfileVersion 1: nested `dependencies` trees, no `packages` map.
+      const walk = (deps) => {
+        for (const [name, entry] of Object.entries(deps ?? {})) {
+          check(name, entry);
+          if (entry && typeof entry === "object") walk(entry.dependencies);
+        }
+      };
+      walk(data.dependencies);
     }
   } else if (/yarn\.lock$/.test(file)) {
     const berry = /__metadata:/.test(text);
@@ -491,7 +511,7 @@ function scanMcpJson(file, text) {
         entry.package_runner = true;
         entry.package_version_exact = pkg ? packageSpecPinned(pkg) : false;
       }
-      const secretArgs = args.filter((a) => /^--?[\w-]*(token|key|secret|password)[\w-]*=/i.test(a)).map((a) => a.split("=")[0]);
+      const secretArgs = args.filter((a) => /^--?[\w-]*(token|key|secret|passw(or)?d|pwd|credential|auth)[\w-]*(=|$)/i.test(a)).map((a) => a.split("=")[0]);
       if (secretArgs.length) entry.secret_named_args = secretArgs;
     }
     const env = server?.env && typeof server.env === "object" ? server.env : {};
