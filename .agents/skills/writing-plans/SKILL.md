@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: "Use when a clear task needs a multi-step implementation plan, dependency ordering, or a durable handoff. Skip for routine changes that can be executed directly."
+description: "Clear task needing a multi-step implementation plan, dependency ordering, or durable handoff. Skip routine changes doable directly."
 ---
 
 # Plan implementation

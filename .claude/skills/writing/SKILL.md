@@ -1,6 +1,6 @@
 ---
 name: writing
-description: "Write or edit audience-facing prose: docs, UI copy, emails, release notes, and application answers. Use also for voice matching, clarity review, or AI-tell cleanup. Ordinary session replies follow session conventions."
+description: "Write or edit audience-facing prose: docs, UI copy, emails, release notes, application answers; voice matching, clarity review, AI-tell cleanup. Session replies follow session conventions."
 ---
 
 # Writing
