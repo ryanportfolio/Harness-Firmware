@@ -76,6 +76,8 @@ const SECRET_FLAG_SPLIT = new RegExp(`(\\s--?[\\w-]*${SECRET_WORD}[\\w-]*\\s+["'
 function redact(text, max = 240) {
   let out = String(text)
     .replace(/(:\/\/)(?!git@)[^/\s@]+@/g, "$1<redacted>@")
+    .replace(/(\bauthorization["']?\s*[:=]\s*["']?)(?:(?:bearer|basic|token|digest)\s+)?(?!\$)[^\s"',;&|)}]+/gi, "$1<redacted>")
+    .replace(/\b(bearer|basic)\s+(?!\$|<redacted)[A-Za-z0-9._~+/=-]{8,}/gi, "$1 <redacted>")
     .replace(SECRET_ASSIGNMENT, "$1<redacted>")
     .replace(SECRET_FLAG_SPLIT, "$1<redacted>")
     .replace(/[A-Za-z0-9_+/=-]{24,}/g, (run) => (/[A-Za-z]/.test(run) && /[0-9]/.test(run) && !/^[a-f0-9]{40}$/.test(run) && !run.includes("/") ? `<redacted ${run.length} chars>` : run))
@@ -132,6 +134,26 @@ const lineOf = (text, index) => text.slice(0, index).split("\n").length;
 const lines = (text) => text.split(/\r?\n/);
 const capped = (list) => (list.length > MAX_LIST ? { items: list.slice(0, MAX_LIST), total: list.length } : list);
 
+// YAML ends a plain scalar at " #": drop that comment unless the "#" sits inside quotes.
+function stripComment(value) {
+  let quote = null;
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    if (quote) { if (ch === quote) quote = null; continue; }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === "#" && (i === 0 || /\s/.test(value[i - 1]))) return value.slice(0, i).trim();
+  }
+  return value.trim();
+}
+
+// Parses JSON that must be an object; null, arrays, and scalars are reported like bad JSON.
+function parseObject(text) {
+  try {
+    const data = JSON.parse(text);
+    return data && typeof data === "object" && !Array.isArray(data) ? data : null;
+  } catch { return null; }
+}
+
 // Line-based YAML walker: gives each line its key path, and the owning key for block-scalar
 // lines. List items appear in the path as "-@<line>" so steps can be grouped. Not a full YAML
 // parser: anchors, flow mappings, and multi-document files are read as plain lines.
@@ -168,11 +190,11 @@ function walkYaml(text) {
     const parent = stack.map((entry) => entry.key);
     const match = rest.match(/^(?:"([^"]+)"|'([^']+)'|([^\s#'"{[][^:#]*?))\s*:(?:\s+(.*)|$)/);
     if (!match) {
-      out.push({ n, path: parent, key: null, value: rest.trim() });
+      out.push({ n, path: parent, key: null, value: stripComment(rest) });
       continue;
     }
     const key = (match[1] ?? match[2] ?? match[3]).trim();
-    const value = (match[4] ?? "").trim();
+    const value = stripComment(match[4] ?? "");
     out.push({ n, path: parent, key, value });
     stack.push({ indent, key });
     if (/^[|>][-+0-9]*\s*(#.*)?$/.test(value)) block = { indent, path: parent, key };
@@ -322,9 +344,24 @@ function packageSpecPinned(arg) {
   return isExactVersion(arg.slice(at + 1));
 }
 
+// The package a runner fetches: an explicit --package/-p (npm) or --from/--spec (uv, pipx)
+// value, else the first non-flag argument. npm pins as name@1.2.3; Python as name==1.2.3.
+function runnerPackagePinned(args, python) {
+  const select = python ? /^--(from|spec)$/ : /^(--package|-p)$/;
+  let spec = null;
+  for (let i = 0; i < args.length; i++) {
+    const inline = args[i].match(python ? /^--(?:from|spec)=(.+)$/ : /^--package=(.+)$/);
+    if (inline) { spec = inline[1]; break; }
+    if (select.test(args[i]) && args[i + 1]) { spec = args[i + 1]; break; }
+  }
+  spec ??= args.find((a) => !a.startsWith("-") && a !== "dlx" && a !== "run") ?? null;
+  if (!spec) return false;
+  return python ? /^[A-Za-z0-9][\w.-]*(\[[^\]]*\])?==[\w.!+-]+$/.test(spec) : packageSpecPinned(spec);
+}
+
 function scanPackageJson(file, text, scopesUsed) {
-  let data;
-  try { data = JSON.parse(text); } catch { return { path: file, error: "unparseable JSON" }; }
+  const data = parseObject(text);
+  if (!data) return { path: file, error: "unparseable JSON or not an object" };
   const report = { path: file };
   const lifecycle = [];
   for (const name of ["preinstall", "install", "postinstall", "prepare", "prepublish", "prepack"]) {
@@ -382,8 +419,8 @@ function scanLockfile(file, text) {
     if (!/^(registry\.npmjs\.org|registry\.yarnpkg\.com)$/.test(host)) nonRegistry.push({ name, source: redact(url, 160) });
   };
   if (/package-lock\.json$|npm-shrinkwrap\.json$/.test(file)) {
-    let data;
-    try { data = JSON.parse(text); } catch { return { path: file, error: "unparseable JSON" }; }
+    const data = parseObject(text);
+    if (!data) return { path: file, error: "unparseable JSON or not an object" };
     const check = (name, entry) => {
       if (!entry || typeof entry !== "object" || entry.link || entry.inBundle || entry.bundled) return;
       entries += 1;
@@ -467,8 +504,8 @@ const BROAD_BASH = /^Bash(\(\s*\*?\s*\))?$|^Bash\(\s*\*\s*[: ]?\*?\s*\)$/;
 const INTERPRETER_PREFIX = /^Bash\(\s*(node|python3?|py|sh|bash|zsh|pwsh|powershell|cmd|curl|wget|npx|npm\s+(run|exec)|pnpm\s+(dlx|exec)|bunx|uvx|deno|ruby|perl|php|eval|xargs|env|sudo|iex|Invoke-Expression)\b[^)]*\)$/i;
 
 function scanClaudeSettings(file, text) {
-  let data;
-  try { data = JSON.parse(text); } catch { return { path: file, error: "unparseable JSON" }; }
+  const data = parseObject(text);
+  if (!data) return { path: file, error: "unparseable JSON or not an object" };
   const report = { path: file };
   const hooks = [];
   for (const [event, groups] of Object.entries(data.hooks ?? {})) {
@@ -481,7 +518,7 @@ function scanClaudeSettings(file, text) {
           command: redact(hook.command, 300),
           uses_eval_or_shell_string: /\beval\b|\bsh\s+-c\b|\bbash\s+-c\b|Invoke-Expression|\biex\b|\$\(/.test(hook.command),
           reads_tool_input: /\bjq\b|stdin|tool_input|\bxargs\b|\bread\s/i.test(hook.command),
-          scripts: [...hook.command.matchAll(/[^\s"']+\.(?:sh|bash|ps1|mjs|cjs|js|ts|py)\b/g)].map((m) => m[0]).slice(0, 5),
+          scripts: [...redact(hook.command, 2000).matchAll(/[^\s"']+\.(?:sh|bash|ps1|mjs|cjs|js|ts|py)\b/g)].map((m) => m[0]).slice(0, 5),
         });
       }
     }
@@ -497,8 +534,8 @@ function scanClaudeSettings(file, text) {
 }
 
 function scanMcpJson(file, text) {
-  let data;
-  try { data = JSON.parse(text); } catch { return [{ path: file, error: "unparseable JSON" }]; }
+  const data = parseObject(text);
+  if (!data) return [{ path: file, error: "unparseable JSON or not an object" }];
   const servers = [];
   for (const [name, server] of Object.entries(data.mcpServers ?? data.servers ?? {})) {
     const entry = { path: file, server: name };
@@ -508,11 +545,11 @@ function scanMcpJson(file, text) {
     if (typeof server?.command === "string") {
       const args = Array.isArray(server.args) ? server.args.filter((a) => typeof a === "string") : [];
       entry.command = redact([server.command, ...args].join(" "), 200);
-      const runner = /(^|[\\/])(npx|bunx|uvx|pipx)(\.cmd|\.exe)?$/i.test(server.command) || (/(^|[\\/])pnpm(\.cmd)?$/i.test(server.command) && args[0] === "dlx");
+      const python = /(^|[\\/])(uvx|pipx)(\.cmd|\.exe)?$/i.test(server.command);
+      const runner = python || /(^|[\\/])(npx|bunx)(\.cmd|\.exe)?$/i.test(server.command) || (/(^|[\\/])pnpm(\.cmd)?$/i.test(server.command) && args[0] === "dlx");
       if (runner) {
-        const pkg = args.find((a) => !a.startsWith("-") && a !== "dlx");
         entry.package_runner = true;
-        entry.package_version_exact = pkg ? packageSpecPinned(pkg) : false;
+        entry.package_version_exact = runnerPackagePinned(args, python);
       }
       const secretArgs = args.filter((a) => /^--?[\w-]*(token|key|secret|passw(or)?d|pwd|credential|auth)[\w-]*(=|$)/i.test(a)).map((a) => a.split("=")[0]);
       if (secretArgs.length) entry.secret_named_args = secretArgs;
@@ -645,7 +682,9 @@ function main() {
   }
 
   const mapped = new Set(report.npmrc.flatMap((entry) => entry.scopes.map((s) => s.scope)));
-  if (mapped.size) report.npm_scopes_without_registry_mapping = [...scopesUsed].filter((scope) => !mapped.has(scope)).sort();
+  // With no mapping at all, every scope resolves from the default registry; public scopes
+  // such as @types appear too, and the hunter decides which ones are internal.
+  report.npm_scopes_without_registry_mapping = [...scopesUsed].filter((scope) => !mapped.has(scope)).sort();
   report.public_bundler_secret_names = [...publicNames].map(([name, where]) => ({ name, locations: where.slice(0, 10), count: where.length }));
   for (const key of ["pip_extra_indexes", "tls_verification_off", "fuzz_targets"]) report[key] = capped(report[key]);
 
