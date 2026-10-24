@@ -12,20 +12,20 @@ Ordinary chat follows session conventions, including Caveman when configured. De
 ## Precedence
 
 1. The writer's own sample voice: mirror sentence length, register, punctuation, recurring phrases. Never upgrade casual to corporate.
-2. An optional project voice reference identified by repository instructions, such as CLAUDE.md or AGENTS.md. Apply it only to that project's work; no particular voice file is required.
+2. A voice reference named by user or repository instructions, such as the global or project CLAUDE.md or AGENTS.md. Follow it wherever the rules below leave a choice open; where they conflict, the rules win. A project's reference takes priority over a user-wide one for that project's work. No voice file is required.
 3. The rules below.
 
 Explicit user choices override all style defaults, including punctuation. Preserve facts, uncertainty, quotations, identifiers, and technical meaning.
 
 ## Building a voice reference
 
-When the user wants deliverables in their own voice and the project has no voice reference, offer to build one. Ask for complete pieces they wrote without AI help, ideally three or more of the kind being drafted. Whole pieces show how the writer opens, moves between points, and ends; excerpts do not. From the samples, record:
+When the user wants deliverables in their own voice and no voice reference exists, offer to build one. Ask for complete pieces they wrote without AI help, ideally three or more of the kind being drafted. Whole pieces show how the writer opens, moves between points, and ends; excerpts do not. From the samples, record:
 
 - **Traits**, each with a short exact quote from a sample: sentence length, register, openings and endings, humor, how they hedge, recurring phrases.
 - **Words and moves they avoid**, from the samples and from the user's own list. The tells below already cover generic AI phrasing; list only what belongs to this writer.
 - **Anti-examples**: a few passages that miss the voice, such as a draft the user rejected or one sample paragraph rewritten in generic style, each with one line on what is wrong with it.
 
-Record only traits the samples show. Save the reference where repository instructions point; if they name no location, ask the user where it goes. When drafting in that voice, load the whole reference, anti-examples included, and keep the samples available.
+Record only traits the samples show. Save the reference where user or repository instructions point; if they name no location, ask the user where it goes. When drafting in that voice, load the whole reference, anti-examples included, and keep the samples available.
 
 ## Before drafting
 
