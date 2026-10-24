@@ -3,36 +3,41 @@
    Runs axe-core for the rules it already measures well (contrast on solid
    backgrounds, names, roles, target size) and adds the checks axe leaves to a
    human: contrast over images and gradients, focus visibility and focus hidden
-   under sticky UI, reflow at 320 and 640 CSS px, text spacing, text-only
-   enlargement, reduced motion, layout shift, dark mode contrast.
+   under sticky UI, clickable elements Tab cannot reach, reflow at 320 and 640
+   CSS px, text spacing, text-only enlargement, reduced motion, layout shift
+   during load, dark mode contrast. What axe could not decide is listed, not
+   dropped.
 
    Headed Chrome only (headless renders through the CPU and hides GPU-only
    bugs), offscreen and muted, through the repo's launchPlacedChrome() when it
    exists.
 
-   Needs axe-core and playwright-core (or playwright) resolvable from the
-   current directory or the repo root. Scratch install, nothing saved:
-     npm i --no-save axe-core@latest playwright-core@latest
+   Needs axe-core and playwright-core (or playwright). Install them for the run
+   into a scratch folder the probe looks in first, nothing saved to the project:
+     npm i --no-save --prefix .tmp/ui-quality-deps axe-core@latest playwright-core@latest
 
    Usage:
      node <skill>/scripts/probe.mjs --url <url> [--url <url> ...] [--out <dir>]
        [--storage-state <playwright-state.json>] [--wait-for <css>] [--settle <ms>]
-       [--max-tabs <n>] [--skip <check,check>] [--strict]
+       [--max-tabs <n>] [--skip <check,check>] [--strict] [--allow-error-status]
 
    Writes <out>/report.json, <out>/report.md and screenshots. Exit 0 when every
    URL was audited, 1 with --strict when any finding is a fail, 2 when the probe
-   could not run or a URL could not be audited. */
+   could not run, a URL could not be audited (including an HTTP 4xx or 5xx
+   answer), or a check errored. */
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO = resolve(HERE, '../../../..');
+// Run from the audited repository root. This also works when the skill is a
+// scratch copy or a personal install rather than four levels below it.
+const REPO = existsSync(join(process.cwd(), '.git')) ? process.cwd() : resolve(HERE, '../../../..');
 const CHECKS = ['axe', 'contrast', 'focus', 'reflow', 'spacing', 'textscale', 'motion', 'shift', 'dark', 'phone'];
 
 function parseArgs(argv) {
-  const opts = { urls: [], out: null, storageState: null, waitFor: null, settle: 1500, maxTabs: 80, skip: new Set(), strict: false };
+  const opts = { urls: [], out: null, storageState: null, waitFor: null, settle: 1500, maxTabs: 80, skip: new Set(), strict: false, allowErrorStatus: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => {
@@ -48,6 +53,7 @@ function parseArgs(argv) {
     else if (a === '--max-tabs') opts.maxTabs = Number(next());
     else if (a === '--skip') next().split(',').map((s) => s.trim()).filter(Boolean).forEach((s) => opts.skip.add(s));
     else if (a === '--strict') opts.strict = true;
+    else if (a === '--allow-error-status') opts.allowErrorStatus = true;
     else throw new Error(`unknown argument ${a}`);
   }
   if (!opts.urls.length) throw new Error('at least one --url is required');
@@ -59,9 +65,13 @@ function parseArgs(argv) {
   return opts;
 }
 
-// resolve a package from the current directory first, then the repo root
+// where the per-run install goes: a scratch folder, so the project's own node_modules and lockfile stay untouched
+const DEPS = join(REPO, '.tmp', 'ui-quality-deps');
+const INSTALL = `npm i --no-save --prefix "${DEPS}" axe-core@latest playwright-core@latest`;
+
+// resolve a package from the scratch install (under the current folder or the repo root), then the current folder, then the repo root
 function resolvePkg(spec) {
-  for (const base of [process.cwd(), REPO]) {
+  for (const base of [join(process.cwd(), '.tmp', 'ui-quality-deps'), DEPS, process.cwd(), REPO]) {
     try {
       return createRequire(join(base, 'package.json')).resolve(spec);
     } catch { /* try the next base */ }
@@ -69,26 +79,32 @@ function resolvePkg(spec) {
   return null;
 }
 
+let launchedVia = '';
 async function launch() {
-  const place = process.env.CHROME_PLACE || 'offscreen';
+  // always offscreen: nothing here needs watching, and another placement would cover the operator's screen
+  const place = 'offscreen';
   const launcher = join(REPO, 'scripts', 'lib', 'launch-chrome.mjs');
   if (existsSync(launcher)) {
     try {
       const { launchPlacedChrome } = await import(pathToFileURL(launcher).href);
+      launchedVia = 'launchPlacedChrome()';
       return await launchPlacedChrome({ place, purpose: 'ui-quality probe' });
     } catch (err) {
       console.warn(`[probe] launchPlacedChrome unavailable (${err.message}); launching directly`);
     }
   }
   const entry = resolvePkg('playwright-core') || resolvePkg('playwright');
-  if (!entry) throw new Error('playwright-core not found; run: npm i --no-save axe-core@latest playwright-core@latest');
+  if (!entry) throw new Error(`playwright-core not found; run: ${INSTALL}`);
   // a CommonJS package imported by path exposes its exports on default
   const mod = await import(pathToFileURL(entry).href);
   const chromium = mod.chromium ?? mod.default?.chromium;
   const args = ['--window-position=-2400,-2400', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'];
   try {
+    launchedVia = 'installed Chrome';
     return await chromium.launch({ headless: false, channel: 'chrome', args });
   } catch {
+    // no installed Chrome: bundled Chromium, still headed; the report says so
+    launchedVia = 'bundled Chromium (no installed Chrome found)';
     return await chromium.launch({ headless: false, args });
   }
 }
@@ -145,7 +161,7 @@ const INIT = () => {
       for (const { r, text } of textRects(el)) {
         const x = overX && (r.right > b.right + 1 || r.left < b.left - 1);
         const y = overY && (r.bottom > b.bottom + 1 || r.top < b.top - 1);
-        if (x || y) { out.push({ selector: sel(el), text: text.slice(0, 60), axis: x && y ? 'both' : x ? 'x' : 'y' }); break; }
+        if (x || y) { out.push({ selector: sel(el), text: text.slice(0, 60), axis: x && y ? 'both' : x ? 'x' : 'y', hidden: Math.max(el.scrollWidth - el.clientWidth, el.scrollHeight - el.clientHeight) }); break; }
       }
     }
     return out;
@@ -220,7 +236,7 @@ const opts = (() => {
 
 const axePath = resolvePkg('axe-core/axe.min.js');
 if (!axePath && !opts.skip.has('axe')) {
-  console.error('[probe] axe-core not found; run: npm i --no-save axe-core@latest playwright-core@latest');
+  console.error(`[probe] axe-core not found; run: ${INSTALL}`);
   process.exit(2);
 }
 const axeSource = axePath ? readFileSync(axePath, 'utf8') : null;
@@ -228,15 +244,31 @@ mkdirSync(opts.out, { recursive: true });
 
 const findings = [];
 const notes = [];
+const axeReview = new Map();
 const shots = [];
 const add = (f) => {
   // the same problem seen at several viewports is one finding
+  const observation = { viewport: f.viewport, measured: f.measured, ...(f.threshold ? { threshold: f.threshold } : {}) };
   const same = findings.find((g) => g.check === f.check && g.url === f.url && g.selector === f.selector);
-  if (same) { if (!same.viewport.split(', ').includes(f.viewport)) same.viewport += `, ${f.viewport}`; return; }
-  findings.push(f);
+  if (same) {
+    if (!same.viewport.split(', ').includes(f.viewport)) same.viewport += `, ${f.viewport}`;
+    same.observations.push(observation);
+    return;
+  }
+  findings.push({ ...f, observations: [observation] });
 };
 const on = (check) => !opts.skip.has(check);
-const slug = (url) => url.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'page';
+// numbered by position, so state URLs that share a long prefix never overwrite each other's screenshots
+const slug = (url) => `${String(opts.urls.indexOf(url) + 1).padStart(2, '0')}-${url.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'page'}`;
+
+// a crash anywhere is an incomplete run (exit 2), never confused with --strict's exit 1
+const crash = async (err) => {
+  console.error(`[probe] crashed: ${err?.stack || err}`);
+  try { await browser?.close(); } catch { /* already gone */ }
+  process.exit(2);
+};
+process.on('uncaughtException', crash);
+process.on('unhandledRejection', crash);
 
 let browser;
 try {
@@ -245,6 +277,8 @@ try {
   console.error(`[probe] could not launch Chrome: ${err.message.split('\n')[0]}`);
   process.exit(2);
 }
+const browserInfo = `${launchedVia}, version ${browser.version()}`;
+if (launchedVia.startsWith('bundled')) notes.push(`ran in ${browserInfo}, not the installed Chrome; GPU and font rendering may differ`);
 const blank = await (await browser.newContext()).newPage();
 const pixels = (args) => blank.evaluate(PIXELS, args);
 
@@ -258,7 +292,12 @@ async function open(url, ctxOpts = {}) {
   });
   await context.addInitScript(INIT);
   const page = await context.newPage();
-  await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+  const response = await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+  // a 404 or 500 page, or a sign-in page served with an error code, is not the page that was asked for
+  if (response && response.status() >= 400 && !opts.allowErrorStatus) {
+    await context.close();
+    throw new Error(`HTTP ${response.status()}: not audited (pass --allow-error-status to audit an error page on purpose)`);
+  }
   if (opts.waitFor) await page.waitForSelector(opts.waitFor, { timeout: 30000 });
   await page.waitForTimeout(opts.settle);
   return { context, page };
@@ -290,12 +329,48 @@ async function runAxe(page, url, viewport, tags) {
     }
     if (v.nodes.length > 15) notes.push(`${url} ${viewport}: axe ${v.id} has ${v.nodes.length - 15} more nodes`);
   }
+  // Keep every undecided row, including contrast at widths the pixel check does
+  // not sample. Desktop contrast also goes on to the pixel check; the report
+  // reader reconciles that evidence rather than treating absence as a pass.
+  for (const r of res.incomplete) {
+    const key = `${url} ${viewport} ${r.id}`;
+    if (!axeReview.has(key)) axeReview.set(key, { url, id: r.id, help: r.help, viewports: [], nodes: r.nodes.slice(0, 5).map((n) => n.target.join(' ')), count: r.nodes.length });
+    axeReview.get(key).viewports.push(viewport);
+  }
   return res.incomplete;
+}
+
+// the two names axe accepts and a person would not: a placeholder as the only field label, one glyph as a control's name
+async function nameGaps(page, url) {
+  const gaps = await page.evaluate(() => {
+    const out = [];
+    const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
+    for (const el of document.querySelectorAll('input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]):not([type=image]), textarea')) {
+      const ph = (el.getAttribute('placeholder') || '').trim();
+      if (!ph || !shown(el)) continue;
+      const labelled = [...(el.labels || [])].some((l) => l.innerText.trim()) || (el.getAttribute('aria-label') || '').trim() || el.hasAttribute('aria-labelledby');
+      if (!labelled) out.push({ kind: 'placeholder', selector: window.__uq.sel(el), name: ph });
+    }
+    for (const el of document.querySelectorAll('button, a[href], [role=button], [role=link], input[type=submit], input[type=button]')) {
+      if (el.hasAttribute('aria-labelledby') || !shown(el)) continue;
+      const name = (el.getAttribute('aria-label') || (el.localName === 'input' ? el.value : el.innerText) || '').replace(/\s+/g, ' ').trim();
+      // one non-digit character ("x", "×", "+", "»"), or two characters with no letter or digit; page numbers are left alone
+      if (/^\P{N}$/u.test(name) || (name.length === 2 && !/[\p{L}\p{N}]/u.test(name))) out.push({ kind: 'glyph', selector: window.__uq.sel(el), name });
+    }
+    return out;
+  });
+  for (const g of gaps.filter((x) => x.kind === 'placeholder').slice(0, 15)) {
+    add({ check: 'name:placeholder-only', url, viewport: '1280', wcag: ['3.3.2'], level: 'A/AA', severity: 'review', selector: g.selector, measured: `field named only by its placeholder "${g.name}", which disappears once the user types; axe accepts it` });
+  }
+  for (const g of gaps.filter((x) => x.kind === 'glyph').slice(0, 15)) {
+    add({ check: 'name:glyph', url, viewport: '1280', wcag: ['4.1.2'], level: 'A/AA', severity: 'review', selector: g.selector, measured: `control's accessible name is "${g.name}", which does not say what it does; axe accepts it` });
+  }
 }
 
 async function compositedContrast(page, url, incomplete) {
   const cc = incomplete.find((r) => r.id === 'color-contrast');
   if (!cc) return;
+  if (cc.nodes.length > 40) notes.push(`${url}: contrast over images checked the first 40 of ${cc.nodes.length} elements axe could not decide; the rest were not checked`);
   for (const n of cc.nodes.slice(0, 40)) {
     const selector = n.target.join(' ');
     const info = await page.evaluate((s) => {
@@ -361,11 +436,13 @@ async function focusWalk(page, url) {
       const r = el.getBoundingClientRect();
       const vw = innerWidth, vh = innerHeight;
       const inView = r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < vw && r.top < vh;
+      const hiddenInput = el.localName === 'input' && (r.width <= 1 || r.height <= 1) && (['checkbox', 'radio'].includes(el.type) || el.labels?.length > 0);
       // sample the focused box: is something fixed or sticky painted on top of it?
       const pts = [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]]
         .map(([fx, fy]) => [r.left + r.width * fx, r.top + r.height * fy])
         .filter(([x, y]) => x >= 0 && y >= 0 && x < vw && y < vh);
-      let covered = 0, coveredBy = '';
+      let covered = 0;
+      const coverers = new Set();
       for (const [x, y] of pts) {
         const top = document.elementFromPoint(x, y);
         if (!top || el.contains(top) || top.contains(el)) continue;
@@ -374,12 +451,12 @@ async function focusWalk(page, url) {
           const p = getComputedStyle(n).position;
           if (p === 'fixed' || p === 'sticky') { pinned = true; break; }
         }
-        if (pinned) { covered++; coveredBy = window.__uq.sel(n); }
+        if (pinned) { covered++; coverers.add(window.__uq.sel(n)); }
       }
       return {
         selector: window.__uq.sel(el), name: (el.getAttribute('aria-label') || el.innerText || el.value || el.title || '').trim().slice(0, 40),
         rect: { x: r.left - 8, y: r.top - 8, width: r.width + 16, height: r.height + 16 }, perimeter: 2 * (r.width + r.height),
-        inView, points: pts.length, covered, coveredBy,
+        inView, hiddenInput, points: pts.length, covered, coverers: [...coverers], coveredBy: [...coverers].join(', '),
       };
     });
     if (!f) { if (i > 0) break; continue; }
@@ -387,29 +464,60 @@ async function focusWalk(page, url) {
     if (f.repeat === 'first') break;
     if (f.repeat) { notes.push(`${url}: focus returned to ${f.selector} before reaching the end; possible trap or loop`); break; }
     order.push(f.name ? `${f.selector} "${f.name}"` : f.selector);
-    if (!f.inView) {
-      add({ check: 'focus:offscreen', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'fail', selector: f.selector, measured: 'focused element is outside the viewport or has no size' });
+    if (!f.inView || f.hiddenInput) {
+      // a visually hidden native input behind a custom control usually draws its ring on the label; a person has to look
+      if (f.hiddenInput) add({ check: 'focus:hidden-input', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'review', selector: f.selector, measured: 'focus is on a 0 or 1 px native input; check that its label or custom control shows a focus marker' });
+      else add({ check: 'focus:offscreen', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'fail', selector: f.selector, measured: 'focused element is outside the viewport or has no size' });
       continue;
     }
+    let hidden = [];
     if (f.points && f.covered === f.points) {
       add({ check: 'focus:obscured', url, viewport: '1280', wcag: ['2.4.11'], level: 'A/AA', severity: 'fail', selector: f.selector, measured: `entirely covered by ${f.coveredBy}` });
-      // a covered element shows no ring either; one finding is enough
-      continue;
+      // still measure the ring itself: hide what covers it for the two screenshots
+      hidden = f.coverers;
     } else if (f.covered) {
       add({ check: 'focus:partly-obscured', url, viewport: '1280', wcag: ['2.4.12'], level: 'AAA', severity: 'advisory', selector: f.selector, measured: `${f.covered}/${f.points} sample points covered by ${f.coveredBy}` });
     }
+    const cover = (on) => page.evaluate(([sels, hide]) => {
+      for (const s of sels) { const n = document.querySelector(s); if (n) n.style.visibility = hide ? 'hidden' : ''; }
+    }, [hidden, on]);
+    if (hidden.length) { await cover(true); await page.waitForTimeout(50); }
     // focused vs unfocused pixels around the element; then put focus back for the next Tab
     const on1 = await page.screenshot();
     await page.evaluate(() => { window.__uqLast = document.activeElement; document.activeElement.blur(); });
     await page.waitForTimeout(180);
     const off = await page.screenshot();
     await page.evaluate(() => window.__uqLast.focus({ preventScroll: true }));
+    if (hidden.length) await cover(false);
     const d = await pixels({ op: 'diff', a: on1.toString('base64'), b: off.toString('base64'), rect: f.rect, threshold: 48 });
+    const how = hidden.length ? ` (measured with ${f.coveredBy} hidden)` : '';
     if (d.changed === 0) {
-      add({ check: 'focus:invisible', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'fail', selector: f.selector, measured: 'no pixel changes between focused and unfocused' });
+      add({ check: 'focus:invisible', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'fail', selector: f.selector, measured: `no pixel changes between focused and unfocused${how}` });
     } else if (d.changed < f.perimeter) {
-      add({ check: 'focus:weak', url, viewport: '1280', wcag: ['2.4.13'], level: 'AAA', severity: 'review', selector: f.selector, measured: `${d.changed} px changed; a 1 px ring around it would be ${Math.round(f.perimeter)} px` });
+      // a craft heuristic, not the 2.4.13 area-and-contrast test
+      add({ check: 'focus:weak', url, viewport: '1280', wcag: [], level: 'craft', severity: 'review', selector: f.selector, measured: `${d.changed} px changed, less than a 1 px ring around it (${Math.round(f.perimeter)} px)${how}` });
     }
+  }
+  // things styled as clickable that Tab can never reach: a div with a pointer cursor or an inline onclick
+  const unreachable = await page.evaluate(() => {
+    // reachable by Tab itself, or a label; tabindex="-1" is not reachable
+    const self = 'a[href], button, input, select, textarea, summary, label, [contenteditable], [tabindex]:not([tabindex^="-"])';
+    // only real controls make their descendants part of one target; a focus wrapper such as <main tabindex="-1"> does not
+    const wraps = 'a[href], button, summary, [contenteditable]';
+    const out = [];
+    for (const el of document.body.querySelectorAll('*')) {
+      if (el.matches(self) || el.parentElement.closest(wraps)) continue;
+      const cs = getComputedStyle(el);
+      const pointer = cs.cursor === 'pointer' && getComputedStyle(el.parentElement).cursor !== 'pointer';
+      if (!pointer && !el.hasAttribute('onclick')) continue;
+      const b = el.getBoundingClientRect();
+      if (!b.width || !b.height || cs.visibility === 'hidden') continue;
+      out.push(`${window.__uq.sel(el)}${el.getAttribute('role') ? ` role=${el.getAttribute('role')}` : ''}`);
+    }
+    return out;
+  });
+  for (const s of unreachable.slice(0, 15)) {
+    add({ check: 'keyboard:unreachable', url, viewport: '1280', wcag: ['2.1.1'], level: 'A/AA', severity: 'review', selector: s, measured: 'styled as clickable (pointer cursor or onclick) but not a link, button or form control and has no tabindex of 0 or more; Tab cannot reach it' });
   }
   if (order.length >= opts.maxTabs) notes.push(`${url}: focus walk stopped at --max-tabs ${opts.maxTabs}; later controls were not checked`);
   if (!order.length) add({ check: 'focus:none', url, viewport: '1280', wcag: ['2.1.1'], level: 'A/AA', severity: 'review', selector: 'document', measured: 'Tab reached no element; confirm the page has controls' });
@@ -423,39 +531,53 @@ async function reflow(page, url) {
     const r = await page.evaluate(() => {
       const se = document.scrollingElement;
       const vw = innerWidth;
-      const scrollsInside = (el) => {
+      // overflow-x on html, or on body when html leaves it visible, applies to the viewport;
+      // hidden or clip there cuts content off even though scrollWidth still counts it
+      const ox = (el) => getComputedStyle(el).overflowX;
+      const rootOx = ox(document.documentElement) !== 'visible' ? ox(document.documentElement) : ox(document.body);
+      const rootClips = rootOx === 'hidden' || rootOx === 'clip';
+      // nearest ancestor that fits the viewport and stops overflow: 'scroll' (content scrolls inside it) or 'clip' (content is cut off)
+      const container = (el) => {
         for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+          if (n.getBoundingClientRect().right > vw + 1) continue;
           const o = getComputedStyle(n).overflowX;
-          if ((o === 'auto' || o === 'scroll' || o === 'hidden' || o === 'clip') && n.getBoundingClientRect().right <= vw + 1) return true;
+          if (o === 'auto' || o === 'scroll') return 'scroll';
+          if (o === 'hidden' || o === 'clip') return 'clip';
         }
-        return false;
+        return null;
       };
-      const over = [];
+      const over = [], cut = [];
       for (const el of document.body.querySelectorAll('*')) {
         const b = el.getBoundingClientRect();
-        if (!b.width || b.right <= vw + 1 || scrollsInside(el)) continue;
+        if (!b.width || b.right <= vw + 1) continue;
+        const c = container(el);
+        if (c === 'scroll') continue;
         // closed off-canvas menus and drawers are not lost content
         const cs = getComputedStyle(el);
         if (cs.visibility === 'hidden' || cs.opacity === '0' || el.closest('[aria-hidden="true"], [inert]')) continue;
-        over.push(el);
+        (c === 'clip' ? cut : over).push(el);
       }
       // keep the outermost offenders only
-      const set = new Set(over);
-      const top = over.filter((el) => !set.has(el.parentElement)).slice(0, 15);
-      return { overflow: se.scrollWidth - se.clientWidth, offenders: top.map((el) => ({ selector: window.__uq.sel(el), right: Math.round(el.getBoundingClientRect().right) })), clipped: window.__uq.clipped() };
+      const outer = (list) => { const set = new Set(list); return list.filter((el) => !set.has(el.parentElement)).slice(0, 15).map((el) => ({ selector: window.__uq.sel(el), right: Math.round(el.getBoundingClientRect().right) })); };
+      return { overflow: rootClips ? 0 : se.scrollWidth - se.clientWidth, offenders: outer(over), cut: outer(cut), clipped: window.__uq.clipped() };
     });
     await shot(page, `${slug(url)}-${width}`);
+    // responsive pages show and hide different controls at 320; axe runs there too
+    if (width === 320 && on('axe') && axeSource) await runAxe(page, url, '320', ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']);
     if (r.overflow > 1) {
       add({
         check: 'reflow:horizontal-scroll', url, viewport: String(width), wcag: ['1.4.10'], level: 'A/AA', severity: 'fail',
         selector: r.offenders.map((o) => `${o.selector} (right ${o.right})`).join('; ') || 'document',
         measured: `page scrolls sideways by ${r.overflow} px at ${width} CSS px (${width === 320 ? '400' : '200'}% zoom of 1280)`,
       });
-    } else if (r.offenders.length) {
+    }
+    // past the right edge with no way to scroll to it: inside a wrapper that hides overflow, or on a page that hides it
+    const cutOff = [...r.cut, ...(r.overflow > 1 ? [] : r.offenders)];
+    if (cutOff.length) {
       add({
         check: 'reflow:cut-off', url, viewport: String(width), wcag: ['1.4.10'], level: 'A/AA', severity: 'review',
-        selector: r.offenders.map((o) => `${o.selector} (right ${o.right})`).join('; '),
-        measured: `no sideways scroll, but content extends past the right edge at ${width} CSS px; if the page hides overflow, that content is cut off`,
+        selector: cutOff.map((o) => `${o.selector} (right ${o.right})`).join('; '),
+        measured: `content extends past the right edge at ${width} CSS px inside a box or page that hides overflow, so it is cut off; real if a user needs it`,
       });
     }
     for (const c of r.clipped.slice(0, 10)) {
@@ -469,15 +591,18 @@ async function reflow(page, url) {
 async function stress(url, check, wcag, level, severity, apply, label) {
   const { context, page } = await open(url);
   try {
-    const before = new Set((await page.evaluate(() => window.__uq.clipped())).map((c) => c.selector));
+    const before = new Map((await page.evaluate(() => window.__uq.clipped())).map((c) => [c.selector, c.hidden]));
     const overflowBefore = await page.evaluate(() => document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth);
     await page.evaluate(apply);
     await page.waitForTimeout(400);
     const after = await page.evaluate(() => window.__uq.clipped());
     const overflowAfter = await page.evaluate(() => document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth);
     await shot(page, `${slug(url)}-${check}`);
-    for (const c of after.filter((c) => !before.has(c.selector)).slice(0, 15)) {
-      add({ check: `${check}:clipped-text`, url, viewport: '1280', wcag, level, severity, selector: c.selector, measured: `${label}: text now cut off on ${c.axis}: "${c.text}"` });
+    // new clipping, or a box that already clipped and now hides more
+    for (const c of after.filter((c) => !before.has(c.selector) || c.hidden > before.get(c.selector) + 2).slice(0, 15)) {
+      const was = before.has(c.selector) ? ` (${before.get(c.selector)} px hidden before, ${c.hidden} px now)` : '';
+      // a box that already cut its text off (an ellipsis, a line clamp) lost content before the stress; a person decides
+      add({ check: `${check}:clipped-text`, url, viewport: '1280', wcag, level, severity: was ? 'review' : severity, selector: c.selector, measured: `${label}: text now cut off on ${c.axis}: "${c.text}"${was}` });
     }
     if (overflowAfter > overflowBefore + 1) {
       add({ check: `${check}:horizontal-scroll`, url, viewport: '1280', wcag, level, severity, selector: 'document', measured: `${label}: page now scrolls sideways by ${overflowAfter} px` });
@@ -489,7 +614,8 @@ async function stress(url, check, wcag, level, severity, apply, label) {
 
 async function layoutShift(page, url) {
   const shifts = await page.evaluate(() => window.__uq.shifts);
-  // CLS: largest session window (gap under 1 s, window under 5 s)
+  // largest session window (gap under 1 s, window under 5 s), the way CLS is scored; but only
+  // load and settle are recorded, so this is a lower bound of the CLS a visit would see
   let best = 0, cur = 0, start = 0, last = -Infinity, bestSources = [], curSources = [];
   for (const s of shifts) {
     if (s.t - last > 1000 || s.t - start > 5000) { cur = 0; start = s.t; curSources = []; }
@@ -498,9 +624,9 @@ async function layoutShift(page, url) {
   }
   if (best > 0.1) {
     add({
-      check: 'shift:cls', url, viewport: '1280', wcag: [], level: 'craft', severity: best > 0.25 ? 'fail' : 'review',
+      check: 'shift:load', url, viewport: '1280', wcag: [], level: 'craft', severity: 'review',
       selector: [...new Set(bestSources)].slice(0, 8).join('; ') || 'unknown',
-      measured: `CLS ${best.toFixed(3)} during load and settle`, threshold: 'good under 0.1, poor over 0.25 (Core Web Vitals)',
+      measured: `layout shift ${best.toFixed(3)} during load and the first ${opts.settle} ms`, threshold: 'CLS good under 0.1, poor over 0.25 (Core Web Vitals); this is a lower bound',
     });
   }
   return best;
@@ -533,14 +659,15 @@ async function motion(url) {
   const reduced = await sample('reduce');
   const pct = (x) => `${(x * 100).toFixed(1)}%`;
   if (reduced.anims.length || reduced.videos.length || reduced.moving > 0.002) {
-    // fail only when the setting changed nothing and the motion is on screen; an offscreen loop stays review
+    // no WCAG criterion requires honouring the setting (2.3.3 covers motion caused by interaction),
+    // so this is craft; "ignored" means the setting changed nothing that is on screen
     const ignored = normal.anims.length && reduced.anims.length >= normal.anims.length
       && (reduced.moving > 0.0005 || reduced.videos.length > 0) && reduced.moving >= normal.moving * 0.8;
     add({
-      check: 'motion:reduced', url, viewport: '1280', wcag: ['2.3.3'], level: 'AAA', severity: ignored ? 'fail' : 'review',
+      check: 'motion:reduced', url, viewport: '1280', wcag: [], level: 'craft', severity: 'review',
       selector: [...reduced.anims.map((a) => `${a.target} (${a.name}, ${a.iterations === Infinity ? 'infinite' : `${a.duration} ms`})`), ...reduced.videos.map((v) => `${v} (playing video)`)].slice(0, 10).join('; ') || 'canvas or script-driven motion',
-      measured: `with reduced motion: ${reduced.anims.length} long or looping animations, ${reduced.videos.length} playing videos, ${pct(reduced.moving)} of the viewport changing per second (without: ${normal.anims.length}, ${normal.videos.length}, ${pct(normal.moving)})`,
-      threshold: ignored ? 'the reduced-motion setting changes nothing; treat as a fail of the project floor' : 'confirm each remaining motion is essential or tiny',
+      measured: `with reduced motion: ${reduced.anims.length} long or looping animations, ${reduced.videos.length} playing videos, ${pct(reduced.moving)} of the viewport changing within 0.7 s (without: ${normal.anims.length}, ${normal.videos.length}, ${pct(normal.moving)})`,
+      threshold: ignored ? 'the reduced-motion setting changes nothing on screen' : 'confirm each remaining motion is essential or tiny',
     });
   }
   if (normal.anims.some((a) => a.iterations === Infinity) || normal.videos.length) {
@@ -552,16 +679,26 @@ async function dark(url) {
   const { context, page } = await open(url, { colorScheme: 'dark' });
   try {
     const supports = await page.evaluate(() => {
+      // walk @layer, @supports, @media, nesting and @import, not only top-level rules
+      const walk = (rules) => {
+        for (const r of rules) {
+          if (r.media && /prefers-color-scheme/.test(r.media.mediaText)) return true;
+          let inner = null;
+          try { inner = r.styleSheet ? r.styleSheet.cssRules : r.cssRules; } catch { /* cross-origin import */ }
+          if (inner && walk(inner)) return true;
+        }
+        return false;
+      };
       for (const sheet of document.styleSheets) {
         let rules;
         try { rules = sheet.cssRules; } catch { continue; }
-        for (const r of rules) if (r.media && /prefers-color-scheme/.test(r.media.mediaText)) return true;
+        if (walk(rules)) return true;
       }
       return [...document.querySelectorAll('meta[name="color-scheme"]')].some((m) => /dark/.test(m.content)) || /dark/.test(getComputedStyle(document.documentElement).colorScheme);
     });
-    if (!supports) { notes.push(`${url}: no dark-scheme styles found in readable stylesheets; dark mode not checked`); return; }
+    if (!supports) { notes.push(`${url}: no dark-scheme styles found in readable stylesheets (cross-origin ones cannot be read) and no class or attribute toggle tried; dark mode not checked`); return; }
     await shot(page, `${slug(url)}-dark`);
-    if (axeSource) {
+    if (on('axe') && axeSource) {
       await page.evaluate(axeSource);
       const res = await page.evaluate(() => window.axe.run(document, { runOnly: { type: 'rule', values: ['color-contrast'] }, resultTypes: ['violations'] }));
       for (const v of res.violations) for (const n of v.nodes.slice(0, 15)) {
@@ -577,7 +714,7 @@ async function phone(url) {
   const { context, page } = await open(url, { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
   try {
     await shot(page, `${slug(url)}-375`);
-    if (axeSource) await runAxe(page, url, '375 touch', ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']);
+    if (on('axe') && axeSource) await runAxe(page, url, '375 touch', ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']);
     const small = await page.evaluate(() => {
       const out = [];
       for (const el of document.querySelectorAll('a[href], button, input:not([type=hidden]), select, textarea, [role=button], [role=link], [role=tab], [role=checkbox], [role=switch], [tabindex]:not([tabindex="-1"])')) {
@@ -597,42 +734,60 @@ async function phone(url) {
   }
 }
 
+if (!on('axe')) notes.push('axe skipped: contrast over images and dark-mode contrast depend on it and were not measured either; axe rules at 320 and 375 px were not run');
 const pages = [];
 try {
   for (const url of opts.urls) {
-    const entry = { url, ok: true, cls: null, focusOrder: [] };
+    const entry = { url, ok: true, cls: null, focusOrder: [], checks: {} };
     pages.push(entry);
     console.log(`[probe] ${url}`);
+    // run one check and record what happened to it; an error is reported, not allowed to hide the checks after it
+    const step = async (name, fn) => {
+      if (!on(name)) { entry.checks[name] = 'skipped'; return; }
+      try {
+        await fn();
+        entry.checks[name] ??= 'ran';
+      } catch (err) {
+        entry.checks[name] = `error: ${err.message.split('\n')[0]}`;
+        console.error(`[probe] ${url} ${name}: ${entry.checks[name]}`);
+      }
+    };
     try {
       const { context, page } = await open(url);
       try {
-        if (on('shift')) entry.cls = await layoutShift(page, url);
+        await step('shift', async () => { entry.cls = await layoutShift(page, url); });
         await shot(page, `${slug(url)}-1280`);
         let incomplete = [];
-        if (on('axe')) incomplete = await runAxe(page, url, '1280', ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']);
-        if (on('contrast') && axeSource) await compositedContrast(page, url, incomplete);
-        if (on('focus')) entry.focusOrder = await focusWalk(page, url);
-        if (on('reflow')) await reflow(page, url);
+        await step('axe', async () => {
+          incomplete = await runAxe(page, url, '1280', ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']);
+          await nameGaps(page, url);
+        });
+        await step('contrast', async () => {
+          if (!axeSource || entry.checks.axe !== 'ran') { entry.checks.contrast = 'not run: needs axe'; return; }
+          await compositedContrast(page, url, incomplete);
+        });
+        await step('focus', async () => { entry.focusOrder = await focusWalk(page, url); });
+        await step('reflow', () => reflow(page, url));
       } finally {
         await context.close();
       }
-      if (on('spacing')) {
+      await step('spacing', async () => {
         await stress(url, 'spacing', ['1.4.12'], 'A/AA', 'fail', () => {
           const s = document.createElement('style');
           s.textContent = '*{line-height:1.5!important;letter-spacing:.12em!important;word-spacing:.16em!important}p{margin-bottom:2em!important}';
           document.head.appendChild(s);
         }, 'WCAG text spacing');
-      }
-      if (on('textscale')) {
+      });
+      await step('textscale', async () => {
         await stress(url, 'textscale', ['1.4.4'], 'A/AA', 'review', () => {
           const els = [...document.body.querySelectorAll('*')];
           const sizes = els.map((el) => parseFloat(getComputedStyle(el).fontSize));
           els.forEach((el, i) => el.style.setProperty('font-size', `${sizes[i] * 2}px`, 'important'));
         }, 'text-only 200%');
-      }
-      if (on('motion')) await motion(url);
-      if (on('dark')) await dark(url);
-      if (on('phone')) await phone(url);
+      });
+      await step('motion', () => motion(url));
+      await step('dark', () => dark(url));
+      await step('phone', () => phone(url));
     } catch (err) {
       entry.ok = false;
       entry.error = err.message.split('\n')[0];
@@ -645,26 +800,49 @@ try {
 
 const order = { fail: 0, review: 1, advisory: 2 };
 findings.sort((a, b) => order[a.severity] - order[b.severity] || a.url.localeCompare(b.url) || a.check.localeCompare(b.check));
+for (const [i, finding] of findings.entries()) finding.id = `F${String(i + 1).padStart(3, '0')}`;
 const counts = Object.fromEntries(Object.keys(order).map((k) => [k, findings.filter((f) => f.severity === k).length]));
-const report = { generated: new Date().toISOString(), urls: opts.urls, skipped: [...opts.skip], counts, pages, findings, notes, screenshots: shots };
+const undecided = [...axeReview.values()];
+const notMeasured = [
+  'Whether names, alt text, labels and error messages make sense; reading and focus order that is legal but confusing.',
+  'Screen reader announcements, live regions, dialogs and menus in use, keyboard operation beyond Tab.',
+  'Anything that needs a click, a keystroke other than Tab, typing or a submit: errors, menus, tooltips, toasts.',
+  'Controls Tab never reaches when nothing styles them as clickable; only a person or the code shows them.',
+  'States the URL did not show: empty, loading, error, long content, no permission, signed out.',
+  'Widths other than 320, 375, 640 and 1280, and the 256 px tall reflow case for content that scrolls sideways. Narrow viewports do not prove actual browser zoom behavior. Focus, names, motion, layout shift, contrast over images and the stress tests run at 1280 only.',
+  'Dark themes switched by a class or data attribute, and styles in cross-origin stylesheets. Dark-mode axe incompletes are not collected.',
+  'Layout shift after the settle time; the figure above covers load only.',
+  'Under text spacing and enlarged text: text that overlaps its neighbours in a box that does not hide overflow; only cut-off text is measured, at 1280 px only.',
+  'Canvas, WebGL and media content; content inside cross-origin iframes.',
+];
+const report = { generated: new Date().toISOString(), browser: browserInfo, urls: opts.urls, skipped: [...opts.skip], counts, pages, findings, axeUndecided: undecided, notes, notMeasured, screenshots: shots };
 writeFileSync(join(opts.out, 'report.json'), JSON.stringify(report, null, 2));
 
+const cell = (value) => String(value).replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
 const md = [
   `# ui-quality probe`, '',
   `${report.generated}. Fails ${counts.fail}, review ${counts.review}, advisory ${counts.advisory}.${opts.skip.size ? ` Skipped: ${[...opts.skip].join(', ')}.` : ''}`, '',
-  ...pages.map((p) => `- ${p.url}: ${p.ok ? `ran${p.cls !== null ? `, CLS ${p.cls.toFixed(3)}` : ''}, ${p.focusOrder.length} focus stops` : `FAILED: ${p.error}`}`), '',
-  '| Severity | Check | WCAG | Viewport | Where | Measured |', '|---|---|---|---|---|---|',
-  ...findings.map((f) => `| ${f.severity} | ${f.check} | ${f.wcag.join(', ') || f.level} | ${f.viewport} | \`${String(f.selector).replace(/\|/g, '\\|').slice(0, 160)}\` | ${String(f.measured).replace(/\|/g, '\\|').slice(0, 220)}${f.threshold ? ` (need ${f.threshold})` : ''} |`),
+  `Browser: ${browserInfo}.`, '',
+  'Rows below are candidates, not confirmed owner findings. Verify each fail; at full depth also resolve review rows and relevant advisories. IDs refer to this run only. Full evidence and per-viewport observations are in report.json.', '',
+  'A check with no finding is not a pass for its WCAG criterion: axe accepts names and labels a person would reject. The `name:` checks catch two of them (a placeholder as the only label, one glyph such as "x" as a name); a name that is present but wrong is not caught.', '',
+  ...pages.map((p) => `- ${p.url}: ${p.ok ? `ran${p.cls !== null ? `, layout shift during load ${p.cls.toFixed(3)}` : ''}, ${p.focusOrder.length} focus stops` : `NOT AUDITED: ${p.error}`}${Object.keys(p.checks).length ? `. Checks: ${Object.entries(p.checks).map(([k, v]) => `${k} ${v}`).join('; ')}` : ''}`), '',
+  '| ID | Severity | URL | Check | WCAG / source | Viewport | Where | Measured |', '|---|---|---|---|---|---|---|---|',
+  ...findings.map((f) => `| ${f.id} | ${f.severity} | ${cell(f.url)} | ${f.check} | ${f.wcag.join(', ') || f.level} | ${f.viewport} | ${cell(f.selector)} | ${f.observations.map((o) => cell(`${o.viewport}: ${o.measured}${o.threshold ? ` (need ${o.threshold})` : ''}`)).join('<br>')} |`),
+  '', '## axe could not decide', '',
+  'These require a decision. Desktop contrast may have additional pixel evidence above; other widths have no composited contrast measurement. The first five selectors are listed per rule and viewport; further nodes remain unchecked.', '',
+  ...(undecided.length ? undecided.map((u) => `- ${u.url}: ${u.id} (${u.count} elements, ${u.viewports.join(', ')}): ${u.help}. First: \`${u.nodes.join('`, `')}\``) : ['- none']),
   '', '## Notes', '', ...(notes.length ? notes.map((n) => `- ${n}`) : ['- none']),
   '', '## Focus order', '', ...pages.flatMap((p) => [`${p.url}:`, ...p.focusOrder.map((s, i) => `${i + 1}. ${s}`), '']),
+  '## Screenshots', '',
+  'Names start with the URL position (01, 02, etc.). Suffixes identify width, dark theme or text stress. Baseline screenshots show context, not the transient focus or motion measurements; reproduce those checks when verifying.', '',
+  ...shots.map((file) => `- ${file}`), '',
   '## Not measured', '',
-  '- Whether names, alt text, labels and error messages make sense; reading and focus order that is legal but confusing.',
-  '- Screen reader announcements, live regions, dialogs and menus in use, keyboard operation beyond Tab.',
-  '- States the URL did not show: empty, loading, error, long content, no permission, signed out.',
-  '- Canvas, WebGL and media content; content inside cross-origin iframes.',
+  ...notMeasured.map((gap) => `- ${gap}`),
 ];
 writeFileSync(join(opts.out, 'report.md'), md.join('\n') + '\n');
 console.log(`[probe] fails ${counts.fail}, review ${counts.review}, advisory ${counts.advisory}`);
 console.log(`[probe] report: ${join(opts.out, 'report.md')}`);
 // a URL that could not be audited makes the whole run incomplete, with or without --strict
-process.exitCode = pages.some((p) => !p.ok) ? 2 : opts.strict && counts.fail ? 1 : 0;
+// a URL not audited, or a check that errored, leaves the run incomplete
+const checkErrors = pages.some((p) => Object.values(p.checks).some((v) => v.startsWith('error')));
+process.exitCode = pages.some((p) => !p.ok) || checkErrors ? 2 : opts.strict && counts.fail ? 1 : 0;

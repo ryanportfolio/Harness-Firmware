@@ -5,61 +5,29 @@ description: "Quality floor for everyday UI (forms, dashboards, settings, app sc
 
 # UI quality
 
-Makes sure everyone can see, read, reach and operate a screen, in every state it can be in. Covers the everyday interfaces `showpiece` leaves alone: forms, tables, dashboards, settings, account and app screens, plus the quality floor under any ambitious page.
+Build or audit screens people can see, read, reach and operate: forms, dashboards, settings, tables and app screens. Use the project's design system. Visual direction belongs to `showpiece` or `frontend-design`; conversion decisions belong to `conversion-ux`.
 
-It does not choose a look. Style, palette and type come from the project's design system or from `showpiece` and `frontend-design`. It does not judge whether a flow converts; that is `conversion-ux`.
+## Start here
 
-## Rules that override everything here
+Use the accompanying request as the target, including Claude's `$ARGUMENTS` when present. Both Claude Code and Codex follow the same steps:
 
-- **Measure, don't tick.** A finding comes from the probe, a screenshot or code you read, and says which. Never mark a rule as met because it seems likely.
-- **Say what was not measured.** The probe covers part of the rules. An audit lists what it could not see, and never calls a screen "accessible" or "WCAG compliant".
-- **The repository wins.** Its instructions, design tokens, theme files and component library beat anything in this skill. Follow them; report a conflict instead of overriding it.
-- **Never assume the stack.** Detect it from the project's manifest files; if nothing is detectable and it matters, ask.
-- **No made-up specifics.** If no measurement or source backs a number, label it a judgment call.
+1. Read the repository instructions. Identify the requested screen, its main user task, and whether you may change it. A public site you do not own is read-only.
+2. Choose the route below. Read only that route first.
 
-## Modes
+| Request | Read next | Finish with |
+|---|---|---|
+| Build or change a UI | [build.md](references/build.md), in order | Implemented states, saved design decisions, then a quick audit |
+| Audit, accessibility review, mobile check, production readiness | [audit.md](references/audit.md), in order | Verified findings and explicit coverage gaps |
+| Check after a build or a narrow fix | [audit.md](references/audit.md), quick depth | Evidence for the changed screen and states |
 
-- **Build** a screen, component or flow: [build.md](references/build.md). Read the saved design decisions, cover every state, then run audit mode on the result before calling it done.
-- **Audit** an existing page, flow or component: [audit.md](references/audit.md). Run the probe on every state, verify what it reports, do the checks it cannot, and report.
+[rules.md](references/rules.md) is a lookup table. During a build, read the groups relevant to the components. During an audit, use the rule IDs in the audit guide to look up the source for each finding. You do not need to read the probe's implementation to run it.
 
-[rules.md](references/rules.md) lists every rule with its source (a WCAG 2.2 success criterion, a platform guideline, or craft) and whether the probe measures it.
+## Evidence rules
 
-## The probe
+- A finding needs evidence, labelled Probe (a row in this run's output), Measured by hand, Observed, or From code, with its location. Report the user's difficulty and a concrete fix.
+- Probe rows are candidates. Verify them before presenting them as defects. A clean run establishes only that the checks found nothing in the tested state; it never establishes WCAG compliance.
+- Keep unverified candidates and checks you could not perform separate from confirmed findings. Include failures to start the probe or reach a state in coverage gaps.
+- Use WCAG sources only for what their criterion requires. Label craft, platform and AAA advice separately. The probe's `fail`, `review` and `advisory` labels are not owner-facing priorities.
+- Follow repository constraints and existing design decisions. Detect the stack from manifests before choosing implementation techniques. Report conflicting project decisions rather than silently replacing them.
 
-`scripts/probe.mjs` loads each URL in headed Chrome, offscreen and muted, and measures:
-
-| Check | What it measures |
-|---|---|
-| `axe` | axe-core WCAG 2.2 A/AA and best-practice rules at 1280 px and at 375 px with touch |
-| `contrast` | text contrast over images and gradients that axe marks as needing review, from pixels behind the text |
-| `focus` | Tab through the page: focus visible (pixel difference focused vs not), focus hidden under fixed or sticky UI, off-screen focus, loops |
-| `reflow` | sideways scrolling and cut-off content at 320 and 640 CSS px (400% and 200% zoom of 1280) |
-| `spacing` | text newly cut off under WCAG 1.4.12 text spacing |
-| `textscale` | text newly cut off when all text is doubled (a stress test beside 1.4.4) |
-| `motion` | animations, videos and moving pixels with and without reduced motion |
-| `shift` | layout shift (CLS) during load |
-| `dark` | axe contrast under the dark colour scheme, when the page has one |
-| `phone` | 375 px screenshot, axe at that width, controls under 44 px |
-
-Install the two packages for this run only, from the project root, then run it against a URL the project serves:
-
-```bash
-npm i --no-save axe-core@latest playwright-core@latest
-node .claude/skills/ui-quality/scripts/probe.mjs --url http://localhost:3000/settings --out <screenshot dir>
-```
-
-Options: `--url` (repeat for several), `--out`, `--storage-state <file>` (a saved Playwright sign-in), `--wait-for <css>`, `--settle <ms>` (default 1500), `--max-tabs <n>` (default 80), `--skip <check,check>`, `--strict` (exit 1 on any fail). It writes `report.md`, `report.json` and screenshots, and takes about 30 to 45 seconds per URL. Exit 2 means the run is incomplete: no Chrome, no packages, bad arguments, or a URL that could not be audited (its error is in the report).
-
-Severity in the report: `fail` is a measured WCAG A/AA failure, `review` needs a person to decide, `advisory` is AAA, best practice or a platform guideline. The probe can be wrong; [audit.md](references/audit.md) lists its known false positives.
-
-## Neighboring skills
-
-- `showpiece`: ambitious creative direction. Its work still has to pass this skill's floor.
-- `conversion-ux`: whether users can decide and act in a flow. Its screen checks lean on this skill for accessibility.
-- `redesign-concepts`, `design-prototypes`: image concepts before or after a build.
-- `writing`: wording of labels, errors and empty states once this skill has said what each must tell the user.
-- When installed: `frontend-design` (visual styling).
-
-## Claude Code use
-
-Use the request accompanying /ui-quality, including $ARGUMENTS, as the target: a URL, a route, a component path or a description. Live pages you do not own are read-only. The probe uses `launchPlacedChrome()` from `scripts/lib/launch-chrome.mjs` when the repository has it and otherwise launches Chrome directly; it never runs headless. Save its output where the project's instructions put screenshots. A subagent running the probe or an audit gets these rules, the URLs and states, the output folder, and the headed-Chrome rule in its brief. Stop any dev server you started for the audit when you finish.
+The probe uses headed Chrome, offscreen at `-2400,-2400` and muted. It uses the repository's `launchPlacedChrome()` when available; it never uses headless or minimized Chrome. Audit setup, commands, output interpretation and cleanup are all in [audit.md](references/audit.md).

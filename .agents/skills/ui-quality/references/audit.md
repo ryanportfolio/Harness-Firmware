@@ -1,63 +1,142 @@
 # Audit mode
 
-## Depth
+Follow this guide in order. An audit request defaults to full depth. A check after a build or a narrow fix uses quick depth. Both run the probe and verify its failures. Full depth also resolves review candidates and performs the applicable manual checks below. A narrow mobile request can limit scope to mobile behavior; say so in the report.
 
-- **Quick:** the probe on each URL and state, every `fail` verified, the report. Use after a build and for a single screen.
-- **Full:** quick, plus the manual checks below and every `review` item decided. Use when the user asks for an audit or before a launch.
+## 1. Define scope and access
 
-Pick from the request; ask only when the scope is unclear and large.
+Record the main user task, URLs, states and themes requested. Use a short table: `URL | state | how reached | checked / unavailable`. Include relevant loading, empty, error, success, disabled and long-content states; mark those you cannot reach. Read existing design decisions if available, but do not create or change them during an audit-only task.
 
-## 1. List what to audit
+Use the project's existing server command. A static HTML file can be served with an available static server; keep its assets and relative paths intact. Never assume the port or app stack. On a public site you do not own, load and inspect read-only. Do not submit forms, sign in, change data or run destructive actions there.
 
-Write the URLs and the states each needs ([build.md](build.md) step 3 has the list). States the bare URL does not show need a way in: a query string, seeded data, a feature flag, a mocked response, or a signed-in session. For a signed-in session, sign in once in a Playwright script and save `context.storageState({ path })` to a file under `.tmp/`, then pass `--storage-state`. Never put credentials in the report or in a committed file.
+The probe reopens each URL in fresh contexts. It does not reproduce menus you opened or input you typed in another browser. States need their own URL, an existing fixture or a saved session. Use an authorized test account for owned apps, and pass an existing Playwright storage-state file with `--storage-state`. Keep that file under private scratch storage, out of reports and commits. Do not pass signed-in sessions for sites you do not own. If a state cannot survive a reload, check it manually and record that the probe did not cover it.
 
-A state you cannot reach goes in the report as not checked, with what access would reach it.
+## 2. Run the probe from the repository root
 
-## 2. Run the probe
+The probe is `scripts/probe.mjs` in the folder that holds the SKILL.md you are applying: `.claude/skills/ui-quality/` in Claude Code, `.agents/skills/ui-quality/` in Codex. The commands below use the Codex path.
+
+Install its packages for this run in scratch storage. This changes neither the project's dependencies nor its lockfile:
 
 ```bash
-node .agents/skills/ui-quality/scripts/probe.mjs --url <url> --url <url> --out <screenshot dir>
+npm i --no-save --prefix .tmp/ui-quality-deps axe-core@latest playwright-core@latest
 ```
 
-Run it on the project's own server, not on a production site you do not own. Use `--wait-for <css>` when content arrives after load, and `--skip` to leave out checks that do not apply (`dark` for a light-only product). Several URLs share one browser; run separate probes one after another on shared hardware.
+Run it on the real target, into a fresh output folder:
 
-No running app (no server, missing secrets, a native app): read the code against [rules.md](rules.md) and label every finding "from code, not measured". For native apps use a simulator and screenshots, and say which device and text size you checked.
+```bash
+node .agents/skills/ui-quality/scripts/probe.mjs --url http://localhost:3000/settings --out <output folder>
+```
 
-## 3. Verify before reporting
+Put the output where the repository's instructions put screenshots, in a new folder for this run. Without such an instruction, leave out `--out` and the probe writes to `.tmp/ui-quality/<time>`. Say in the report where the output went.
 
-Open the screenshot and the element for every `fail`, and for every `review` at full depth. Drop what is wrong and say how many you dropped. Known false positives:
+Read the exit code straight away.
 
-- `focus:invisible` or `focus:weak` next to an animation: moving pixels count as a change, so a marker can look stronger or weaker than it is.
-- `contrast:composited` with a low worst-5% value but a high median: the text box also covers an icon or border. Look at the text.
-- `reflow:horizontal-scroll` caused by a carousel, code block or table that should scroll inside its own box: the fix is the container's overflow, not the content.
-- `reflow:cut-off`: an off-canvas element that is visible and not marked hidden; real if it holds content a user needs.
-- `shift:cls` on first visit only: a consent banner or font swap. Still real for new visitors.
-- `motion:reduced` as `review` for a loop that is off screen: check it once scrolled into view.
-- `axe` best-practice items: advisory; report them only when they matter to this product.
+| Exit | Meaning and next action |
+|---|---|
+| 0 | The run completed. Read findings and gaps; this is not a clean bill of health. |
+| 1 | With `--strict`, at least one candidate has `fail`. Verify the rows. |
+| 2 | Incomplete run: the probe could not start, a URL was not audited (an error page such as a 404 or 500 counts), or a check errored. Read the terminal error, each page's `error` and `checks` in report.json. Report partial evidence and the missing checks; repair only the named prerequisite, then retry if possible. |
 
-## 4. Do what the probe cannot (full depth)
+No Chrome launch allowed or available: do not try headless. Continue with permitted code or manual evidence and mark browser measurements unavailable. Native apps use simulator/device checks, not this web probe; record device and text size.
 
-- Keyboard beyond Tab: Enter and Space on every control, Escape on dialogs, menus and popovers, arrow keys in tabs, menus, radios and grids. Dialogs keep focus inside and return it on close.
-- Names and text: do labels, alt text, button names and error messages make sense read alone?
-- Forms: submit empty, submit wrong, submit twice, go back. Errors next to the field, input kept, summary focused when several fail.
-- Status messages: does a saved, filtered or failed state announce itself? Check `aria-live` or `role="status"` in the code.
-- Hover and drag: anything shown on hover is reachable by focus and dismissable with Escape; anything dragged has a click alternative.
-- Content the probe skips: canvas, WebGL, video captions, cross-origin iframes.
-- A screen reader pass (NVDA on Windows, VoiceOver on macOS and iOS, TalkBack on Android) when one is available. Without one, say so.
-- Drift: compare the code with `design/system.md` and report differences.
+Useful options, only when needed:
 
-## 5. Report
+| Option | Use |
+|---|---|
+| `--url <url>` repeated | Several reachable states; one browser, sequential checks |
+| `--wait-for '<css>'` | Wait for content that appears after page load |
+| `--settle <ms>` | Change the default 1500 ms settling interval |
+| `--storage-state <file>` | Existing authorized Playwright session for an owned app |
+| `--max-tabs <n>` | Raise the default 80 if the focus walk was truncated |
+| `--skip <check,check>` | Omit inapplicable checks and report each omission |
+| `--strict` | Return 1 for candidate failures; it does not replace verification |
+| `--allow-error-status` | Audit a page that answers with an HTTP error on purpose, such as a designed 404 page |
 
-Lead with the result, then the detail.
+Check names: `axe,contrast,focus,reflow,spacing,textscale,motion,shift,dark,phone`. Skipping axe also removes the evidence needed by composited contrast and dark contrast. Run probes sequentially on shared hardware. The probe closes its browser; close any verification browser and stop any server you started when finished.
 
-1. **Fix first:** up to five findings, most harmful first, each one line with its fix.
-2. **Coverage:** URLs and states checked, depth, widths, themes, and what was not checked and why. Copy the probe's "Not measured" list and remove what you checked by hand.
-3. **Findings**, one per row:
+## 3. Read output in this order
 
-| Severity | Where | Measured | Rule | Fix |
-|---|---|---|---|---|
-| Blocker, Major or Minor | URL, viewport, element, screenshot file | what was observed, with the number and the threshold | rule ID and source from rules.md, or Unmatched | concrete change, with code or copy where it helps |
+1. Open `report.md`. Before reading defect counts, check each URL's line ("NOT AUDITED" and its reason) and its list of checks (ran, skipped, not run, or error), then the notes and "Not measured". A check that did not run measured nothing.
+2. Read `report.json` for full selectors, measurements, observations at each width and screenshot paths. The Markdown table is a navigation aid. IDs such as `F001` refer to this run only.
+3. Verify every `fail`. At full depth, also decide every `review` and relevant `advisory`. For each row, inspect the element in the recorded state and viewport, read the measurement and threshold, then look up its source below. Open the relevant screenshot; a baseline screenshot does not prove a focused state or a moving effect. Reproduce those when needed.
+4. Check every entry in `axeUndecided`, including colour contrast. Pixel sampling covers only eligible desktop text; an undecided row at another width remains unresolved until you check it. Notes about limits mean the remaining elements were not checked.
 
-Severity is about people, not the probe's label. **Blocker:** some users cannot complete the task (no keyboard access, focus hidden, content lost at 320 px, a required field with no label). **Major:** a WCAG A or AA failure that makes the task harder, or motion that ignores reduced motion. **Minor:** AAA, platform and craft items. Mark each finding Measured (probe or a check you ran), Observed (screenshot or manual check), or From code.
+Use these rule groups in [rules.md](rules.md):
 
-Never conclude "accessible" or "compliant". Say what passed, what failed and what was not checked.
+| Output | Rule lookup and verification |
+|---|---|
+| `axe:*` | Use the row's WCAG number and `help` link. Find the matching rule; preserve an unmatched WCAG source rather than inventing a rule ID. Names/labels: OP1 through OP3, OP11 and OP12; images: SE4; contrast: SE1; targets: RC7. |
+| `contrast:*`, `dark:*` | SE1, SE5. Inspect actual text over its background; distinguish median and worst-5% values. |
+| `name:*` | OP3 (placeholder as the only label), OP1 and OP12 (a glyph as the only name). axe accepted these; decide whether the name tells a person what the control is or does. |
+| `focus:*`, `keyboard:*` | RC1 through RC6. Confirm focus marker, occlusion and actual keyboard access; a pointer cursor alone does not prove an action. |
+| `reflow:*` | RE1, RE5. Check which needed content is lost. Tables/maps/code may scroll inside their own container. |
+| `spacing:*`, `textscale:*` | RE2, RE3, RE5. Compare before/after. Width reduction and doubled fonts are probes, not proof of browser zoom behavior. |
+| `motion:*` | MO1, MO2. Verify whether motion is essential and whether long-running motion has a pause control. |
+| `shift:*` | ST1. Report measured load interval; it is not whole-visit CLS. |
+| `phone:*` | RC7. Under 44 CSS px is AAA/advice; check AA's 24 px size or spacing exceptions separately. |
+
+For each candidate choose **confirmed**, **dismissed** (state the evidence that disproves it), or **unresolved** (state the missing check). Group repeated manifestations of the same defect, preserving all affected states and widths. Never average measurements across widths or turn a candidate count into a count of confirmed defects.
+
+Common traps when verifying:
+
+- Focus pixel differences can include animation or miss a marker drawn on a sibling/label of a hidden native input. Tab manually and inspect the actual control.
+- Five occlusion samples suggest coverage; they do not prove every pixel is hidden. Confirm before assigning a WCAG failure.
+- Low contrast in the worst 5% may come from a border/icon inside a sampled line box. Check the text itself; effects, transparency and dynamic backgrounds can need manual measurement.
+- An off-canvas drawer or intentional clipping may appear in reflow results. Establish whether visible, needed content is lost. Interior scrolling is different from page-wide scrolling.
+- Text stress checks detect clipping, not every overlap. Inspect screenshots for collisions. A consent banner or font swap on first load still affects new visitors.
+- A dark media-query check does not operate class/data-attribute theme switches. Test the shipped switch manually; unseen dark styles are a gap.
+
+## 4. Complete manual checks at full depth
+
+Read only the linked rule groups needed for the page. If tools or authorization prevent a check, record it as unavailable. On third-party pages, keep interaction read-only and never infer hidden form behavior from the initial view.
+
+| Check | Action and evidence to retain |
+|---|---|
+| Names, content and semantics | Inspect visible labels and accessible names together. Placeholder-only labels and ambiguous icon names need human judgment even when axe is quiet. Check heading order, table headers, image alternatives and colour-only signals. Record element and markup or screenshot. SE2 through SE4, OP1 through OP3, OP11 and OP12. |
+| Keyboard | Tab and Shift+Tab in logical order; activate controls with Enter/Space; operate arrows where appropriate. Open/close permitted menus and dialogs, check Escape, focus containment and return. Inspect hover content and drag alternatives. Record failing step and element. RC1 through RC11, OP13. |
+| Forms and states, owned test app only | Submit empty and invalid values, correct errors, retry and go back. Verify input retained, errors associated, and save/error messages announced. Check disabled reasons, password paste, repeated input and timeout recovery when applicable. Record exact steps and resulting state. OP4 through OP10, OP14 and OP15. |
+| Responsive and text | Inspect 320/375 CSS px, supported orientation and actual 200% browser zoom or text resize. Check text overlap under spacing/enlargement. Report which method and sizes you used. RE1 through RE6. |
+| Motion and stability | Check reduced motion, pause controls, hover/press movement and changes after the probe's settling interval. Do not claim a flashing-safety pass from two screenshots. MO1 through MO4, ST1 and ST2. |
+| Assistive technology | Use available Narrator, NVDA, VoiceOver or TalkBack. Verify names, order, states and announcements on the main task. DOM/ARIA inspection alone is code evidence, not a screen-reader pass. Record tool and task, or inability to test. |
+| Special content and design drift | Inspect relevant canvas, WebGL, media/captions and embedded frames separately. Compare implementation against saved design decisions. Record uncovered areas and any conflicting decision. |
+
+## 5. Write the owner report
+
+Save `audit.md` beside `report.md`/`report.json` and link it in the handover. With no probe, choose the same permitted output location and state "Probe not run". Keep raw reports unchanged. Use this structure:
+
+```markdown
+# UI audit: <screen>
+
+Result: <confirmed blocker/major/minor counts>. <Main user impact>.
+Fix first: <up to five prioritized actions, linked to findings>.
+
+## Coverage
+Depth: <quick/full or narrower requested scope>
+Target and main task: <URL and task>
+States, widths, themes: <actually checked, with method>
+Evidence: <raw report links, browser/tool, command and exit code>
+Unavailable: <state/check, why, and what would enable it>
+
+## Confirmed findings
+### A1. <specific defect> [<Blocker/Major/Minor>]
+Where: <URL, state, viewport, selector>
+Evidence: <Probe / Measured by hand / Observed / From code>; <probe ID, command, steps, or file and line>
+Observed: <actual value/behavior, threshold where applicable, screenshot/code link>
+Impact: <who cannot do what, or what becomes harder>
+Source: <rule ID, and one source category: WCAG criterion and level, a named platform guideline, Core Web Vitals, or Craft>
+Fix: <concrete change>
+Verify fix: <repeatable action and expected result>
+
+## Unresolved candidates and limitations
+<IDs, missing checks, skipped checks, errors and sampling limits>
+
+## Dismissed candidates
+<IDs and the observation that disproved each; group identical causes>
+```
+
+Evidence labels: **Probe** only when a row with that ID is in this run's report.json, with the same element and value; **Measured by hand** for a value you measured yourself, naming the command or script and its output; **Observed** for what you saw doing a manual step, with the screenshot; **From code** for what the source shows, with file and line. Never label your own measurement Probe.
+
+Sources: every finding names one category. axe best-practice items are Craft (axe best practice). A defect no rule in rules.md covers still names its category, for example "Craft (no matching rule)" or the WCAG criterion it fails.
+
+Priorities describe user impact: **Blocker** prevents completing the main task for some users; **Major** substantially hinders it or is another confirmed A/AA failure; **Minor** is a lower-impact craft, platform or AAA improvement. Explain impact; do not assign Blocker solely from an axe impact label.
+
+Carry forward the probe's "Not measured", skipped checks, run errors and limit notes. Remove a gap only when you performed that check, and name the method. If nothing is confirmed, say "No confirmed defects in the tested scope" and retain unresolved candidates. Never conclude "accessible" or "WCAG compliant".

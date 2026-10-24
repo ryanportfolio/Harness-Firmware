@@ -1,52 +1,60 @@
 # Build mode
 
-For a new screen, component or flow, or a change to one. The order matters: decisions first, states second, code third, audit last.
+Follow these steps for a new screen or a change to an existing one. Preserve behavior outside the requested scope.
 
-## 1. Read what the project already decided
+## 1. Read existing decisions
 
-- Repository instructions, then the design system in code: tokens, theme files, CSS variables, Tailwind config, a component library. These are the record. Reuse an existing component before writing a new one.
-- The saved decisions file, `design/system.md`, if it exists, and `design/pages/<page>.md` for the page you are building. A page file overrides the main file for that page only.
-- Detect the stack from the manifests (`package.json` dependencies, `pubspec.yaml`, `Package.swift` or `*.xcodeproj`, `build.gradle` with Compose, `composer.json`, `Gemfile`). If nothing is detectable and the stack changes what you write, ask. Load the matching stack traps in [rules.md](rules.md).
+Read repository instructions, the relevant manifests, existing components and design tokens, then `design/system.md` and `design/pages/<page>.md` if present. The page file overrides the system file for that page only. If the repository uses another location for design decisions, use it. Read its own UI skill when one is supplied. Report conflicts between those sources.
 
-## 2. Make the missing decisions once
+Detect the stack from manifests such as `package.json`, `pubspec.yaml`, `Package.swift`, `build.gradle`, `composer.json` or `Gemfile`. Reuse the project's controls and tokens. Do not install a UI library or change the stack to follow this skill.
 
-Decide only what the code and the decisions file do not already settle, write it down in `design/system.md`, and keep it short. Record what the code cannot show. Do not copy token values that live in code; point to the file.
+## 2. Save only missing decisions
 
-- **Density:** spacious (marketing and reading pages), standard, or dense (dashboards, admin tables). It sets the spacing scale and row height.
-- **Text:** body size (at least 16 px on phones), line length, and the type scale steps in use.
-- **Colour roles:** surfaces, text, one accent for the primary action, status colours used only for status. Contrast of each text and control pair measured in every theme the product ships (rules SE1, SE2, SE5).
-- **Focus style:** one visible marker for every control, at least a 2 px outline or equivalent with 3:1 contrast (RC4, RC6). Use `:focus-visible`.
-- **Targets:** 24 px minimum on the web, 44 px for touch-first products; 44 pt or 48 dp in native apps (RC7).
-- **Motion:** two or three duration steps and what each is for, and the reduced-motion version of each (MO1, MO4).
-- **Test widths:** 320, 375, 768 and 1280 CSS px, or the product's own breakpoints.
+Create or update `design/system.md` for shared decisions and `design/pages/<page>.md` for exceptions. Point to token files instead of copying values. A short record can use this format:
 
-When a decision changes later, update the file in the same change as the code. A decisions file that no build reads goes stale. Audit mode compares code with it and reports drift.
+```markdown
+# Design decisions
 
-## 3. List every state before writing markup
+Applies to: account screens
+Existing components and tokens: <paths>
+Density and text: <chosen scale and reason>
+Colour roles and themes: <token references; themes shipped>
+Focus and targets: <component or CSS reference>
+Motion and reduced motion: <behavior, duration tokens>
+Widths to verify: <product breakpoints plus 320 and 375 CSS px>
+Page exceptions: <links, or none>
+```
 
-For each screen, write the states it can be in and what the user sees and can do in each. A state with no design is a bug the first user will find.
+Use the See, Read, Reach and Motion groups in [rules.md](rules.md) for these decisions. Choose values from the existing system. If none exists, distinguish minimum requirements from chosen defaults: 24 CSS px target size with WCAG exceptions is AA; 44 CSS px touch targets and a 2 px, 3:1 focus marker are stronger targets. Body text of 16 px on phones is craft advice, not a WCAG minimum. Measure text and control contrast in each shipped theme.
 
-| State | Ask |
+## 3. Inventory states before markup
+
+For each affected component or screen, record the applicable states below. For each, state what the user sees, what they can do and how you will reach it for verification. Mark inapplicable states with a reason rather than implementing speculative features.
+
+| State | What to design and verify |
 |---|---|
-| Default | Real content at realistic length, not placeholder text |
-| Empty | First use (explain and give the one action that fills it), no results (say what was searched and how to widen it), cleared by the user |
-| Loading | Under 1 s: nothing. 1 to 10 s: skeleton or progress that keeps the layout's space. Over 10 s: progress with a way to cancel or leave |
-| Partial | Some data arrived, some failed or is still coming |
-| Error | Network, validation, not found, no permission, server. Each says what happened and what to do next, and keeps the user's input |
-| Success | Confirmation that names what changed; undo where the action can be undone |
-| Disabled or read-only | Why it is unavailable and how to make it available |
-| Offline or slow | What still works; what will retry |
-| Signed out, other roles | What a visitor or a lower-permission user sees |
-| Hostile content | Longest name, a word with no break points, huge numbers, long currency formats, text 30 to 40 percent longer after translation, right-to-left if supported, one item and many items |
+| Default | Realistic content and the main user task |
+| Empty | First use, no search results, or content cleared by the user; a useful next action |
+| Loading | Layout space held, progress for a noticeable wait, cancel or leave for long operations |
+| Partial | Some data present while another part loads or fails |
+| Error | Validation, network, not found, no permission, server error; recovery and input retained |
+| Success | What changed and undo if supported |
+| Disabled or read-only | Why an action is unavailable and how to make it available |
+| Offline or slow | What still works and what will retry |
+| Identity and roles | Signed out and supported permission levels |
+| Content extremes | Long names, unbroken strings, large numbers, one or many rows, supported translations and right-to-left text |
 
-## 4. Build
+Keep the inventory with the task or page decisions. An inaccessible fixture or missing account is a verification gap, not a tested state.
 
-- Native elements first: `button`, `a`, `label`, `input`, `select`, `dialog`, `details`. A custom control needs its role, name, state and keyboard behaviour (OP1, RC1).
-- Forms: visible labels; hints before the field; `autocomplete` attributes; paste allowed; errors next to the field and kept on resubmit; a linked summary when several fail (OP3, OP4, OP5).
-- Reserve space for images, embeds and late data (ST1). Never change an element's size on hover or press (ST2).
-- Long lists over about 50 items: paginate or virtualise.
-- Respect `prefers-reduced-motion` and `prefers-color-scheme` if the product has a dark theme.
+## 4. Build with the relevant rules
 
-## 5. Audit what you built
+- Use native elements and existing components. Read Reach and Operate in [rules.md](rules.md) for keyboard behavior, names and state. Custom controls need equivalent semantics and keyboard operation.
+- Forms need visible associated labels, hints, suitable `autocomplete`, usable validation and input preserved after failure. Keep paste and password managers available. Read OP1 through OP6 and OP14.
+- Read Read and Stability for responsive content, text resizing and space reserved for late data. Choose pagination or virtualization only when the actual content and performance need it; preserve keyboard and screen reader access.
+- Read Motion when anything animates. Implement the reduced-motion behavior and keep the resulting content available.
 
-Serve it locally and run [audit.md](audit.md) at quick depth on every state you listed in step 3 that a URL can show. Fix every `fail` before calling the work done, and say which states you could not reach and why.
+Update saved decisions when implementation changes them. Use audience-appropriate prose for labels, errors and empty states; use the Writing skill if available.
+
+## 5. Audit the result
+
+Follow [audit.md](audit.md) at quick depth. Run the probe for each distinct URL-addressable state in the inventory. Exercise other changed states manually where authorized. Verify and fix confirmed failures in scope, then recheck the affected behavior. Record unresolved items, inaccessible states and unavailable checks. Do not call an untested state complete.
