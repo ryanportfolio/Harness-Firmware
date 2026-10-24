@@ -128,7 +128,8 @@ const INIT = () => {
     for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
       if (n.id && unique(`#${CSS.escape(n.id)}`)) { parts.unshift(`#${CSS.escape(n.id)}`); break; }
       let part = n.localName;
-      const sibs = n.parentElement ? [...n.parentElement.children].filter((c) => c.localName === n.localName) : [];
+      // parentNode, not parentElement: an element directly inside a shadow root still has siblings there
+      const sibs = n.parentNode ? [...n.parentNode.children].filter((c) => c.localName === n.localName) : [];
       if (sibs.length > 1) part += `:nth-of-type(${sibs.indexOf(n) + 1})`;
       parts.unshift(part);
       if (n.localName === 'body' || unique(parts.join(' > '))) break;
@@ -195,6 +196,26 @@ const INIT = () => {
     }
     return { left: x, top: y, width: r.width, height: r.height, right: x + r.width, bottom: y + r.height, framed };
   };
+  // the element painted at a point of the top page, looking inside open shadow roots and same-origin frames
+  const deepPoint = (x, y) => {
+    let el = document.elementFromPoint(x, y);
+    for (;;) {
+      const inner = el?.shadowRoot?.elementFromPoint(x, y);
+      if (inner && inner !== el) { el = inner; continue; }
+      if (el?.localName === 'iframe' || el?.localName === 'frame') {
+        let doc = null;
+        try { doc = el.contentDocument; } catch { /* cross-origin */ }
+        if (doc) {
+          const b = el.getBoundingClientRect(), cs = style(el);
+          x -= b.left + el.clientLeft + parseFloat(cs.paddingLeft);
+          y -= b.top + el.clientTop + parseFloat(cs.paddingTop);
+          const hit = doc.elementFromPoint(x, y);
+          if (hit) { el = hit; continue; }
+        }
+      }
+      return el;
+    }
+  };
   const ownText = (el) => [...el.childNodes].filter((c) => c.nodeType === 3).map((c) => c.textContent).join('').replace(/\s+/g, ' ').trim();
   // screen-reader-only text and text pushed out of an icon button are hidden on purpose
   const hiddenOnPurpose = (el) => {
@@ -233,7 +254,7 @@ const INIT = () => {
     }
     return out;
   };
-  window.__uq = { sel, find, up, style, roots, all, deepActive, topRect, ownText, textRects, clipped, shifts: [] };
+  window.__uq = { sel, find, up, style, roots, all, deepActive, topRect, deepPoint, ownText, textRects, clipped, shifts: [] };
   try {
     new PerformanceObserver((list) => {
       for (const e of list.getEntries()) {
@@ -296,17 +317,22 @@ const PIXELS = async ({ op, a, a2, b, b2, rect, rects, color, threshold }) => {
     }
     return { changed, total: n, moving };
   }
-  // op === 'contrast': text colour (with alpha) against every background pixel under the text's own line boxes
-  const ctx = await load(a);
-  const parts = rects.map((box) => crop(ctx, box)).filter(Boolean);
+  // op === 'contrast': text colour (with alpha) against every background pixel under the text's own line boxes.
+  // Optional b: the same view with the text's faded boxes at full opacity. With their opacities multiplied into
+  // color.a, a text pixel is the a pixel plus color.a times (text colour minus the b pixel); without b that is
+  // plain alpha blending over a
+  const ctx = await load(a), under = b ? await load(b) : null;
+  const parts = rects.map((box) => [crop(ctx, box), under && crop(under, box)]).filter(([p, q]) => p && (!under || q));
   if (!parts.length) return null;
-  const d = parts.length === 1 ? parts[0] : parts.reduce((acc, p) => { const out = new Uint8ClampedArray(acc.length + p.length); out.set(acc); out.set(p, acc.length); return out; });
+  const join = (list) => (list.length === 1 ? list[0] : list.reduce((acc, p) => { const out = new Uint8ClampedArray(acc.length + p.length); out.set(acc); out.set(p, acc.length); return out; }));
+  const d = join(parts.map(([p]) => p)), e = under ? join(parts.map(([, q]) => q)) : d;
   const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
   const lum = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  const clamp = (v) => Math.min(255, Math.max(0, v));
   const ratios = [];
   for (let i = 0; i < d.length; i += 4) {
     const [r, g, bl] = [d[i], d[i + 1], d[i + 2]];
-    const fr = color.r * color.a + r * (1 - color.a), fg = color.g * color.a + g * (1 - color.a), fb = color.b * color.a + bl * (1 - color.a);
+    const fr = clamp(r + color.a * (color.r - e[i])), fg = clamp(g + color.a * (color.g - e[i + 1])), fb = clamp(bl + color.a * (color.b - e[i + 2]));
     const l1 = lum(fr, fg, fb), l2 = lum(r, g, bl);
     ratios.push((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05));
   }
@@ -526,9 +552,28 @@ async function compositedContrast(page, url, incomplete) {
       return (own.length ? own : textRects(el)).map(({ r }) => ({ x: r.left + t.left - b.left, y: r.top + t.top - b.top, width: r.width, height: r.height }));
     }, selector);
     const buf = await page.screenshot();
+    // a faded box can paint its own background behind the text, already faded in buf; a second shot with every
+    // opacity set to 1 shows what the text sits on inside the faded boxes
+    let flat = null;
+    if (info.opacity < 1) {
+      await page.evaluate((s) => {
+        const { find, up } = window.__uq;
+        window.__uqOpacity = [];
+        for (let x = find(s); x; x = up(x)) {
+          window.__uqOpacity.push([x, x.style.getPropertyValue('opacity'), x.style.getPropertyPriority('opacity')]);
+          x.style.setProperty('opacity', '1', 'important');
+        }
+      }, selector);
+      await page.waitForTimeout(50);
+      flat = await page.screenshot();
+      await page.evaluate(() => {
+        for (const [x, value, priority] of window.__uqOpacity) value ? x.style.setProperty('opacity', value, priority) : x.style.removeProperty('opacity');
+        delete window.__uqOpacity;
+      });
+    }
     await page.evaluate((s) => { const el = window.__uq.find(s); el.style.cssText = el.dataset.uqColor; delete el.dataset.uqColor; }, selector);
     if (!rects.length) continue;
-    const r = await pixels({ op: 'contrast', a: buf.toString('base64'), rects, color: info.color });
+    const r = await pixels({ op: 'contrast', a: buf.toString('base64'), b: flat?.toString('base64'), rects, color: info.color });
     if (!r) continue;
     const need = info.large ? 3 : 4.5;
     const severity = r.median < need ? 'fail' : r.p05 < need ? 'review' : 'pass';
@@ -572,7 +617,7 @@ async function focusWalk(page, url) {
       pressed = false;
       await page.waitForTimeout(180);
       const f = navigatedTo ? null : await page.evaluate(() => {
-        const { deepActive, sel, topRect, up } = window.__uq;
+        const { deepActive, sel, topRect, up, style, deepPoint } = window.__uq;
         const el = deepActive();
         if (!el || el === document.body || el === document.documentElement) return null;
         if (el.localName === 'iframe' || el.localName === 'frame') {
@@ -600,11 +645,13 @@ async function focusWalk(page, url) {
         let covered = 0;
         const coverers = new Set();
         for (const [x, y] of pts) {
-          const top = document.elementFromPoint(x, y);
+          // the deepest element painted there, so an overlay inside the element's own frame or component counts
+          const top = deepPoint(x, y);
           if (!top || inside(top, el) || inside(el, top)) continue;
           let n = top, pinned = false;
-          for (; n && n !== document.body; n = n.parentElement) {
-            const p = getComputedStyle(n).position;
+          // climb out of frames too (a fixed chat iframe is an overlay), but not into a box that holds the element
+          for (; n && !(n.localName === 'body' && n.ownerDocument === document) && !inside(el, n); n = up(n)) {
+            const p = style(n).position;
             if (p === 'fixed' || p === 'sticky') { pinned = true; break; }
           }
           if (pinned) { covered++; coverers.add(sel(n)); }
@@ -701,13 +748,24 @@ async function focusWalk(page, url) {
 
   // focusable elements the walk never reached: behind a trap, after a loop, or out of the Tab order by script
   const missed = ended === 'max-tabs' || !order.length ? [] : await page.evaluate(() => {
-    const { all, sel } = window.__uq;
+    const { all, sel, up } = window.__uq;
     const seen = window.__uqFocus?.seen || new WeakSet();
-    // visible and not inert, in its own document and in every frame around it
+    // visible and not inert, in its own document and in every frame around it; boxes outside an open modal dialog are inert too
+    const modals = new Map();
+    const modalOf = (doc) => { if (!modals.has(doc)) modals.set(doc, doc.querySelector('dialog:modal')); return modals.get(doc); };
     const shown = (el) => {
-      for (let x = el; x;) {
-        if (x.closest('[inert]') || !(x.checkVisibility?.({ visibilityProperty: true }) ?? x.getClientRects().length > 0)) return false;
-        try { x = x.ownerDocument.defaultView.frameElement; } catch { x = null; }
+      if (!(el.checkVisibility?.({ visibilityProperty: true }) ?? el.getClientRects().length > 0)) return false;
+      let doc = null;
+      for (let x = el; x; x = up(x)) {
+        if (x.hasAttribute('inert')) return false;
+        // the first box in each document's own tree decides whether it sits outside that document's open modal dialog
+        if (x.ownerDocument !== doc && x.getRootNode() === x.ownerDocument) {
+          doc = x.ownerDocument;
+          const modal = modalOf(doc);
+          if (modal && !modal.contains(x)) return false;
+        }
+        // the frame around a frame's document must show it too
+        if (x.localName === 'iframe' || x.localName === 'frame') if (!(x.checkVisibility?.({ visibilityProperty: true }) ?? x.getClientRects().length > 0)) return false;
       }
       return true;
     };
@@ -717,13 +775,14 @@ async function focusWalk(page, url) {
       if (seen.has(el) || el.matches(':disabled') || Number(el.getAttribute('tabindex')) < 0) continue;
       if (el.localName === 'summary' && el.parentElement?.localName !== 'details') continue;
       if (!shown(el)) continue;
-      // one radio per group is a Tab stop: report a group only when none of its radios was reached
+      // one radio per group is a Tab stop: report a group only when none of its radios was reached.
+      // A group is one name within one form, or within one document or shadow root outside any form
       if (el.type === 'radio' && el.name) {
-        const root = el.getRootNode();
-        if (!groups.has(root)) groups.set(root, new Set());
-        if (groups.get(root).has(el.name)) continue;
-        groups.get(root).add(el.name);
-        if ([...root.querySelectorAll('input[type=radio]')].some((r) => r.name === el.name && seen.has(r))) continue;
+        const root = el.getRootNode(), owner = el.form || root;
+        if (!groups.has(owner)) groups.set(owner, new Set());
+        if (groups.get(owner).has(el.name)) continue;
+        groups.get(owner).add(el.name);
+        if ([...root.querySelectorAll('input[type=radio]')].some((r) => r.name === el.name && r.form === el.form && seen.has(r))) continue;
       }
       out.push(sel(el));
     }
