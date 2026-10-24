@@ -560,8 +560,16 @@ function scanDockerfile(file, text) {
         report.images.push({ line: n, image: imageName(image), tagged: imageTagged(image), registry_host_named: image.includes("/") && (first.includes(".") || first.includes(":") || first === "localhost"), digest_pinned: /@sha256:[0-9a-f]{64}$/.test(image) });
       }
     }
-    const argEnv = line.match(/^\s*(ARG|ENV)\s+([A-Za-z_][A-Za-z0-9_]*)/i);
-    if (argEnv && SECRET_NAME.test(argEnv[2])) report.secret_named_args_env.push({ line: n, instruction: argEnv[1].toUpperCase(), name: argEnv[2] });
+    // ENV and ARG can set several variables in one instruction ("ENV A=1 B=2", "ARG A B=1");
+    // the legacy form "ENV NAME value" sets only the first word.
+    const argEnv = line.match(/^\s*(ARG|ENV)\s+(.*)$/i);
+    if (argEnv) {
+      const instruction = argEnv[1].toUpperCase();
+      const rest = argEnv[2];
+      const legacy = instruction === "ENV" && /^[A-Za-z_][A-Za-z0-9_]*\s/.test(rest) && !/^[A-Za-z_][A-Za-z0-9_]*=/.test(rest);
+      const names = legacy ? [rest.match(/^[A-Za-z_][A-Za-z0-9_]*/)[0]] : [...rest.matchAll(/(?:^|\s)([A-Za-z_][A-Za-z0-9_]*)(?==|\s|$)/g)].map((m) => m[1]);
+      for (const name of new Set(names)) if (SECRET_NAME.test(name)) report.secret_named_args_env.push({ line: n, instruction, name: safe(name, ENV_NAME) });
+    }
     if (/^\s*ADD\s+(--\S+\s+)*https?:\/\//i.test(line)) report.add_from_url.push({ line: n });
     if (/\b(curl|wget)\b[^\n]*\|\s*(sudo\s+)?(sh|bash|zsh|python3?|node)\b/.test(line)) report.piped_remote_scripts.push({ line: n });
     if (/^\s*USER\s+(?!root\b|0\b)\S+/i.test(line)) report.sets_user = true;

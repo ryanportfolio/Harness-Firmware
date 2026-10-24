@@ -51,24 +51,73 @@ function keywordsOf(subject) {
   return [...found].sort();
 }
 
+const gitBytes = (repo, args, input) => spawnSync("git", ["-c", "core.fsmonitor=false", "-C", repo, ...args], { input, maxBuffer: 1024 * 1024 * 1024 });
+
+// Parses commit objects from cat-file --batch: "<sha> commit <size>\n<size bytes>\n" each.
+function readCommits(repo, shas) {
+  const out = new Map();
+  if (!shas.length) return out;
+  const result = gitBytes(repo, ["cat-file", "--batch"], `${shas.join("\n")}\n`);
+  if (result.status !== 0) throw new Error(`git cat-file failed: ${result.stderr.toString().trim().slice(0, 300)}`);
+  const buffer = result.stdout;
+  let offset = 0;
+  for (const sha of shas) {
+    const newline = buffer.indexOf(10, offset);
+    if (newline < 0) break;
+    const [gotSha, type, size] = buffer.slice(offset, newline).toString().split(" ");
+    const length = Number(size);
+    const object = buffer.slice(newline + 1, newline + 1 + length).toString("utf8");
+    offset = newline + 1 + length + 1;
+    if (gotSha !== sha || type !== "commit") continue;
+    const split = object.indexOf("\n\n");
+    const header = split < 0 ? object : object.slice(0, split);
+    const message = split < 0 ? "" : object.slice(split + 2);
+    const committed = header.match(/^committer .* (\d+) [+-]\d{4}$/m)?.[1];
+    const subject = message.split(/\n\s*\n/)[0].replace(/\s*\n\s*/g, " ").trim();
+    out.set(sha, { date: committed ? new Date(Number(committed) * 1000).toISOString() : null, subject, body: message.slice(0, 64 * 1024) });
+  }
+  return out;
+}
+
+// Paths each commit changed, from diff-tree --stdin -z. The output lists each commit's SHA
+// and then its paths; the next expected SHA from rev-list marks the next record.
+function changedPaths(repo, shas) {
+  const out = new Map();
+  if (!shas.length) return out;
+  const result = gitBytes(repo, ["diff-tree", "--stdin", "-r", "--root", "--name-only", "-z", "--no-renames"], `${shas.join("\n")}\n`);
+  if (result.status !== 0) throw new Error(`git diff-tree failed: ${result.stderr.toString().trim().slice(0, 300)}`);
+  const position = new Map(shas.map((sha, i) => [sha, i]));
+  let current = null;
+  for (const token of result.stdout.toString("utf8").split("\0")) {
+    const trimmed = token.replace(/^\n/, "");
+    if (position.has(trimmed) && (current === null || position.get(trimmed) > position.get(current))) {
+      current = trimmed;
+      out.set(current, []);
+    } else if (current && trimmed) out.get(current).push(trimmed);
+  }
+  return out;
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const repo = path.resolve(options.repo);
   const head = git(repo, ["rev-parse", "--verify", `${options.ref}^{commit}`]);
   if (head.status !== 0) throw new Error(`cannot resolve ${options.ref} in ${repo}`);
 
-  // Records are split on \x1e; fields on \x1f. --name-only lists paths after the body.
-  const log = git(repo, ["log", "--no-color", "--no-ext-diff", "--no-textconv", `--max-count=${options.max}`, "--name-only", "--format=%x1e%H%x1f%cI%x1f%s%x1f%b%x1f", head.stdout.trim()]);
-  if (log.status !== 0) throw new Error(`git log failed: ${log.stderr.trim().slice(0, 300)}`);
+  // Commit messages may contain any byte, so no message text is used as a separator. SHAs come
+  // from rev-list (hex only, one per line); each message comes from cat-file --batch, which
+  // gives its exact length; changed paths come from diff-tree in the same commit order.
+  const list = git(repo, ["rev-list", `--max-count=${options.max}`, head.stdout.trim()]);
+  if (list.status !== 0) throw new Error(`git rev-list failed: ${list.stderr.trim().slice(0, 300)}`);
+  const shas = list.stdout.split("\n").map((s) => s.trim()).filter((s) => /^[0-9a-f]{40}$/.test(s));
+  const objects = readCommits(repo, shas);
+  const paths = changedPaths(repo, shas);
 
-  const commits = [];
-  for (const record of log.stdout.split("\x1e")) {
-    if (!record.trim()) continue;
-    const [sha, date, subject, body, rest = ""] = record.split("\x1f");
-    const paths = rest.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-    const reverted = (body ?? "").match(REVERT_BODY)?.[1] ?? null;
-    commits.push({ sha, date, subject: subject ?? "", paths, reverted });
-  }
+  const commits = shas.map((sha) => {
+    const { date, subject, body } = objects.get(sha) ?? { date: null, subject: "", body: "" };
+    const reverted = body.match(REVERT_BODY)?.[1] ?? null;
+    return { sha, date, subject, paths: paths.get(sha) ?? [], reverted };
+  });
 
   const selected = new Map();
   for (const commit of commits) {
