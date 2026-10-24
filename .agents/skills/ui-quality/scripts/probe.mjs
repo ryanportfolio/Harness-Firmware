@@ -580,8 +580,10 @@ async function compositedContrast(page, url, incomplete) {
         await page.evaluate((s) => {
           const { find, up } = window.__uq;
           window.__uqOpacity = [];
+          // transitions off as well, or an opacity transition would still be fading in when the shot is taken
           for (let x = find(s); x; x = up(x)) {
-            window.__uqOpacity.push([x, x.style.getPropertyValue('opacity'), x.style.getPropertyPriority('opacity')]);
+            for (const prop of ['opacity', 'transition']) window.__uqOpacity.push([x, prop, x.style.getPropertyValue(prop), x.style.getPropertyPriority(prop)]);
+            x.style.setProperty('transition', 'none', 'important');
             x.style.setProperty('opacity', '1', 'important');
           }
         }, selector);
@@ -591,7 +593,7 @@ async function compositedContrast(page, url, incomplete) {
     } finally {
       // put the page back even when a capture fails, so the checks after this one measure it unchanged
       await page.evaluate((s) => {
-        for (const [x, value, priority] of window.__uqOpacity || []) value ? x.style.setProperty('opacity', value, priority) : x.style.removeProperty('opacity');
+        for (const [x, prop, value, priority] of window.__uqOpacity || []) value ? x.style.setProperty(prop, value, priority) : x.style.removeProperty(prop);
         delete window.__uqOpacity;
         const el = window.__uq.find(s);
         if (el && 'uqColor' in el.dataset) { el.style.cssText = el.dataset.uqColor; delete el.dataset.uqColor; }
@@ -1068,10 +1070,11 @@ async function phone(url) {
       if (scale < 1) notes.push(`${url}: axe target sizes at 375 px are in CSS px, larger than the phone shows at ${Math.round(scale * 100)}%`);
     }
     const small = await page.evaluate((k) => {
-      const { all, style, sel, ownText } = window.__uq;
+      const { all, style, sel, ownText, topRect } = window.__uq;
       const out = [];
       for (const el of all('a[href], button, input:not([type=hidden]), select, textarea, [role=button], [role=link], [role=tab], [role=checkbox], [role=switch], [tabindex]:not([tabindex="-1"])')) {
-        const r = el.getBoundingClientRect();
+        // the size on the page, after any scaling of the frames around it
+        const r = topRect(el);
         if (!r.width || !r.height) continue;
         // inline links inside running text are exempt from target size
         if (el.localName === 'a' && style(el).display === 'inline' && el.parentElement && ownText(el.parentElement)) continue;
