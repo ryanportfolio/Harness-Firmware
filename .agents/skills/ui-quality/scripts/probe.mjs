@@ -296,17 +296,22 @@ async function open(url, ctxOpts = {}) {
     ...(opts.storageState ? { storageState: opts.storageState } : {}),
     ...ctxOpts,
   });
-  await context.addInitScript(INIT);
-  const page = await context.newPage();
-  const response = await page.goto(url, { waitUntil: 'load', timeout: 60000 });
-  // a 404 or 500 page, or a sign-in page served with an error code, is not the page that was asked for
-  if (response && response.status() >= 400 && !opts.allowErrorStatus) {
-    await context.close();
-    throw new Error(`HTTP ${response.status()}: not audited (pass --allow-error-status to audit an error page on purpose)`);
+  // the caller closes the context only once it has it; a failure here closes it before rethrowing
+  try {
+    await context.addInitScript(INIT);
+    const page = await context.newPage();
+    const response = await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    // a 404 or 500 page, or a sign-in page served with an error code, is not the page that was asked for
+    if (response && response.status() >= 400 && !opts.allowErrorStatus) {
+      throw new Error(`HTTP ${response.status()}: not audited (pass --allow-error-status to audit an error page on purpose)`);
+    }
+    if (opts.waitFor) await page.waitForSelector(opts.waitFor, { timeout: 30000 });
+    await page.waitForTimeout(opts.settle);
+    return { context, page };
+  } catch (err) {
+    await context.close().catch(() => { /* already gone */ });
+    throw err;
   }
-  if (opts.waitFor) await page.waitForSelector(opts.waitFor, { timeout: 30000 });
-  await page.waitForTimeout(opts.settle);
-  return { context, page };
 }
 
 async function shot(page, name, full = true) {
