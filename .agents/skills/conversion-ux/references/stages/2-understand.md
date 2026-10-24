@@ -39,7 +39,7 @@ The next four are screen-craft rules and count toward the Polish cap.
 
 **UN11. Price and trust near the title.** Price far down the page; rating far from the name. Fix: name, rating and price together near the top. GGg61sdEjeI 6:51, 10:39. Craft.
 
-**UN12. Reference prices.** A struck-through earlier price makes the current one read as a deal. zr37ibqXl1U 12:47. Adjacent research. Guard: a genuine earlier price for the same item; in the EU, the lowest price of the previous 30 days.
+**UN12. Reference prices.** A struck-through earlier price makes the current one read as a deal. zr37ibqXl1U 12:47. Adjacent research. Guard: a genuine earlier price for the same item. For goods sold to consumers in the EU, the earlier price shown with a reduction must be the lowest of the previous 30 days, subject to national rules and exceptions; that rule does not cover services or digital content, where the general principle still holds.
 
 **UN13. Like-for-like context.** A fee alone feels large; beside what it protects it reads small. 2TlIg3VokY8 9:36. Adjacent research. Guard: same units. The video's "$49/month · just 2.6%" of a one-off $1,899 price is about 31% of it per year; show "$588 a year" instead. Recheck at Pay, where add-ons are often framed this way (PA2).
 

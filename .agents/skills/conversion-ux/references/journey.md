@@ -29,7 +29,7 @@ Walk the stages the journey has, in the order the user meets them. Not every jou
 
 Checked at every hand-off, in both modes.
 
-**JO1. Choices carry over.** Between any two stages, the user's choices (plan, billing period, quantity, dates, filters, form input) and their place survive: through gates (GA1), the browser back button, closing a sheet, a page refresh, and a trip from a list to a detail page and back. Fix: keep state in the URL or a saved session; restore the scroll position on back; name the carried choice on the next screen. Convention.
+**JO1. Choices carry over.** Between any two stages, the user's choices (plan, billing period, quantity, dates, filters, form input) and their place survive: through gates (GA1), the browser back button, closing a sheet, a page refresh, and a trip from a list to a detail page and back. Fix: keep non-sensitive selections (plan, period, quantity, dates, filters) in the URL or a saved session, and form input in a saved session only; never put credentials, verification codes, payment details or private content in a URL, where history and logs keep it. Restore the scroll position on back; name the carried choice on the next screen. Convention.
 
 **JO2. Count the path.** Taps, fields and screens from arrival to the goal, and any dead end. Report the count now and the count your fixes would leave. Where the next choice is small (a time slot, a size), put it on the card so the action needs no extra screen ("Book Sat 11:30"). U7jTCgIWS4w 8:48, about 9:48 (frames). Presenter.
 

@@ -72,7 +72,7 @@ Video: ranges are read at the high end; a struck-through price makes the current
 
 Anchoring: Tversky, A., & Kahneman, D. (1974). Judgment under uncertainty: Heuristics and biases. *Science*, 185(4157), 1124-1131. Decoy (attraction) effect: Huber, J., Payne, J. W., & Puto, C. (1982). Adding asymmetrically dominated alternatives: Violations of regularity and the similarity hypothesis. *Journal of Consumer Research*, 9(1), 90-98.
 
-The specific claim that people read a price range at its upper end is the presenter's; no study is named. The laptop example compares a monthly fee with a one-off price ("$49/month · just 2.6%"); per year the plan costs about 31% of the laptop. Reference prices are regulated in some markets: in the EU, a price reduction must show the lowest price of the previous 30 days as the earlier price (Directive 98/6/EC, Article 6a, added by Directive (EU) 2019/2161).
+The specific claim that people read a price range at its upper end is the presenter's; no study is named. The laptop example compares a monthly fee with a one-off price ("$49/month · just 2.6%"); per year the plan costs about 31% of the laptop. Reference prices are regulated in some markets: in the EU, a price reduction on goods must show the lowest price of the previous 30 days as the earlier price (Directive 98/6/EC, Article 6a, added by Directive (EU) 2019/2161). The Commission's guidance notice on Article 6a (Official Journal C 526, 29 December 2021, section 1.1) says the directive covers goods, not services or digital content, and member states may set exceptions.
 
 Use: anchors and context are real effects, so the rules only allow true reference prices and like-for-like comparisons (UN12, UN13).
 

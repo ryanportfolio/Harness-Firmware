@@ -51,7 +51,7 @@ Zero results, slow loads and errors while filtering: SC6 in [every-screen.md](..
 
 ## Honesty items here
 
-HO2 ("3 people are viewing", invented stock), HO4 (a pre-selected plan or add-on that adds cost), HO6 (counts and ratings on options), HO12 (a paid item under a personal label). Details in [honesty.md](../honesty.md).
+HO2 ("3 people are viewing", invented stock), HO4 (an upgrade or add-on the user did not ask for, pre-selected so it adds cost; a visibly priced default chosen per CH1 is fine), HO6 (counts and ratings on options), HO12 (a paid item under a personal label). Details in [honesty.md](../honesty.md).
 
 ## Build moves
 
