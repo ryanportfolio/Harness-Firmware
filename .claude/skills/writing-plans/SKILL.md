@@ -15,6 +15,11 @@ exposed planning tool if available; otherwise keep a short Markdown checklist. S
 in the repository's preferred location when the user requests a document, a handoff needs
 one, or the work must survive a context reset. Otherwise keep planning lightweight.
 
+When a subagent maps existing code for the plan, brief it with descriptive questions only
+(where a thing lives, how it behaves today), never the change being planned, and ask for
+file:line facts without recommendations, so its findings describe the code as it is rather
+than what would suit the plan.
+
 When planning extraction or migration of repeated operations, read
 [selective shared-code refactoring](references/shared-code-refactoring.md).
 
