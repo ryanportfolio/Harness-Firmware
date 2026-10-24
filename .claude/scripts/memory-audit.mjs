@@ -21,11 +21,22 @@
 // verdict. The /refine skill runs this in its tooling lens.
 //
 // Usage: node .claude/scripts/memory-audit.mjs [--json] [--project-dir <path>]
+//        node .claude/scripts/memory-audit.mjs --diff <ref> [--json]
 //   --project-dir  scan this transcript directory instead of deriving it from
 //                  the working directory's main checkout (testing, or
 //                  auditing another repo's history from here).
+//   --diff <ref>   write-side check instead of the transcript audit: list the
+//                  reference entries that cite a file changed since the merge
+//                  base with <ref> (committed, staged, unstaged and untracked
+//                  changes), so each can be re-checked against the new code
+//                  before a pull request. A cited path is a backticked or
+//                  path-shaped token; a bare file name counts only when one
+//                  tracked file has that name. Advisory: a hit is a prompt to
+//                  re-read the entry, not proof it is stale, and an entry that
+//                  describes changed code without naming a path is missed.
 //
-// Exit 0 always (2 on bad usage). Requires Node >= 18, no dependencies.
+// Exit 0 always (2 on bad usage or an unknown --diff ref). Requires Node >= 18,
+// no dependencies.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -36,16 +47,23 @@ import { spawnSync } from "node:child_process";
 const argv = process.argv.slice(2);
 let jsonMode = false;
 let projectDirOverride = null;
+let diffRef = null;
+const usage = () => {
+  console.error("Usage: node .claude/scripts/memory-audit.mjs [--json] [--project-dir <path>]");
+  console.error("       node .claude/scripts/memory-audit.mjs --diff <ref> [--json]");
+  process.exit(2);
+};
 for (let i = 0; i < argv.length; i += 1) {
   if (argv[i] === "--json") jsonMode = true;
   else if (argv[i] === "--project-dir" && argv[i + 1]) {
     projectDirOverride = argv[i + 1];
     i += 1;
-  } else {
-    console.error("Usage: node .claude/scripts/memory-audit.mjs [--json] [--project-dir <path>]");
-    process.exit(2);
-  }
+  } else if (argv[i] === "--diff" && argv[i + 1] && !argv[i + 1].startsWith("-")) {
+    diffRef = argv[i + 1];
+    i += 1;
+  } else usage();
 }
+if (diffRef && projectDirOverride) usage();
 
 const root = process.cwd();
 const projectsRoot = path.join(os.homedir(), ".claude", "projects");
@@ -82,6 +100,127 @@ const referenceDir = path.join(root, ".claude", "reference");
 const referenceFiles = fs.existsSync(referenceDir)
   ? fs.readdirSync(referenceDir).filter((f) => f.endsWith(".md"))
   : [];
+
+if (diffRef) {
+  runDiffCheck(diffRef);
+  process.exit(0);
+}
+
+// --diff: which reference entries cite a file this change touched. Paths are
+// compared repo-relative, forward slashes, lower case. Changes to the
+// reference files themselves are left out: editing memory does not make
+// another entry's claim about code stale.
+function runDiffCheck(ref) {
+  const git = (args, cwd = root) => spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  const fail = (msg) => {
+    console.error(`memory-audit --diff: ${msg}`);
+    process.exit(2);
+  };
+  const topOut = git(["rev-parse", "--show-toplevel"]);
+  if (topOut.status !== 0 || !topOut.stdout.trim()) fail("not inside a git repository");
+  const top = topOut.stdout.trim();
+  const refOut = git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], top);
+  if (refOut.status !== 0) fail(`unknown ref ${ref} (fetch it first, for example git fetch origin main)`);
+  const refSha = refOut.stdout.trim();
+  const mb = git(["merge-base", refSha, "HEAD"], top);
+  const base = mb.status === 0 && mb.stdout.trim() ? mb.stdout.trim() : refSha;
+  const list = (args) => {
+    const out = git(args, top);
+    if (out.status !== 0) fail(`git ${args.join(" ")} failed: ${out.stderr.trim().split("\n")[0]}`);
+    return out.stdout.split("\0").filter(Boolean).map(normalize);
+  };
+  const changed = [
+    ...new Set([
+      ...list(["diff", "--name-only", "--no-renames", "-z", base]),
+      ...list(["ls-files", "--others", "--exclude-standard", "-z"]),
+    ]),
+  ].filter((p) => !p.startsWith(".claude/reference/"));
+  const nameCount = new Map();
+  for (const p of new Set([...list(["ls-files", "-z"]), ...changed])) {
+    const name = p.slice(p.lastIndexOf("/") + 1);
+    nameCount.set(name, (nameCount.get(name) ?? 0) + 1);
+  }
+
+  // Path-shaped tokens: something with a slash, or a name with an extension.
+  // Backticks are dropped first so a command like `node scripts/x.mjs --check`
+  // still yields its path; URLs are removed so their path parts never match.
+  const PATH_TOKEN = /(?:[\w.@~+-]+\/)+[\w.@~+-]*|[\w@~+-][\w.@~+-]*\.[A-Za-z][A-Za-z0-9]{0,7}\b/g;
+  const citedTokens = (line) => {
+    const text = line.replace(/\\/g, "/").replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, " ").replace(/`/g, " ");
+    const tokens = new Set();
+    for (const m of text.matchAll(PATH_TOKEN)) {
+      const t = normalize(m[0])
+        .replace(/[.,;:!?]+$/, "")
+        .replace(/^\.\//, "")
+        .replace(/:\d+(?:[-:]\d+)*$/, "");
+      if (t && t !== "." && t !== "/") tokens.add(t);
+    }
+    return tokens;
+  };
+  const changedFor = (token) => {
+    const t = token.replace(/\/+$/, "");
+    if (!t) return [];
+    if (t.includes("/")) {
+      return changed.filter((c) => c === t || c.endsWith(`/${t}`) || c.startsWith(`${t}/`));
+    }
+    if (nameCount.get(t) !== 1) return [];
+    return changed.filter((c) => c.slice(c.lastIndexOf("/") + 1) === t);
+  };
+
+  const refDir = path.join(top, ".claude", "reference");
+  const files = fs.existsSync(refDir) ? fs.readdirSync(refDir).filter((f) => f.endsWith(".md")).sort() : [];
+  const entries = [];
+  for (const file of files) {
+    const lines = fs.readFileSync(path.join(refDir, file), "utf8").split(/\r?\n/);
+    let entry = { file, line: 1, heading: "(top of file)", citations: new Map() };
+    const flush = () => {
+      if (entry.citations.size > 0) {
+        entries.push({
+          file: entry.file,
+          line: entry.line,
+          heading: entry.heading,
+          citations: [...entry.citations].map(([cited, hits]) => ({ cited, changed: [...hits].sort() })),
+        });
+      }
+    };
+    lines.forEach((text, i) => {
+      const heading = text.match(/^(#{2,6})\s+(.+?)\s*$/);
+      if (heading) {
+        flush();
+        entry = { file, line: i + 1, heading: `${heading[1]} ${heading[2]}`, citations: new Map() };
+        return;
+      }
+      for (const token of citedTokens(text)) {
+        const hits = changedFor(token);
+        if (hits.length === 0) continue;
+        const set = entry.citations.get(token) ?? new Set();
+        for (const h of hits) set.add(h);
+        entry.citations.set(token, set);
+      }
+    });
+    flush();
+  }
+
+  if (jsonMode) {
+    console.log(JSON.stringify({ ref, base, changedFiles: changed.length, entries }, null, 2));
+    return;
+  }
+  console.log(
+    `memory-audit --diff ${ref}: base ${base.slice(0, 7)}, ${changed.length} changed file(s) outside .claude/reference/`,
+  );
+  if (entries.length === 0) {
+    console.log("no reference entry cites a changed file.");
+    return;
+  }
+  console.log(
+    `${entries.length} reference entr${entries.length === 1 ? "y cites" : "ies cite"} a changed file. Re-read each against the new code;`,
+  );
+  console.log('amend it if it no longer holds, or retire it with a "retired YYYY-MM-DD: <old claim>; reason: <what changed>" line (recall skill):');
+  for (const e of entries) {
+    console.log(`  ${e.file}:${e.line}  ${e.heading}`);
+    for (const c of e.citations) console.log(`    cites ${c.cited} -> ${c.changed.join(", ")}`);
+  }
+}
 
 const skillsDir = path.join(root, ".claude", "skills");
 const skillNames = fs.existsSync(skillsDir)
