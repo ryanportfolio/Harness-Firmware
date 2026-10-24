@@ -6,7 +6,7 @@ Step 3 of the loop. Adapted from upstream `HUNTING.md` (Cloudflare, MIT).
 
 Assign `planned` units to hunters. One hunter may own closely related units in one subsystem; never combine unrelated boundaries, and never leave a unit silently unassigned. A unit the budget cannot reach becomes `deferred` with reason `budget_cannot_reserve_critics_and_validation`.
 
-Priority order when hunters are capped: (1) unauthenticated or lowest-trust entry surfaces; (2) boundaries protecting the most valuable resources (credentials, cross-tenant data, code execution, release authority); (3) prior gaps, revalidation and fixed-finding variant units, changed source, and units seeded from signals; (4) classes that historically yield confirmed findings for this target type. Ties break by `coverage_id`. Record the ordering rationale in the ledger.
+Priority order when hunters are capped: (1) unauthenticated or lowest-trust entry surfaces; (2) boundaries protecting the most valuable resources (credentials, cross-tenant data, code execution, release authority); (3) prior gaps, revalidation and fixed-finding variant units, changed source, units seeded from signals, and variant units seeded from `history-fixes.json` (sibling paths of a past fix, and fixes that were reverted); (4) classes that historically yield confirmed findings for this target type. Ties break by `coverage_id`. Record the ordering rationale in the ledger.
 
 Before launch the parent sets each assigned unit to `in_progress`, gives it a canonical `agent_id`, and creates `agents/<id>/scratch/` and `agents/<id>/artifacts/`. Launch the whole wave in one message.
 
@@ -18,7 +18,7 @@ Every hunter brief contains, in this order:
 2. The rules from SKILL.md (Rules every phase and every brief carries) and the tier for each assigned path, with the owner-local command template when the tier allows local checks.
 3. `architecture.md` verbatim.
 4. The assigned coverage IDs, subsystem, boundary, starting paths, and each unit's block map from the ledger.
-5. The selected blocks copied verbatim: each ordinary class block from `classes/ATTACK-CLASSES.md`, and from each selected companion its `Core discipline`, each chosen class subsection, `Universal moves`, and `Validation rules`. Never send a block name alone.
+5. The selected blocks copied verbatim: each ordinary class block from `classes/ATTACK-CLASSES.md`, and from each selected companion (including `local-classes.md`) its `Core discipline`, each chosen class subsection, `Universal moves`, and `Validation rules`. Never send a block name alone.
 6. Excluded blocks, each with its reason.
 7. The method and candidate gate below.
 8. Carried same-source confirmed exclusions (fingerprint, title, root cause only) and peer-owned coverage IDs this hunter must not duplicate.
@@ -64,7 +64,17 @@ duplicate, mixed encoding, stale, revoked, reordered, concurrent, partially migr
 failed dependency, and rollback state, only where the interface accepts them. Compare
 canonicalization and units at every parser or policy handoff. For multi-step issues,
 treat each output as a prerequisite; if any prerequisite is not established, record a
-blocker.
+blocker. An idempotency key must be bound to the principal and to a hash of the request
+body: the same key sent by another principal, or with a different body, must not return
+or reuse the first result. A long-running export, download, or stream must recheck
+access when the principal's access is revoked partway through.
+
+MULTI-STEP FLOWS: for signup, checkout, approval, invitation, recovery, or any flow with
+more than one request, write a state-machine table before testing: each state, each
+transition with who may make it, when, and how many times, and the side effects of each
+transition (payment, email, role change, credit). Then test transitions the table does
+not allow: skipping a step, going backwards, repeating a step that should happen once,
+and making a transition as a role that the table does not list for it.
 
 VARIANTS: when a high or critical candidate reveals a reusable root cause, search the
 paths your coverage IDs own for lexical, structural, and logical variants. Consolidate
@@ -78,6 +88,22 @@ minimal harness, a dummy-tenant call, a small malformed fixture, a deterministic
 schedule, or a locally rendered policy. Do not install or fetch anything. On a
 source-only path, or when the check would reach a real network service, do not run it:
 return needs_validation with the exact blocker.
+
+For a race, record the schedule or barrier you used (for example, ten calls released
+together by one barrier), attempts versus successes, and the exact state change (a
+coupon redeemed three times, a balance moving from 10 to -20). Put the success rate in
+execution.observed_result.
+
+Fuzzing, on owner-local paths only: you may run the repository's existing fuzz targets
+or property tests, or a fuzzer built into the toolchain such as `go test -fuzz`, with the
+same command template, for about 60 seconds with one worker, and with every cache and
+corpus directory pointed into your scratch (for Go: GOCACHE and GOPATH under scratch,
+GOPROXY=off, -parallel=1; a target that needs modules the repository does not vendor
+becomes needs_validation, because nothing may be fetched). Go writes a failing input under
+the package's testdata/fuzz/ in the exec tree; copy it to your scratch. Evidence is the
+minimized failing input plus the stack trace. Never install a fuzzer or a fuzzing
+plugin. A crash alone still fails the candidate gate: name the boundary it crosses and
+the result beyond the crash.
 
 Record the exact input, command, limits, and minimum result. Record only the named
 environment variables you set, with their dummy values; never the ambient environment,

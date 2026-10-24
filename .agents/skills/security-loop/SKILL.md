@@ -7,7 +7,7 @@ description: "Whole-repo security audit or pen-test in verified runs → fix own
 
 Find vulnerabilities that cross a real trust boundary, prove each one from source plus the smallest local check, have agents that did not find it try to refute it, fix what the owner picks, and audit again until a run adds nothing new. A candidate with no concrete affected principal, resource, and outcome is not a finding.
 
-The method, attack-class files, findings schema, and validators come from Cloudflare's [security-audit skill](https://github.com/cloudflare/security-audit-skill) at commit `c1c8a8c` (MIT, `LICENSE` in this folder). This version changes how checks run on this machine, adds history and scanner signals, guards the auditing agents against injected instructions, adds a cross-vendor check on serious findings, and adds fix rounds. `references/classes/` is upstream text, unchanged.
+The method, attack-class files, findings schema, and validators come from Cloudflare's [security-audit skill](https://github.com/cloudflare/security-audit-skill) at commit `c1c8a8c` (MIT, `LICENSE` in this folder). This version changes how checks run on this machine, adds history and scanner signals, guards the auditing agents against injected instructions, adds a cross-vendor check on serious findings, and adds fix rounds. `references/classes/` is upstream text, unchanged. Local additions with no upstream counterpart: `references/local-classes.md` (concrete checks for CI, dependencies, Claude Code configuration, deployment settings, and web and API logic, each extending an upstream class or filling a gap), `references/fixing.md`, and the scripts `secret-sweep.mjs`, `promote-artifact.mjs`, `ci-surface-scan.mjs`, and `history-fixes.mjs`. Several ideas in `local-classes.md` came from SnailSploit's [Claude-Red](https://github.com/SnailSploit/Claude-Red) (MIT), rewritten here as source checks.
 
 ## Use it for
 
@@ -89,7 +89,7 @@ Rough cost: 4 recon agents, one hunter per few units, one or two critics per wav
 
 Each run follows these phases in order. Read each reference when its phase starts.
 
-1. **Setup and signals** ([recon.md](references/recon.md)): layout, prior runs, existing alerts, `npm audit`, the history secret sweep.
+1. **Setup and signals** ([recon.md](references/recon.md)): layout, prior runs, existing alerts, `npm audit`, the history secret sweep, the CI and configuration scan, and past security fixes.
 2. **Reconnaissance and ledger** ([recon.md](references/recon.md)): four parallel recon agents, `architecture.md`, and the deterministic coverage ledger.
 3. **Hunting waves and critics** ([hunting.md](references/hunting.md)).
 4. **Candidate validation** by fresh verifiers ([verification.md](references/verification.md)).
