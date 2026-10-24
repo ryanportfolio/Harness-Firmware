@@ -24,7 +24,7 @@ What each depth can reach, by stage:
 - **Native app**: use a simulator or emulator, or the owner's screenshots. Purchases and cancellations through an app store happen in the store's own sheets and the phone's subscription settings; judge the app's screens before and after them.
 - **States**: capture the ones this depth can reach (logged out and in, empty, loading, error, trial, paid). List the rest under "Not checked"; do not guess what they look like.
 
-Capture each stage as you walk it, and keep the screenshot path for the journey map. Every piece of UI text you quote must appear in a capture of the state it belongs to (a screenshot or saved page text taken in that state, such as "size 10 selected"); name the state beside the quote.
+Capture each stage as you walk it, and keep the screenshot path for the journey map. Every piece of UI text you quote as observed must appear in a capture of the state it belongs to (a screenshot or saved page text taken in that state, such as "size 10 selected"); name the state beside the quote. Text you could only read from code or markup is quoted with its file and line and the condition that shows it (a prop, a flag, a route), and marked "read from code; not observed".
 
 ## 3. Walk the journey
 
@@ -51,7 +51,7 @@ Then the **Honesty** section: each item from [honesty.md](honesty.md) found, wit
 Then the findings, Blocks first, then Slows, then Polish; within each grade, in stage order. Each finding:
 
 - **Stage**: where in the journey it bites, or the hand-off between two stages.
-- **Where**: the element, its exact current text, and a screenshot path or selector. Mark each fact as observed or read from code.
+- **Where**: the element, its exact current text, and where that text came from: a screenshot path or selector for observed text, a file and line for text read from code. Mark each fact as observed or read from code.
 - **Before → after**: the hard question and the easier one the fix asks. For friction that is not a question (an overlay, low contrast), name it and say it is removed.
 - **Rule**: one rule ID, the closest fit, or **Unmatched** with a one-line statement of the principle broken.
 - **Fix**: the concrete change, with replacement copy when copy is the fix. Copy stays true to the product; any fact you could not confirm (a reminder email, a cancellation route) is an assumption for the owner to check.
