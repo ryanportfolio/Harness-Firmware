@@ -7,8 +7,8 @@
 //
 // Files are read from git objects (ls-tree + cat-file), never from the working tree, so the
 // scan cannot follow a symlink or junction, enter a submodule, or run target code. Symlinks
-// and submodules are counted and skipped. Snippets are truncated and long token-shaped
-// strings are redacted; secret-looking variables are reported by name only. Read-only; zero
+// and submodules are counted and skipped. The report holds no free text from the target, only
+// paths, lines, labels, and validated identifiers (see safe() below). Read-only; zero
 // dependencies.
 //
 // Usage: node ci-surface-scan.mjs --tree <path> [--ref <rev>] [--out <file>]
@@ -66,39 +66,43 @@ function parseArgs(argv) {
 // core.fsmonitor off: a repository-configured monitor is a program, and this scan runs none.
 const git = (tree, args, extra = {}) => spawnSync("git", ["-c", "core.fsmonitor=false", "-C", tree, ...args], { maxBuffer: 512 * 1024 * 1024, ...extra });
 
-// Values of secret-named assignments and flags (API_KEY=x, --token=x, --key x), URL userinfo
-// (https://token@host, https://user:pass@host; the plain git@ user is kept), and long
-// token-shaped runs (letters and digits mixed, 24+ chars) are replaced. Environment
-// references such as ${NPM_TOKEN} or $NPM_TOKEN are kept.
-const SECRET_WORD = "(?:token|secret|passw(?:or)?d|pwd|key|credential|auth)";
-// A secret value: a whole quoted string (spaces included), or an unquoted run. Values that
-// start with "$" are environment references and are kept.
-const SECRET_VALUE = `("(?!\\$)[^"\\n]*"|'(?!\\$)[^'\\n]*'|(?![-"'$])[^\\s"',;&|)}]+)`;
-const SECRET_ASSIGNMENT = new RegExp(`((?:\\b|-)[\\w.-]*${SECRET_WORD}[\\w.-]*["']?\\s*[=:]\\s*)${SECRET_VALUE}`, "gi");
-const SECRET_FLAG_SPLIT = new RegExp(`(\\s--?[\\w-]*${SECRET_WORD}[\\w-]*\\s+)${SECRET_VALUE}`, "gi");
-const AUTHORIZATION = /(\bauthorization["']?\s*[:=]\s*)("(?!\$)[^"\n]*"|'(?!\$)[^'\n]*'|(?:(?:bearer|basic|token|digest)\s+)?(?![-"'$])[^\s"',;&|)}]+)/gi;
-// A long run of letters and digits, not a 40-hex commit SHA. Paths also contain "/", so a run
-// with "/" counts only when one of its segments looks like base64: 16+ characters mixing
-// upper case, lower case, and digits.
-function tokenLike(run) {
-  if (!/[A-Za-z]/.test(run) || !/[0-9]/.test(run) || /^[a-f0-9]{40}$/.test(run)) return false;
-  if (!run.includes("/")) return true;
-  return run.split("/").some((part) => part.length >= 16 && /[A-Z]/.test(part) && /[a-z]/.test(part) && /[0-9]/.test(part));
+// Output policy: the report never copies free text from the target (commands, script bodies,
+// URLs, expressions). It holds file paths, line numbers, booleans, labels chosen by this
+// script, and short identifiers parsed from the target. Every parsed identifier passes
+// safe(): it must match a strict pattern for its kind and contain no secret-shaped part (16+
+// characters mixing letters and digits), or it is written as "(nonconforming)". File paths
+// are taken as tracked and not checked.
+const NONCONFORMING = "(nonconforming)";
+const SECRET_PART = (part) => part.length >= 16 && /[A-Za-z]/.test(part) && /[0-9]/.test(part);
+function safe(value, pattern) {
+  const text = typeof value === "string" ? value : "";
+  if (!text || text.length > 200 || !pattern.test(text)) return NONCONFORMING;
+  return text.split(/[^A-Za-z0-9+=]+/).some(SECRET_PART) ? NONCONFORMING : text;
 }
-const maskValue = (match, prefix, value) => `${prefix}${value[0] === '"' || value[0] === "'" ? `${value[0]}<redacted>${value[0]}` : "<redacted>"}`;
-function redact(text, max = 240) {
-  // Only the first `max` characters are ever returned, so the masking regexes (which can
-  // backtrack quadratically on long hyphen runs) see a bounded prefix.
-  let out = String(text).slice(0, Math.max(max * 4, 1024))
-    .replace(/(:\/\/)(?!git@)[^/\s@]+@/g, "$1<redacted>@")
-    .replace(AUTHORIZATION, maskValue)
-    .replace(/\b(bearer|basic)\s+(?!\$|<redacted)[A-Za-z0-9._~+/=-]{8,}/gi, "$1 <redacted>")
-    .replace(SECRET_ASSIGNMENT, maskValue)
-    .replace(SECRET_FLAG_SPLIT, maskValue)
-    .replace(/[A-Za-z0-9_+/=-]{24,}/g, (run) => (tokenLike(run) ? `<redacted ${run.length} chars>` : run))
-    .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "?");
-  if (out.length > max) out = `${out.slice(0, max)}...`;
-  return out;
+const ID = /^[A-Za-z0-9_][\w.-]*$/;
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const FLAG = /^--?[A-Za-z][\w-]*$/;
+const NPM_NAME = /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/i;
+const PY_NAME = /^[A-Za-z0-9][\w.-]*$/;
+const HOSTNAME = /^[A-Za-z0-9][A-Za-z0-9.-]*(:\d{1,5})?$/;
+const ACTION_REF = /^[\w.-]+\/[\w.-]+(\/[\w./-]+)?@[\w./-]+$|^docker:\/\/[\w./:-]+(@sha256:[0-9a-f]{64})?$/;
+const IMAGE = /^[\w./:-]+$/;
+const MATCHER = /^[\w|*.^$()[\]-]{1,100}$/;
+const SCRIPT_PATH = /^[\w$./{}~-]+$/;
+// Host of a URL-like string, or a label for non-URL sources. Userinfo, path, and query are
+// dropped by URL parsing; the host itself still passes safe().
+function hostOf(spec) {
+  if (/^(git\+ssh|ssh):|^git@/.test(spec)) return safe(spec.match(/@([^:/]+)/)?.[1], HOSTNAME);
+  try { return safe(new URL(spec.replace(/^git\+/, "")).host, HOSTNAME); } catch { return NONCONFORMING; }
+}
+function sourceKind(spec) {
+  if (/^(git\+|git:|ssh:|git@)/.test(spec)) return "git";
+  if (/^(github|gitlab|bitbucket):/.test(spec)) return spec.split(":")[0];
+  if (/^https?:/.test(spec)) return "url";
+  if (/^file:|^\.{0,2}\//.test(spec)) return "file";
+  if (/^link:/.test(spec)) return "link";
+  if (/^[\w.-]+\/[\w.-]+(#.*)?$/.test(spec)) return "github-shorthand";
+  return "other";
 }
 
 function listTree(tree, ref) {
@@ -223,17 +227,23 @@ function walkYaml(text) {
   return out;
 }
 
+// Expression sources are context paths only; bracket contents become [] so no literal from
+// the expression is kept.
+const CONTEXT_PATH = /^(github\.event(\.[\w-]+|\[\])+|github\.head_ref|(github\.event\.)?inputs\.[\w-]+|(steps|needs)\.[\w-]+\.outputs\.[\w-]+)$/;
 const untrustedEventPath = (expression) => {
   const hits = [];
   if (/\bgithub\.head_ref\b/.test(expression)) hits.push("github.head_ref");
   for (const m of expression.matchAll(/\b(?:github\.event\.)?inputs\.[\w-]+/g)) hits.push(m[0]);
   for (const m of expression.matchAll(/\bgithub\.event\.[\w.-]+(?:\[[^\]]*\][\w.-]*)*/g)) {
     if (/^github\.event\.inputs\./.test(m[0])) continue;
-    if (!SAFE_EVENT_FIELD.test(m[0])) hits.push(m[0]);
+    const path = m[0].replace(/\[[^\]]*\]/g, "[]");
+    if (!SAFE_EVENT_FIELD.test(path)) hits.push(path);
   }
-  return hits;
+  return [...new Set(hits.map((hit) => safe(hit, CONTEXT_PATH)))];
 };
-const derivedPath = (expression) => [...expression.matchAll(/\b(?:steps|needs)\.[\w-]+\.outputs\.[\w-]+/g)].map((m) => m[0]);
+const derivedPath = (expression) => [...new Set([...expression.matchAll(/\b(?:steps|needs)\.[\w-]+\.outputs\.[\w-]+/g)].map((m) => safe(m[0], CONTEXT_PATH)))];
+const AGENT_CLI_LABEL = (text) => (/\bclaude\s/.test(text) ? "claude -p" : /\bcodex\s/.test(text) ? "codex exec" : /\bgemini\s/.test(text) ? "gemini -p" : "aider --message");
+const INSTALL_LABEL = (match) => match.replace(/\s+/g, " ").replace(/\s*(&&|;|--)\s*$/, "").trim();
 
 function scanWorkflow(file, text, isAction) {
   const nodes = walkYaml(text);
@@ -251,7 +261,7 @@ function scanWorkflow(file, text, isAction) {
     // Block sequence: "on:" followed by "- pull_request_target" items.
     if (top === "on" && node.path.length === 2 && node.path[1].startsWith("-@")) triggers.add((node.key ?? node.value).replace(/["']/g, ""));
   }
-  const triggerList = [...triggers].sort();
+  const triggerList = [...new Set([...triggers].map((t) => safe(t, /^[a-z_]+$/)))].sort();
   const privileged = triggerList.filter((t) => PRIVILEGED_TRIGGERS.has(t));
   const outsideText = triggerList.filter((t) => OUTSIDE_TEXT_TRIGGERS.has(t));
   if (!isAction) {
@@ -266,11 +276,12 @@ function scanWorkflow(file, text, isAction) {
     secrets_to_third_party_actions: [], persisted_token_uploaded: [], agent_steps: [], install_commands: [],
   };
   const jobs = new Map();
+  const jobLabel = (job) => (job === null || job === "(action)" ? job : safe(job, ID));
   // Workflow-level env reaches every job, so its secrets count as in scope for each one.
   const workflowEnvSecrets = !isAction && nodes.some((node) => node.path[0] === "env" && /\bsecrets\./.test(node.value));
   const stepOf = (node) => {
     const index = node.path.findIndex((part, i) => part === "steps" && i >= 2 && node.path[i + 1]?.startsWith("-@"));
-    const job = node.path[0] === "jobs" ? node.path[1] : isAction ? "(action)" : null;
+    const job = node.path[0] === "jobs" ? node.path[1] ?? null : isAction ? "(action)" : null;
     if (isAction) {
       const actionIndex = node.path.indexOf("steps");
       if (actionIndex >= 0 && node.path[actionIndex + 1]?.startsWith("-@")) return { job, step: node.path[actionIndex + 1], rel: node.path.slice(actionIndex + 2) };
@@ -297,15 +308,15 @@ function scanWorkflow(file, text, isAction) {
       if (owner === "with" && (node.key === "script" || rel[1] === "script")) stepState.script.push(node);
     }
     if (node.key === "permissions" && /write-all/.test(node.value)) findings.write_all.push({ line: node.n, job });
-    if (node.key === "id-token" && /write/.test(node.value)) findings.id_token_write.push({ line: node.n, job, triggers: triggerList });
+    if (node.key === "id-token" && /write/.test(node.value)) findings.id_token_write.push({ line: node.n, job: jobLabel(job), triggers: triggerList });
     if (node.key === "uses" && node.value) {
       const ref = node.value.replace(/["']/g, "").split(/\s/)[0];
       const local = ref.startsWith("./") || ref.startsWith("../");
       const pinned = /@[0-9a-f]{40}$/.test(ref) || /^docker:\/\/.*@sha256:[0-9a-f]{64}$/.test(ref);
-      if (!local && !pinned) findings.unpinned_uses.push({ line: node.n, ref: redact(ref), first_party: /^(actions|github)\//.test(ref) });
+      if (!local && !pinned) findings.unpinned_uses.push({ line: node.n, ref: safe(ref, ACTION_REF), first_party: /^(actions|github)\//.test(ref) });
     }
     if (!isAction && (node.path[0] === "env" || (node.path[0] === "jobs" && node.path[2] === "env")) && node.key && /\bsecrets\./.test(node.value)) {
-      findings.workflow_or_job_env_secrets.push({ line: node.n, level: node.path[0] === "env" ? "workflow" : `job ${node.path[1]}`, name: node.key });
+      findings.workflow_or_job_env_secrets.push({ line: node.n, level: node.path[0] === "env" ? "workflow" : "job", job: node.path[0] === "env" ? null : safe(node.path[1], ID), name: safe(node.key, ENV_NAME) });
     }
   }
 
@@ -319,8 +330,9 @@ function scanWorkflow(file, text, isAction) {
       for (const node of stepState.script) runLike.push({ node, job, context: "github-script" });
       if (/^actions\/checkout@/.test(uses)) {
         const refLine = stepState.with.find((node) => node.key === "ref");
-        if (refLine && (privileged.length || isAction) && /pull_request\.head\.(sha|ref)|github\.head_ref|refs\/pull\/|workflow_run\.head_(sha|branch)|pull\/\$\{\{/.test(refLine.value)) {
-          findings.pr_head_checkouts.push({ line: refLine.n, job, ref: redact(refLine.value), triggers: privileged });
+        const headRef = refLine?.value.match(/pull_request\.head\.(sha|ref)|github\.head_ref|refs\/pull\/|workflow_run\.head_(sha|branch)|pull\/\$\{\{/);
+        if (headRef && (privileged.length || isAction)) {
+          findings.pr_head_checkouts.push({ line: refLine.n, job: jobLabel(job), via: "actions/checkout ref", matched: headRef[0], triggers: privileged });
         }
         const persist = stepState.with.find((node) => node.key === "persist-credentials");
         if (!persist || !/false/.test(persist.value)) checkoutPersists ??= stepState.line;
@@ -329,31 +341,31 @@ function scanWorkflow(file, text, isAction) {
         const pathNodes = stepState.with.filter((node) => node.key === "path" || (node.block && node.key === "path"));
         if (pathNodes.some((node) => /^(\.\/?|\$\{\{\s*github\.workspace\s*\}\}\/?)$|(^|\/)\.git(\/|$)/.test(node.value.replace(/["']/g, "").trim()))) uploadsWorkspace ??= stepState.line;
       }
-      if (privileged.length && (/(^|\/)(download-artifact|action-download-artifact)@/.test(uses))) findings.artifact_downloads.push({ line: stepState.line, job, uses: redact(uses), triggers: privileged });
+      if (privileged.length && (/(^|\/)(download-artifact|action-download-artifact)@/.test(uses))) findings.artifact_downloads.push({ line: stepState.line, job: jobLabel(job), uses: safe(uses, ACTION_REF), triggers: privileged });
       if (uses && !/^(\.{1,2}\/|actions\/|github\/)/.test(uses)) {
-        for (const node of stepState.with) if (/\bsecrets\./.test(node.value)) findings.secrets_to_third_party_actions.push({ line: node.n, job, action: redact(uses), input: node.key, github_token_only: !/secrets\.(?!GITHUB_TOKEN\b)/.test(node.value) });
+        for (const node of stepState.with) if (/\bsecrets\./.test(node.value)) findings.secrets_to_third_party_actions.push({ line: node.n, job: jobLabel(job), action: safe(uses, ACTION_REF), input: safe(node.key, ID), github_token_only: !/secrets\.(?!GITHUB_TOKEN\b)/.test(node.value) });
       }
-      if (AGENT_ACTION.test(uses)) findings.agent_steps.push({ line: stepState.line, job, via: redact(uses), outside_text_triggers: outsideText, job_has_secrets: state.secrets });
+      if (AGENT_ACTION.test(uses)) findings.agent_steps.push({ line: stepState.line, job: jobLabel(job), via: safe(uses, ACTION_REF), outside_text_triggers: outsideText, job_has_secrets: state.secrets });
     }
-    if (checkoutPersists && uploadsWorkspace) findings.persisted_token_uploaded.push({ job, checkout_line: checkoutPersists, upload_line: uploadsWorkspace });
+    if (checkoutPersists && uploadsWorkspace) findings.persisted_token_uploaded.push({ job: jobLabel(job), checkout_line: checkoutPersists, upload_line: uploadsWorkspace });
     for (const { node, context } of runLike.filter((entry) => entry.job === job)) {
       const value = node.value;
       for (const m of value.matchAll(/\$\{\{([^}]*)\}\}/g)) {
         const untrusted = untrustedEventPath(m[1]);
-        if (untrusted.length) findings.untrusted_expressions.push({ line: node.n, job, context, expression: redact(m[0], 160), sources: untrusted, triggers: triggerList });
+        if (untrusted.length) findings.untrusted_expressions.push({ line: node.n, job: jobLabel(job), context, sources: untrusted, triggers: triggerList });
         else {
           const derived = derivedPath(m[1]);
-          if (derived.length) findings.derived_expressions.push({ line: node.n, job, context, expression: redact(m[0], 160) });
+          if (derived.length) findings.derived_expressions.push({ line: node.n, job: jobLabel(job), context, sources: derived });
         }
       }
       if (context === "run") {
         const target = value.match(/\b(GITHUB_ENV|GITHUB_PATH|GITHUB_OUTPUT)\b/);
-        if (target && /(>>|>|\btee\b|Out-File|Add-Content|Set-Content)/.test(value)) findings.env_file_writes.push({ line: node.n, job, file: target[1], interpolates_expression: /\$\{\{/.test(value) });
-        if ((privileged.length || isAction) && /gh\s+pr\s+checkout|git\s+(fetch|checkout|pull)\b.*(pull\/|refs\/pull|head_ref|head\.sha|head\.ref)/.test(value)) findings.pr_head_checkouts.push({ line: node.n, job, ref: redact(value, 160), triggers: privileged });
-        if (privileged.length && /\bgh\s+run\s+download\b/.test(value)) findings.artifact_downloads.push({ line: node.n, job, uses: "gh run download", triggers: privileged });
-        if (AGENT_CLI.test(value)) findings.agent_steps.push({ line: node.n, job, via: redact(value, 160), outside_text_triggers: outsideText, job_has_secrets: state.secrets });
+        if (target && /(>>|>|\btee\b|Out-File|Add-Content|Set-Content)/.test(value)) findings.env_file_writes.push({ line: node.n, job: jobLabel(job), file: target[1], interpolates_expression: /\$\{\{/.test(value) });
+        if ((privileged.length || isAction) && /gh\s+pr\s+checkout|git\s+(fetch|checkout|pull)\b.*(pull\/|refs\/pull|head_ref|head\.sha|head\.ref)/.test(value)) findings.pr_head_checkouts.push({ line: node.n, job: jobLabel(job), via: /gh\s+pr\s+checkout/.test(value) ? "gh pr checkout" : "git fetch, checkout, or pull of a PR ref", triggers: privileged });
+        if (privileged.length && /\bgh\s+run\s+download\b/.test(value)) findings.artifact_downloads.push({ line: node.n, job: jobLabel(job), uses: "gh run download", triggers: privileged });
+        if (AGENT_CLI.test(value)) findings.agent_steps.push({ line: node.n, job: jobLabel(job), via: AGENT_CLI_LABEL(value.match(AGENT_CLI)[0]), outside_text_triggers: outsideText, job_has_secrets: state.secrets });
         const install = value.match(INSTALL_CMD);
-        if (install) findings.install_commands.push({ line: node.n, job, command: redact(install[0].trim(), 60), ignore_scripts: /--ignore-scripts\b/.test(value), lockfile_strict: /\bnpm\s+ci\b|--frozen-lockfile|--immutable|--locked/.test(value), job_has_secrets: state.secrets });
+        if (install) findings.install_commands.push({ line: node.n, job: jobLabel(job), command: INSTALL_LABEL(install[0]), ignore_scripts: /--ignore-scripts\b/.test(value), lockfile_strict: /\bnpm\s+ci\b|--frozen-lockfile|--immutable|--locked/.test(value), job_has_secrets: state.secrets });
       }
     }
   }
@@ -371,15 +383,34 @@ function packageSpecPinned(arg) {
 // Every package a runner fetches must be exact. npm: each --package/-p value, else the first
 // positional argument (name@1.2.3). uv and pipx: each --from/--spec value, else the first
 // positional argument, plus each --with value (name==1.2.3). Values of other flags that take
-// one are skipped when looking for the positional argument.
+// one are skipped when looking for the positional argument. Inputs this scan cannot check
+// (a requirements file, an editable path, pip arguments, or a git, URL, or path spec) make the
+// launch unverified, which reports as not exact.
 const NPM_SELECT = new Set(["--package", "-p"]);
 const NPM_VALUE_FLAGS = new Set([...NPM_SELECT, "--registry", "--cache", "-c", "--call", "--userconfig"]);
 const PY_SELECT = new Set(["--from", "--spec"]);
 const PY_EXTRA = new Set(["--with"]);
-const PY_VALUE_FLAGS = new Set([...PY_SELECT, ...PY_EXTRA, "--with-requirements", "--with-editable", "--python", "-p", "--index", "--index-url", "--default-index", "--extra-index-url", "--pip-args"]);
-function runnerPackagePinned(args, python) {
-  const select = python ? PY_SELECT : NPM_SELECT;
+const PY_UNVERIFIED = new Set(["--with-requirements", "--with-editable", "--pip-args", "-r", "--requirement", "--editable", "-e"]);
+const PY_VALUE_FLAGS = new Set([...PY_SELECT, ...PY_EXTRA, ...PY_UNVERIFIED, "--python", "-p", "--index", "--index-url", "--default-index", "--extra-index-url"]);
+function runnerPackages(args, python) {
   const valueFlags = python ? PY_VALUE_FLAGS : NPM_VALUE_FLAGS;
+  const unverified = new Set();
+  for (const arg of args) {
+    const flag = arg.startsWith("-") && arg.includes("=") ? arg.slice(0, arg.indexOf("=")) : arg;
+    if (python && PY_UNVERIFIED.has(flag)) unverified.add(flag);
+  }
+  const specs = runnerSpecs(args, python, valueFlags);
+  for (const spec of specs) if (/^(git\+|git:|https?:|file:|ssh:|\.{0,2}[\\/])/.test(spec) || /\s@\s/.test(spec)) unverified.add("non-registry spec");
+  const pinned = (spec) => (python ? /^[A-Za-z0-9][\w.-]*(\[[^\]]*\])?==[\w.!+-]+$/.test(spec) : packageSpecPinned(spec));
+  const name = (spec) => (python ? safe(spec.split(/[=<>!~[;@\s]/)[0], PY_NAME) : safe(spec.replace(/(.)@[^@]*$/, "$1"), NPM_NAME));
+  return {
+    names: [...new Set(specs.map(name))],
+    exact: specs.length > 0 && unverified.size === 0 && specs.every(pinned),
+    unverified: [...unverified].sort(),
+  };
+}
+function runnerSpecs(args, python, valueFlags) {
+  const select = python ? PY_SELECT : NPM_SELECT;
   const selected = [];
   const extras = [];
   let positional = null;
@@ -394,10 +425,7 @@ function runnerPackagePinned(args, python) {
     if (inlineValue === null && valueFlags.has(flag)) { i += 1; continue; }
     if (!arg.startsWith("-") && arg !== "dlx" && arg !== "run" && positional === null) positional = arg;
   }
-  const specs = [...(selected.length ? selected : positional ? [positional] : []), ...extras];
-  if (!specs.length) return false;
-  const pinned = (spec) => (python ? /^[A-Za-z0-9][\w.-]*(\[[^\]]*\])?==[\w.!+-]+$/.test(spec) : packageSpecPinned(spec));
-  return specs.every(pinned);
+  return [...(selected.length ? selected : positional ? [positional] : []), ...extras];
 }
 
 function scanPackageJson(file, text, scopesUsed) {
@@ -408,20 +436,26 @@ function scanPackageJson(file, text, scopesUsed) {
   for (const name of ["preinstall", "install", "postinstall", "prepare", "prepublish", "prepack"]) {
     const script = data?.scripts?.[name];
     if (typeof script !== "string") continue;
+    const head = script.slice(0, 64 * 1024);
     lifecycle.push({
       script: name,
-      command: redact(script, 200),
-      fetches_remote: /\b(curl|wget|fetch|Invoke-WebRequest|iwr)\b|https?:\/\//.test(script),
-      evaluates_code: /\bnode\s+-e\b|\beval\b|\|\s*(sh|bash|node)\b/.test(script),
-      reads_env: /process\.env|\$\{?[A-Z_][A-Z0-9_]*\}?|%[A-Z_]+%|\$env:/.test(script),
+      fetches_remote: /\b(curl|wget|fetch|Invoke-WebRequest|iwr)\b|https?:\/\//.test(head),
+      remote_hosts: [...new Set([...head.matchAll(/https?:\/\/[^\s"'`<>]+/g)].map((m) => hostOf(m[0])))].slice(0, 10),
+      evaluates_code: /\bnode\s+-e\b|\beval\b|\|\s*(sh|bash|node)\b/.test(head),
+      env_vars: [...new Set([...head.matchAll(/process\.env\.([A-Za-z_]\w*)|\$\{?([A-Z_][A-Z0-9_]*)\}?|%([A-Z_][A-Z0-9_]*)%|\$env:([A-Za-z_]\w*)/g)].map((m) => safe(m[1] ?? m[2] ?? m[3] ?? m[4], ENV_NAME)))].slice(0, 10),
     });
   }
   if (lifecycle.length) report.lifecycle_scripts = lifecycle;
   const nonRegistry = [];
   for (const group of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) {
-    for (const [name, spec] of Object.entries(data?.[group] ?? {})) {
-      if (name.startsWith("@")) scopesUsed.add(name.split("/")[0]);
-      if (typeof spec === "string" && /^(git\+|git:|github:|gitlab:|bitbucket:|https?:|file:|link:)|^[\w.-]+\/[\w.-]+(#.*)?$/.test(spec)) nonRegistry.push({ name, group, spec: redact(spec, 160) });
+    const deps = data?.[group];
+    if (!deps || typeof deps !== "object") continue;
+    for (const [name, spec] of Object.entries(deps)) {
+      if (name.startsWith("@")) scopesUsed.add(safe(name.split("/")[0], /^@[a-z0-9][\w.-]*$/i));
+      if (typeof spec === "string" && /^(git\+|git:|github:|gitlab:|bitbucket:|https?:|file:|link:)|^[\w.-]+\/[\w.-]+(#.*)?$/.test(spec)) {
+        const kind = sourceKind(spec);
+        nonRegistry.push({ name: safe(name, NPM_NAME), group, source_kind: kind, host: kind === "git" || kind === "url" ? hostOf(spec) : null });
+      }
     }
   }
   if (nonRegistry.length) report.non_registry_dependencies = capped(nonRegistry);
@@ -436,11 +470,13 @@ function scanNpmrc(file, text) {
   const settings = [];
   lines(text).forEach((line, i) => {
     const scope = line.match(/^\s*(@[\w.-]+):registry\s*=\s*(\S+)/);
-    if (scope) scopes.push({ scope: scope[1], registry: redact(scope[2], 160), line: i + 1 });
+    if (scope) scopes.push({ scope: safe(scope[1], /^@[a-z0-9][\w.-]*$/i), registry_host: hostOf(scope[2]), line: i + 1 });
     const setting = line.match(/^\s*(registry|always-auth|strict-ssl|ignore-scripts|[^=\s]*_authToken|[^=\s]*_auth|[^=\s]*_password)\s*=\s*(.*)$/);
     if (setting) {
-      const sensitive = /_auth|_password/.test(setting[1]);
-      settings.push({ line: i + 1, key: sensitive ? setting[1].replace(/^\/\/[^:]*:/, "//<host>:") : setting[1], value: sensitive ? (/^\$\{[A-Z0-9_]+\}$/.test(setting[2].trim()) ? "env reference" : "literal value present") : redact(setting[2], 160) });
+      const sensitive = setting[1].match(/(_authToken|_auth|_password)$/)?.[1];
+      const value = setting[2].trim();
+      if (sensitive) settings.push({ line: i + 1, key: sensitive, host: hostOf(`https:${setting[1].replace(/:[^:]*$/, "")}`), value: /^\$\{[A-Za-z0-9_]+\}$/.test(value) ? "env reference" : "literal value present" });
+      else settings.push({ line: i + 1, key: setting[1], value: setting[1] === "registry" ? hostOf(value) : safe(value, /^(true|false)$/) });
     }
   });
   return { path: file, scopes, settings };
@@ -452,12 +488,10 @@ function scanLockfile(file, text) {
   let entries = 0;
   let missingIntegrity = 0;
   const note = (name, url) => {
-    let host = "(unparsed)";
-    if (/^(git\+|git:|github:|ssh:)/.test(url)) host = "git";
-    else if (/^file:|^link:|^\.\.?\//.test(url)) host = "local path";
-    else { try { host = new URL(url).host; } catch { /* keep */ } }
+    const kind = sourceKind(url);
+    const host = kind === "url" ? hostOf(url) : kind;
     hosts.set(host, (hosts.get(host) ?? 0) + 1);
-    if (!/^(registry\.npmjs\.org|registry\.yarnpkg\.com)$/.test(host)) nonRegistry.push({ name, source: redact(url, 160) });
+    if (!/^(registry\.npmjs\.org|registry\.yarnpkg\.com)$/.test(host)) nonRegistry.push({ name: safe(name, NPM_NAME), source_kind: kind, host: kind === "git" || kind === "url" ? hostOf(url) : null });
   };
   if (/package-lock\.json$|npm-shrinkwrap\.json$/.test(file)) {
     const data = parseObject(text);
@@ -491,7 +525,8 @@ function scanLockfile(file, text) {
       const name = head.replace(/["':]/g, "").split(",")[0].trim();
       const resolved = blockText.match(berry ? /^\s+resolution:\s*"?([^"\n]+)"?/m : /^\s+resolved\s+"?([^"\s]+)"?/m);
       if (resolved && !berry) note(name, resolved[1]);
-      if (resolved && berry && /@(git|https?|file|link|portal|patch):/.test(resolved[1])) nonRegistry.push({ name, source: redact(resolved[1], 160) });
+      const protocol = resolved?.[1].match(/@(git|https?|file|link|portal|patch):/)?.[1];
+      if (berry && protocol) nonRegistry.push({ name: safe(name.replace(/(.)@.*$/, "$1"), NPM_NAME), source_kind: protocol, host: null });
       if (!(berry ? /^\s+checksum:/m : /^\s+integrity\s/m).test(blockText) && !/@(workspace|link|portal):/.test(resolved?.[1] ?? "")) missingIntegrity += 1;
     }
   } else {
@@ -501,11 +536,15 @@ function scanLockfile(file, text) {
       const tarball = m[1].match(/tarball:\s*([^,\s}]+)/);
       const repo = m[1].match(/repo:\s*([^,\s}]+)/);
       if (tarball) note("(pnpm entry)", tarball[1]);
-      if (repo) nonRegistry.push({ name: "(pnpm git entry)", source: redact(repo[1], 160) });
+      if (repo) nonRegistry.push({ name: "(pnpm git entry)", source_kind: "git", host: hostOf(repo[1]) });
     }
   }
   return { path: file, entries, resolved_hosts: Object.fromEntries([...hosts].sort((a, b) => b[1] - a[1])), non_registry_sources: capped(nonRegistry), missing_integrity: missingIntegrity };
 }
+
+// Image repository without tag or digest; whether a tag is set is reported separately.
+const imageName = (image) => safe(image.replace(/@sha256:[0-9a-f]{64}$/, "").replace(/:[^/:]*$/, ""), IMAGE);
+const imageTagged = (image) => /:[^/:]+$/.test(image.replace(/@sha256:[0-9a-f]{64}$/, ""));
 
 function scanDockerfile(file, text) {
   const stages = new Set();
@@ -518,7 +557,7 @@ function scanDockerfile(file, text) {
       if (from[2]) stages.add(from[2].toLowerCase());
       if (image !== "scratch" && !stages.has(image.toLowerCase()) && !image.includes("$")) {
         const first = image.split("/")[0];
-        report.images.push({ line: n, image: redact(image, 160), registry_host_named: image.includes("/") && (first.includes(".") || first.includes(":") || first === "localhost"), digest_pinned: /@sha256:[0-9a-f]{64}$/.test(image) });
+        report.images.push({ line: n, image: imageName(image), tagged: imageTagged(image), registry_host_named: image.includes("/") && (first.includes(".") || first.includes(":") || first === "localhost"), digest_pinned: /@sha256:[0-9a-f]{64}$/.test(image) });
       }
     }
     const argEnv = line.match(/^\s*(ARG|ENV)\s+([A-Za-z_][A-Za-z0-9_]*)/i);
@@ -536,7 +575,7 @@ function scanCompose(file, text) {
     const m = line.match(/^\s*image:\s*["']?([^"'\s#]+)/);
     if (!m || m[1].includes("$")) return;
     const first = m[1].split("/")[0];
-    images.push({ line: i + 1, image: redact(m[1], 160), registry_host_named: m[1].includes("/") && (first.includes(".") || first.includes(":") || first === "localhost"), digest_pinned: /@sha256:[0-9a-f]{64}$/.test(m[1]) });
+    images.push({ line: i + 1, image: imageName(m[1]), tagged: imageTagged(m[1]), registry_host_named: m[1].includes("/") && (first.includes(".") || first.includes(":") || first === "localhost"), digest_pinned: /@sha256:[0-9a-f]{64}$/.test(m[1]) });
   });
   return images.length ? { path: file, images } : null;
 }
@@ -553,13 +592,14 @@ function scanClaudeSettings(file, text) {
     for (const group of Array.isArray(groups) ? groups : []) {
       for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) {
         if (typeof hook?.command !== "string") continue;
+        const command = hook.command.slice(0, 64 * 1024);
         hooks.push({
-          event,
-          matcher: group.matcher ?? null,
-          command: redact(hook.command, 300),
-          uses_eval_or_shell_string: /\beval\b|\bsh\s+-c\b|\bbash\s+-c\b|Invoke-Expression|\biex\b|\$\(/.test(hook.command),
-          reads_tool_input: /\bjq\b|stdin|tool_input|\bxargs\b|\bread\s/i.test(hook.command),
-          scripts: [...redact(hook.command, 2000).matchAll(/[^\s"']+\.(?:sh|bash|ps1|mjs|cjs|js|ts|py)\b/g)].map((m) => m[0]).slice(0, 5),
+          event: safe(event, /^[A-Za-z]+$/),
+          matcher: group.matcher == null ? null : safe(String(group.matcher), MATCHER),
+          uses_eval_or_shell_string: /\beval\b|\bsh\s+-c\b|\bbash\s+-c\b|Invoke-Expression|\biex\b|\$\(/.test(command),
+          reads_tool_input: /\bjq\b|stdin|tool_input|\bxargs\b|\bread\s/i.test(command),
+          fetches_remote: /\b(curl|wget|Invoke-WebRequest|iwr)\b|https?:\/\//.test(command),
+          scripts: [...new Set([...command.matchAll(/(?<![\w:/@.])[\w$./{}~-]+\.(?:sh|bash|ps1|mjs|cjs|js|ts|py)\b(?![:@])/g)].map((m) => safe(m[0], SCRIPT_PATH)))].slice(0, 5),
         });
       }
     }
@@ -567,10 +607,10 @@ function scanClaudeSettings(file, text) {
   if (hooks.length) report.hooks = hooks;
   const allow = Array.isArray(data.permissions?.allow) ? data.permissions.allow : [];
   const broad = allow.filter((entry) => typeof entry === "string" && (BROAD_BASH.test(entry.trim()) || INTERPRETER_PREFIX.test(entry.trim())));
-  if (broad.length) report.broad_allows = broad.map((entry) => redact(entry, 120));
-  if (data.permissions?.defaultMode) report.default_mode = data.permissions.defaultMode;
+  if (broad.length) report.broad_allows = broad.map((entry) => (BROAD_BASH.test(entry.trim()) ? "Bash (all commands)" : `Bash(${entry.trim().match(INTERPRETER_PREFIX)[1].replace(/\s+/g, " ").toLowerCase()} ...)`));
+  if (data.permissions?.defaultMode) report.default_mode = safe(String(data.permissions.defaultMode), /^[A-Za-z]+$/);
   if (data.enableAllProjectMcpServers === true) report.enable_all_project_mcp_servers = true;
-  if (Array.isArray(data.enabledMcpjsonServers) && data.enabledMcpjsonServers.length) report.enabled_mcpjson_servers = data.enabledMcpjsonServers.map((s) => redact(s, 80));
+  if (Array.isArray(data.enabledMcpjsonServers) && data.enabledMcpjsonServers.length) report.enabled_mcpjson_servers = data.enabledMcpjsonServers.map((s) => safe(s, ID));
   return Object.keys(report).length > 1 ? report : null;
 }
 
@@ -580,32 +620,27 @@ function scanMcpJson(file, text) {
   const data = parseObject(text);
   if (!data) return [{ path: file, error: "unparseable JSON or not an object" }];
   const servers = [];
-  for (const [name, server] of Object.entries(data.mcpServers ?? data.servers ?? {})) {
-    const entry = { path: file, server: name };
-    if (typeof server?.url === "string") {
-      entry.remote_url_host = (() => { try { return new URL(server.url).host; } catch { return "(unparsed)"; } })();
-    }
+  const serverMap = data.mcpServers ?? data.servers;
+  for (const [name, server] of Object.entries(serverMap && typeof serverMap === "object" ? serverMap : {})) {
+    const entry = { path: file, server: safe(name, ID) };
+    if (typeof server?.url === "string") entry.remote_url_host = hostOf(server.url);
     if (typeof server?.command === "string") {
       const args = Array.isArray(server.args) ? server.args.filter((a) => typeof a === "string") : [];
-      // Mask whole secret argument values before joining: a value with spaces would
-      // otherwise lose its boundaries and be only partly masked.
-      const masked = args.map((arg, i) => {
-        if (SECRET_ARG_FLAG.test(arg) && arg.includes("=")) return arg.replace(/=.*$/s, (v) => (/^=\$/.test(v) ? v : "=<redacted>"));
-        if (i > 0 && SECRET_ARG_FLAG.test(args[i - 1]) && !args[i - 1].includes("=") && !arg.startsWith("-") && !arg.startsWith("$")) return "<redacted>";
-        return arg;
-      });
-      entry.command = redact([server.command, ...masked].join(" "), 200);
+      entry.launcher = safe(server.command.split(/[\\/]/).pop(), ID);
       const python = /(^|[\\/])(uvx|pipx)(\.cmd|\.exe)?$/i.test(server.command);
       const runner = python || /(^|[\\/])(npx|bunx)(\.cmd|\.exe)?$/i.test(server.command) || (/(^|[\\/])pnpm(\.cmd)?$/i.test(server.command) && args[0] === "dlx");
       if (runner) {
+        const packages = runnerPackages(args, python);
         entry.package_runner = true;
-        entry.package_version_exact = runnerPackagePinned(args, python);
+        entry.packages = packages.names;
+        entry.package_version_exact = packages.exact;
+        if (packages.unverified.length) entry.unverified_inputs = packages.unverified;
       }
-      const secretArgs = args.filter((a) => SECRET_ARG_FLAG.test(a)).map((a) => a.split("=")[0]);
+      const secretArgs = [...new Set(args.filter((a) => SECRET_ARG_FLAG.test(a)).map((a) => safe(a.split("=")[0], FLAG)))];
       if (secretArgs.length) entry.secret_named_args = secretArgs;
     }
     const env = server?.env && typeof server.env === "object" ? server.env : {};
-    const secretEnv = Object.entries(env).filter(([key]) => SECRET_NAME.test(key)).map(([key, value]) => ({ name: key, value: typeof value === "string" && /^\$\{[^}]+\}$/.test(value.trim()) ? "env reference" : "literal value present" }));
+    const secretEnv = Object.entries(env).filter(([key]) => SECRET_NAME.test(key)).map(([key, value]) => ({ name: safe(key, ENV_NAME), value: typeof value === "string" && /^\$\{[^}]+\}$/.test(value.trim()) ? "env reference" : "literal value present" }));
     if (secretEnv.length) entry.secret_named_env = secretEnv;
     servers.push(entry);
   }
@@ -628,7 +663,9 @@ function scanFuzz(file, text, fuzz) {
   if (/_test\.go$/.test(file)) {
     for (const m of text.matchAll(/^func\s+(Fuzz\w+)\s*\(\s*\w+\s+\*testing\.F\s*\)/gm)) {
       const dir = path.posix.dirname(file);
-      fuzz.push({ path: file, line: lineOf(text, m.index), kind: "go-native-fuzz", target: m[1], command: `go test -run=^$ -fuzz=^${m[1]}$ -fuzztime=60s -parallel=1 ${dir === "." ? "." : `./${dir}`}`, needs_tool: null });
+      const target = safe(m[1], /^Fuzz\w+$/);
+      if (target === NONCONFORMING) continue;
+      fuzz.push({ path: file, line: lineOf(text, m.index), kind: "go-native-fuzz", target, command: `go test -run=^$ -fuzz=^${target}$ -fuzztime=60s -parallel=1 ${dir === "." ? "." : `./${dir}`}`, needs_tool: null });
     }
   }
   if (/(^|\/)fuzz\/Cargo\.toml$/.test(file) && /libfuzzer-sys|cargo-fuzz/.test(text)) {
@@ -707,7 +744,7 @@ function main() {
     }
     if (base === ".npmrc" || base === ".yarnrc.yml" || base === ".yarnrc") {
       const npmrc = scanNpmrc(file, text);
-      if (base === ".yarnrc.yml") for (const m of text.matchAll(/^\s*["']?([\w.-]+)["']?:\s*\n\s+npmRegistryServer:\s*["']?(\S+?)["']?\s*$/gm)) npmrc.scopes.push({ scope: `@${m[1]}`, registry: redact(m[2], 160), line: lineOf(text, m.index) });
+      if (base === ".yarnrc.yml") for (const m of text.matchAll(/^\s*["']?([\w.-]+)["']?:\s*\n\s+npmRegistryServer:\s*["']?(\S+?)["']?\s*$/gm)) npmrc.scopes.push({ scope: safe(`@${m[1]}`, /^@[a-z0-9][\w.-]*$/i), registry_host: hostOf(m[2]), line: lineOf(text, m.index) });
       if (npmrc.scopes.length || npmrc.settings.length) report.npmrc.push(npmrc);
     }
     if (LOCKFILE.test(file)) report.lockfiles.push(scanLockfile(file, text));
@@ -722,7 +759,7 @@ function main() {
         for (const [name, regex] of TLS_OFF) if (regex.test(line)) report.tls_verification_off.push({ path: file, line: i + 1, pattern: name, in_docs: isDoc });
         if (!isDoc) for (const [name, regex] of SOURCE_MAP_SETTINGS) if (regex.test(line)) report.source_maps.settings.push({ path: file, line: i + 1, pattern: name });
         for (const m of line.matchAll(PUBLIC_SECRET_VAR)) {
-          const key = `${m[0]}`;
+          const key = safe(m[0], ENV_NAME);
           if (!publicNames.has(key)) publicNames.set(key, []);
           publicNames.get(key).push(`${file}:${i + 1}`);
         }
