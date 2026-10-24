@@ -11,7 +11,7 @@ Users decide across a run of screens, and many are lost between them: a plan for
 
 The rules come from four uxpeak videos (the question idea is from one of them), checked against the research they cite. The videos show no test data, so each rule says what it rests on: Research, Adjacent research, Presenter, Craft or Convention ([journey.md](references/journey.md) defines them).
 
-Built for web and app screens where someone decides whether to act: buy, subscribe, sign up, book, filter, choose. For native apps, work from a simulator or screenshots. It does not replace an accessibility audit; it checks only that every user can reach the action.
+Built for web and app screens where someone decides whether to act: buy, subscribe, sign up, book, filter, choose. For native apps, work from a simulator or screenshots. It does not replace an accessibility audit (`ui-quality` does that); it checks only that every user can reach the action.
 
 ## Stages
 
@@ -45,6 +45,7 @@ Every upsell has a decline of equal weight that leaves the user where they were:
 - `redesign-concepts`: generated images of better versions of a built UI; use after an audit to show the fixes.
 - `design-prototypes`: image concepts from a brief, before anything is built.
 - `showpiece`: ambitious creative direction. This skill judges whether a user can decide and act, not originality.
+- `ui-quality`: the accessibility and state floor, measured on the rendered page; run it on screens this skill audits or builds.
 - `writing`: final polish of UI copy once this skill has decided what the copy must answer.
 - When installed: `frontend-design` (visual styling), `design-brief` (a design-build prompt), `product-walkthrough` (animated product demos).
 
