@@ -234,13 +234,29 @@ const opts = (() => {
   }
 })();
 
+// a crash anywhere is an incomplete run (exit 2), never confused with --strict's exit 1
+let browser;
+const crash = async (err) => {
+  console.error(`[probe] crashed: ${err?.stack || err}`);
+  try { await browser?.close(); } catch { /* already gone */ }
+  process.exit(2);
+};
+process.on('uncaughtException', crash);
+process.on('unhandledRejection', crash);
+
 const axePath = resolvePkg('axe-core/axe.min.js');
 if (!axePath && !opts.skip.has('axe')) {
   console.error(`[probe] axe-core not found; run: ${INSTALL}`);
   process.exit(2);
 }
-const axeSource = axePath ? readFileSync(axePath, 'utf8') : null;
-mkdirSync(opts.out, { recursive: true });
+let axeSource = null;
+try {
+  axeSource = axePath ? readFileSync(axePath, 'utf8') : null;
+  mkdirSync(opts.out, { recursive: true });
+} catch (err) {
+  console.error(`[probe] could not start: ${err.message}`);
+  process.exit(2);
+}
 
 const findings = [];
 const notes = [];
@@ -261,16 +277,6 @@ const on = (check) => !opts.skip.has(check);
 // numbered by position, so state URLs that share a long prefix never overwrite each other's screenshots
 const slug = (url) => `${String(opts.urls.indexOf(url) + 1).padStart(2, '0')}-${url.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'page'}`;
 
-// a crash anywhere is an incomplete run (exit 2), never confused with --strict's exit 1
-const crash = async (err) => {
-  console.error(`[probe] crashed: ${err?.stack || err}`);
-  try { await browser?.close(); } catch { /* already gone */ }
-  process.exit(2);
-};
-process.on('uncaughtException', crash);
-process.on('unhandledRejection', crash);
-
-let browser;
 try {
   browser = await launch();
 } catch (err) {
@@ -425,12 +431,18 @@ async function focusWalk(page, url) {
     await page.keyboard.press('Tab');
     await page.waitForTimeout(180);
     const f = await page.evaluate(() => {
-      const el = document.activeElement;
+      // focus inside a shadow root shows on document.activeElement as its host; follow it to the real element
+      let el = document.activeElement;
+      while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement;
       if (!el || el === document.body || el === document.documentElement) return null;
-      if (el.localName === 'iframe') return { selector: window.__uq.sel(el), iframe: true };
+      // selector through each shadow host, joined by >>
+      const where = (n) => { const parts = []; for (let x = n; x; x = x.getRootNode().host) parts.unshift(window.__uq.sel(x)); return parts.join(' >> '); };
+      // contains() stops at shadow boundaries; walk up through hosts instead
+      const within = (outer, inner) => { for (let n = inner; n; n = n.parentNode || n.host) if (n === outer) return true; return false; };
+      if (el.localName === 'iframe') return { selector: where(el), iframe: true };
       // element identity, not selector text, decides whether focus came back around
       const st = (window.__uqFocus ||= { seen: new WeakSet(), first: null });
-      if (st.seen.has(el)) return { selector: window.__uq.sel(el), repeat: el === st.first ? 'first' : 'other' };
+      if (st.seen.has(el)) return { selector: where(el), repeat: el === st.first ? 'first' : 'other' };
       st.seen.add(el);
       st.first ??= el;
       const r = el.getBoundingClientRect();
@@ -445,7 +457,7 @@ async function focusWalk(page, url) {
       const coverers = new Set();
       for (const [x, y] of pts) {
         const top = document.elementFromPoint(x, y);
-        if (!top || el.contains(top) || top.contains(el)) continue;
+        if (!top || within(el, top) || within(top, el)) continue;
         let n = top, pinned = false;
         for (; n && n !== document.body; n = n.parentElement) {
           const p = getComputedStyle(n).position;
@@ -453,8 +465,11 @@ async function focusWalk(page, url) {
         }
         if (pinned) { covered++; coverers.add(window.__uq.sel(n)); }
       }
+      // never read what was typed into a field: a password or saved personal data would end up in the report
+      const typed = el.localName === 'textarea' || (el.localName === 'input' && !['button', 'submit', 'reset'].includes(el.type));
+      const labels = [...(el.labels || [])].map((l) => l.innerText).join(' ');
       return {
-        selector: window.__uq.sel(el), name: (el.getAttribute('aria-label') || el.innerText || el.value || el.title || '').trim().slice(0, 40),
+        selector: where(el), name: (el.getAttribute('aria-label') || labels || (typed ? '' : el.innerText || el.value) || el.title || '').trim().slice(0, 40),
         rect: { x: r.left - 8, y: r.top - 8, width: r.width + 16, height: r.height + 16 }, perimeter: 2 * (r.width + r.height),
         inView, hiddenInput, points: pts.length, covered, coverers: [...coverers], coveredBy: [...coverers].join(', '),
       };
@@ -484,7 +499,12 @@ async function focusWalk(page, url) {
     if (hidden.length) { await cover(true); await page.waitForTimeout(50); }
     // focused vs unfocused pixels around the element; then put focus back for the next Tab
     const on1 = await page.screenshot();
-    await page.evaluate(() => { window.__uqLast = document.activeElement; document.activeElement.blur(); });
+    await page.evaluate(() => {
+      let a = document.activeElement;
+      while (a?.shadowRoot?.activeElement) a = a.shadowRoot.activeElement;
+      window.__uqLast = a;
+      a.blur();
+    });
     await page.waitForTimeout(180);
     const off = await page.screenshot();
     await page.evaluate(() => window.__uqLast.focus({ preventScroll: true }));
@@ -498,26 +518,35 @@ async function focusWalk(page, url) {
       add({ check: 'focus:weak', url, viewport: '1280', wcag: [], level: 'craft', severity: 'review', selector: f.selector, measured: `${d.changed} px changed, less than a 1 px ring around it (${Math.round(f.perimeter)} px)${how}` });
     }
   }
-  // things styled as clickable that Tab can never reach: a div with a pointer cursor or an inline onclick
+  // things styled as clickable that Tab can never reach: a div with a pointer cursor or an inline onclick,
+  // or a native link or button taken out of the Tab order with a negative tabindex
   const unreachable = await page.evaluate(() => {
+    const native = 'a[href], button, input, select, textarea, summary, [contenteditable]';
     // reachable by Tab itself, or a label; tabindex="-1" is not reachable
-    const self = 'a[href], button, input, select, textarea, summary, label, [contenteditable], [tabindex]:not([tabindex^="-"])';
+    const self = `:is(${native}):not([tabindex^="-"]), label, [tabindex]:not([tabindex^="-"])`;
     // only real controls make their descendants part of one target; a focus wrapper such as <main tabindex="-1"> does not
     const wraps = 'a[href], button, summary, [contenteditable]';
+    // roving tabindex: a composite widget keeps one item in the Tab order and moves between the rest with arrow keys
+    const roving = '[role=toolbar], [role=tablist], [role=menu], [role=menubar], [role=listbox], [role=radiogroup], [role=grid], [role=tree], [role=treegrid]';
     const out = [];
     for (const el of document.body.querySelectorAll('*')) {
       if (el.matches(self) || el.parentElement.closest(wraps)) continue;
+      const nativeOut = el.matches('a[href], button, summary');
+      if (nativeOut && (el.disabled || el.closest('[aria-hidden="true"]') || el.closest(roving)?.querySelector('[tabindex="0"]'))) continue;
       const cs = getComputedStyle(el);
       const pointer = cs.cursor === 'pointer' && getComputedStyle(el.parentElement).cursor !== 'pointer';
-      if (!pointer && !el.hasAttribute('onclick')) continue;
+      if (!nativeOut && !pointer && !el.hasAttribute('onclick')) continue;
       const b = el.getBoundingClientRect();
       if (!b.width || !b.height || cs.visibility === 'hidden') continue;
-      out.push(`${window.__uq.sel(el)}${el.getAttribute('role') ? ` role=${el.getAttribute('role')}` : ''}`);
+      out.push({ selector: `${window.__uq.sel(el)}${el.getAttribute('role') ? ` role=${el.getAttribute('role')}` : ''}`, native: nativeOut });
     }
     return out;
   });
-  for (const s of unreachable.slice(0, 15)) {
-    add({ check: 'keyboard:unreachable', url, viewport: '1280', wcag: ['2.1.1'], level: 'A/AA', severity: 'review', selector: s, measured: 'styled as clickable (pointer cursor or onclick) but not a link, button or form control and has no tabindex of 0 or more; Tab cannot reach it' });
+  for (const u of unreachable.slice(0, 15)) {
+    const measured = u.native
+      ? 'a visible link or button with a negative tabindex; Tab skips it'
+      : 'styled as clickable (pointer cursor or onclick) but not a link, button or form control and has no tabindex of 0 or more; Tab cannot reach it';
+    add({ check: 'keyboard:unreachable', url, viewport: '1280', wcag: ['2.1.1'], level: 'A/AA', severity: 'review', selector: u.selector, measured });
   }
   if (order.length >= opts.maxTabs) notes.push(`${url}: focus walk stopped at --max-tabs ${opts.maxTabs}; later controls were not checked`);
   if (!order.length) add({ check: 'focus:none', url, viewport: '1280', wcag: ['2.1.1'], level: 'A/AA', severity: 'review', selector: 'document', measured: 'Tab reached no element; confirm the page has controls' });
