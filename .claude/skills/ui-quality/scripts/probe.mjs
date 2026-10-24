@@ -352,13 +352,29 @@ const opts = (() => {
   }
 })();
 
+// a crash anywhere is an incomplete run (exit 2), never confused with --strict's exit 1
+let browser;
+const crash = async (err) => {
+  console.error(`[probe] crashed: ${err?.stack || err}`);
+  try { await browser?.close(); } catch { /* already gone */ }
+  process.exit(2);
+};
+process.on('uncaughtException', crash);
+process.on('unhandledRejection', crash);
+
 const axePath = resolvePkg('axe-core/axe.min.js');
 if (!axePath && !opts.skip.has('axe')) {
   console.error(`[probe] axe-core not found; run: ${INSTALL}`);
   process.exit(2);
 }
-const axeSource = axePath ? readFileSync(axePath, 'utf8') : null;
-mkdirSync(opts.out, { recursive: true });
+let axeSource = null;
+try {
+  axeSource = axePath ? readFileSync(axePath, 'utf8') : null;
+  mkdirSync(opts.out, { recursive: true });
+} catch (err) {
+  console.error(`[probe] could not start: ${err.message}`);
+  process.exit(2);
+}
 
 const findings = [];
 const notes = [];
@@ -384,16 +400,6 @@ const samePage = (a, b) => a.split('#')[0] === b.split('#')[0];
 // numbered by position, so state URLs that share a long prefix never overwrite each other's screenshots
 const slug = (url) => `${String(opts.urls.indexOf(url) + 1).padStart(2, '0')}-${url.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'page'}`;
 
-// a crash anywhere is an incomplete run (exit 2), never confused with --strict's exit 1
-const crash = async (err) => {
-  console.error(`[probe] crashed: ${err?.stack || err}`);
-  try { await browser?.close(); } catch { /* already gone */ }
-  process.exit(2);
-};
-process.on('uncaughtException', crash);
-process.on('unhandledRejection', crash);
-
-let browser;
 try {
   browser = await launch();
 } catch (err) {
@@ -413,17 +419,22 @@ async function open(url, ctxOpts = {}) {
     ...(opts.storageState ? { storageState: opts.storageState } : {}),
     ...ctxOpts,
   });
-  await context.addInitScript(INIT);
-  const page = await context.newPage();
-  const response = await page.goto(url, { waitUntil: 'load', timeout: 60000 });
-  // a 404 or 500 page, or a sign-in page served with an error code, is not the page that was asked for
-  if (response && response.status() >= 400 && !opts.allowErrorStatus) {
-    await context.close();
-    throw new Error(`HTTP ${response.status()}: not audited (pass --allow-error-status to audit an error page on purpose)`);
+  // the caller closes the context only once it has it; a failure here closes it before rethrowing
+  try {
+    await context.addInitScript(INIT);
+    const page = await context.newPage();
+    const response = await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    // a 404 or 500 page, or a sign-in page served with an error code, is not the page that was asked for
+    if (response && response.status() >= 400 && !opts.allowErrorStatus) {
+      throw new Error(`HTTP ${response.status()}: not audited (pass --allow-error-status to audit an error page on purpose)`);
+    }
+    if (opts.waitFor) await page.waitForSelector(opts.waitFor, { timeout: 30000 });
+    await page.waitForTimeout(opts.settle);
+    return { context, page };
+  } catch (err) {
+    await context.close().catch(() => { /* already gone */ });
+    throw err;
   }
-  if (opts.waitFor) await page.waitForSelector(opts.waitFor, { timeout: 30000 });
-  await page.waitForTimeout(opts.settle);
-  return { context, page };
 }
 
 async function shot(page, name, full = true) {
@@ -656,8 +667,11 @@ async function focusWalk(page, url) {
           }
           if (pinned) { covered++; coverers.add(sel(n)); }
         }
+        // never read what was typed into a field: a password or saved personal data would end up in the report
+        const typed = el.localName === 'textarea' || (el.localName === 'input' && !['button', 'submit', 'reset'].includes(el.type));
+        const labels = [...(el.labels || [])].map((l) => l.innerText).join(' ');
         return {
-          selector: sel(el), name: (el.getAttribute('aria-label') || el.innerText || el.value || el.title || '').trim().slice(0, 40),
+          selector: sel(el), name: (el.getAttribute('aria-label') || labels || (typed ? '' : el.innerText || el.value) || el.title || '').trim().slice(0, 40),
           rect: { x: r.left - 8, y: r.top - 8, width: r.width + 16, height: r.height + 16 }, perimeter: 2 * (r.width + r.height),
           inView, hiddenInput, points: pts.length, covered, coverers: [...coverers], coveredBy: [...coverers].join(', '),
         };
@@ -794,28 +808,37 @@ async function focusWalk(page, url) {
         : 'focus left the page before reaching them';
     add({ check: 'keyboard:not-reached', url, viewport: '1280', wcag: ['2.1.1', '2.1.2'], level: 'A/AA', severity: 'review', selector: missed.slice(0, 12).join('; '), measured: `${missed.length} visible focusable elements Tab never reached; ${why}` });
   }
-  // things styled as clickable that Tab can never reach: a div with a pointer cursor or an inline onclick
+  // things styled as clickable that Tab can never reach: a div with a pointer cursor or an inline onclick,
+  // or a native link or button taken out of the Tab order with a negative tabindex
   const unreachable = await page.evaluate(() => {
     const { all, style, sel } = window.__uq;
+    const native = 'a[href], button, input, select, textarea, summary, [contenteditable]';
     // reachable by Tab itself, or a label; tabindex="-1" is not reachable
-    const self = 'a[href], button, input, select, textarea, summary, label, [contenteditable], [tabindex]:not([tabindex^="-"])';
+    const self = `:is(${native}):not([tabindex^="-"]), label, [tabindex]:not([tabindex^="-"])`;
     // only real controls make their descendants part of one target; a focus wrapper such as <main tabindex="-1"> does not
     const wraps = 'a[href], button, summary, [contenteditable]';
+    // roving tabindex: a composite widget keeps one item in the Tab order and moves between the rest with arrow keys
+    const roving = '[role=toolbar], [role=tablist], [role=menu], [role=menubar], [role=listbox], [role=radiogroup], [role=grid], [role=tree], [role=treegrid]';
     const out = [];
     for (const el of all('*')) {
       const parent = el.parentElement || el.getRootNode().host;
       if (!parent || el.matches(self) || parent.closest(wraps)) continue;
+      const nativeOut = el.matches('a[href], button, summary');
+      if (nativeOut && (el.disabled || el.closest('[aria-hidden="true"]') || el.closest(roving)?.querySelector('[tabindex="0"]'))) continue;
       const cs = style(el);
       const pointer = cs.cursor === 'pointer' && style(parent).cursor !== 'pointer';
-      if (!pointer && !el.hasAttribute('onclick')) continue;
+      if (!nativeOut && !pointer && !el.hasAttribute('onclick')) continue;
       const b = el.getBoundingClientRect();
       if (!b.width || !b.height || cs.visibility === 'hidden') continue;
-      out.push(`${sel(el)}${el.getAttribute('role') ? ` role=${el.getAttribute('role')}` : ''}`);
+      out.push({ selector: `${sel(el)}${el.getAttribute('role') ? ` role=${el.getAttribute('role')}` : ''}`, native: nativeOut });
     }
     return out;
   });
-  for (const s of unreachable.slice(0, 15)) {
-    add({ check: 'keyboard:unreachable', url, viewport: '1280', wcag: ['2.1.1'], level: 'A/AA', severity: 'review', selector: s, measured: 'styled as clickable (pointer cursor or onclick) but not a link, button or form control and has no tabindex of 0 or more; Tab cannot reach it' });
+  for (const u of unreachable.slice(0, 15)) {
+    const measured = u.native
+      ? 'a visible link or button with a negative tabindex; Tab skips it'
+      : 'styled as clickable (pointer cursor or onclick) but not a link, button or form control and has no tabindex of 0 or more; Tab cannot reach it';
+    add({ check: 'keyboard:unreachable', url, viewport: '1280', wcag: ['2.1.1'], level: 'A/AA', severity: 'review', selector: u.selector, measured });
   }
   if (!order.length) add({ check: 'focus:none', url, viewport: '1280', wcag: ['2.1.1'], level: 'A/AA', severity: 'review', selector: 'document', measured: 'Tab reached no element; confirm the page has controls' });
   return { order, navigated: false };

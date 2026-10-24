@@ -66,6 +66,7 @@
       "caveman": ["why"],
       "codex-fullreview": ["impartial-review"],
       "codex-review": ["external-review"],
+      "conversion-ux": ["ui-quality"],
       "deep-plan": ["why"],
       "design-prototypes": ["codex-image-gen"],
       "merge": ["codex-fullreview", "codex-review"],
