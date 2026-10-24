@@ -137,8 +137,9 @@ function runDiffCheck(ref) {
     ...new Set([...list(["diff", "--name-only", "--no-renames", "-z", base]), ...untracked]),
   ].filter((p) => !p.startsWith(".claude/reference/"));
   // A bare file name is a citation only when it names one file. Count names in
-  // the current tree; a move then still counts once. A name that exists only
-  // among deleted paths falls back to the changed list.
+  // the current tree (indexed paths minus those deleted on disk, plus
+  // untracked), so a move, staged or not, still counts once. A name that
+  // exists only among deleted paths falls back to the changed list.
   const countNames = (paths) => {
     const counts = new Map();
     for (const p of paths) {
@@ -147,7 +148,10 @@ function runDiffCheck(ref) {
     }
     return counts;
   };
-  const currentNames = countNames(new Set([...list(["ls-files", "-z"]), ...untracked]));
+  const deletedOnDisk = new Set(list(["ls-files", "--deleted", "-z"]));
+  const currentNames = countNames(
+    new Set([...list(["ls-files", "-z"]).filter((p) => !deletedOnDisk.has(p)), ...untracked]),
+  );
   const changedNames = countNames(changed);
   const uniqueName = (name) =>
     currentNames.has(name) ? currentNames.get(name) === 1 : changedNames.get(name) === 1;
