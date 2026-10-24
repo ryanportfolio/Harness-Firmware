@@ -59,7 +59,7 @@ Defaults until configured:
 
 - "Complete" = the requested change finished and verified to this environment's limits. On Complete: commit, push, and open or update the PR. Mid-task or exploratory work is NOT a commit trigger.
 - Stage intentionally. Never blanket-commit unrelated changes.
-- Before opening a PR, check for an existing one (`gh pr list --head <branch>`) and push to that instead.
+- Before opening a PR, check for an existing one (`gh pr list --head <branch>`) and push to that instead. Before opening or updating one, re-check the reference entries the change may have made stale (`recall`: `memory-audit.mjs --diff`).
 - Merge PRs with **squash** by default (`gh pr merge --squash`); merge-commit or rebase only when the user explicitly asks.
 - Never force-push or run destructive git operations without an explicit request.
 - End commit messages with the standard `Co-Authored-By:` trailer.

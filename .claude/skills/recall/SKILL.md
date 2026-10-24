@@ -13,6 +13,18 @@ When a stored fact changes an action, say so with its file and date, for example
 pitfalls.md (2026-03-14): the test database must be reset first, resetting it", so a stale
 fact surfaces as a dated claim the user can correct in one reply.
 
+Before opening or updating a pull request, fetch the default branch and run
+`node .claude/scripts/memory-audit.mjs --diff origin/<default-branch>`. It lists the
+reference entries that cite a file the change touched. Re-read each one against the new
+code: leave it if it still holds, amend it if part of it changed, or retire it as below if
+the change made it false. Correcting an entry the change made false needs no separate
+request; adding new facts still follows the save rules below. The list is a prompt, not a
+verdict, and it misses an entry that describes changed code without naming its path, so
+also check entries you know cover the area. When writing an entry, cite folders with a
+trailing slash (`assets/`) and files by path or full name: a bare name with no slash or
+extension (`assets`) matches only while it still exists, so deleting it hides the entry.
+Report what you changed, or that every listed entry still holds.
+
 For lookup, answer from relevant entries with evidence pointers. If no entry answers the
 question, inspect the project or state the gap. Do not create facts or edit memory merely
 because a lookup found nothing. Stay within the requested project's history and references.
