@@ -201,6 +201,11 @@ const INIT = () => {
     }
     return { left: x, top: y, width: w, height: h, right: x + w, bottom: y + h, framed };
   };
+  // whether every frame around an element shows it: a frame hidden with visibility:hidden still lays out its document
+  const framesShow = (el) => {
+    for (let f = frameOf(el.ownerDocument); f; f = frameOf(f.ownerDocument)) if (!(f.checkVisibility?.({ visibilityProperty: true }) ?? f.getClientRects().length > 0)) return false;
+    return true;
+  };
   // the element painted at a point of the top page, looking inside open shadow roots and same-origin frames
   const deepPoint = (x, y) => {
     let el = document.elementFromPoint(x, y);
@@ -258,7 +263,7 @@ const INIT = () => {
     }
     return out;
   };
-  window.__uq = { sel, find, up, style, roots, all, deepActive, topRect, deepPoint, ownText, textRects, clipped, shifts: [] };
+  window.__uq = { sel, find, up, style, roots, all, deepActive, topRect, framesShow, deepPoint, ownText, textRects, clipped, shifts: [] };
   try {
     new PerformanceObserver((list) => {
       for (const e of list.getEntries()) {
@@ -504,8 +509,8 @@ async function runAxe(page, url, viewport, tags) {
 async function nameGaps(page, url) {
   const gaps = await page.evaluate(() => {
     const out = [];
-    const { all, style } = window.__uq;
-    const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && style(el).visibility !== 'hidden'; };
+    const { all, style, framesShow } = window.__uq;
+    const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && style(el).visibility !== 'hidden' && framesShow(el); };
     for (const el of all('input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]):not([type=image]), textarea')) {
       const ph = (el.getAttribute('placeholder') || '').trim();
       if (!ph || !shown(el)) continue;
@@ -647,6 +652,8 @@ async function focusWalk(page, url) {
   let ended = 'max-tabs';
   let last = null;
   let pressed = false;
+  // elements hidden for the screenshots, to show again if a measurement throws
+  let uncover = null;
   try {
     for (let i = 0; i < opts.maxTabs; i++) {
       // after leaving a cross-origin frame, focus already sits on the next stop
@@ -754,7 +761,7 @@ async function focusWalk(page, url) {
       const cover = (on) => page.evaluate(([sels, hide]) => {
         for (const s of sels) { const n = window.__uq.find(s); if (n) n.style.visibility = hide ? 'hidden' : ''; }
       }, [hidden, on]);
-      if (hidden.length) { await cover(true); await page.waitForTimeout(50); }
+      if (hidden.length) { await cover(true); uncover = () => cover(false); await page.waitForTimeout(50); }
       // focused vs unfocused pixels around the element; a second shot of each state shows what changes there on its own.
       // Then put focus back for the next Tab
       const on1 = await page.screenshot();
@@ -766,7 +773,7 @@ async function focusWalk(page, url) {
       await page.waitForTimeout(180);
       const off2 = await page.screenshot();
       await page.evaluate(() => window.__uqLast.focus({ preventScroll: true }));
-      if (hidden.length) await cover(false);
+      if (uncover) { await uncover(); uncover = null; }
       const b64 = (buf) => buf.toString('base64');
       const d = await pixels({ op: 'diff', a: b64(on1), a2: b64(on2), b: b64(off), b2: b64(off2), rect: f.rect, threshold: 48 });
       const how = `${hidden.length ? ` (measured with ${f.coveredBy} hidden)` : ''}${d.moving ? ` (${d.moving} px that change on their own left out)` : ''}`;
@@ -782,10 +789,14 @@ async function focusWalk(page, url) {
     }
   } finally {
     page.off('framenavigated', onNav);
+    // the checks after this one reopen a page that navigated, so its measuring style needs no clean-up.
+    // On any other exit, an error included, reflow measures this page next and needs it as it was
+    if (!navigatedTo) {
+      if (uncover) await uncover().catch(() => {});
+      await page.evaluate(() => { for (const r of window.__uq.roots()) for (const s of r.querySelectorAll('style.__uq-still, #__uq-start')) s.remove(); }).catch(() => {});
+    }
   }
-  // the checks after this one reopen a page that navigated, so its measuring style needs no clean-up
   if (ended === 'navigated') return { order, navigated: true };
-  await page.evaluate(() => { for (const r of window.__uq.roots()) for (const s of r.querySelectorAll('style.__uq-still, #__uq-start')) s.remove(); });
   if (ended === 'max-tabs') notes.push(`${url}: focus walk stopped at --max-tabs ${opts.maxTabs}; later controls were not checked`);
 
   // focusable elements the walk never reached: behind a trap, after a loop, or out of the Tab order by script
@@ -838,7 +849,7 @@ async function focusWalk(page, url) {
   // things styled as clickable that Tab can never reach: a div with a pointer cursor or an inline onclick,
   // or a native link or button taken out of the Tab order with a negative tabindex
   const unreachable = await page.evaluate(() => {
-    const { all, style, sel } = window.__uq;
+    const { all, style, sel, framesShow } = window.__uq;
     const native = 'a[href], button, input, select, textarea, summary, [contenteditable]';
     // reachable by Tab itself, or a label; tabindex="-1" is not reachable
     const self = `:is(${native}):not([tabindex^="-"]), label, [tabindex]:not([tabindex^="-"])`;
@@ -856,7 +867,7 @@ async function focusWalk(page, url) {
       const pointer = cs.cursor === 'pointer' && style(parent).cursor !== 'pointer';
       if (!nativeOut && !pointer && !el.hasAttribute('onclick')) continue;
       const b = el.getBoundingClientRect();
-      if (!b.width || !b.height || cs.visibility === 'hidden') continue;
+      if (!b.width || !b.height || cs.visibility === 'hidden' || !framesShow(el)) continue;
       out.push({ selector: `${sel(el)}${el.getAttribute('role') ? ` role=${el.getAttribute('role')}` : ''}`, native: nativeOut });
     }
     return out;
@@ -1073,12 +1084,12 @@ async function phone(url) {
       if (scale < 1) notes.push(`${url}: axe target sizes at 375 px are in CSS px, larger than the phone shows at ${Math.round(scale * 100)}%`);
     }
     const small = await page.evaluate((k) => {
-      const { all, style, sel, ownText, topRect } = window.__uq;
+      const { all, style, sel, ownText, topRect, framesShow } = window.__uq;
       const out = [];
       for (const el of all('a[href], button, input:not([type=hidden]), select, textarea, [role=button], [role=link], [role=tab], [role=checkbox], [role=switch], [tabindex]:not([tabindex="-1"])')) {
         // the size on the page, after any scaling of the frames around it
         const r = topRect(el);
-        if (!r.width || !r.height) continue;
+        if (!r.width || !r.height || !framesShow(el)) continue;
         // inline links inside running text are exempt from target size
         if (el.localName === 'a' && style(el).display === 'inline' && el.parentElement && ownText(el.parentElement)) continue;
         const w = r.width * k, h = r.height * k;
