@@ -13,6 +13,17 @@ condensed.
 
 ### Added
 
+- `ui-quality` for Claude and Codex: a quality floor for everyday screens
+  (forms, tables, dashboards, settings), the work `showpiece` leaves alone. Build
+  mode reads the project's design system and a short saved decisions file, then
+  lists every state a screen can be in before any markup. Audit mode runs a probe
+  that measures the rendered page in headed Chrome: axe-core, plus contrast over
+  images and gradients, focus visibility and focus hidden under sticky UI, reflow
+  at 320 and 640 px, WCAG text spacing, text enlargement, reduced motion, layout
+  shift and dark mode. Each rule cites its WCAG 2.2 criterion, platform guideline
+  or craft basis. Ideas taken from ui-ux-pro-max-skill (MIT); its style, palette
+  and font tables were left out.
+
 - `conversion-ux` for Claude and Codex: audits an existing screen or guides a new
   one so users can decide and act. Built around one test (every element asks the
   user a question; make it an easier, honest one) and a walk through seven stages,

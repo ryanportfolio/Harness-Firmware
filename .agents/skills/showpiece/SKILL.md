@@ -1,6 +1,6 @@
 ---
 name: showpiece
-description: "Push an artifact past what people expect of its kind, any medium. Use: $showpiece, ambitious creative direction, portfolio-quality work, replacing generic AI styling. Not quiet or faithful work (forms, dashboards, exact recreations, brand matching) → project UI skill. Skip routine edits unless invoked."
+description: "Push an artifact past what people expect of its kind, any medium. Use: $showpiece, ambitious creative direction, portfolio-quality work, replacing generic AI styling. Not quiet or faithful work (forms, dashboards, exact recreations, brand matching) → ui-quality or project UI skill. Skip routine edits unless invoked."
 ---
 
 # Showpiece

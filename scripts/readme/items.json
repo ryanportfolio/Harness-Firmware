@@ -150,6 +150,11 @@
       "group": "specialist"
     },
     {
+      "name": "ui-quality",
+      "label": "UI quality",
+      "group": "specialist"
+    },
+    {
       "name": "codex-image-gen",
       "label": "Codex image gen",
       "group": "specialist"
