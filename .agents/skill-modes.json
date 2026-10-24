@@ -49,6 +49,7 @@
     "wow-loop": "native",
     "wrapup": "native",
     "writing": "native",
-    "writing-plans": "native"
+    "writing-plans": "native",
+    "gauntlet": "disabled"
   }
 }

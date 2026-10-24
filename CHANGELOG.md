@@ -13,6 +13,15 @@ condensed.
 
 ### Added
 
+- `gauntlet` for Claude: one command runs a draft through the quality chain
+  used to build `conversion-ux`. The owner confirms a contract, then dare's four
+  fresh-context steps run with two owner gates, a final draft is written, one
+  fresh reviewer checks it (why), the draft is rewritten and run through a blind
+  arena with the draft as baseline, and the real check runs. It commits without
+  pushing and stops for `/merge`. Skills run fully; other artifacts need a stated
+  way to test candidates and one real check, and are labeled experimental.
+  Disabled for Codex.
+
 - `ui-quality` for Claude and Codex: a quality floor for everyday screens
   (forms, tables, dashboards, settings), the work `showpiece` leaves alone. Build
   mode reads the project's design system and a short saved decisions file, then
