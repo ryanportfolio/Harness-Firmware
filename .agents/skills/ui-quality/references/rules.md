@@ -10,7 +10,7 @@ The probe uses `fail` for candidates associated with WCAG A or AA. Confirm the c
 
 | ID | Rule | Source | Checked by |
 |---|---|---|---|
-| SE1 | Body text at least 4.5:1 against what is behind it; large text (24 px, or 18.66 px bold) at least 3:1 | WCAG 1.4.3 AA | Probe `axe`, `contrast` |
+| SE1 | Body text at least 4.5:1 against what is behind it; large text (24 px, or 18.66 px bold) at least 3:1 | WCAG 1.4.3 AA | Probe `axe`, `contrast` (counts the opacity of the text and the boxes around it; not filters or blend modes) |
 | SE2 | Icons that carry meaning, input borders, focus rings and control edges at least 3:1 against neighbours | WCAG 1.4.11 AA | Manual; axe covers only part |
 | SE3 | Colour is never the only signal: errors, status, required fields and links in text also differ by text, icon, weight or underline | WCAG 1.4.1 A | Manual |
 | SE4 | Meaningful images have a text alternative; decorative ones are hidden from assistive technology | WCAG 1.1.1 A | Probe `axe` finds missing ones; whether the text makes sense is manual |
@@ -23,7 +23,7 @@ The probe uses `fail` for candidates associated with WCAG A or AA. Confirm the c
 | RE1 | At 320 CSS px wide nothing needs sideways scrolling and nothing is cut off, except content that needs two dimensions (data tables, maps, code) scrolling inside its own box | WCAG 1.4.10 AA | Probe `reflow` |
 | RE2 | Text survives WCAG text spacing (line height 1.5, paragraph gap 2em, letter 0.12em, word 0.16em) without being cut off | WCAG 1.4.12 AA | Probe `spacing` |
 | RE3 | Text can grow to 200% without lost content or functionality; preserve zoom | WCAG 1.4.4 AA | Probe `axe` (viewport tag), `reflow` at 640 and `textscale` give candidates; verify actual browser zoom or text resize manually |
-| RE4 | Body text at least 16 px on phones; lines about 45 to 75 characters on wide screens | Craft | Manual |
+| RE4 | Body text at least 16 px on phones; lines about 45 to 75 characters on wide screens | Craft | Probe `phone:no-mobile-layout` when a phone shrinks a desktop-width layout; sizes and line length are manual |
 | RE5 | Fixed heights with hidden overflow around text are a bug waiting for a longer name or language | Craft | Probe `reflow`, `spacing`, `textscale` (clipped text) |
 | RE6 | The screen works in portrait and landscape unless one orientation is essential | WCAG 1.3.4 AA | Manual |
 
@@ -31,13 +31,13 @@ The probe uses `fail` for candidates associated with WCAG A or AA. Confirm the c
 
 | ID | Rule | Source | Checked by |
 |---|---|---|---|
-| RC1 | Every action works by keyboard alone | WCAG 2.1.1 A | Probe `focus` for Tab reach and for elements styled as clickable that Tab cannot reach; Enter, Space, Escape and arrow keys are manual |
-| RC2 | Focus can always leave a component; dialogs keep focus inside while open and return it to the opener on close | WCAG 2.1.2 A, 2.4.3 A | Probe `focus` notes loops; dialogs are manual |
+| RC1 | Every action works by keyboard alone | WCAG 2.1.1 A | Probe `focus` for Tab reach, focusable elements Tab never reached and elements styled as clickable that Tab cannot reach; Enter, Space, Escape and arrow keys are manual |
+| RC2 | Focus can always leave a component; dialogs keep focus inside while open and return it to the opener on close | WCAG 2.1.2 A, 2.4.3 A | Probe `focus` notes loops, and `keyboard:not-reached` names what a walk that cycled back skipped, which is how a trap looks; dialogs are manual |
 | RC3 | Focus order follows the visual and reading order | WCAG 2.4.3 A | Probe lists the order; judging it is manual |
-| RC4 | The focused element is always visibly marked | WCAG 2.4.7 AA | Probe `focus` |
+| RC4 | The focused element is always visibly marked | WCAG 2.4.7 AA | Probe `focus`; `focus:unmeasured` when motion around the element hides the comparison |
 | RC5 | Sticky headers, cookie bars and chat widgets never cover the focused element entirely | WCAG 2.4.11 AA (2.4.12 AAA for partly) | Probe `focus` |
 | RC6 | The focus marker is at least as large as a 2 px outline around the element and changes contrast by 3:1 | WCAG 2.4.13 AAA | Manual; the probe's `focus:weak` is a craft check for markers smaller than a 1 px ring, not this test |
-| RC7 | Pointer targets at least 24 by 24 CSS px or spaced so a 24 px circle fits; 44 pt on Apple platforms and 48 dp on Android for touch | WCAG 2.5.8 AA; Apple HIG; Material | Probe `axe` (24 px), `phone` (44 px) |
+| RC7 | Pointer targets at least 24 by 24 CSS px or spaced so a 24 px circle fits; 44 pt on Apple platforms and 48 dp on Android for touch | WCAG 2.5.8 AA; Apple HIG; Material | Probe `axe` (24 px), `phone` (44 px, scaled to what the phone shows when the page has no mobile layout) |
 | RC8 | Anything done by dragging also works with a single tap or click | WCAG 2.5.7 AA | Manual |
 | RC9 | Content shown on hover or focus can be dismissed with Escape, hovered itself, and stays until dismissed | WCAG 1.4.13 AA | Manual |
 | RC10 | Nothing essential depends on hover; touch screens have none | Craft | Manual |
@@ -59,7 +59,7 @@ The probe uses `fail` for candidates associated with WCAG A or AA. Confirm the c
 | OP10 | Disabled controls say why, or stay enabled and explain on use | Craft | Manual |
 | OP11 | Labels, headings, lists and table headers shown on screen are also in the markup; a label is tied to its field | WCAG 1.3.1 A | Probe `axe` in part; manual |
 | OP12 | Headings and labels describe their topic or purpose | WCAG 2.4.6 AA | Manual |
-| OP13 | Moving focus or changing a field never submits, navigates or opens something unannounced | WCAG 3.2.1 A, 3.2.2 A | Manual |
+| OP13 | Moving focus or changing a field never submits, navigates or opens something unannounced | WCAG 3.2.1 A, 3.2.2 A | Probe `focus:navigated` for focus that loads another page; changes to fields are manual |
 | OP14 | Fields for the user's own details (name, email, address, phone) carry `autocomplete` values | WCAG 1.3.5 AA | Manual or from code |
 | OP15 | A session time limit warns first and lets the user extend it | WCAG 2.2.1 A | Manual or from code |
 
