@@ -31,7 +31,9 @@
 //                  changes), so each can be re-checked against the new code
 //                  before a pull request. A cited path is a path-shaped token
 //                  in an entry's heading or body (a whole backticked span
-//                  counts too, so paths with spaces work; absolute paths
+//                  counts too, so paths with spaces work, and so does a
+//                  backticked name without slash or extension, such as
+//                  `assets` or `Dockerfile`, when it exists; absolute paths
 //                  inside the repo are made relative); a directory matches
 //                  files under it; a bare file name counts only when one
 //                  file in the current tree has that name. Advisory: a hit is a prompt to
@@ -193,8 +195,15 @@ function runDiffCheck(ref) {
       }
       if (t && t !== "." && t !== "/") tokens.set(normalize(t), t);
     };
+    // A backticked span with no slash or extension (`assets`, `Dockerfile`)
+    // counts when it names an existing file or folder, or a changed path.
     for (const m of text.matchAll(/`([^`]+)`/g)) {
-      if (/\//.test(m[1]) || /\.[A-Za-z][A-Za-z0-9]{0,7}$/.test(m[1].trim())) add(m[1]);
+      const span = clean(m[1]);
+      if (
+        /\//.test(span) ||
+        /\.[A-Za-z][A-Za-z0-9]{0,7}$/.test(span) ||
+        (span && (fs.existsSync(path.join(top, span)) || changed.includes(normalize(span))))
+      ) add(m[1]);
     }
     for (const m of text.replace(/`/g, " ").matchAll(PATH_TOKEN)) add(m[0]);
     return tokens;
