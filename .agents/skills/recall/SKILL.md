@@ -20,8 +20,10 @@ code: leave it if it still holds, amend it if part of it changed, or retire it a
 the change made it false. Correcting an entry the change made false needs no separate
 request; adding new facts still follows the save rules below. The list is a prompt, not a
 verdict, and it misses an entry that describes changed code without naming its path, so
-also check entries you know cover the area. Report what you changed, or that every listed
-entry still holds.
+also check entries you know cover the area. When writing an entry, cite folders with a
+trailing slash (`assets/`) and files by path or full name: a bare name with no slash or
+extension (`assets`) matches only while it still exists, so deleting it hides the entry.
+Report what you changed, or that every listed entry still holds.
 
 For lookup, answer from relevant entries with evidence pointers. If no entry answers the
 question, inspect the project or state the gap. Do not create facts or edit memory merely
