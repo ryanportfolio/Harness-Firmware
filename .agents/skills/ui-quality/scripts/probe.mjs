@@ -583,13 +583,17 @@ async function compositedContrast(page, url, incomplete) {
       // opacity set to 1 shows what the text sits on inside the faded boxes
       if (info.opacity < 1) {
         await page.evaluate((s) => {
-          const { find, up } = window.__uq;
+          const { find, up, style } = window.__uq;
           window.__uqOpacity = [];
           // transitions off as well, or an opacity transition would still be fading in when the shot is taken
           for (let x = find(s); x; x = up(x)) {
-            for (const prop of ['opacity', 'transition']) window.__uqOpacity.push([x, prop, x.style.getPropertyValue(prop), x.style.getPropertyPriority(prop)]);
+            const faded = parseFloat(style(x).opacity) < 1;
+            for (const prop of ['opacity', 'transition', 'isolation']) window.__uqOpacity.push([x, prop, x.style.getPropertyValue(prop), x.style.getPropertyPriority(prop)]);
             x.style.setProperty('transition', 'none', 'important');
             x.style.setProperty('opacity', '1', 'important');
+            // opacity made a faded box its own stacking context; keep one, or a z-index:-1 layer inside it would drop
+            // behind its background and the shot would show a different backdrop
+            if (faded) x.style.setProperty('isolation', 'isolate', 'important');
           }
         }, selector);
         await page.waitForTimeout(50);
@@ -660,6 +664,8 @@ async function focusWalk(page, url) {
       if (!pressed) await page.keyboard.press('Tab');
       pressed = false;
       await page.waitForTimeout(180);
+      // focus has left the start marker; take it out before measuring, or selectors such as :first-child would stop matching
+      if (i === 0 && !navigatedTo) await page.evaluate(() => { for (const r of window.__uq.roots()) r.querySelector('#__uq-start')?.remove(); }).catch(() => {});
       const f = navigatedTo ? null : await page.evaluate(() => {
         const { deepActive, sel, topRect, up, style, deepPoint } = window.__uq;
         const el = deepActive();
