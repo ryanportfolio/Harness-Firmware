@@ -29,9 +29,12 @@
 //                  reference entries that cite a file changed since the merge
 //                  base with <ref> (committed, staged, unstaged and untracked
 //                  changes), so each can be re-checked against the new code
-//                  before a pull request. A cited path is a backticked or
-//                  path-shaped token; a bare file name counts only when one
-//                  tracked file has that name. Advisory: a hit is a prompt to
+//                  before a pull request. A cited path is a path-shaped token
+//                  in an entry's heading or body (a whole backticked span
+//                  counts too, so paths with spaces work; absolute paths
+//                  inside the repo are made relative); a directory matches
+//                  files under it; a bare file name counts only when one
+//                  file in the current tree has that name. Advisory: a hit is a prompt to
 //                  re-read the entry, not proof it is stale, and an entry that
 //                  describes changed code without naming a path is missed.
 //
@@ -129,41 +132,74 @@ function runDiffCheck(ref) {
     if (out.status !== 0) fail(`git ${args.join(" ")} failed: ${out.stderr.trim().split("\n")[0]}`);
     return out.stdout.split("\0").filter(Boolean).map(normalize);
   };
+  const untracked = list(["ls-files", "--others", "--exclude-standard", "-z"]);
   const changed = [
-    ...new Set([
-      ...list(["diff", "--name-only", "--no-renames", "-z", base]),
-      ...list(["ls-files", "--others", "--exclude-standard", "-z"]),
-    ]),
+    ...new Set([...list(["diff", "--name-only", "--no-renames", "-z", base]), ...untracked]),
   ].filter((p) => !p.startsWith(".claude/reference/"));
-  const nameCount = new Map();
-  for (const p of new Set([...list(["ls-files", "-z"]), ...changed])) {
-    const name = p.slice(p.lastIndexOf("/") + 1);
-    nameCount.set(name, (nameCount.get(name) ?? 0) + 1);
-  }
+  // A bare file name is a citation only when it names one file. Count names in
+  // the current tree; a move then still counts once. A name that exists only
+  // among deleted paths falls back to the changed list.
+  const countNames = (paths) => {
+    const counts = new Map();
+    for (const p of paths) {
+      const name = p.slice(p.lastIndexOf("/") + 1);
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return counts;
+  };
+  const currentNames = countNames(new Set([...list(["ls-files", "-z"]), ...untracked]));
+  const changedNames = countNames(changed);
+  const uniqueName = (name) =>
+    currentNames.has(name) ? currentNames.get(name) === 1 : changedNames.get(name) === 1;
+  const isDir = (rel) => {
+    try {
+      return fs.statSync(path.join(top, rel)).isDirectory();
+    } catch {
+      return false;
+    }
+  };
 
   // Path-shaped tokens: something with a slash, or a name with an extension.
-  // Backticks are dropped first so a command like `node scripts/x.mjs --check`
-  // still yields its path; URLs are removed so their path parts never match.
+  // An absolute path inside the repository is cut to its repo-relative part.
+  // A backticked span also counts whole, so a path with spaces survives;
+  // backticks are then dropped so a command like `node scripts/x.mjs --check`
+  // still yields its path. URLs are removed so their path parts never match.
+  // Tokens map normalized form -> original case, for the directory check.
   const PATH_TOKEN = /(?:[\w.@~+-]+\/)+[\w.@~+-]*|[\w@~+-][\w.@~+-]*\.[A-Za-z][A-Za-z0-9]{0,7}\b/g;
+  const topEscaped = top.replace(/\\/g, "/").replace(/[.*+?^$()|[\]{}\\]/g, "\\$&");
+  const topPrefix = new RegExp(topEscaped + "/", "gi");
+  const clean = (raw) =>
+    raw
+      .trim()
+      .replace(/[.,;:!?]+$/, "")
+      .replace(/^\.\//, "")
+      .replace(/:\d+(?:[-:]\d+)*$/, "");
   const citedTokens = (line) => {
-    const text = line.replace(/\\/g, "/").replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, " ").replace(/`/g, " ");
-    const tokens = new Set();
-    for (const m of text.matchAll(PATH_TOKEN)) {
-      const t = normalize(m[0])
-        .replace(/[.,;:!?]+$/, "")
-        .replace(/^\.\//, "")
-        .replace(/:\d+(?:[-:]\d+)*$/, "");
-      if (t && t !== "." && t !== "/") tokens.add(t);
+    const text = line
+      .replace(/\\/g, "/")
+      .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s`)]+/gi, " ")
+      .replace(topPrefix, "");
+    const tokens = new Map();
+    const add = (raw) => {
+      const t = clean(raw);
+      if (t && t !== "." && t !== "/") tokens.set(normalize(t), t);
+    };
+    for (const m of text.matchAll(/`([^`]+)`/g)) {
+      if (/\//.test(m[1]) || /\.[A-Za-z][A-Za-z0-9]{0,7}$/.test(m[1].trim())) add(m[1]);
     }
+    for (const m of text.replace(/`/g, " ").matchAll(PATH_TOKEN)) add(m[0]);
     return tokens;
   };
-  const changedFor = (token) => {
+  const changedFor = (token, raw) => {
     const t = token.replace(/\/+$/, "");
     if (!t) return [];
+    if (token.endsWith("/") || isDir(raw.replace(/\/+$/, ""))) {
+      return changed.filter((c) => c.startsWith(`${t}/`) || (t.includes("/") && c.includes(`/${t}/`)));
+    }
     if (t.includes("/")) {
       return changed.filter((c) => c === t || c.endsWith(`/${t}`) || c.startsWith(`${t}/`));
     }
-    if (nameCount.get(t) !== 1) return [];
+    if (!uniqueName(t)) return [];
     return changed.filter((c) => c.slice(c.lastIndexOf("/") + 1) === t);
   };
 
@@ -188,10 +224,10 @@ function runDiffCheck(ref) {
       if (heading) {
         flush();
         entry = { file, line: i + 1, heading: `${heading[1]} ${heading[2]}`, citations: new Map() };
-        return;
       }
-      for (const token of citedTokens(text)) {
-        const hits = changedFor(token);
+      // A heading can carry the citation itself, so it is scanned too.
+      for (const [token, raw] of citedTokens(heading ? heading[2] : text)) {
+        const hits = changedFor(token, raw);
         if (hits.length === 0) continue;
         const set = entry.citations.get(token) ?? new Set();
         for (const h of hits) set.add(h);
