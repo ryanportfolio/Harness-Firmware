@@ -43,6 +43,13 @@ const SECRET_WORD = "(?:token|secret|passw(?:or)?d|pwd|key|credential|auth)";
 const SECRET_VALUE = `("(?!\\$)[^"\\n]*"|'(?!\\$)[^'\\n]*'|(?![-"'$])[^\\s"',;&|)}]+)`;
 const SECRET_ASSIGNMENT = new RegExp(`((?:\\b|-)[\\w.-]*${SECRET_WORD}[\\w.-]*["']?\\s*=\\s*)${SECRET_VALUE}`, "gi");
 const SECRET_FLAG_SPLIT = new RegExp(`(\\s--?[\\w-]*${SECRET_WORD}[\\w-]*\\s+)${SECRET_VALUE}`, "gi");
+// Same rule as ci-surface-scan.mjs: a long letter-and-digit run that is not a commit SHA; a
+// run with "/" only when a segment looks like base64 (16+ chars, mixed case and digits).
+function tokenLike(run) {
+  if (!/[A-Za-z]/.test(run) || !/[0-9]/.test(run) || /^[a-f0-9]{40}$/.test(run)) return false;
+  if (!run.includes("/")) return true;
+  return run.split("/").some((part) => part.length >= 16 && /[A-Z]/.test(part) && /[a-z]/.test(part) && /[0-9]/.test(part));
+}
 const maskValue = (match, prefix, value) => `${prefix}${value[0] === '"' || value[0] === "'" ? `${value[0]}<redacted>${value[0]}` : "<redacted>"}`;
 
 function clean(text, max = 120) {
@@ -52,7 +59,7 @@ function clean(text, max = 120) {
     .replace(/(:\/\/)(?!git@)[^/\s@]+@/g, "$1<redacted>@")
     .replace(SECRET_ASSIGNMENT, maskValue)
     .replace(SECRET_FLAG_SPLIT, maskValue)
-    .replace(/[A-Za-z0-9_+/=-]{24,}/g, (run) => (/[A-Za-z]/.test(run) && /[0-9]/.test(run) && !/^[a-f0-9]{40}$/.test(run) && !run.includes("/") ? `<redacted ${run.length} chars>` : run))
+    .replace(/[A-Za-z0-9_+/=-]{24,}/g, (run) => (tokenLike(run) ? `<redacted ${run.length} chars>` : run))
     .replace(/[\u0000-\u001f\u007f]/g, " ")
     .trim();
   if (out.length > max) out = `${out.slice(0, max)}...`;

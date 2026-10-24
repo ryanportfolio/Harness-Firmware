@@ -77,6 +77,14 @@ const SECRET_VALUE = `("(?!\\$)[^"\\n]*"|'(?!\\$)[^'\\n]*'|(?![-"'$])[^\\s"',;&|
 const SECRET_ASSIGNMENT = new RegExp(`((?:\\b|-)[\\w.-]*${SECRET_WORD}[\\w.-]*["']?\\s*[=:]\\s*)${SECRET_VALUE}`, "gi");
 const SECRET_FLAG_SPLIT = new RegExp(`(\\s--?[\\w-]*${SECRET_WORD}[\\w-]*\\s+)${SECRET_VALUE}`, "gi");
 const AUTHORIZATION = /(\bauthorization["']?\s*[:=]\s*)("(?!\$)[^"\n]*"|'(?!\$)[^'\n]*'|(?:(?:bearer|basic|token|digest)\s+)?(?![-"'$])[^\s"',;&|)}]+)/gi;
+// A long run of letters and digits, not a 40-hex commit SHA. Paths also contain "/", so a run
+// with "/" counts only when one of its segments looks like base64: 16+ characters mixing
+// upper case, lower case, and digits.
+function tokenLike(run) {
+  if (!/[A-Za-z]/.test(run) || !/[0-9]/.test(run) || /^[a-f0-9]{40}$/.test(run)) return false;
+  if (!run.includes("/")) return true;
+  return run.split("/").some((part) => part.length >= 16 && /[A-Z]/.test(part) && /[a-z]/.test(part) && /[0-9]/.test(part));
+}
 const maskValue = (match, prefix, value) => `${prefix}${value[0] === '"' || value[0] === "'" ? `${value[0]}<redacted>${value[0]}` : "<redacted>"}`;
 function redact(text, max = 240) {
   // Only the first `max` characters are ever returned, so the masking regexes (which can
@@ -87,7 +95,7 @@ function redact(text, max = 240) {
     .replace(/\b(bearer|basic)\s+(?!\$|<redacted)[A-Za-z0-9._~+/=-]{8,}/gi, "$1 <redacted>")
     .replace(SECRET_ASSIGNMENT, maskValue)
     .replace(SECRET_FLAG_SPLIT, maskValue)
-    .replace(/[A-Za-z0-9_+/=-]{24,}/g, (run) => (/[A-Za-z]/.test(run) && /[0-9]/.test(run) && !/^[a-f0-9]{40}$/.test(run) && !run.includes("/") ? `<redacted ${run.length} chars>` : run))
+    .replace(/[A-Za-z0-9_+/=-]{24,}/g, (run) => (tokenLike(run) ? `<redacted ${run.length} chars>` : run))
     .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "?");
   if (out.length > max) out = `${out.slice(0, max)}...`;
   return out;
@@ -360,19 +368,36 @@ function packageSpecPinned(arg) {
   return isExactVersion(arg.slice(at + 1));
 }
 
-// The package a runner fetches: an explicit --package/-p (npm) or --from/--spec (uv, pipx)
-// value, else the first non-flag argument. npm pins as name@1.2.3; Python as name==1.2.3.
+// Every package a runner fetches must be exact. npm: each --package/-p value, else the first
+// positional argument (name@1.2.3). uv and pipx: each --from/--spec value, else the first
+// positional argument, plus each --with value (name==1.2.3). Values of other flags that take
+// one are skipped when looking for the positional argument.
+const NPM_SELECT = new Set(["--package", "-p"]);
+const NPM_VALUE_FLAGS = new Set([...NPM_SELECT, "--registry", "--cache", "-c", "--call", "--userconfig"]);
+const PY_SELECT = new Set(["--from", "--spec"]);
+const PY_EXTRA = new Set(["--with"]);
+const PY_VALUE_FLAGS = new Set([...PY_SELECT, ...PY_EXTRA, "--with-requirements", "--with-editable", "--python", "-p", "--index", "--index-url", "--default-index", "--extra-index-url", "--pip-args"]);
 function runnerPackagePinned(args, python) {
-  const select = python ? /^--(from|spec)$/ : /^(--package|-p)$/;
-  let spec = null;
+  const select = python ? PY_SELECT : NPM_SELECT;
+  const valueFlags = python ? PY_VALUE_FLAGS : NPM_VALUE_FLAGS;
+  const selected = [];
+  const extras = [];
+  let positional = null;
   for (let i = 0; i < args.length; i++) {
-    const inline = args[i].match(python ? /^--(?:from|spec)=(.+)$/ : /^--package=(.+)$/);
-    if (inline) { spec = inline[1]; break; }
-    if (select.test(args[i]) && args[i + 1]) { spec = args[i + 1]; break; }
+    const arg = args[i];
+    const eq = arg.indexOf("=");
+    const flag = arg.startsWith("-") && eq > 0 ? arg.slice(0, eq) : arg;
+    const inlineValue = arg.startsWith("-") && eq > 0 ? arg.slice(eq + 1) : null;
+    const value = inlineValue ?? (valueFlags.has(flag) ? args[i + 1] : null);
+    if (select.has(flag) && value) selected.push(value);
+    else if (python && PY_EXTRA.has(flag) && value) extras.push(value);
+    if (inlineValue === null && valueFlags.has(flag)) { i += 1; continue; }
+    if (!arg.startsWith("-") && arg !== "dlx" && arg !== "run" && positional === null) positional = arg;
   }
-  spec ??= args.find((a) => !a.startsWith("-") && a !== "dlx" && a !== "run") ?? null;
-  if (!spec) return false;
-  return python ? /^[A-Za-z0-9][\w.-]*(\[[^\]]*\])?==[\w.!+-]+$/.test(spec) : packageSpecPinned(spec);
+  const specs = [...(selected.length ? selected : positional ? [positional] : []), ...extras];
+  if (!specs.length) return false;
+  const pinned = (spec) => (python ? /^[A-Za-z0-9][\w.-]*(\[[^\]]*\])?==[\w.!+-]+$/.test(spec) : packageSpecPinned(spec));
+  return specs.every(pinned);
 }
 
 function scanPackageJson(file, text, scopesUsed) {
