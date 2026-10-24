@@ -184,17 +184,22 @@ const INIT = () => {
       return el;
     }
   };
+  // where a frame's viewport starts in its parent's viewport, and how much a CSS transform scales it there
+  const frameBox = (f) => {
+    const b = f.getBoundingClientRect(), cs = style(f);
+    const sx = f.offsetWidth ? b.width / f.offsetWidth : 1, sy = f.offsetHeight ? b.height / f.offsetHeight : 1;
+    return { x: b.left + (f.clientLeft + parseFloat(cs.paddingLeft)) * sx, y: b.top + (f.clientTop + parseFloat(cs.paddingTop)) * sy, sx, sy };
+  };
   // an element's box in the top page's viewport, and whether every frame around it shows some of it
   const topRect = (el) => {
     const r = el.getBoundingClientRect();
-    let x = r.left, y = r.top, framed = true;
-    for (let w = el.ownerDocument.defaultView, f = frameOf(el.ownerDocument); f; w = w.parent, f = frameOf(w.document)) {
-      if (x + r.width <= 0 || y + r.height <= 0 || x >= w.innerWidth || y >= w.innerHeight) framed = false;
-      const b = f.getBoundingClientRect(), cs = style(f);
-      x += b.left + f.clientLeft + parseFloat(cs.paddingLeft);
-      y += b.top + f.clientTop + parseFloat(cs.paddingTop);
+    let x = r.left, y = r.top, w = r.width, h = r.height, framed = true;
+    for (let win = el.ownerDocument.defaultView, f = frameOf(el.ownerDocument); f; win = win.parent, f = frameOf(win.document)) {
+      if (x + w <= 0 || y + h <= 0 || x >= win.innerWidth || y >= win.innerHeight) framed = false;
+      const fb = frameBox(f);
+      x = fb.x + x * fb.sx; y = fb.y + y * fb.sy; w *= fb.sx; h *= fb.sy;
     }
-    return { left: x, top: y, width: r.width, height: r.height, right: x + r.width, bottom: y + r.height, framed };
+    return { left: x, top: y, width: w, height: h, right: x + w, bottom: y + h, framed };
   };
   // the element painted at a point of the top page, looking inside open shadow roots and same-origin frames
   const deepPoint = (x, y) => {
@@ -206,9 +211,8 @@ const INIT = () => {
         let doc = null;
         try { doc = el.contentDocument; } catch { /* cross-origin */ }
         if (doc) {
-          const b = el.getBoundingClientRect(), cs = style(el);
-          x -= b.left + el.clientLeft + parseFloat(cs.paddingLeft);
-          y -= b.top + el.clientTop + parseFloat(cs.paddingTop);
+          const fb = frameBox(el);
+          x = (x - fb.x) / fb.sx; y = (y - fb.y) / fb.sy;
           const hit = doc.elementFromPoint(x, y);
           if (hit) { el = hit; continue; }
         }
@@ -395,8 +399,12 @@ const on = (check) => !opts.skip.has(check);
 // an axe target has one entry per frame level, each a selector or a list of selectors through shadow roots;
 // written the way sel() writes them, so __uq.find() resolves both
 const fmtTarget = (target) => target.map((t) => (Array.isArray(t) ? t.join(' >> ') : t)).join(' >>> ');
-// the same page apart from the part after #
-const samePage = (a, b) => a.split('#')[0] === b.split('#')[0];
+// the same page apart from an in-page anchor after #; a hash route (#/settings, #!/settings) names a different screen.
+// Plain anchors are ignored because scroll-spy scripts rewrite them while Tab scrolls the page
+const samePage = (a, b) => {
+  const page = (u) => { const [base, hash = ''] = u.split(/#(.*)/s); return /^[/!]/.test(hash) ? `${base}#${hash}` : base; };
+  return page(a) === page(b);
+};
 // numbered by position, so state URLs that share a long prefix never overwrite each other's screenshots
 const slug = (url) => `${String(opts.urls.indexOf(url) + 1).padStart(2, '0')}-${url.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'page'}`;
 
@@ -553,36 +561,42 @@ async function compositedContrast(page, url, incomplete) {
       el.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
       el.style.setProperty('text-shadow', 'none', 'important');
     }, selector);
-    await page.waitForTimeout(50);
-    // sample only where the text sits: its line boxes, not the whole element, moved into the top page's coordinates
-    const rects = await page.evaluate((s) => {
-      const { find, textRects, topRect } = window.__uq;
-      const el = find(s);
-      const t = topRect(el), b = el.getBoundingClientRect();
-      const own = textRects(el, true);
-      return (own.length ? own : textRects(el)).map(({ r }) => ({ x: r.left + t.left - b.left, y: r.top + t.top - b.top, width: r.width, height: r.height }));
-    }, selector);
-    const buf = await page.screenshot();
-    // a faded box can paint its own background behind the text, already faded in buf; a second shot with every
-    // opacity set to 1 shows what the text sits on inside the faded boxes
-    let flat = null;
-    if (info.opacity < 1) {
-      await page.evaluate((s) => {
-        const { find, up } = window.__uq;
-        window.__uqOpacity = [];
-        for (let x = find(s); x; x = up(x)) {
-          window.__uqOpacity.push([x, x.style.getPropertyValue('opacity'), x.style.getPropertyPriority('opacity')]);
-          x.style.setProperty('opacity', '1', 'important');
-        }
-      }, selector);
+    let rects = [], buf = null, flat = null;
+    try {
       await page.waitForTimeout(50);
-      flat = await page.screenshot();
-      await page.evaluate(() => {
-        for (const [x, value, priority] of window.__uqOpacity) value ? x.style.setProperty('opacity', value, priority) : x.style.removeProperty('opacity');
+      // sample only where the text sits: its line boxes, not the whole element, moved into the top page's coordinates
+      rects = await page.evaluate((s) => {
+        const { find, textRects, topRect } = window.__uq;
+        const el = find(s);
+        const t = topRect(el), b = el.getBoundingClientRect();
+        const sx = b.width ? t.width / b.width : 1, sy = b.height ? t.height / b.height : 1;
+        const own = textRects(el, true);
+        return (own.length ? own : textRects(el)).map(({ r }) => ({ x: t.left + (r.left - b.left) * sx, y: t.top + (r.top - b.top) * sy, width: r.width * sx, height: r.height * sy }));
+      }, selector);
+      buf = await page.screenshot();
+      // a faded box can paint its own background behind the text, already faded in buf; a second shot with every
+      // opacity set to 1 shows what the text sits on inside the faded boxes
+      if (info.opacity < 1) {
+        await page.evaluate((s) => {
+          const { find, up } = window.__uq;
+          window.__uqOpacity = [];
+          for (let x = find(s); x; x = up(x)) {
+            window.__uqOpacity.push([x, x.style.getPropertyValue('opacity'), x.style.getPropertyPriority('opacity')]);
+            x.style.setProperty('opacity', '1', 'important');
+          }
+        }, selector);
+        await page.waitForTimeout(50);
+        flat = await page.screenshot();
+      }
+    } finally {
+      // put the page back even when a capture fails, so the checks after this one measure it unchanged
+      await page.evaluate((s) => {
+        for (const [x, value, priority] of window.__uqOpacity || []) value ? x.style.setProperty('opacity', value, priority) : x.style.removeProperty('opacity');
         delete window.__uqOpacity;
-      });
+        const el = window.__uq.find(s);
+        if (el && 'uqColor' in el.dataset) { el.style.cssText = el.dataset.uqColor; delete el.dataset.uqColor; }
+      }, selector);
     }
-    await page.evaluate((s) => { const el = window.__uq.find(s); el.style.cssText = el.dataset.uqColor; delete el.dataset.uqColor; }, selector);
     if (!rects.length) continue;
     const r = await pixels({ op: 'contrast', a: buf.toString('base64'), b: flat?.toString('base64'), rects, color: info.color });
     if (!r) continue;
@@ -610,6 +624,16 @@ async function focusWalk(page, url) {
     }
     window.scrollTo(0, 0);
     document.activeElement?.blur?.();
+    // start Tab from the top of the page, or of an open modal dialog: blurring an autofocused control would start it
+    // there instead, and the controls before it would read as never reached
+    let modal = null;
+    for (const r of window.__uq.roots(document)) if (r === document || r.host) modal ||= r.querySelector('dialog:modal');
+    const mark = document.createElement('span');
+    mark.id = '__uq-start';
+    mark.tabIndex = -1;
+    mark.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden';
+    (modal || document.body).prepend(mark);
+    mark.focus({ preventScroll: true });
   });
   // focus that loads another page is a change of context (WCAG 3.2.1), and every later check would measure the wrong page
   const start = page.url();
@@ -757,30 +781,28 @@ async function focusWalk(page, url) {
   }
   // the checks after this one reopen a page that navigated, so its measuring style needs no clean-up
   if (ended === 'navigated') return { order, navigated: true };
-  await page.evaluate(() => { for (const r of window.__uq.roots()) for (const s of r.querySelectorAll('style.__uq-still')) s.remove(); });
+  await page.evaluate(() => { for (const r of window.__uq.roots()) for (const s of r.querySelectorAll('style.__uq-still, #__uq-start')) s.remove(); });
   if (ended === 'max-tabs') notes.push(`${url}: focus walk stopped at --max-tabs ${opts.maxTabs}; later controls were not checked`);
 
   // focusable elements the walk never reached: behind a trap, after a loop, or out of the Tab order by script
   const missed = ended === 'max-tabs' || !order.length ? [] : await page.evaluate(() => {
-    const { all, sel, up } = window.__uq;
+    const { all, sel, up, roots } = window.__uq;
     const seen = window.__uqFocus?.seen || new WeakSet();
-    // visible and not inert, in its own document and in every frame around it; boxes outside an open modal dialog are inert too
+    // an open modal dialog, in the page, a shadow root or a frame, makes the rest of its document inert
     const modals = new Map();
-    const modalOf = (doc) => { if (!modals.has(doc)) modals.set(doc, doc.querySelector('dialog:modal')); return modals.get(doc); };
+    for (const r of roots()) for (const d of r.querySelectorAll('dialog:modal')) if (!modals.has(d.ownerDocument)) modals.set(d.ownerDocument, d);
+    // visible and not inert, in its own document and in every frame around it
     const shown = (el) => {
       if (!(el.checkVisibility?.({ visibilityProperty: true }) ?? el.getClientRects().length > 0)) return false;
-      let doc = null;
+      const chain = [];
       for (let x = el; x; x = up(x)) {
         if (x.hasAttribute('inert')) return false;
-        // the first box in each document's own tree decides whether it sits outside that document's open modal dialog
-        if (x.ownerDocument !== doc && x.getRootNode() === x.ownerDocument) {
-          doc = x.ownerDocument;
-          const modal = modalOf(doc);
-          if (modal && !modal.contains(x)) return false;
-        }
         // the frame around a frame's document must show it too
         if (x.localName === 'iframe' || x.localName === 'frame') if (!(x.checkVisibility?.({ visibilityProperty: true }) ?? x.getClientRects().length > 0)) return false;
+        chain.push(x);
       }
+      // outside its document's open modal dialog, through shadow hosts as well
+      for (const [doc, modal] of modals) if (chain.some((x) => x.ownerDocument === doc) && !chain.includes(modal)) return false;
       return true;
     };
     const groups = new Map();
