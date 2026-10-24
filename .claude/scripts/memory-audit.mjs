@@ -185,7 +185,12 @@ function runDiffCheck(ref) {
       .replace(topPrefix, "");
     const tokens = new Map();
     const add = (raw) => {
-      const t = clean(raw);
+      let t = clean(raw);
+      // A "../" link is relative to the note, which sits in .claude/reference/.
+      if (t.startsWith("../")) {
+        t = path.posix.normalize(path.posix.join(".claude/reference", t));
+        if (t.startsWith("../")) return; // points outside the repository
+      }
       if (t && t !== "." && t !== "/") tokens.set(normalize(t), t);
     };
     for (const m of text.matchAll(/`([^`]+)`/g)) {
