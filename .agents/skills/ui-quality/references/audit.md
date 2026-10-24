@@ -67,20 +67,26 @@ Use these rule groups in [rules.md](rules.md):
 | `axe:*` | Use the row's WCAG number and `help` link. Find the matching rule; preserve an unmatched WCAG source rather than inventing a rule ID. Names/labels: OP1 through OP3, OP11 and OP12; images: SE4; contrast: SE1; targets: RC7. |
 | `contrast:*`, `dark:*` | SE1, SE5. Inspect actual text over its background; distinguish median and worst-5% values. |
 | `name:*` | OP3 (placeholder as the only label), OP1 and OP12 (a glyph as the only name). axe accepted these; decide whether the name tells a person what the control is or does. |
-| `focus:*`, `keyboard:*` | RC1 through RC6. Confirm focus marker, occlusion and actual keyboard access; a pointer cursor alone does not prove an action. |
+| `focus:*`, `keyboard:*` | RC1 through RC6; `focus:navigated` is OP13. Confirm focus marker, occlusion and actual keyboard access; a pointer cursor alone does not prove an action. |
 | `reflow:*` | RE1, RE5. Check which needed content is lost. Tables/maps/code may scroll inside their own container. |
 | `spacing:*`, `textscale:*` | RE2, RE3, RE5. Compare before/after. Width reduction and doubled fonts are probes, not proof of browser zoom behavior. |
 | `motion:*` | MO1, MO2. Verify whether motion is essential and whether long-running motion has a pause control. |
 | `shift:*` | ST1. Report measured load interval; it is not whole-visit CLS. |
-| `phone:*` | RC7. Under 44 CSS px is AAA/advice; check AA's 24 px size or spacing exceptions separately. |
+| `phone:*` | RC7; `phone:no-mobile-layout` is RE4. Under 44 px is AAA/advice; check AA's 24 px size or spacing exceptions separately. |
 
 For each candidate choose **confirmed**, **dismissed** (state the evidence that disproves it), or **unresolved** (state the missing check). Group repeated manifestations of the same defect, preserving all affected states and widths. Never average measurements across widths or turn a candidate count into a count of confirmed defects.
 
 Common traps when verifying:
 
-- Focus pixel differences can include animation or miss a marker drawn on a sibling/label of a hidden native input. Tab manually and inspect the actual control.
+- A selector with `>>` points inside a shadow root, and one with `>>>` inside an iframe. Inside a cross-origin iframe only axe ran: check focus markers, names and contrast there by hand. axe also tests each frame's own document, so a row such as `bypass` on `iframe >>> html` is about the frame; decide it for the page as a whole.
+- Focus pixel differences can miss a marker drawn on a sibling/label of a hidden native input. Tab manually and inspect the actual control.
+- Pixels that change on their own (a spinner, a video, an animated background) are left out of the focus comparison. When they cover more than a tenth of the compared area the row is `focus:unmeasured`, which is not a defect: Tab to the element and look. A marker drawn only over moving content is left out with it and can read as `focus:invisible`.
+- `keyboard:not-reached` lists visible focusable elements the Tab walk never reached. When the walk cycled back to its first stop, treat it as a focus trap until shown otherwise. Widgets that move `tabindex` as they are used (tabs, toolbars, grids) and controls that only become reachable after an interaction can also appear.
+- `focus:navigated` means another address loaded during the Tab walk; the probe reopened the page for the checks after it. A timer or load-time redirect looks the same: reload, wait without pressing Tab, and see whether the page still navigates.
+- `phone:no-mobile-layout` means a phone lays the page out at desktop width and shrinks it. The touch-target sizes on that page are scaled to what the phone shows; axe's target-size rows are not. A page built only for desktop does this on purpose; the row still describes what a phone user gets.
 - Five occlusion samples suggest coverage; they do not prove every pixel is hidden. Confirm before assigning a WCAG failure.
-- Low contrast in the worst 5% may come from a border/icon inside a sampled line box. Check the text itself; effects, transparency and dynamic backgrounds can need manual measurement.
+- Low contrast in the worst 5% may come from a border/icon inside a sampled line box. Check the text itself; filters, blend modes and dynamic backgrounds can need manual measurement.
+- Contrast over images multiplies in the opacity of the text and of every box around it, and says so in the row. A fade-in still running when the probe measured lowers the ratio; check the settled page.
 - An off-canvas drawer or intentional clipping may appear in reflow results. Establish whether visible, needed content is lost. Interior scrolling is different from page-wide scrolling.
 - Text stress checks detect clipping, not every overlap. Inspect screenshots for collisions. A consent banner or font swap on first load still affects new visitors.
 - A dark media-query check does not operate class/data-attribute theme switches. Test the shipped switch manually; unseen dark styles are a gap.
@@ -97,7 +103,7 @@ Read only the linked rule groups needed for the page. If tools or authorization 
 | Responsive and text | Inspect 320/375 CSS px, supported orientation and actual 200% browser zoom or text resize. Check text overlap under spacing/enlargement. Report which method and sizes you used. RE1 through RE6. |
 | Motion and stability | Check reduced motion, pause controls, hover/press movement and changes after the probe's settling interval. Do not claim a flashing-safety pass from two screenshots. MO1 through MO4, ST1 and ST2. |
 | Assistive technology | Use available Narrator, NVDA, VoiceOver or TalkBack. Verify names, order, states and announcements on the main task. DOM/ARIA inspection alone is code evidence, not a screen-reader pass. Record tool and task, or inability to test. |
-| Special content and design drift | Inspect relevant canvas, WebGL, media/captions and embedded frames separately. Compare implementation against saved design decisions. Record uncovered areas and any conflicting decision. |
+| Special content and design drift | Inspect relevant canvas, WebGL, media/captions and cross-origin frames separately. Compare implementation against saved design decisions. Record uncovered areas and any conflicting decision. |
 
 ## 5. Write the owner report
 

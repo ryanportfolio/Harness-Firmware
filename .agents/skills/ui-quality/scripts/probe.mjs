@@ -6,7 +6,9 @@
    under sticky UI, clickable elements Tab cannot reach, reflow at 320 and 640
    CSS px, text spacing, text-only enlargement, reduced motion, layout shift
    during load, dark mode contrast. What axe could not decide is listed, not
-   dropped.
+   dropped. axe runs inside every iframe; the probe's own checks of names,
+   focus, contrast and targets also reach open shadow roots and same-origin
+   iframes.
 
    Headed Chrome only (headless renders through the CPU and hides GPU-only
    bugs), offscreen and muted, through the repo's launchPlacedChrome() when it
@@ -111,12 +113,17 @@ async function launch() {
 
 /* ---------- code that runs inside the page ---------- */
 
-// installed before page scripts on every load: selector helper and layout-shift recorder
+// installed before page scripts on every load: selector helper and layout-shift recorder.
+// Elements in open shadow roots and same-origin iframes are reached from the top page;
+// their selectors read "host >> inner" (inside a shadow root) and "iframe >>> inner" (inside a frame).
 const INIT = () => {
-  // shortest path from the element upward that matches only this element
+  // the frame element holding a document, when the parent page may be read
+  const frameOf = (doc) => { try { return doc.defaultView?.frameElement || null; } catch { return null; } };
+  // shortest path from the element upward that matches only this element, within its own document or shadow root
   const sel = (el) => {
     if (!el || el.nodeType !== 1) return '';
-    const unique = (s) => { try { return document.querySelectorAll(s).length === 1; } catch { return false; } };
+    const root = el.getRootNode();
+    const unique = (s) => { try { return root.querySelectorAll(s).length === 1; } catch { return false; } };
     const parts = [];
     for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
       if (n.id && unique(`#${CSS.escape(n.id)}`)) { parts.unshift(`#${CSS.escape(n.id)}`); break; }
@@ -126,20 +133,80 @@ const INIT = () => {
       parts.unshift(part);
       if (n.localName === 'body' || unique(parts.join(' > '))) break;
     }
-    return parts.join(' > ');
+    const own = parts.join(' > ');
+    if (root.host) return `${sel(root.host)} >> ${own}`;
+    const frame = frameOf(el.ownerDocument);
+    return frame ? `${sel(frame)} >>> ${own}` : own;
+  };
+  // the element a selector from sel() or an axe target names; null when it is gone or inside a cross-origin frame
+  const find = (path) => {
+    let el = null;
+    for (const level of path.split(' >>> ')) {
+      let scope;
+      try { scope = el ? el.contentDocument : document; } catch { return null; }
+      for (const part of level.split(' >> ')) {
+        if (!scope) return null;
+        try { el = scope.querySelector(part); } catch { return null; }
+        if (!el) return null;
+        scope = el.shadowRoot;
+      }
+    }
+    return el;
+  };
+  // the next box up: parent element, shadow host, or the iframe holding this document
+  const up = (el) => el.parentElement || el.getRootNode().host || frameOf(el.ownerDocument);
+  const style = (el) => el.ownerDocument.defaultView.getComputedStyle(el);
+  // the page, every open shadow root and every same-origin frame document under it
+  const roots = (root = document) => {
+    const out = [root];
+    for (const el of root.querySelectorAll('*')) {
+      if (el.shadowRoot) out.push(...roots(el.shadowRoot));
+      if (el.localName === 'iframe' || el.localName === 'frame') {
+        let doc = null;
+        try { doc = el.contentDocument; } catch { /* cross-origin */ }
+        if (doc?.body) out.push(...roots(doc));
+      }
+    }
+    return out;
+  };
+  const all = (selector) => roots().flatMap((r) => [...(r.body || r).querySelectorAll(selector)]);
+  // the focused element itself: not the shadow host or iframe that document.activeElement reports
+  const deepActive = () => {
+    let el = document.activeElement;
+    for (;;) {
+      if (el?.shadowRoot?.activeElement) { el = el.shadowRoot.activeElement; continue; }
+      if (el?.localName === 'iframe' || el?.localName === 'frame') {
+        let doc = null;
+        try { doc = el.contentDocument; } catch { /* cross-origin */ }
+        if (doc?.activeElement && doc.activeElement !== doc.body) { el = doc.activeElement; continue; }
+      }
+      return el;
+    }
+  };
+  // an element's box in the top page's viewport, and whether every frame around it shows some of it
+  const topRect = (el) => {
+    const r = el.getBoundingClientRect();
+    let x = r.left, y = r.top, framed = true;
+    for (let w = el.ownerDocument.defaultView, f = frameOf(el.ownerDocument); f; w = w.parent, f = frameOf(w.document)) {
+      if (x + r.width <= 0 || y + r.height <= 0 || x >= w.innerWidth || y >= w.innerHeight) framed = false;
+      const b = f.getBoundingClientRect(), cs = style(f);
+      x += b.left + f.clientLeft + parseFloat(cs.paddingLeft);
+      y += b.top + f.clientTop + parseFloat(cs.paddingTop);
+    }
+    return { left: x, top: y, width: r.width, height: r.height, right: x + r.width, bottom: y + r.height, framed };
   };
   const ownText = (el) => [...el.childNodes].filter((c) => c.nodeType === 3).map((c) => c.textContent).join('').replace(/\s+/g, ' ').trim();
   // screen-reader-only text and text pushed out of an icon button are hidden on purpose
   const hiddenOnPurpose = (el) => {
-    const cs = getComputedStyle(el);
+    const cs = style(el);
     const b = el.getBoundingClientRect();
     return b.width <= 2 || b.height <= 2 || cs.clip !== 'auto' || /inset\(50%/.test(cs.clipPath) || Math.abs(parseFloat(cs.textIndent)) > 999;
   };
   // client rects of the visible text inside an element, its own text first
   const textRects = (el, own = false) => {
-    const range = document.createRange();
+    const range = el.ownerDocument.createRange();
     const rects = [];
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const walker = el.ownerDocument.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(), i = 0; n && i < 300; n = walker.nextNode(), i++) {
       if (!n.textContent.trim() || (own && n.parentElement !== el) || hiddenOnPurpose(n.parentElement)) continue;
       range.selectNodeContents(n);
@@ -166,7 +233,7 @@ const INIT = () => {
     }
     return out;
   };
-  window.__uq = { sel, ownText, textRects, clipped, shifts: [] };
+  window.__uq = { sel, find, up, style, roots, all, deepActive, topRect, ownText, textRects, clipped, shifts: [] };
   try {
     new PerformanceObserver((list) => {
       for (const e of list.getEntries()) {
@@ -178,7 +245,7 @@ const INIT = () => {
 };
 
 // pixel work happens on a blank page so the audited page's CSP and scripts cannot interfere
-const PIXELS = async ({ op, a, b, rect, rects, color, threshold }) => {
+const PIXELS = async ({ op, a, a2, b, b2, rect, rects, color, threshold }) => {
   const load = async (b64) => {
     const img = new Image();
     img.src = `data:image/png;base64,${b64}`;
@@ -196,13 +263,38 @@ const PIXELS = async ({ op, a, b, rect, rects, color, threshold }) => {
     return ctx.getImageData(x, y, w, h).data;
   };
   if (op === 'diff') {
-    const da = crop(await load(a)), db = crop(await load(b));
-    if (!da || !db) return { changed: 0, total: 0 };
-    let changed = 0;
-    for (let i = 0; i < da.length; i += 4) {
-      if (Math.abs(da[i] - db[i]) + Math.abs(da[i + 1] - db[i + 1]) + Math.abs(da[i + 2] - db[i + 2]) > threshold) changed++;
+    const ca = await load(a);
+    const da = crop(ca), db = crop(await load(b));
+    if (!da || !db) return { changed: 0, total: 0, moving: 0 };
+    const differ = (x, y, i) => Math.abs(x[i] - y[i]) + Math.abs(x[i + 1] - y[i + 1]) + Math.abs(x[i + 2] - y[i + 2]) > threshold;
+    const n = da.length / 4;
+    // optional a2 and b2: second shots of a's and b's states. Pixels that differ within either pair change on their
+    // own; they and the 2 px around them (where the motion may have been between the shots) are left out
+    const still = new Uint8Array(n).fill(1);
+    const pairs = [[da, a2], [db, b2]].filter(([, s]) => s);
+    if (pairs.length) {
+      // the crop's width, as crop() computed it
+      const w = Math.min(ca.canvas.width - Math.max(0, Math.floor(rect.x)), Math.ceil(rect.width));
+      const motion = new Uint8Array(n);
+      for (const [x, s] of pairs) {
+        const y = crop(await load(s));
+        if (y) for (let i = 0; i < n; i++) if (differ(x, y, i * 4)) motion[i] = 1;
+      }
+      for (let i = 0; i < n; i++) {
+        if (!motion[i]) continue;
+        const px = i % w, py = Math.floor(i / w);
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+          const qx = px + dx, qy = py + dy, q = qy * w + qx;
+          if (qx >= 0 && qx < w && q >= 0 && q < n) still[q] = 0;
+        }
+      }
     }
-    return { changed, total: da.length / 4 };
+    let changed = 0, moving = 0;
+    for (let i = 0; i < n; i++) {
+      if (!still[i]) moving++;
+      else if (differ(da, db, i * 4)) changed++;
+    }
+    return { changed, total: n, moving };
   }
   // op === 'contrast': text colour (with alpha) against every background pixel under the text's own line boxes
   const ctx = await load(a);
@@ -258,6 +350,11 @@ const add = (f) => {
   findings.push({ ...f, observations: [observation] });
 };
 const on = (check) => !opts.skip.has(check);
+// an axe target has one entry per frame level, each a selector or a list of selectors through shadow roots;
+// written the way sel() writes them, so __uq.find() resolves both
+const fmtTarget = (target) => target.map((t) => (Array.isArray(t) ? t.join(' >> ') : t)).join(' >>> ');
+// the same page apart from the part after #
+const samePage = (a, b) => a.split('#')[0] === b.split('#')[0];
 // numbered by position, so state URLs that share a long prefix never overwrite each other's screenshots
 const slug = (url) => `${String(opts.urls.indexOf(url) + 1).padStart(2, '0')}-${url.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'page'}`;
 
@@ -310,8 +407,26 @@ async function shot(page, name, full = true) {
   return file;
 }
 
-async function runAxe(page, url, viewport, tags) {
+// axe tests inside an iframe only when its own copy runs there; Playwright reaches cross-origin frames too,
+// and each copy must accept messages from other origins or axe skips cross-origin frames
+const axeReady = () => window.axe.configure({ allowedOrigins: ['<unsafe_all_origins>'] });
+async function injectAxe(page, url) {
   await page.evaluate(axeSource);
+  await page.evaluate(axeReady);
+  for (const frame of page.frames()) {
+    if (frame === page.mainFrame()) continue;
+    try {
+      await frame.evaluate(axeSource);
+      await frame.evaluate(axeReady);
+    } catch (err) {
+      const note = `${url}: axe could not run inside frame ${frame.url().slice(0, 80) || '(no address)'} (${err.message.split('\n')[0]}); its content was not checked`;
+      if (!notes.includes(note)) notes.push(note);
+    }
+  }
+}
+
+async function runAxe(page, url, viewport, tags) {
+  await injectAxe(page, url);
   const res = await page.evaluate((values) => window.axe.run(document, {
     runOnly: { type: 'tag', values },
     resultTypes: ['violations', 'incomplete'],
@@ -323,7 +438,7 @@ async function runAxe(page, url, viewport, tags) {
       add({
         check: `axe:${v.id}`, url, viewport, wcag, level,
         severity: level === 'A/AA' ? 'fail' : 'advisory',
-        selector: n.target.join(' '), measured: n.failureSummary?.split('\n').slice(1).join(' ').trim() || v.help,
+        selector: fmtTarget(n.target), measured: n.failureSummary?.split('\n').slice(1).join(' ').trim() || v.help,
         help: v.helpUrl,
       });
     }
@@ -334,7 +449,7 @@ async function runAxe(page, url, viewport, tags) {
   // reader reconciles that evidence rather than treating absence as a pass.
   for (const r of res.incomplete) {
     const key = `${url} ${viewport} ${r.id}`;
-    if (!axeReview.has(key)) axeReview.set(key, { url, id: r.id, help: r.help, viewports: [], nodes: r.nodes.slice(0, 5).map((n) => n.target.join(' ')), count: r.nodes.length });
+    if (!axeReview.has(key)) axeReview.set(key, { url, id: r.id, help: r.help, viewports: [], nodes: r.nodes.slice(0, 5).map((n) => fmtTarget(n.target)), count: r.nodes.length });
     axeReview.get(key).viewports.push(viewport);
   }
   return res.incomplete;
@@ -344,14 +459,15 @@ async function runAxe(page, url, viewport, tags) {
 async function nameGaps(page, url) {
   const gaps = await page.evaluate(() => {
     const out = [];
-    const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
-    for (const el of document.querySelectorAll('input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]):not([type=image]), textarea')) {
+    const { all, style } = window.__uq;
+    const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && style(el).visibility !== 'hidden'; };
+    for (const el of all('input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]):not([type=image]), textarea')) {
       const ph = (el.getAttribute('placeholder') || '').trim();
       if (!ph || !shown(el)) continue;
       const labelled = [...(el.labels || [])].some((l) => l.innerText.trim()) || (el.getAttribute('aria-label') || '').trim() || el.hasAttribute('aria-labelledby');
       if (!labelled) out.push({ kind: 'placeholder', selector: window.__uq.sel(el), name: ph });
     }
-    for (const el of document.querySelectorAll('button, a[href], [role=button], [role=link], input[type=submit], input[type=button]')) {
+    for (const el of all('button, a[href], [role=button], [role=link], input[type=submit], input[type=button]')) {
       if (el.hasAttribute('aria-labelledby') || !shown(el)) continue;
       const name = (el.getAttribute('aria-label') || (el.localName === 'input' ? el.value : el.innerText) || '').replace(/\s+/g, ' ').trim();
       // one non-digit character ("x", "×", "+", "»"), or two characters with no letter or digit; page numbers are left alone
@@ -371,39 +487,46 @@ async function compositedContrast(page, url, incomplete) {
   const cc = incomplete.find((r) => r.id === 'color-contrast');
   if (!cc) return;
   if (cc.nodes.length > 40) notes.push(`${url}: contrast over images checked the first 40 of ${cc.nodes.length} elements axe could not decide; the rest were not checked`);
+  let unreached = 0;
   for (const n of cc.nodes.slice(0, 40)) {
-    const selector = n.target.join(' ');
+    const selector = fmtTarget(n.target);
     const info = await page.evaluate((s) => {
-      const el = document.querySelector(s);
+      const { find, up, style } = window.__uq;
+      const el = find(s);
       if (!el) return null;
       el.scrollIntoView({ block: 'center', inline: 'center' });
-      const cs = getComputedStyle(el);
+      const cs = style(el);
       // any CSS colour (oklch, color(), rgb) to sRGB through a canvas
       const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
       ctx.fillStyle = cs.color;
       ctx.fillRect(0, 0, 1, 1);
       const m = ctx.getImageData(0, 0, 1, 1).data;
+      // opacity on the element or any box around it (across shadow roots and frames) fades the text as well
+      let opacity = 1;
+      for (let x = el; x; x = up(x)) opacity *= parseFloat(style(x).opacity);
       const size = parseFloat(cs.fontSize), weight = Number(cs.fontWeight) || 400;
-      return { color: { r: m[0], g: m[1], b: m[2], a: m[3] / 255 }, large: size >= 24 || (size >= 18.66 && weight >= 700) };
+      return { color: { r: m[0], g: m[1], b: m[2], a: (m[3] / 255) * opacity }, opacity, large: size >= 24 || (size >= 18.66 && weight >= 700) };
     }, selector);
-    if (!info) continue;
+    if (!info) { unreached++; continue; }
     // hide the text itself so the screenshot shows only what sits behind it
     await page.evaluate((s) => {
-      const el = document.querySelector(s);
+      const el = window.__uq.find(s);
       el.dataset.uqColor = el.style.cssText;
       el.style.setProperty('color', 'transparent', 'important');
       el.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
       el.style.setProperty('text-shadow', 'none', 'important');
     }, selector);
     await page.waitForTimeout(50);
-    // sample only where the text sits: its line boxes, not the whole element
+    // sample only where the text sits: its line boxes, not the whole element, moved into the top page's coordinates
     const rects = await page.evaluate((s) => {
-      const el = document.querySelector(s);
-      const own = window.__uq.textRects(el, true);
-      return (own.length ? own : window.__uq.textRects(el)).map(({ r }) => ({ x: r.left, y: r.top, width: r.width, height: r.height }));
+      const { find, textRects, topRect } = window.__uq;
+      const el = find(s);
+      const t = topRect(el), b = el.getBoundingClientRect();
+      const own = textRects(el, true);
+      return (own.length ? own : textRects(el)).map(({ r }) => ({ x: r.left + t.left - b.left, y: r.top + t.top - b.top, width: r.width, height: r.height }));
     }, selector);
     const buf = await page.screenshot();
-    await page.evaluate((s) => { const el = document.querySelector(s); el.style.cssText = el.dataset.uqColor; delete el.dataset.uqColor; }, selector);
+    await page.evaluate((s) => { const el = window.__uq.find(s); el.style.cssText = el.dataset.uqColor; delete el.dataset.uqColor; }, selector);
     if (!rects.length) continue;
     const r = await pixels({ op: 'contrast', a: buf.toString('base64'), rects, color: info.color });
     if (!r) continue;
@@ -412,116 +535,231 @@ async function compositedContrast(page, url, incomplete) {
     if (severity === 'pass') continue;
     add({
       check: 'contrast:composited', url, viewport: '1280', wcag: ['1.4.3'], level: 'A/AA', severity, selector,
-      measured: `median ${r.median.toFixed(2)}:1, worst 5% ${r.p05.toFixed(2)}:1 over ${r.pixels} px`,
+      measured: `median ${r.median.toFixed(2)}:1, worst 5% ${r.p05.toFixed(2)}:1 over ${r.pixels} px${info.opacity < 1 ? `, text faded to ${Math.round(info.opacity * 100)}% by opacity` : ''}`,
       threshold: `${need}:1 (${info.large ? 'large' : 'normal'} text)`,
     });
   }
+  if (unreached) notes.push(`${url}: contrast over images could not reach ${unreached} of the elements axe could not decide (inside a cross-origin frame, or gone from the page); they were not checked`);
 }
 
 async function focusWalk(page, url) {
-  await page.evaluate(() => { window.scrollTo(0, 0); document.activeElement?.blur?.(); });
+  // measure settled markers: a ring still fading, or a smooth scroll still moving the page, would read as pixels
+  // that change on their own. Animations keep running; the comparison below leaves their pixels out instead.
+  await page.evaluate(() => {
+    for (const r of window.__uq.roots()) {
+      const s = (r.ownerDocument || r).createElement('style');
+      s.className = '__uq-still';
+      s.textContent = '*,*::before,*::after{transition:none!important;scroll-behavior:auto!important}';
+      (r.head || r).appendChild(s);
+    }
+    window.scrollTo(0, 0);
+    document.activeElement?.blur?.();
+  });
+  // focus that loads another page is a change of context (WCAG 3.2.1), and every later check would measure the wrong page
+  const start = page.url();
+  let navigatedTo = null;
+  const onNav = (frame) => { if (frame === page.mainFrame() && !samePage(frame.url(), start)) navigatedTo = frame.url(); };
+  page.on('framenavigated', onNav);
   const order = [];
-  for (let i = 0; i < opts.maxTabs; i++) {
-    await page.keyboard.press('Tab');
-    await page.waitForTimeout(180);
-    const f = await page.evaluate(() => {
-      const el = document.activeElement;
-      if (!el || el === document.body || el === document.documentElement) return null;
-      if (el.localName === 'iframe') return { selector: window.__uq.sel(el), iframe: true };
-      // element identity, not selector text, decides whether focus came back around
-      const st = (window.__uqFocus ||= { seen: new WeakSet(), first: null });
-      if (st.seen.has(el)) return { selector: window.__uq.sel(el), repeat: el === st.first ? 'first' : 'other' };
-      st.seen.add(el);
-      st.first ??= el;
-      const r = el.getBoundingClientRect();
-      const vw = innerWidth, vh = innerHeight;
-      const inView = r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < vw && r.top < vh;
-      const hiddenInput = el.localName === 'input' && (r.width <= 1 || r.height <= 1) && (['checkbox', 'radio'].includes(el.type) || el.labels?.length > 0);
-      // sample the focused box: is something fixed or sticky painted on top of it?
-      const pts = [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]]
-        .map(([fx, fy]) => [r.left + r.width * fx, r.top + r.height * fy])
-        .filter(([x, y]) => x >= 0 && y >= 0 && x < vw && y < vh);
-      let covered = 0;
-      const coverers = new Set();
-      for (const [x, y] of pts) {
-        const top = document.elementFromPoint(x, y);
-        if (!top || el.contains(top) || top.contains(el)) continue;
-        let n = top, pinned = false;
-        for (; n && n !== document.body; n = n.parentElement) {
-          const p = getComputedStyle(n).position;
-          if (p === 'fixed' || p === 'sticky') { pinned = true; break; }
+  // why the walk stopped: 'end' (focus left the page), 'cycle', 'loop', 'navigated', or the --max-tabs limit
+  let ended = 'max-tabs';
+  let last = null;
+  let pressed = false;
+  try {
+    for (let i = 0; i < opts.maxTabs; i++) {
+      // after leaving a cross-origin frame, focus already sits on the next stop
+      if (!pressed) await page.keyboard.press('Tab');
+      pressed = false;
+      await page.waitForTimeout(180);
+      const f = navigatedTo ? null : await page.evaluate(() => {
+        const { deepActive, sel, topRect, up } = window.__uq;
+        const el = deepActive();
+        if (!el || el === document.body || el === document.documentElement) return null;
+        if (el.localName === 'iframe' || el.localName === 'frame') {
+          let doc = null;
+          try { doc = el.contentDocument; } catch { /* cross-origin */ }
+          // a same-origin frame with nothing focused inside it yet: the next Tab moves in
+          if (doc) return { frameIdle: true };
+          window.__uqFrame = el;
+          return { selector: sel(el), crossFrame: true };
         }
-        if (pinned) { covered++; coverers.add(window.__uq.sel(n)); }
+        // element identity, not selector text, decides whether focus came back around
+        const st = (window.__uqFocus ||= { seen: new WeakSet(), first: null });
+        if (st.seen.has(el)) return { selector: sel(el), repeat: el === st.first ? 'first' : 'other' };
+        st.seen.add(el);
+        st.first ??= el;
+        const r = topRect(el);
+        const vw = innerWidth, vh = innerHeight;
+        const inView = r.width > 0 && r.height > 0 && r.framed && r.right > 0 && r.bottom > 0 && r.left < vw && r.top < vh;
+        const hiddenInput = el.localName === 'input' && (r.width <= 1 || r.height <= 1) && (['checkbox', 'radio'].includes(el.type) || el.labels?.length > 0);        // sample the focused box: is something fixed or sticky painted on top of it?
+        const pts = [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]]
+          .map(([fx, fy]) => [r.left + r.width * fx, r.top + r.height * fy])
+          .filter(([x, y]) => x >= 0 && y >= 0 && x < vw && y < vh);
+        // a is b or inside it, across shadow roots and frames
+        const inside = (a, b) => { for (let x = a; x; x = up(x)) if (x === b) return true; return false; };
+        let covered = 0;
+        const coverers = new Set();
+        for (const [x, y] of pts) {
+          const top = document.elementFromPoint(x, y);
+          if (!top || inside(top, el) || inside(el, top)) continue;
+          let n = top, pinned = false;
+          for (; n && n !== document.body; n = n.parentElement) {
+            const p = getComputedStyle(n).position;
+            if (p === 'fixed' || p === 'sticky') { pinned = true; break; }
+          }
+          if (pinned) { covered++; coverers.add(sel(n)); }
+        }
+        return {
+          selector: sel(el), name: (el.getAttribute('aria-label') || el.innerText || el.value || el.title || '').trim().slice(0, 40),
+          rect: { x: r.left - 8, y: r.top - 8, width: r.width + 16, height: r.height + 16 }, perimeter: 2 * (r.width + r.height),
+          inView, hiddenInput, points: pts.length, covered, coverers: [...coverers], coveredBy: [...coverers].join(', '),
+        };
+      }).catch(async (err) => {
+        // a page that navigates destroys the context mid-call; wait for the navigation event before calling it an error
+        await page.waitForTimeout(500);
+        if (navigatedTo) return null;
+        throw err;
+      });
+      if (navigatedTo) {
+        add({ check: 'focus:navigated', url, viewport: '1280', wcag: ['3.2.1'], level: 'A/AA', severity: 'review', selector: last || 'document', measured: `pressing Tab${last ? ` from ${last}` : ''} loaded ${navigatedTo}; moving focus alone must not change the page (rule out a timer or load-time redirect)` });
+        notes.push(`${url}: focus walk stopped after ${order.length} stops because the page navigated; later checks reopened the page`);
+        ended = 'navigated';
+        break;
       }
-      return {
-        selector: window.__uq.sel(el), name: (el.getAttribute('aria-label') || el.innerText || el.value || el.title || '').trim().slice(0, 40),
-        rect: { x: r.left - 8, y: r.top - 8, width: r.width + 16, height: r.height + 16 }, perimeter: 2 * (r.width + r.height),
-        inView, hiddenInput, points: pts.length, covered, coverers: [...coverers], coveredBy: [...coverers].join(', '),
-      };
-    });
-    if (!f) { if (i > 0) break; continue; }
-    if (f.iframe) { notes.push(`${url}: focus entered iframe ${f.selector}; walk stopped there`); break; }
-    if (f.repeat === 'first') break;
-    if (f.repeat) { notes.push(`${url}: focus returned to ${f.selector} before reaching the end; possible trap or loop`); break; }
-    order.push(f.name ? `${f.selector} "${f.name}"` : f.selector);
-    if (!f.inView || f.hiddenInput) {
-      // a visually hidden native input behind a custom control usually draws its ring on the label; a person has to look
-      if (f.hiddenInput) add({ check: 'focus:hidden-input', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'review', selector: f.selector, measured: 'focus is on a 0 or 1 px native input; check that its label or custom control shows a focus marker' });
-      else add({ check: 'focus:offscreen', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'fail', selector: f.selector, measured: 'focused element is outside the viewport or has no size' });
-      continue;
+      if (!f) { if (i > 0) { ended = 'end'; break; } continue; }
+      if (f.frameIdle) continue;
+      if (f.crossFrame) {
+        // Tab on through the frame's own controls until focus is back outside it; those controls are not measured
+        let stops = 1;
+        for (; stops <= opts.maxTabs; stops++) {
+          await page.keyboard.press('Tab');
+          await page.waitForTimeout(60);
+          if (!(await page.evaluate(() => window.__uq.deepActive() === window.__uqFrame))) break;
+        }
+        order.push(`${f.selector} (cross-origin frame, ${stops} Tab stops inside, not measured)`);
+        notes.push(`${url}: focus markers inside cross-origin frame ${f.selector} were not measured`);
+        if (stops > opts.maxTabs) { notes.push(`${url}: focus stayed inside frame ${f.selector} for --max-tabs presses; walk stopped there`); ended = 'loop'; break; }
+        // the press that left the frame already moved focus to the next stop
+        pressed = true;
+        last = f.selector;
+        continue;
+      }
+      if (f.repeat === 'first') { ended = 'cycle'; break; }
+      if (f.repeat) { notes.push(`${url}: focus returned to ${f.selector} before reaching the end; possible trap or loop`); ended = 'loop'; break; }
+      last = f.selector;
+      order.push(f.name ? `${f.selector} "${f.name}"` : f.selector);
+      if (!f.inView || f.hiddenInput) {
+        // a visually hidden native input behind a custom control usually draws its ring on the label; a person has to look
+        if (f.hiddenInput) add({ check: 'focus:hidden-input', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'review', selector: f.selector, measured: 'focus is on a 0 or 1 px native input; check that its label or custom control shows a focus marker' });
+        else add({ check: 'focus:offscreen', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'fail', selector: f.selector, measured: 'focused element is outside the viewport or has no size' });
+        continue;
+      }
+      let hidden = [];
+      if (f.points && f.covered === f.points) {
+        add({ check: 'focus:obscured', url, viewport: '1280', wcag: ['2.4.11'], level: 'A/AA', severity: 'fail', selector: f.selector, measured: `entirely covered by ${f.coveredBy}` });
+        // still measure the ring itself: hide what covers it for the screenshots
+        hidden = f.coverers;
+      } else if (f.covered) {
+        add({ check: 'focus:partly-obscured', url, viewport: '1280', wcag: ['2.4.12'], level: 'AAA', severity: 'advisory', selector: f.selector, measured: `${f.covered}/${f.points} sample points covered by ${f.coveredBy}` });
+      }
+      const cover = (on) => page.evaluate(([sels, hide]) => {
+        for (const s of sels) { const n = window.__uq.find(s); if (n) n.style.visibility = hide ? 'hidden' : ''; }
+      }, [hidden, on]);
+      if (hidden.length) { await cover(true); await page.waitForTimeout(50); }
+      // focused vs unfocused pixels around the element; a second shot of each state shows what changes there on its own.
+      // Then put focus back for the next Tab
+      const on1 = await page.screenshot();
+      await page.waitForTimeout(180);
+      const on2 = await page.screenshot();
+      await page.evaluate(() => { window.__uqLast = window.__uq.deepActive(); window.__uqLast.blur(); });
+      await page.waitForTimeout(180);
+      const off = await page.screenshot();
+      await page.waitForTimeout(180);
+      const off2 = await page.screenshot();
+      await page.evaluate(() => window.__uqLast.focus({ preventScroll: true }));
+      if (hidden.length) await cover(false);
+      const b64 = (buf) => buf.toString('base64');
+      const d = await pixels({ op: 'diff', a: b64(on1), a2: b64(on2), b: b64(off), b2: b64(off2), rect: f.rect, threshold: 48 });
+      const how = `${hidden.length ? ` (measured with ${f.coveredBy} hidden)` : ''}${d.moving ? ` (${d.moving} px that change on their own left out)` : ''}`;
+      if (d.moving > d.total * 0.1) {
+        // an animation or video behind the element: the comparison cannot tell a marker from motion
+        add({ check: 'focus:unmeasured', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'review', selector: f.selector, measured: `${d.moving} of ${d.total} px around it change with no change of focus, so the marker could not be measured; Tab to it and look` });
+      } else if (d.changed === 0) {
+        add({ check: 'focus:invisible', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'fail', selector: f.selector, measured: `no pixel changes between focused and unfocused${how}` });
+      } else if (d.changed < f.perimeter) {
+        // a craft heuristic, not the 2.4.13 area-and-contrast test
+        add({ check: 'focus:weak', url, viewport: '1280', wcag: [], level: 'craft', severity: 'review', selector: f.selector, measured: `${d.changed} px changed, less than a 1 px ring around it (${Math.round(f.perimeter)} px)${how}` });
+      }
     }
-    let hidden = [];
-    if (f.points && f.covered === f.points) {
-      add({ check: 'focus:obscured', url, viewport: '1280', wcag: ['2.4.11'], level: 'A/AA', severity: 'fail', selector: f.selector, measured: `entirely covered by ${f.coveredBy}` });
-      // still measure the ring itself: hide what covers it for the two screenshots
-      hidden = f.coverers;
-    } else if (f.covered) {
-      add({ check: 'focus:partly-obscured', url, viewport: '1280', wcag: ['2.4.12'], level: 'AAA', severity: 'advisory', selector: f.selector, measured: `${f.covered}/${f.points} sample points covered by ${f.coveredBy}` });
+  } finally {
+    page.off('framenavigated', onNav);
+  }
+  // the checks after this one reopen a page that navigated, so its measuring style needs no clean-up
+  if (ended === 'navigated') return { order, navigated: true };
+  await page.evaluate(() => { for (const r of window.__uq.roots()) for (const s of r.querySelectorAll('style.__uq-still')) s.remove(); });
+  if (ended === 'max-tabs') notes.push(`${url}: focus walk stopped at --max-tabs ${opts.maxTabs}; later controls were not checked`);
+
+  // focusable elements the walk never reached: behind a trap, after a loop, or out of the Tab order by script
+  const missed = ended === 'max-tabs' || !order.length ? [] : await page.evaluate(() => {
+    const { all, sel } = window.__uq;
+    const seen = window.__uqFocus?.seen || new WeakSet();
+    // visible and not inert, in its own document and in every frame around it
+    const shown = (el) => {
+      for (let x = el; x;) {
+        if (x.closest('[inert]') || !(x.checkVisibility?.({ visibilityProperty: true }) ?? x.getClientRects().length > 0)) return false;
+        try { x = x.ownerDocument.defaultView.frameElement; } catch { x = null; }
+      }
+      return true;
+    };
+    const groups = new Map();
+    const out = [];
+    for (const el of all('a[href], button, input:not([type="hidden"]), select, textarea, summary, [contenteditable=""], [contenteditable="true"], [tabindex]')) {
+      if (seen.has(el) || el.matches(':disabled') || Number(el.getAttribute('tabindex')) < 0) continue;
+      if (el.localName === 'summary' && el.parentElement?.localName !== 'details') continue;
+      if (!shown(el)) continue;
+      // one radio per group is a Tab stop: report a group only when none of its radios was reached
+      if (el.type === 'radio' && el.name) {
+        const root = el.getRootNode();
+        if (!groups.has(root)) groups.set(root, new Set());
+        if (groups.get(root).has(el.name)) continue;
+        groups.get(root).add(el.name);
+        if ([...root.querySelectorAll('input[type=radio]')].some((r) => r.name === el.name && seen.has(r))) continue;
+      }
+      out.push(sel(el));
     }
-    const cover = (on) => page.evaluate(([sels, hide]) => {
-      for (const s of sels) { const n = document.querySelector(s); if (n) n.style.visibility = hide ? 'hidden' : ''; }
-    }, [hidden, on]);
-    if (hidden.length) { await cover(true); await page.waitForTimeout(50); }
-    // focused vs unfocused pixels around the element; then put focus back for the next Tab
-    const on1 = await page.screenshot();
-    await page.evaluate(() => { window.__uqLast = document.activeElement; document.activeElement.blur(); });
-    await page.waitForTimeout(180);
-    const off = await page.screenshot();
-    await page.evaluate(() => window.__uqLast.focus({ preventScroll: true }));
-    if (hidden.length) await cover(false);
-    const d = await pixels({ op: 'diff', a: on1.toString('base64'), b: off.toString('base64'), rect: f.rect, threshold: 48 });
-    const how = hidden.length ? ` (measured with ${f.coveredBy} hidden)` : '';
-    if (d.changed === 0) {
-      add({ check: 'focus:invisible', url, viewport: '1280', wcag: ['2.4.7'], level: 'A/AA', severity: 'fail', selector: f.selector, measured: `no pixel changes between focused and unfocused${how}` });
-    } else if (d.changed < f.perimeter) {
-      // a craft heuristic, not the 2.4.13 area-and-contrast test
-      add({ check: 'focus:weak', url, viewport: '1280', wcag: [], level: 'craft', severity: 'review', selector: f.selector, measured: `${d.changed} px changed, less than a 1 px ring around it (${Math.round(f.perimeter)} px)${how}` });
-    }
+    return out;
+  });
+  if (missed.length) {
+    const why = ended === 'cycle' ? 'focus cycled back to the first stop without reaching them, which is how a focus trap looks'
+      : ended === 'loop' ? 'focus came back to an earlier stop, so the walk ended before them'
+        : 'focus left the page before reaching them';
+    add({ check: 'keyboard:not-reached', url, viewport: '1280', wcag: ['2.1.1', '2.1.2'], level: 'A/AA', severity: 'review', selector: missed.slice(0, 12).join('; '), measured: `${missed.length} visible focusable elements Tab never reached; ${why}` });
   }
   // things styled as clickable that Tab can never reach: a div with a pointer cursor or an inline onclick
   const unreachable = await page.evaluate(() => {
+    const { all, style, sel } = window.__uq;
     // reachable by Tab itself, or a label; tabindex="-1" is not reachable
     const self = 'a[href], button, input, select, textarea, summary, label, [contenteditable], [tabindex]:not([tabindex^="-"])';
     // only real controls make their descendants part of one target; a focus wrapper such as <main tabindex="-1"> does not
     const wraps = 'a[href], button, summary, [contenteditable]';
     const out = [];
-    for (const el of document.body.querySelectorAll('*')) {
-      if (el.matches(self) || el.parentElement.closest(wraps)) continue;
-      const cs = getComputedStyle(el);
-      const pointer = cs.cursor === 'pointer' && getComputedStyle(el.parentElement).cursor !== 'pointer';
+    for (const el of all('*')) {
+      const parent = el.parentElement || el.getRootNode().host;
+      if (!parent || el.matches(self) || parent.closest(wraps)) continue;
+      const cs = style(el);
+      const pointer = cs.cursor === 'pointer' && style(parent).cursor !== 'pointer';
       if (!pointer && !el.hasAttribute('onclick')) continue;
       const b = el.getBoundingClientRect();
       if (!b.width || !b.height || cs.visibility === 'hidden') continue;
-      out.push(`${window.__uq.sel(el)}${el.getAttribute('role') ? ` role=${el.getAttribute('role')}` : ''}`);
+      out.push(`${sel(el)}${el.getAttribute('role') ? ` role=${el.getAttribute('role')}` : ''}`);
     }
     return out;
   });
   for (const s of unreachable.slice(0, 15)) {
     add({ check: 'keyboard:unreachable', url, viewport: '1280', wcag: ['2.1.1'], level: 'A/AA', severity: 'review', selector: s, measured: 'styled as clickable (pointer cursor or onclick) but not a link, button or form control and has no tabindex of 0 or more; Tab cannot reach it' });
   }
-  if (order.length >= opts.maxTabs) notes.push(`${url}: focus walk stopped at --max-tabs ${opts.maxTabs}; later controls were not checked`);
   if (!order.length) add({ check: 'focus:none', url, viewport: '1280', wcag: ['2.1.1'], level: 'A/AA', severity: 'review', selector: 'document', measured: 'Tab reached no element; confirm the page has controls' });
-  return order;
+  return { order, navigated: false };
 }
 
 async function reflow(page, url) {
@@ -699,10 +937,10 @@ async function dark(url) {
     if (!supports) { notes.push(`${url}: no dark-scheme styles found in readable stylesheets (cross-origin ones cannot be read) and no class or attribute toggle tried; dark mode not checked`); return; }
     await shot(page, `${slug(url)}-dark`);
     if (on('axe') && axeSource) {
-      await page.evaluate(axeSource);
+      await injectAxe(page, url);
       const res = await page.evaluate(() => window.axe.run(document, { runOnly: { type: 'rule', values: ['color-contrast'] }, resultTypes: ['violations'] }));
       for (const v of res.violations) for (const n of v.nodes.slice(0, 15)) {
-        add({ check: 'dark:color-contrast', url, viewport: '1280 dark', wcag: ['1.4.3'], level: 'A/AA', severity: 'fail', selector: n.target.join(' '), measured: n.failureSummary?.split('\n').slice(1).join(' ').trim() || v.help });
+        add({ check: 'dark:color-contrast', url, viewport: '1280 dark', wcag: ['1.4.3'], level: 'A/AA', severity: 'fail', selector: fmtTarget(n.target), measured: n.failureSummary?.split('\n').slice(1).join(' ').trim() || v.help });
       }
     }
   } finally {
@@ -714,20 +952,32 @@ async function phone(url) {
   const { context, page } = await open(url, { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
   try {
     await shot(page, `${slug(url)}-375`);
-    if (on('axe') && axeSource) await runAxe(page, url, '375 touch', ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']);
-    const small = await page.evaluate(() => {
+    // without a working viewport tag a phone lays the page out at desktop width and shrinks it to fit,
+    // so every CSS px size overstates what the user sees
+    const vp = await page.evaluate(() => ({ layout: document.documentElement.clientWidth, tag: document.querySelector('meta[name="viewport"]')?.content ?? null }));
+    const scale = vp.layout > 380 ? 375 / vp.layout : 1;
+    if (scale < 1) {
+      add({ check: 'phone:no-mobile-layout', url, viewport: '375 touch', wcag: [], level: 'craft', severity: 'review', selector: vp.tag === null ? 'no meta[name=viewport]' : `meta[name=viewport] "${vp.tag}"`, measured: `a 375 px phone lays the page out ${vp.layout} px wide and shrinks it to ${Math.round(scale * 100)}%, so text and targets show smaller than their CSS size; touch targets below are scaled to what the phone shows` });
+    }
+    if (on('axe') && axeSource) {
+      await runAxe(page, url, '375 touch', ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']);
+      if (scale < 1) notes.push(`${url}: axe target sizes at 375 px are in CSS px, larger than the phone shows at ${Math.round(scale * 100)}%`);
+    }
+    const small = await page.evaluate((k) => {
+      const { all, style, sel, ownText } = window.__uq;
       const out = [];
-      for (const el of document.querySelectorAll('a[href], button, input:not([type=hidden]), select, textarea, [role=button], [role=link], [role=tab], [role=checkbox], [role=switch], [tabindex]:not([tabindex="-1"])')) {
+      for (const el of all('a[href], button, input:not([type=hidden]), select, textarea, [role=button], [role=link], [role=tab], [role=checkbox], [role=switch], [tabindex]:not([tabindex="-1"])')) {
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height) continue;
         // inline links inside running text are exempt from target size
-        if (el.localName === 'a' && getComputedStyle(el).display === 'inline' && el.parentElement && window.__uq.ownText(el.parentElement)) continue;
-        if (r.width < 44 || r.height < 44) out.push(`${window.__uq.sel(el)} ${Math.round(r.width)}x${Math.round(r.height)}`);
+        if (el.localName === 'a' && style(el).display === 'inline' && el.parentElement && ownText(el.parentElement)) continue;
+        const w = r.width * k, h = r.height * k;
+        if (w < 44 || h < 44) out.push(`${sel(el)} ${Math.round(w)}x${Math.round(h)}`);
       }
       return out;
-    });
+    }, scale);
     if (small.length) {
-      add({ check: 'phone:touch-target', url, viewport: '375 touch', wcag: ['2.5.5'], level: 'AAA', severity: 'advisory', selector: small.slice(0, 12).join('; '), measured: `${small.length} controls under 44x44 CSS px`, threshold: '44 pt (Apple HIG), 48 dp (Material); WCAG AA minimum is 24 px, which axe target-size checks' });
+      add({ check: 'phone:touch-target', url, viewport: '375 touch', wcag: ['2.5.5'], level: 'AAA', severity: 'advisory', selector: small.slice(0, 12).join('; '), measured: `${small.length} controls under 44x44 ${scale < 1 ? 'px as the phone shows them' : 'CSS px'}`, threshold: '44 pt (Apple HIG), 48 dp (Material); WCAG AA minimum is 24 px, which axe target-size checks' });
     }
   } finally {
     await context.close();
@@ -753,8 +1003,9 @@ try {
       }
     };
     try {
-      const { context, page } = await open(url);
+      let { context, page } = await open(url);
       try {
+        const loaded = page.url();
         await step('shift', async () => { entry.cls = await layoutShift(page, url); });
         await shot(page, `${slug(url)}-1280`);
         let incomplete = [];
@@ -766,7 +1017,13 @@ try {
           if (!axeSource || entry.checks.axe !== 'ran') { entry.checks.contrast = 'not run: needs axe'; return; }
           await compositedContrast(page, url, incomplete);
         });
-        await step('focus', async () => { entry.focusOrder = await focusWalk(page, url); });
+        let navigated = false;
+        await step('focus', async () => { ({ order: entry.focusOrder, navigated } = await focusWalk(page, url)); });
+        if (navigated || !samePage(page.url(), loaded)) {
+          // reflow measures the page that was asked for, not the one focus led to
+          await context.close();
+          ({ context, page } = await open(url));
+        }
         await step('reflow', () => reflow(page, url));
       } finally {
         await context.close();
@@ -813,7 +1070,8 @@ const notMeasured = [
   'Dark themes switched by a class or data attribute, and styles in cross-origin stylesheets. Dark-mode axe incompletes are not collected.',
   'Layout shift after the settle time; the figure above covers load only.',
   'Under text spacing and enlarged text: text that overlaps its neighbours in a box that does not hide overflow; only cut-off text is measured, at 1280 px only.',
-  'Canvas, WebGL and media content; content inside cross-origin iframes.',
+  'Canvas, WebGL and media content. Inside cross-origin iframes only axe runs; focus markers, names, contrast over images and targets there are not measured. Reflow, text stress, motion and layout shift look at the top page only. Closed shadow roots are not reached.',
+  'Text whose colour comes from `filter`, `mix-blend-mode` or `background-clip: text`; contrast over images accounts for colour and opacity only.',
 ];
 const report = { generated: new Date().toISOString(), browser: browserInfo, urls: opts.urls, skipped: [...opts.skip], counts, pages, findings, axeUndecided: undecided, notes, notMeasured, screenshots: shots };
 writeFileSync(join(opts.out, 'report.json'), JSON.stringify(report, null, 2));
@@ -825,6 +1083,7 @@ const md = [
   `Browser: ${browserInfo}.`, '',
   'Rows below are candidates, not confirmed owner findings. Verify each fail; at full depth also resolve review rows and relevant advisories. IDs refer to this run only. Full evidence and per-viewport observations are in report.json.', '',
   'A check with no finding is not a pass for its WCAG criterion: axe accepts names and labels a person would reject. The `name:` checks catch two of them (a placeholder as the only label, one glyph such as "x" as a name); a name that is present but wrong is not caught.', '',
+  'Selectors reach into open shadow roots and iframes: `a >> b` is b inside the shadow root of a, `a >>> b` is b inside iframe a.', '',
   ...pages.map((p) => `- ${p.url}: ${p.ok ? `ran${p.cls !== null ? `, layout shift during load ${p.cls.toFixed(3)}` : ''}, ${p.focusOrder.length} focus stops` : `NOT AUDITED: ${p.error}`}${Object.keys(p.checks).length ? `. Checks: ${Object.entries(p.checks).map(([k, v]) => `${k} ${v}`).join('; ')}` : ''}`), '',
   '| ID | Severity | URL | Check | WCAG / source | Viewport | Where | Measured |', '|---|---|---|---|---|---|---|---|',
   ...findings.map((f) => `| ${f.id} | ${f.severity} | ${cell(f.url)} | ${f.check} | ${f.wcag.join(', ') || f.level} | ${f.viewport} | ${cell(f.selector)} | ${f.observations.map((o) => cell(`${o.viewport}: ${o.measured}${o.threshold ? ` (need ${o.threshold})` : ''}`)).join('<br>')} |`),
