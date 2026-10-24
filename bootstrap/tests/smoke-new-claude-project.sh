@@ -35,6 +35,14 @@ export GIT_AUTHOR_EMAIL='creator-smoke@example.invalid'
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 
+# Every git commit starts a detached 'git maintenance run --auto', which takes a
+# lock file inside .git/objects. If it is still running when the EXIT trap
+# deletes the scratch folder, rm fails with 'Directory not empty' after the test
+# has passed. Turn it off for every git call here, the creator's included.
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0='maintenance.auto'
+export GIT_CONFIG_VALUE_0='false'
+
 # The local template: HEAD's tracked files, committed fresh.
 source_dir="$scratch/template"
 mkdir -p "$source_dir"
