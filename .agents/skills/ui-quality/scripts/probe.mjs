@@ -666,7 +666,9 @@ async function focusWalk(page, url) {
           return { selector: sel(el), crossFrame: true };
         }
         // element identity, not selector text, decides whether focus came back around
-        const st = (window.__uqFocus ||= { seen: new WeakSet(), first: null });
+        // via: the shadow hosts and frames around each reached element; a host that delegates focus is reached through them
+        const st = (window.__uqFocus ||= { seen: new WeakSet(), via: new WeakSet(), first: null });
+        for (let x = up(el); x; x = up(x)) st.via.add(x);
         if (st.seen.has(el)) return { selector: sel(el), repeat: el === st.first ? 'first' : 'other' };
         st.seen.add(el);
         st.first ??= el;
@@ -789,7 +791,7 @@ async function focusWalk(page, url) {
   // focusable elements the walk never reached: behind a trap, after a loop, or out of the Tab order by script
   const missed = ended === 'max-tabs' || !order.length ? [] : await page.evaluate(() => {
     const { all, sel, up, roots } = window.__uq;
-    const seen = window.__uqFocus?.seen || new WeakSet();
+    const seen = window.__uqFocus?.seen || new WeakSet(), via = window.__uqFocus?.via || new WeakSet();
     // an open modal dialog, in the page, a shadow root or a frame, makes the rest of its document inert
     const modals = new Map();
     for (const r of roots()) for (const d of r.querySelectorAll('dialog:modal')) if (!modals.has(d.ownerDocument)) modals.set(d.ownerDocument, d);
@@ -810,7 +812,8 @@ async function focusWalk(page, url) {
     const groups = new Map();
     const out = [];
     for (const el of all('a[href], button, input:not([type="hidden"]), select, textarea, summary, [contenteditable=""], [contenteditable="true"], [tabindex]')) {
-      if (seen.has(el) || el.matches(':disabled') || Number(el.getAttribute('tabindex')) < 0) continue;
+      // a shadow host or frame Tab went into counts as reached: delegatesFocus moves its focus to a control inside
+      if (seen.has(el) || (via.has(el) && (el.shadowRoot || el.localName === 'iframe' || el.localName === 'frame')) || el.matches(':disabled') || Number(el.getAttribute('tabindex')) < 0) continue;
       if (el.localName === 'summary' && el.parentElement?.localName !== 'details') continue;
       if (!shown(el)) continue;
       // one radio per group is a Tab stop: report a group only when none of its radios was reached.
