@@ -13,6 +13,17 @@ condensed.
 
 ### Added
 
+- `conversion-ux` for Claude and Codex: audits an existing screen or guides a new
+  one so users can decide and act. Built around one test (every element asks the
+  user a question; make it an easier, honest one) and a walk through seven stages,
+  from arrival to exit, that checks the user's choices survive each hand-off, such
+  as a plan picked before sign-in. Rules for hierarchy, buttons, defaults, filters,
+  price display, paywalls, onboarding and states sit under the stage they serve;
+  build mode walks the same stages forward. Rules come from four uxpeak videos;
+  the presenters' A/B results are marked as unsupported claims, and the studies
+  they cite are checked against the original papers. An honesty guard rules out
+  confirmshaming, fake urgency, hard cancellation and mixed-unit price comparisons.
+
 - `security-loop` for Claude and Codex: whole-repository security audits built on
   Cloudflare's `security-audit` skill (MIT), with independently verified findings,
   a coverage ledger, and reruns that pick up the previous run's gaps. Checks on the
