@@ -14,7 +14,10 @@ $identityVariables = @(
     'GIT_AUTHOR_NAME',
     'GIT_AUTHOR_EMAIL',
     'GIT_COMMITTER_NAME',
-    'GIT_COMMITTER_EMAIL'
+    'GIT_COMMITTER_EMAIL',
+    'GIT_CONFIG_COUNT',
+    'GIT_CONFIG_KEY_0',
+    'GIT_CONFIG_VALUE_0'
 )
 $originalIdentity = @{}
 
@@ -36,6 +39,12 @@ try {
     [Environment]::SetEnvironmentVariable('GIT_AUTHOR_EMAIL', 'generator-smoke@example.invalid', 'Process')
     [Environment]::SetEnvironmentVariable('GIT_COMMITTER_NAME', 'Generator Smoke Test', 'Process')
     [Environment]::SetEnvironmentVariable('GIT_COMMITTER_EMAIL', 'generator-smoke@example.invalid', 'Process')
+    # Every git commit starts a detached 'git maintenance run --auto' that takes a lock
+    # file inside .git/objects; if it is still running when the finally block deletes
+    # the scratch folder, the delete fails after the test has passed. Turn it off here.
+    [Environment]::SetEnvironmentVariable('GIT_CONFIG_COUNT', '1', 'Process')
+    [Environment]::SetEnvironmentVariable('GIT_CONFIG_KEY_0', 'maintenance.auto', 'Process')
+    [Environment]::SetEnvironmentVariable('GIT_CONFIG_VALUE_0', 'false', 'Process')
 
     Import-Module -Force -Name $modulePath
     Assert-True (Test-NewProjectName -Name 'valid-project_1.0') 'Valid project name was rejected.'
