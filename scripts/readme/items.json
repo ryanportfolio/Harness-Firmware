@@ -145,6 +145,11 @@
       "group": "specialist"
     },
     {
+      "name": "conversion-ux",
+      "label": "Conversion UX",
+      "group": "specialist"
+    },
+    {
       "name": "codex-image-gen",
       "label": "Codex image gen",
       "group": "specialist"
