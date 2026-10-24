@@ -48,7 +48,7 @@ npm i --no-save axe-core@latest playwright-core@latest
 node .agents/skills/ui-quality/scripts/probe.mjs --url http://localhost:3000/settings --out <screenshot dir>
 ```
 
-Options: `--url` (repeat for several), `--out`, `--storage-state <file>` (a saved Playwright sign-in), `--wait-for <css>`, `--settle <ms>` (default 1500), `--max-tabs <n>` (default 80), `--skip <check,check>`, `--strict` (exit 1 on any fail). It writes `report.md`, `report.json` and screenshots, and takes about 30 to 45 seconds per URL. Exit 2 means the probe could not run: no Chrome, no packages, or bad arguments.
+Options: `--url` (repeat for several), `--out`, `--storage-state <file>` (a saved Playwright sign-in), `--wait-for <css>`, `--settle <ms>` (default 1500), `--max-tabs <n>` (default 80), `--skip <check,check>`, `--strict` (exit 1 on any fail). It writes `report.md`, `report.json` and screenshots, and takes about 30 to 45 seconds per URL. Exit 2 means the run is incomplete: no Chrome, no packages, bad arguments, or a URL that could not be audited (its error is in the report).
 
 Severity in the report: `fail` is a measured WCAG A/AA failure, `review` needs a person to decide, `advisory` is AAA, best practice or a platform guideline. The probe can be wrong; [audit.md](references/audit.md) lists its known false positives.
 

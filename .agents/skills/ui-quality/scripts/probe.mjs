@@ -19,9 +19,9 @@
        [--storage-state <playwright-state.json>] [--wait-for <css>] [--settle <ms>]
        [--max-tabs <n>] [--skip <check,check>] [--strict]
 
-   Writes <out>/report.json, <out>/report.md and screenshots. Exit 0 when the
-   run completed, 1 with --strict when any finding is a fail, 2 when the probe
-   itself could not run. */
+   Writes <out>/report.json, <out>/report.md and screenshots. Exit 0 when every
+   URL was audited, 1 with --strict when any finding is a fail, 2 when the probe
+   could not run or a URL could not be audited. */
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -113,25 +113,44 @@ const INIT = () => {
     return parts.join(' > ');
   };
   const ownText = (el) => [...el.childNodes].filter((c) => c.nodeType === 3).map((c) => c.textContent).join('').replace(/\s+/g, ' ').trim();
-  // text that does not fit its box and is cut off rather than wrapped or scrolled
+  // screen-reader-only text and text pushed out of an icon button are hidden on purpose
+  const hiddenOnPurpose = (el) => {
+    const cs = getComputedStyle(el);
+    const b = el.getBoundingClientRect();
+    return b.width <= 2 || b.height <= 2 || cs.clip !== 'auto' || /inset\(50%/.test(cs.clipPath) || Math.abs(parseFloat(cs.textIndent)) > 999;
+  };
+  // client rects of the visible text inside an element, its own text first
+  const textRects = (el, own = false) => {
+    const range = document.createRange();
+    const rects = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(), i = 0; n && i < 300; n = walker.nextNode(), i++) {
+      if (!n.textContent.trim() || (own && n.parentElement !== el) || hiddenOnPurpose(n.parentElement)) continue;
+      range.selectNodeContents(n);
+      for (const r of range.getClientRects()) if (r.width && r.height) rects.push({ r, text: n.textContent.trim() });
+    }
+    return rects;
+  };
+  // a box that hides its overflow while some of the text inside it lies outside the box
   const clipped = () => {
     const out = [];
+    const hides = (v) => v === 'hidden' || v === 'clip';
     for (const el of document.body.querySelectorAll('*')) {
-      const text = ownText(el);
-      if (!text) continue;
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden') continue;
-      // screen-reader-only text and text pushed out of an icon button are hidden on purpose
+      const overX = hides(cs.overflowX) && el.scrollWidth > el.clientWidth + 1;
+      const overY = (hides(cs.overflowY) || cs.webkitLineClamp !== 'none') && el.scrollHeight > el.clientHeight + 1;
+      if ((!overX && !overY) || hiddenOnPurpose(el)) continue;
       const b = el.getBoundingClientRect();
-      if (b.width <= 2 || b.height <= 2 || cs.clip !== 'auto' || /inset\(50%/.test(cs.clipPath) || Math.abs(parseFloat(cs.textIndent)) > 999) continue;
-      const hides = (v) => v === 'hidden' || v === 'clip';
-      const x = hides(cs.overflowX) && el.scrollWidth > el.clientWidth + 1;
-      const y = (hides(cs.overflowY) || cs.webkitLineClamp !== 'none') && el.scrollHeight > el.clientHeight + 1;
-      if (x || y) out.push({ selector: sel(el), text: text.slice(0, 60), axis: x && y ? 'both' : x ? 'x' : 'y' });
+      for (const { r, text } of textRects(el)) {
+        const x = overX && (r.right > b.right + 1 || r.left < b.left - 1);
+        const y = overY && (r.bottom > b.bottom + 1 || r.top < b.top - 1);
+        if (x || y) { out.push({ selector: sel(el), text: text.slice(0, 60), axis: x && y ? 'both' : x ? 'x' : 'y' }); break; }
+      }
     }
     return out;
   };
-  window.__uq = { sel, ownText, clipped, shifts: [] };
+  window.__uq = { sel, ownText, textRects, clipped, shifts: [] };
   try {
     new PerformanceObserver((list) => {
       for (const e of list.getEntries()) {
@@ -143,7 +162,7 @@ const INIT = () => {
 };
 
 // pixel work happens on a blank page so the audited page's CSP and scripts cannot interfere
-const PIXELS = async ({ op, a, b, rect, color, threshold }) => {
+const PIXELS = async ({ op, a, b, rect, rects, color, threshold }) => {
   const load = async (b64) => {
     const img = new Image();
     img.src = `data:image/png;base64,${b64}`;
@@ -154,9 +173,9 @@ const PIXELS = async ({ op, a, b, rect, color, threshold }) => {
     ctx.drawImage(img, 0, 0);
     return ctx;
   };
-  const crop = (ctx) => {
-    const x = Math.max(0, Math.floor(rect.x)), y = Math.max(0, Math.floor(rect.y));
-    const w = Math.min(ctx.canvas.width - x, Math.ceil(rect.width)), h = Math.min(ctx.canvas.height - y, Math.ceil(rect.height));
+  const crop = (ctx, box = rect) => {
+    const x = Math.max(0, Math.floor(box.x)), y = Math.max(0, Math.floor(box.y));
+    const w = Math.min(ctx.canvas.width - x, Math.ceil(box.width)), h = Math.min(ctx.canvas.height - y, Math.ceil(box.height));
     if (w <= 0 || h <= 0) return null;
     return ctx.getImageData(x, y, w, h).data;
   };
@@ -169,9 +188,11 @@ const PIXELS = async ({ op, a, b, rect, color, threshold }) => {
     }
     return { changed, total: da.length / 4 };
   }
-  // op === 'contrast': text colour (with alpha) against every background pixel under it
-  const d = crop(await load(a));
-  if (!d) return null;
+  // op === 'contrast': text colour (with alpha) against every background pixel under the text's own line boxes
+  const ctx = await load(a);
+  const parts = rects.map((box) => crop(ctx, box)).filter(Boolean);
+  if (!parts.length) return null;
+  const d = parts.length === 1 ? parts[0] : parts.reduce((acc, p) => { const out = new Uint8ClampedArray(acc.length + p.length); out.set(acc); out.set(p, acc.length); return out; });
   const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
   const lum = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
   const ratios = [];
@@ -300,10 +321,16 @@ async function compositedContrast(page, url, incomplete) {
       el.style.setProperty('text-shadow', 'none', 'important');
     }, selector);
     await page.waitForTimeout(50);
-    const rect = await page.evaluate((s) => document.querySelector(s).getBoundingClientRect().toJSON(), selector);
+    // sample only where the text sits: its line boxes, not the whole element
+    const rects = await page.evaluate((s) => {
+      const el = document.querySelector(s);
+      const own = window.__uq.textRects(el, true);
+      return (own.length ? own : window.__uq.textRects(el)).map(({ r }) => ({ x: r.left, y: r.top, width: r.width, height: r.height }));
+    }, selector);
     const buf = await page.screenshot();
     await page.evaluate((s) => { const el = document.querySelector(s); el.style.cssText = el.dataset.uqColor; delete el.dataset.uqColor; }, selector);
-    const r = await pixels({ op: 'contrast', a: buf.toString('base64'), rect, color: info.color });
+    if (!rects.length) continue;
+    const r = await pixels({ op: 'contrast', a: buf.toString('base64'), rects, color: info.color });
     if (!r) continue;
     const need = info.large ? 3 : 4.5;
     const severity = r.median < need ? 'fail' : r.p05 < need ? 'review' : 'pass';
@@ -639,4 +666,5 @@ const md = [
 writeFileSync(join(opts.out, 'report.md'), md.join('\n') + '\n');
 console.log(`[probe] fails ${counts.fail}, review ${counts.review}, advisory ${counts.advisory}`);
 console.log(`[probe] report: ${join(opts.out, 'report.md')}`);
-process.exitCode = opts.strict && counts.fail ? 1 : 0;
+// a URL that could not be audited makes the whole run incomplete, with or without --strict
+process.exitCode = pages.some((p) => !p.ok) ? 2 : opts.strict && counts.fail ? 1 : 0;
