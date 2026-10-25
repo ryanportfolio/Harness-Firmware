@@ -198,6 +198,13 @@ function googlebotAllowed(robots, url) {
 // Sitemap elements may carry a namespace prefix (<sm:urlset xmlns:sm="...">).
 const NS = '(?:[A-Za-z_][\\w.-]*:)?';
 const hasRoot = (xml, name) => new RegExp(`<${NS}${name}\\b`, 'i').test(xml);
+// A cut-off or malformed file must not pass as a complete sitemap: the root closes at the end,
+// and every entry opens, closes and carries one <loc>.
+const count = (xml, re) => xml.match(new RegExp(re, 'gi'))?.length ?? 0;
+const wellFormed = (xml, root, entry) =>
+  new RegExp(`</${NS}${root}\\s*>\\s*$`, 'i').test(xml)
+  && count(xml, `<${NS}${entry}\\b`) === count(xml, `</${NS}${entry}\\s*>`)
+  && count(xml, `<${NS}${entry}\\b`) === xmlLocs(xml, entry).length;
 
 function xmlLocs(xml, parent) {
   const re = new RegExp(`<${NS}${parent}\\b[\\s\\S]*?<${NS}loc>\\s*([\\s\\S]*?)\\s*</${NS}loc>`, 'gi');
@@ -418,22 +425,32 @@ async function check(opts) {
     if (sitemapFiles.includes(smUrl)) continue;
     sitemapFiles.push(smUrl);
     if (/\.gz$/i.test(smUrl)) { sitemapComplete = false; add('sitemap-gzip', 'info', smUrl, 'gzipped sitemap not read'); continue; }
-    const res = await timed(smUrl, originGuard);
-    if (res.status !== 200 || res.body === null) {
+    // Google reads a sitemap only where robots.txt lets Googlebot fetch it, redirects included.
+    const blocked = !googlebotAllowed(robots, smUrl);
+    const res = blocked ? null : await timed(smUrl, pageGuard);
+    if (blocked || res.status !== 200 || res.body === null) {
       sitemapComplete = false;
-      if (declared.includes(smUrl)) add('sitemap-unreachable', 'fail', smUrl, `sitemap declared in robots.txt answered ${res.status ?? res.error}`);
-      else if (fromIndex.has(smUrl)) add('sitemap-unreachable', 'fail', smUrl, `sitemap listed in a sitemap index answered ${res.status ?? res.error}`);
-      else if (!declared.length) add('sitemap-missing', 'warn', smUrl, `no sitemap declared in robots.txt and ${smUrl} answered ${res.status ?? res.error}`);
+      const why = blocked ? 'is disallowed by robots.txt for Googlebot'
+        : res.stopped ? `redirects to ${res.finalUrl}, not followed: ${res.stopped}`
+        : `answered ${res.status ?? res.error}`;
+      if (declared.includes(smUrl)) add('sitemap-unreachable', 'fail', smUrl, `sitemap declared in robots.txt ${why}`);
+      else if (fromIndex.has(smUrl)) add('sitemap-unreachable', 'fail', smUrl, `sitemap listed in a sitemap index ${why}`);
+      else if (!declared.length) add('sitemap-missing', 'warn', smUrl, `no sitemap declared in robots.txt and ${smUrl} ${why}`);
       continue;
     }
     if (res.chain.length > 1) add('sitemap-redirect', 'warn', smUrl, `sitemap redirects to ${res.finalUrl}`);
-    if (hasRoot(res.body, 'sitemapindex')) {
+    const [root, entry] = hasRoot(res.body, 'sitemapindex') ? ['sitemapindex', 'sitemap'] : hasRoot(res.body, 'urlset') ? ['urlset', 'url'] : [];
+    if (!root) { sitemapComplete = false; add('sitemap-invalid', 'fail', smUrl, 'sitemap is neither a <urlset> nor a <sitemapindex>'); continue; }
+    if (!wellFormed(res.body, root, entry)) {
+      sitemapComplete = false; // entries read so far are still crawled, but membership is not trusted
+      add('sitemap-invalid', 'fail', smUrl, `sitemap XML is cut off or malformed: needs a closing </${root}> and one <loc> in every closed <${entry}>`);
+    }
+    if (root === 'sitemapindex') {
       for (const loc of xmlLocs(res.body, 'sitemap').map(mapUrl)) {
         if (sameOrigin(loc)) { fromIndex.add(loc); sitemapQueue.push(loc); }
         else { sitemapComplete = false; add('sitemap-other-origin', 'info', loc, `sitemap index ${smUrl} lists a sitemap on another origin; not fetched`); }
       }
-    } else if (hasRoot(res.body, 'urlset')) xmlLocs(res.body, 'url').forEach((loc) => sitemapUrls.add(mapUrl(loc)));
-    else { sitemapComplete = false; add('sitemap-invalid', 'fail', smUrl, 'sitemap is neither a <urlset> nor a <sitemapindex>'); }
+    } else xmlLocs(res.body, 'url').forEach((loc) => sitemapUrls.add(mapUrl(loc)));
   }
   if (sitemapQueue.length) sitemapComplete = false;
   if (sitemapQueue.length) add('sitemap-files-skipped', 'info', origin, `${sitemapQueue.length} sitemap files beyond the first ${MAX_SITEMAP_FILES} not read`);
@@ -557,7 +574,12 @@ async function check(opts) {
       return;
     }
     if (rec.parseError) { add('parse-error', 'fail', url, `HTML could not be read: ${rec.parseError}`); return; }
-    if (!rec.html) return;
+    if (!rec.html) {
+      // Non-HTML files (PDFs, images) can still carry X-Robots-Tag: noindex.
+      if (rec.noindex && inSitemap(rec)) add('sitemap-url-noindex', 'fail', url, 'sitemap lists a file whose X-Robots-Tag is noindex');
+      else if (rec.noindex) add('noindex', 'info', url, 'file is noindex (X-Robots-Tag); confirm that is intended');
+      return;
+    }
     const h = rec.html;
     const isStart = url === startRec?.url || url === startRec?.finalUrl;
 
@@ -609,7 +631,9 @@ async function check(opts) {
       if (target === self) { hasSelf = true; continue; }
       if (!sameOrigin(target)) continue;
       const other = await getPage(target);
-      if (!other || other.blocked || !other.html) continue; // the target's own status is judged as its own page
+      if (!other) { hreflangUnchecked.add(target); continue; }
+      if (other.blocked) { add('hreflang-target-blocked', 'fail', url, `${target} (${alt.lang}) is disallowed by robots.txt, so Google cannot confirm the pair`, `${url}|${target}`); continue; }
+      if (!other.html) continue; // the target's own status is judged as its own page
       const returns = other.html.hreflang.some((b) => { try { return mapUrl(new URL(b.href, other.html.base).href) === self; } catch { return false; } });
       if (!returns) add('hreflang-no-return', 'fail', url, `${target} (${alt.lang}) does not link back with hreflang; Google ignores one-way pairs`, `${url}|${target}`);
     }
@@ -627,12 +651,14 @@ async function check(opts) {
   // Judging a page can fetch its canonical or hreflang targets; judge those too,
   // so every fetched page gets the same checks.
   const judged = new Set();
+  const hreflangUnchecked = new Set(); // hreflang targets past the fetch budget
   for (let pending = [...pages.values()]; pending.length; pending = [...pages.values()].filter((r) => !judged.has(r.url))) {
     for (const rec of pending) {
       judged.add(rec.url);
       await judge(rec);
     }
   }
+  if (hreflangUnchecked.size) limits.push(`${hreflangUnchecked.size} hreflang target(s) past the fetch budget were not checked for return links: ${[...hreflangUnchecked].slice(0, 5).join(', ')}`);
 
   // A complete run read the start page itself: HTTP 200, no redirect, HTML (not 206 or 204).
   const startOk = Boolean(startRec && !startRec.blocked && startRec.status === 200 && startRec.chain.length === 1 && startRec.html);
