@@ -24,8 +24,8 @@ Mode OFF when: user says so ("stop merging", "stop merge mode", "don't merge thi
 Per PR, mode authorizes:
 
 - commit finished work, push, open/reuse PR;
-- 3 self-review agents before Opus round 1 (Step 2);
-- 1× `$opus-fullreview` + ≤3 Opus reruns (`$opus-review`), each billed to user's Claude subscription; mode = user's OK for these reruns, which review skills otherwise ask for;
+- 3 self-review agents before Opus round 1 (Step 2), plus again before a rerun when Step 3's large-fix rule applies;
+- 1× `$opus-fullreview` + ≤3 Opus reruns (`$opus-review`), each billed to user's Claude subscription or Max account pool; mode = user's OK for these reruns, which review skills otherwise ask for;
 - sending scoped PR diff + needed context to Anthropic, as review skills already describe;
 - in-scope fixes for confirmed findings, committed + pushed to PR branch;
 - squash-merge once review loop + CI both pass at same head.
@@ -34,8 +34,9 @@ Review skills' "review ≠ fix authority" rule lifted for in-scope fixes only. S
 
 ## Requirements
 
-- `opus-fullreview` skill (repo `.agents/skills/` or `~/.codex/skills/`). Missing → stop, say so.
-- Rerun reviewer: `opus-review` (repo `.agents/skills/` or `~/.codex/skills/`). Not installed → `$claude-review` with `--model opus --effort high`, the repo's standing Opus review; say which ran. Neither → stop, say so.
+- `opus-fullreview` skill: repo `.agents/skills/` copy wins over `~/.codex/skills/`. Missing → stop, say so. It also needs `.claude/skills/impartial-review/SKILL.md` in the reviewed repo: check before Step 1, missing → stop, say so (round 1 can't run).
+- Rerun reviewer: `opus-review` (repo `.agents/skills/` first, then `~/.codex/skills/`). Not installed → `$claude-review` with `--model opus --effort high`, the repo's standing Opus review; say which ran. Fallback extra check: `ANTHROPIC_DEFAULT_OPUS_MODEL` absent from child env (presence only, never print value), since `claude-review`'s preflight checks only the Fable override; present → stop, say so. Fallback's resolved model stays unverified: report it that way. Neither reviewer → stop, say so.
+- Named review skills are invoked from this skill, not typed by user: open each one's `SKILL.md` and follow it in full; don't rely on the `$name` mention loading it.
 - Each review skill's own fail-closed preflight passes (subscription routing proven, no provider overrides, no billing prompt). Fails → stop before merge, report. Never substitute self-review + call gate passed.
 - Multi-agent tools for Step 2: inspect current tools; `multi_agent = true` alone ≠ proof. None exposed → say so, skip to Step 3; Opus loop still runs in full. Never replace the 3 reviewers with main-thread self-review and call Step 2 done.
 
@@ -66,18 +67,21 @@ Goal: find + fix what Opus would find, so Opus rounds come back clean more often
 
 - crawler/CLI: fetching + IO; parsing + rule logic; comparison/diff output + docs.
 - UI: behavior + states + edge cases; accessibility + layout; docs + tests.
-- docs/skill-only PR: each changed file or contract a reviewer can check against the rest of the repo.
+- docs/skill-only PR: changed files or contracts a reviewer can check against the rest of the repo, grouped into 3.
+
+More files or concerns than 3 → group them. Fewer distinct areas than 3 (tiny PR) → split whole diff by lens instead: false success; common real inputs + error paths; docs vs code.
 
 **Launch.** Spawn 3 agents concurrently with the exposed multi-agent tools, then wait for all 3 results. Fresh context each: no fork of this conversation. Each brief standalone, reviewer has no session context:
 
-- scope: repo path, base = `origin/<target>` SHA, head SHA, `git diff <base>..<head>` as the diff;
-- files to read + area to cover; other 2 areas named so it stays in its own;
+- scope: repo path, base = `git merge-base origin/<target> <head>` SHA (not `origin/<target>` tip: once target moves, two-dot diff from tip shows target's new commits as PR reverts), head SHA, `git diff <base>..<head>` as the diff;
+- files to read + area to cover; other 2 areas named, running in parallel, so it stays in its own;
+- browser work (if any): own headed Chrome per reviewer (repo's `launchPlacedChrome()` or `--window-position=-2400,-2400`), `--mute-audio`; never share one browser between reviewers;
 - bug classes in priority order: false success (reports pass/clean/done when it isn't), then wrong results on common real inputs, then crashes;
 - what earlier rounds already fixed (this session's fix commits + findings), so it hunts new bugs;
 - rules: reproduce every bug before reporting it; fixtures + scratch only under `.tmp/selfreview/<area>/`; never edit repo files, never commit, never push, no nested agents or reviews;
 - return: confirmed findings, each w/ severity (BLOCKING / SHOULD-FIX / NITPICK), file:line, reproduction (command + observed vs expected), suggested fix; then separate list of unconfirmed suspicions.
 
-**While running.** No edits, commits, or pushes: reviewers read working tree. Wait for all 3.
+**While running.** No edits, commits, or pushes: reviewers read working tree. Wait for all 3. Reviewer errors, returns nothing, or report cut off → relaunch that area once; fails again → area uncovered: say so in report, never count it as clean.
 
 **Triage.** Session verifies each reported finding itself (rerun reproduction or read code); reviewer's word ≠ proof. Then:
 
@@ -86,15 +90,15 @@ Goal: find + fix what Opus would find, so Opus rounds come back clean more often
 - Refuted → drop, list under "checked and fine".
 - Fix needs user decision (behavior change, tradeoff, scope growth) → ask.
 
-All self-review fixes = 1 commit naming findings. Run relevant local checks + regressions for each fix, push. Record head SHA → Step 3 round 1 reviews it. 0 confirmed → no commit, go to Step 3.
+All self-review fixes = 1 commit naming findings. Rerun relevant existing local checks for each fix, push. Record head SHA → next Opus round reviews it (round 1, or the rerun a mid-loop self-review precedes). 0 confirmed → no commit, go to that round.
 
 Self-review costs no Opus budget. Doesn't count as an Opus round.
 
 ## Step 3: Opus review loop
 
-Each round: `git fetch origin <target>`, scope = full PR branch diff vs `origin/<target>` at current head SHA. Each review skill's contract applies in full: preflight, own run dir, monitoring, verify every finding. Opus review skills have no automatic retry: failed, empty, or incomplete run → keep verified findings, stop loop, report whether inference started, ask.
+Each round: `git fetch origin <target>`, scope = full PR branch diff from `git merge-base origin/<target> <head>` to current head SHA; state that base in each review's scope. Each review skill's contract applies in full: preflight, own run dir, monitoring, verify every finding. Opus review skills have no automatic retry: failed, empty, or incomplete run → keep verified findings, stop loop, report whether inference started, ask.
 
-**Round 1: `$opus-fullreview`.** 1 run, full PR diff. Must spawn ≥1 sub-reviewer; 0 = Manager alone = single-context, not full review. Lacks verified scope identity (per its skill) → doesn't count: keep verified findings, stop, ask.
+**Round 1: `$opus-fullreview`.** 1 run, full PR diff. Counts only when its Step 4 evidence verifies the impartial-review skill read and ≥1 sub-reviewer completed (final report delivered), not just started. 0 completed = Manager alone = single-context, not full review. "completion/count unverified", plain custom-prompt attribution, `Background tasks still running after … terminating` in its log, or lacks verified scope identity (per its skill) → doesn't count: keep verified findings, stop, ask.
 
 **Reruns: `$opus-review`** (or `$claude-review` with Opus per Requirements). After any round that pushed a commit → 1 rerun alone, full PR diff at new head, not just fix delta. Same rule: failed/incomplete → stop loop, ask.
 
@@ -108,7 +112,7 @@ Each round: `git fetch origin <target>`, scope = full PR branch diff vs `origin/
 
 Fix at cause, run relevant local checks, round's fixes = 1 commit naming findings, push. Leave unrelated work alone.
 
-**Self-check before each rerun.** Opus round found something → after fixing, before push: session itself checks for related cases of same bug kind (same input class, same pattern in sibling code paths, same missing guard elsewhere). Reproduce each one found, fix in same commit. Goal: rerun doesn't find the sibling of a bug just fixed. Full 3-reviewer self-review (Step 2) only before round 1, plus again before a rerun when fixes are large (new module or code path, rewrite of a core function, or fix delta bigger than the original change in that area). Rerun budget unchanged.
+**Self-check before each rerun.** Opus round found something → after fixing, before push: session itself checks for related cases of same bug kind (same input class, same pattern in sibling code paths, same missing guard elsewhere). Reproduce each one found, fix in same commit. Goal: rerun doesn't find the sibling of a bug just fixed. Full 3-reviewer self-review (Step 2) only before round 1, plus again before a rerun when fixes are large (new module or code path, rewrite of a core function, or fix delta bigger than the original change in that area). Then: commit round's fixes locally, no push; run Step 2 on that head so reviewers see the fixes; its fixes = 2nd commit; push both together. Rerun budget unchanged.
 
 **Loop end.** Pass = latest round, on current head, confirmed 0 BLOCKING / SHOULD-FIX (waived excluded). Round 1 passes → no rerun.
 
@@ -130,7 +134,7 @@ Never reset unrelated work, force-push, or push direct to target. Interrupted �
 
 ## Report
 
-Per PR: self-review first: 3 areas covered (or "skipped: no agent tools"), confirmed findings (severity + 1 line each), fix commit SHA (or "0 confirmed"), suspicions left unconfirmed; any later full self-review same way, and each pre-rerun self-check's extra fixes in that round's line. Then each Opus round w/ source attribution as review skill presents it (cross-vendor: Claude reviewed Codex-written code), which skill ran reruns, surviving findings, fix commit SHAs, waivers + reasons, CI result. End w/ 1 line: `merged <PR URL> at <head SHA>`, or `blocked` + open items.
+Per PR: self-review first: areas that returned a usable report (N of 3; name any uncovered area, or "skipped: no agent tools"), confirmed findings (severity + 1 line each), fix commit SHA (or "0 confirmed"), suspicions left unconfirmed; any later full self-review same way, and each pre-rerun self-check's extra fixes in that round's line. Then each Opus round w/ source attribution as review skill presents it (cross-vendor: Claude reviewed Codex-written code), which skill ran reruns, surviving findings, fix commit SHAs, waivers + reasons, CI result. End w/ 1 line: `merged <PR URL> at <head SHA>`, or `blocked` + open items.
 
 After merges land (each time no PR in flight is still pending), close w/ **ELI5 recap**: super-short bullets, plain words a 5-year-old gets, no jargon/SHAs/skill names, not caveman. One bullet per merged PR = what it's for; one bullet = what session did overall. Example:
 

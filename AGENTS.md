@@ -39,10 +39,10 @@ This is the Codex boundary for repositories using the Harness Firmware starter. 
 
 ## Claude review on every PR
 
-Nothing merges until the PR has been through `$claude-review` with the Opus model and its surviving findings are fixed or explicitly waived by the user. This applies to every merge path, including `gh pr merge` and squash-merges done by agents.
+Nothing merges until the PR has been through an Opus review (`$claude-review` with the Opus model, or in merge mode the `merge` skill's Opus loop) and its surviving findings are fixed or explicitly waived by the user. This applies to every merge path, including `gh pr merge` and squash-merges done by agents.
 
 - **Run it automatically.** Opening or updating a PR is itself the trigger: run `$claude-review` with `--model opus` at high effort, in the same turn, without asking and without waiting for a merge request. Naming it as a next step and stopping does not count. This standing rule is the user's request and model choice for that review. In merge mode (the user typed `$merge`) the `merge` skill's loop replaces this trigger: three fresh-context self-reviewers first, then `$opus-fullreview` and up to 3 Opus reruns. Don't run a separate `$claude-review` on top of it.
-- Sequence: open PR → `$claude-review` (Opus) on the full PR diff against the default branch → verify each finding → fix confirmed BLOCKING and SHOULD-FIX findings → push → merge. Rerun only on the user's OK, because each run bills their Claude subscription.
+- Sequence: open PR → `$claude-review` (Opus) on the full PR diff against the default branch → verify each finding → fix confirmed BLOCKING and SHOULD-FIX findings → push → merge. Rerun only on the user's OK, because each run bills their Claude subscription. Typing `$merge` is that OK for every PR in the rest of the session.
 - If the Claude CLI is unavailable (not logged in, CLI broken, `opus` alias rejected), say so and stop before merging. Never substitute a self-review and call it done.
 - The review result goes in the handover: source attribution, findings that survived verification, and what was fixed.
 
