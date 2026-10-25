@@ -32,7 +32,7 @@ node .agents/skills/seo-loop/scripts/seo-check.mjs diff <before.json> <after.jso
 - willaicite: pinned tag; never `npx geo-audit` (unrelated npm pkg). Audits localhost as is. Always exits 0, prints a score even for 404 or dead page → validity = diff's job.
 - diff: same tool + same start URL. Exit 0 nothing new, 1 new fail/warn, warn → fail, or lower willaicite dimension score, 2 not comparable (other tool/URL, page not reached w/ HTTP 200, finding gone only because its URL went unfetched → rerun later check w/ `--include`, later run hit page budget earlier didn't, willaicite failure gone while its dimension has unverified checks). Info findings ignored.
 - seo-check crawls from where the start URL lands (http → https, apex → www); report `url` = that, `requestedUrl` = given. Never fetches other origins or robots-blocked redirect targets.
-- Local preview of a site whose canonical/sitemap/links name the production origin → `--public-origin <prod origin>`; without it run = incomplete (`needs-public-origin`).
+- Local preview of a site w/ a production origin → always `--public-origin <prod origin>`. Without it, run = incomplete (`needs-public-origin`) when robots.txt, sitemap, canonical name another origin, or start page links only to one other origin (≥3 paths). Absolute production links elsewhere are not detected. Site w/ no production origin → pass its local origin.
 - Paths: `.tmp/seo-loop/<yyyymmdd-hhmm>/round-<n>/`, round-0 = baseline. `<slug>` = URL path, `/` → `-`, start page = `home`.
 
 ## Baseline + triage

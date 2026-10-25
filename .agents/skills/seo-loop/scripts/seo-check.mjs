@@ -179,6 +179,18 @@ function patternMatches(pattern, path) {
   return new RegExp('^' + body + (anchored ? '$' : '')).test(path);
 }
 
+// Robots directives from meta robots or X-Robots-Tag, comma separated. "googlebot: noindex" carries a
+// user-agent prefix; max-snippet, max-image-preview, max-video-preview and unavailable_after carry values.
+const VALUE_DIRECTIVE = /^(max-snippet|max-image-preview|max-video-preview|unavailable_after)\s*:/;
+function hasNoindex(directives) {
+  return directives.split(',').some((raw) => {
+    let d = raw.trim().toLowerCase();
+    if (VALUE_DIRECTIVE.test(d)) return false;
+    if (d.includes(':')) d = d.slice(d.indexOf(':') + 1).trim();
+    return d === 'noindex' || d === 'none';
+  });
+}
+
 function googlebotAllowed(robots, url) {
   if (!robots) return true;
   const u = new URL(url);
@@ -522,7 +534,7 @@ async function check(opts) {
       stopped: res.stopped ?? null, html, parseError,
       xRobots: (res.headers['x-robots-tag'] ?? '').toLowerCase(),
     };
-    rec.noindex = /\bnoindex\b|\bnone\b/.test(`${rec.xRobots},${rec.html?.robots ?? ''}`);
+    rec.noindex = hasNoindex(`${rec.xRobots},${rec.html?.robots ?? ''}`);
     rec.indexable = rec.status === 200 && rec.chain.length === 1 && rec.html !== null && !rec.noindex;
     pages.set(url, rec);
     return rec;
@@ -573,6 +585,19 @@ async function check(opts) {
   if (truncated) limits.push(`Crawl stopped at --max-pages ${opts.maxPages}; orphan results cover only links on fetched pages.`);
 
   const startRec = pages.get(list ? list[0] : start.href);
+  if (local && !opts.publicOrigin && startRec?.html && !startRec.html.links.some(sameOrigin)) {
+    const paths = new Map();
+    for (const link of startRec.html.links) {
+      if (!httpUrl(link)) continue;
+      const u = new URL(link);
+      (paths.get(u.origin) ?? paths.set(u.origin, new Set()).get(u.origin)).add(u.pathname);
+    }
+    for (const [o, p] of paths) {
+      if (p.size < 3) continue;
+      needsPublicOrigin = true;
+      add('start-links-other-origin', 'info', startRec.url, `the start page links to no local page but to ${p.size} paths on ${o}; if that is the production origin, rerun with --public-origin ${o} (a site with no production origin: pass its local origin)`, `${startRec.url}|${o}`);
+    }
+  }
 
   // per-page findings
   const canonicalOf = (rec) => {
@@ -627,7 +652,7 @@ async function check(opts) {
       else if (inSitemap(rec)) {
         add('sitemap-url-noindex', 'fail', url, 'sitemap lists a noindex page');
         // Set by meta robots alone: clearing it takes the page's HTML read again, not just a fetch.
-        if (!/\bnoindex\b|\bnone\b/.test(rec.xRobots)) findings.at(-1).via = 'meta';
+        if (!hasNoindex(rec.xRobots)) findings.at(-1).via = 'meta';
       }
       else add('noindex', 'info', url, 'page is noindex; confirm that is intended');
     }
@@ -660,6 +685,7 @@ async function check(opts) {
         else if (target.blocked) add('canonical-target-bad', 'fail', url, `canonical ${canon} is disallowed by robots.txt`);
         else if (target.status !== 200 || target.chain.length > 1) add('canonical-target-bad', 'fail', url, `canonical ${canon} answers ${target.chain.map((c) => c.status).join(' -> ')}`);
         else if (target.noindex) add('canonical-target-bad', 'fail', url, `canonical ${canon} is noindex`);
+        if (findings.at(-1)?.rule === 'canonical-target-bad' && findings.at(-1).url === url) findings.at(-1).deps = [canon];
         if (inSitemap(rec)) add('sitemap-url-canonicalized', 'warn', url, `sitemap lists a page whose canonical is ${canon}`);
       }
     }
@@ -678,10 +704,10 @@ async function check(opts) {
       if (!sameOrigin(target)) continue;
       const other = await getPage(target);
       if (!other) { hreflangUnchecked.add(target); continue; }
-      if (other.blocked) { add('hreflang-target-blocked', 'fail', url, `${target} (${alt.lang}) is disallowed by robots.txt, so Google cannot confirm the pair`, `${url}|${target}`); continue; }
+      if (other.blocked) { add('hreflang-target-blocked', 'fail', url, `${target} (${alt.lang}) is disallowed by robots.txt, so Google cannot confirm the pair`, `${url}|${target}`); findings.at(-1).deps = [target]; continue; }
       if (!other.html) continue; // the target's own status is judged as its own page
       const returns = other.html.hreflang.some((b) => { try { return mapUrl(new URL(b.href, other.html.base).href) === self; } catch { return false; } });
-      if (!returns) add('hreflang-no-return', 'fail', url, `${target} (${alt.lang}) does not link back with hreflang; Google ignores one-way pairs`, `${url}|${target}`);
+      if (!returns) { add('hreflang-no-return', 'fail', url, `${target} (${alt.lang}) does not link back with hreflang; Google ignores one-way pairs`, `${url}|${target}`); findings.at(-1).deps = [target]; }
     }
     if (h.hreflang.length && !hasSelf) add('hreflang-no-self', 'warn', url, 'hreflang set does not include this page itself');
 
@@ -769,6 +795,7 @@ async function check(opts) {
       inSitemap: inSitemap(r),
       title: r.html?.titles[0] ?? null,
       canonical: canonicalOf(r),
+      alternates: (r.html?.hreflang ?? []).flatMap((a) => { try { return [mapUrl(new URL(a.href, r.html.base).href)]; } catch { return []; } }),
       jsonldTypes: r.jsonldTypes ?? [],
     })),
     summary,
@@ -810,6 +837,7 @@ function normalize(report, label) {
     }
     return {
       kind: 'seo-check', valid: report.complete, url: report.url, truncated: Boolean(report.truncated), covered, coveredHtml,
+      refs: new Map((report.pages ?? []).map((p) => [p.url, new Set([p.canonical, ...(p.alternates ?? [])].filter(Boolean))])),
       sitemapComplete: report.sitemap?.complete === true, sitemapList: new Set(report.sitemap?.list ?? []),
       findings: report.findings.filter((f) => f.severity !== 'info'), scores: {},
     };
@@ -860,10 +888,12 @@ function diff(beforePath, afterPath) {
   // Findings about one sitemap entry are settled once a complete later sitemap no longer lists it.
   const entryRule = /^(sitemap-url-|sitemap-bad-url$|sitemap-foreign-url$)/;
   const coverage = (f) => (statusRule.test(f.rule) && f.via !== 'meta' ? b.covered : b.coveredHtml);
+  // A cross-page finding's target needs its HTML read again, unless the source page no longer points at it.
+  const depChecked = (f, u) => b.coveredHtml.has(u) || !b.refs.get(f.url)?.has(u);
   const settled = (f) => {
     if (membershipRule.test(f.rule) && !b.sitemapComplete) return false;
     if (entryRule.test(f.rule) && !b.sitemapList.has(f.url)) return true;
-    return (f.urls ?? [f.url]).every((u) => coverage(f).has(u));
+    return (f.urls ?? [f.url]).every((u) => coverage(f).has(u)) && (f.deps ?? []).every((u) => depChecked(f, u));
   };
   if (b.kind === 'geo-audit') {
     // willaicite gives its checks no ids, so a failure that vanished while its dimension
@@ -879,7 +909,7 @@ function diff(beforePath, afterPath) {
   if (unchecked.length) {
     process.stderr.write(`${unchecked.length} finding(s) disappeared without the later run rechecking their URL (no longer linked or listed, robots-blocked, past the page budget, or no longer HTML). Not counted as fixed; check those URLs, and rerun the later check with --include <file listing them> where they still exist:\n`);
     for (const f of unchecked) {
-      const missing = (f.urls ?? [f.url]).filter((u) => !coverage(f).has(u));
+      const missing = [...(f.urls ?? [f.url]).filter((u) => !coverage(f).has(u)), ...(f.deps ?? []).filter((u) => !depChecked(f, u))];
       const why = missing.length ? missing.join(', ') : `${f.url} (the later run did not read every sitemap file)`;
       process.stderr.write(`  ${f.rule}  ${why}\n`);
     }

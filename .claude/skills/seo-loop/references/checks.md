@@ -13,7 +13,7 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 | `robots-server-error`, `robots-unreachable` | fail | robots.txt 5xx, 429 or no answer → Google stops crawling site first 12 h | host/server config, static file | [robots.txt spec](https://developers.google.com/crawling/docs/robots-txt/robots-txt-spec) |
 | `robots-blocks-root` | fail | Googlebot disallowed from `/` (often staging robots.txt shipped) | `robots.txt` or framework robots route | same |
 | `start-unreadable`, `start-noindex` | fail | start URL: no HTML, blocked, or noindex | env-dependent noindex, auth middleware | [block indexing](https://developers.google.com/search/docs/crawling-indexing/block-indexing) |
-| `needs-public-origin` | fail | local run, robots.txt sitemap line, sitemap or canonical names production origin → run incomplete | rerun w/ `--public-origin <prod origin>` (measurement setup, not the site) | |
+| `needs-public-origin` | fail | local run, robots.txt sitemap line, sitemap or canonical names production origin, or start page links only to one other origin (`start-links-other-origin`) → run incomplete | rerun w/ `--public-origin <prod origin>` (measurement setup, not the site) | |
 | `parse-error` | fail | page HTML couldn't be read by the checker | check the page by hand; report the checker bug | |
 | `http-error`, `http-no-content`, `fetch-error` | fail | linked/sitemap URL → 4xx/5xx, 204/205 (nothing to index), or no answer | the link, route, or redirect map | [HTTP status codes](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes) |
 | `sitemap-unreachable`, `sitemap-invalid`, `sitemap-bad-url` | fail | declared sitemap unreadable (error, robots-blocked, blocked redirect), cut off or malformed, or `<loc>` not absolute URL | sitemap generator config | [build a sitemap](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap) |
@@ -33,7 +33,7 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 | `description-missing` | warn | Google writes own snippet | page metadata | snippets |
 | `viewport-missing` | warn | Google indexes mobile rendering | layout head | [mobile-first indexing](https://developers.google.com/search/docs/crawling-indexing/mobile/mobile-sites-mobile-first-indexing) |
 | `jsonld-no-type` | warn | JSON-LD naming nothing | structured-data component | sd policies |
-| `noindex`, `canonical-missing`, `canonical-other-origin`, `linked-url-blocked`, `linked-url-redirects`, `title-long`, `h1-missing`, `img-alt-missing`, `robots-missing`, `sitemap-not-declared`, `sitemap-other-origin`, `sitemap-gzip`, `sitemap-files-skipped`, `canonical-not-checked`, `start-redirects`, `listed-url-other-origin` | info | look + decide; often intended | | |
+| `noindex`, `canonical-missing`, `canonical-other-origin`, `linked-url-blocked`, `linked-url-redirects`, `title-long`, `h1-missing`, `img-alt-missing`, `robots-missing`, `sitemap-not-declared`, `sitemap-other-origin`, `sitemap-gzip`, `sitemap-files-skipped`, `canonical-not-checked`, `start-redirects`, `listed-url-other-origin`, `start-links-other-origin` | info | look + decide; often intended | | |
 
 `title-long` = 70-char display heuristic, not a Google limit. `h1-missing`, `img-alt-missing` help people + image search; Google requires neither. A11y → `ui-quality`.
 
