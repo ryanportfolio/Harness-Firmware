@@ -93,9 +93,11 @@ async function fetchOnce(url) {
   }
 }
 
-/** Follow redirects by hand so the chain is visible. `guard(next)` returns a
-    reason to stop before fetching a hop (robots.txt, another origin), or null. */
-async function fetchChain(url, guard = () => null) {
+/** Follow redirects by hand so the chain is visible. `rewrite(next)` maps a hop
+    before it is checked (production origin -> preview). `guard(next)` returns a
+    reason to stop before fetching a hop (robots.txt, another origin), or null;
+    the stopped hop stays in the chain with status null. */
+async function fetchChain(url, guard = () => null, rewrite = (u) => u) {
   const chain = [];
   let current = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -104,10 +106,10 @@ async function fetchChain(url, guard = () => null) {
     const loc = res.headers.location;
     if (res.status >= 300 && res.status < 400 && loc) {
       let next;
-      try { next = new URL(loc, current).href; } catch { return { ...res, chain, finalUrl: current, error: `bad Location header: ${loc}` }; }
+      try { next = rewrite(new URL(loc, current).href); } catch { return { ...res, chain, finalUrl: current, error: `bad Location header: ${loc}` }; }
       if (chain.some((c) => c.url === next)) return { ...res, chain, finalUrl: next, error: 'redirect loop' };
       const stop = await guard(next);
-      if (stop) return { ...res, body: null, chain, finalUrl: next, error: null, stopped: stop };
+      if (stop) return { ...res, body: null, chain: [...chain, { url: next, status: null }], finalUrl: next, error: null, stopped: stop };
       current = next;
       continue;
     }
@@ -155,7 +157,11 @@ function rulesFor(robots, agent) {
     as UTF-8, existing escapes upper-cased. `Disallow: /café` then matches `/caf%C3%A9`. */
 const encodeForMatch = (s) => s
   .replace(/[^\x21-\x7e]/gu, (c) => encodeURIComponent(c))
-  .replace(/%[0-9a-f]{2}/gi, (e) => e.toUpperCase());
+  .replace(/%[0-9a-f]{2}/gi, (e) => {
+    // An escaped unreserved character is the character itself (/priv%61te = /private).
+    const c = String.fromCharCode(parseInt(e.slice(1), 16));
+    return /[A-Za-z0-9\-._~]/.test(c) ? c : e.toUpperCase();
+  });
 
 function patternMatches(pattern, path) {
   const anchored = pattern.endsWith('$');
@@ -247,6 +253,7 @@ function parseHtml(html, pageUrl) {
   }
 
   return {
+    base, // document base URL: <base href>, else the page URL; relative metadata URLs resolve against it
     titles,
     descriptions: metaContent('description'),
     robots: [...metaContent('robots'), ...metaContent('googlebot')].join(',').toLowerCase(),
@@ -317,7 +324,13 @@ async function check(opts) {
   const startBlocked = !googlebotAllowed(await robotsFor(requested.origin), requested.href);
   // Crawl from where the start URL lands (http -> https, apex -> www, /old -> /new):
   // its origin decides which links are internal, and it is the page judged as the start page.
-  const first = startBlocked ? null : await fetchChain(requested.href, startGuard);
+  // A preview that redirects to the production origin stays on the preview.
+  const toPreview = (u) => {
+    if (!opts.publicOrigin || opts.publicOrigin === requested.origin) return u;
+    const x = new URL(u);
+    return x.origin === opts.publicOrigin ? requested.origin + x.pathname + x.search + x.hash : u;
+  };
+  const first = startBlocked ? null : await fetchChain(requested.href, startGuard, toPreview);
   const start = new URL(first && first.status !== null && first.chain.length > 1 ? first.finalUrl : requested.href);
   const origin = start.origin;
   const publicOrigin = opts.publicOrigin && opts.publicOrigin !== origin ? opts.publicOrigin : null;
@@ -352,7 +365,7 @@ async function check(opts) {
   const timed = async (url, guard) => {
     if (fetches > 0 && delay > 0) await sleep(delay);
     fetches++;
-    return fetchChain(url, guard);
+    return fetchChain(url, guard, mapUrl);
   };
   const originGuard = (next) => (sameOrigin(next) ? null : 'redirect leaves the audited origin; not followed');
   let robots = null;
@@ -488,7 +501,7 @@ async function check(opts) {
   const canonicalOf = (rec) => {
     const c = rec.html?.canonicals ?? [];
     if (c.length !== 1) return null;
-    try { return mapUrl(new URL(c[0], rec.finalUrl).href); } catch { return null; }
+    try { return mapUrl(new URL(c[0], rec.html.base).href); } catch { return null; }
   };
   const inSitemap = (rec) => sitemapUrls.has(rec.url) || sitemapUrls.has(rec.finalUrl);
   const linkedInfo = (url) => { const f = linkedFrom.get(url); return f ? ` (linked from ${[...f].slice(0, 3).join(', ')}${f.size > 3 ? ` and ${f.size - 3} more` : ''})` : ''; };
@@ -562,12 +575,12 @@ async function check(opts) {
       if (!HREFLANG.test(alt.lang)) { add('hreflang-invalid', 'fail', url, `hreflang="${alt.lang}" is not a valid language or language-region code`, `${url}|${alt.lang}`); continue; }
       if (!/^https?:\/\//i.test(alt.href)) add('hreflang-relative', 'warn', url, `hreflang ${alt.lang} href "${alt.href}" is not a fully qualified URL`, `${url}|${alt.lang}`);
       let target;
-      try { target = mapUrl(new URL(alt.href, self).href); } catch { add('hreflang-invalid', 'fail', url, `hreflang ${alt.lang} href "${alt.href}" is not a URL`, `${url}|${alt.lang}`); continue; }
+      try { target = mapUrl(new URL(alt.href, h.base).href); } catch { add('hreflang-invalid', 'fail', url, `hreflang ${alt.lang} href "${alt.href}" is not a URL`, `${url}|${alt.lang}`); continue; }
       if (target === self) { hasSelf = true; continue; }
       if (!sameOrigin(target)) continue;
       const other = await getPage(target);
       if (!other || other.blocked || !other.html) continue; // the target's own status is judged as its own page
-      const returns = other.html.hreflang.some((b) => { try { return mapUrl(new URL(b.href, other.finalUrl).href) === self; } catch { return false; } });
+      const returns = other.html.hreflang.some((b) => { try { return mapUrl(new URL(b.href, other.html.base).href) === self; } catch { return false; } });
       if (!returns) add('hreflang-no-return', 'fail', url, `${target} (${alt.lang}) does not link back with hreflang; Google ignores one-way pairs`, `${url}|${target}`);
     }
     if (h.hreflang.length && !hasSelf) add('hreflang-no-self', 'warn', url, 'hreflang set does not include this page itself');
@@ -645,6 +658,7 @@ async function check(opts) {
       finalUrl: r.finalUrl ?? null,
       redirects: r.chain ? r.chain.length - 1 : 0,
       stopped: r.stopped ?? null,
+      html: Boolean(r.html),
       indexable: Boolean(r.indexable),
       inSitemap: inSitemap(r),
       title: r.html?.titles[0] ?? null,
@@ -677,14 +691,16 @@ function normalize(report, label) {
     // only if the later run fetched its URL again (a robots.txt block is not a fetch).
     const origin = new URL(report.url).origin;
     const covered = new Set([report.url, origin, origin + '/robots.txt', ...(report.sitemap?.files ?? [])]);
+    const coveredHtml = new Set(); // pages whose HTML was read, so HTML findings were rechecked
     for (const p of report.pages ?? []) {
       if (p.blocked || p.status === null) continue;
       covered.add(p.url);
       // A redirect the guard stopped never fetched its target.
       if (p.finalUrl && !p.stopped) covered.add(p.finalUrl);
+      if (p.html && p.redirects === 0) coveredHtml.add(p.url);
     }
     return {
-      kind: 'seo-check', valid: report.complete, url: report.url, truncated: Boolean(report.truncated), covered,
+      kind: 'seo-check', valid: report.complete, url: report.url, truncated: Boolean(report.truncated), covered, coveredHtml,
       sitemapRead: (report.sitemap?.files ?? []).length > 0, sitemapList: new Set(report.sitemap?.list ?? []),
       findings: report.findings.filter((f) => f.severity !== 'info'), scores: {},
     };
@@ -725,14 +741,19 @@ function diff(beforePath, afterPath) {
   }
   const gone = a.findings.filter((f) => !after.has(f.id));
   // Sitemap-membership findings are settled by reading the later sitemap; the rest need their pages fetched again.
+  // Findings read from a page's HTML need that page's HTML read again; status and
+  // redirect findings only need it fetched.
+  const statusRule = /^(http-error|fetch-error|redirect-chain|sitemap-|robots-|start-unreadable|needs-public-origin|linked-url-|listed-url-)/;
   const settled = (f) => (f.rule.startsWith('sitemap-url-') && b.sitemapRead && !b.sitemapList.has(f.url))
-    || (f.urls ?? [f.url]).every((u) => b.covered.has(u));
+    || (f.urls ?? [f.url]).every((u) => (statusRule.test(f.rule) ? b.covered : b.coveredHtml).has(u));
   const unchecked = b.covered ? gone.filter((f) => !settled(f)) : [];
   if (unchecked.length) {
-    process.stderr.write(`${unchecked.length} finding(s) disappeared without the later run fetching their URL again (no longer linked or listed, robots-blocked, or past the page budget). Not counted as fixed; rerun the later check with --include <file listing them>:\n`);
-    for (const f of unchecked) process.stderr.write(`  ${f.rule}  ${(f.urls ?? [f.url]).filter((u) => !b.covered.has(u)).join(', ')}\n`);
+    process.stderr.write(`${unchecked.length} finding(s) disappeared without the later run rechecking their URL (no longer linked or listed, robots-blocked, past the page budget, or no longer HTML). Not counted as fixed; check those URLs, and rerun the later check with --include <file listing them> where they still exist:\n`);
+    for (const f of unchecked) process.stderr.write(`  ${f.rule}  ${(f.urls ?? [f.url]).filter((u) => !(statusRule.test(f.rule) ? b.covered : b.coveredHtml).has(u)).join(', ')}\n`);
     return 2;
   }
+  // A duplicate group that keeps its id but gains pages is a regression for those pages.
+  const grown = b.findings.filter((f) => f.urls && before.get(f.id)?.urls).map((f) => ({ f, extra: f.urls.filter((u) => !before.get(f.id).urls.includes(u)) })).filter((g) => g.extra.length);
   const fixed = gone;
   const added = b.findings.filter((f) => !before.has(f.id));
   const changed = b.findings.filter((f) => before.has(f.id) && before.get(f.id).message !== f.message);
@@ -750,7 +771,8 @@ function diff(beforePath, afterPath) {
     out.write(`  SCORE  ${key}: ${x ?? 'not verified'} -> ${y ?? 'not verified'}\n`);
     if (x !== null && (y === null || y < x)) drops.push(key);
   }
-  return added.length || drops.length ? 1 : 0;
+  for (const { f, extra } of grown) out.write(`  GREW   ${f.severity}  ${f.rule}  now also ${extra.join(', ')}\n`);
+  return added.length || drops.length || grown.length ? 1 : 0;
 }
 
 // ---------- main ----------
