@@ -40,7 +40,7 @@ Defaults until configured:
 - Code you move or merge keeps its error handling and validation.
 - Never make a change smaller by cutting validation at trust boundaries, error handling that prevents data loss, security, or accessibility.
 - No unit tests or type tests unless the user asks.
-- Solve generally. Never hard-code to pass specific tests. If a test or requirement is wrong, say so rather than work around it.
+- Solve generally. Never hard-code to pass specific tests. If a test or requirement is wrong, say so rather than work around it. Never fake success: no placeholder results, and no fallback added only to silence an error. Fallbacks the product needs (older browsers, offline, missing media) are fine.
 - Scratch work → `.tmp/` (gitignored). Promote to `scripts/` if reusable; otherwise delete.
 - Durable project knowledge → `.claude/reference/` via `/recall save` (committed, travels to every machine and sandbox). Standing truths only: moments (PR numbers, branch names, task status, tool-version snapshots) rot and don't get saved. `/recall` and `.claude/reference/` replace Claude Code's built-in auto memory, which stays off (`"autoMemoryEnabled": false` in `.claude/settings.json`).
 - Welcome correction. Confident-sounding mistakes happen; don't defend wrong answers. Weighty recommendations get a `/why` pressure-test before they're presented (caveman skill); the user can also run `/why` on any recommendation.
