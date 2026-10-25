@@ -1,5 +1,5 @@
-// Lists classes the scenes use that have no rule in the product CSS (or in the scenes'
-// own <style> blocks). A missing class means the replica renders differently from the
+// Lists classes the scenes use that have no rule in the product CSS (or in <style>
+// blocks inside the scene files). A missing class means the replica renders differently from the
 // product: the CSS chunk was not copied, the class was invented, or the product itself
 // uses a class its build purged (report that one to the owner as a product bug).
 //
@@ -22,11 +22,19 @@ for (const a of args._.length ? args._ : ["scenes"]) {
   else files.push(a);
 }
 const sources = files.map((f) => [f, fs.readFileSync(f, "utf8")]);
-// Scene sources join the haystack so classes defined in a scene's own <style> count.
-const haystack = cssFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n") + "\n" + sources.map(([, s]) => s).join("\n");
-const esc = (c) => c.replace(/([^a-zA-Z0-9_-])/g, "\\$1");
+// Only the scenes' own <style> blocks join the haystack, so a class named in a
+// querySelector string never counts as a rule.
+const styles = sources.flatMap(([, s]) => [...s.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]));
+const haystack = cssFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n") + "\n" + styles.join("\n");
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const has = (c) => new RegExp(reEsc("." + esc(c)) + "(?![a-zA-Z0-9_-]|\\\\)").test(haystack);
+// A class starting with a digit (Tailwind's 2xl:) is written `.\32 xl\:grid` in CSS;
+// minifiers may drop the space when the next character is not a hex digit.
+const selector = (c) => {
+  const body = (s) => reEsc(s.replace(/([^a-zA-Z0-9_-])/g, "\\$1"));
+  const m = /^(-?)(\d)(.*)$/.exec(c);
+  return "\\." + (m ? `${reEsc(m[1])}\\\\3${m[2]} ?${body(m[3])}` : body(c));
+};
+const has = (c) => new RegExp(selector(c) + "(?![a-zA-Z0-9_-]|\\\\)").test(haystack);
 
 let total = 0;
 for (const [file, raw] of sources) {

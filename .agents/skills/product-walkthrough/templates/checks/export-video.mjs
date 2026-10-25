@@ -87,11 +87,16 @@ try {
           let nudging = true; first.then(() => { nudging = false; fit.style.opacity = ""; });
           (function nudge(i) { if (!nudging) return; fit.style.opacity = i % 2 ? "0.999" : "1"; requestAnimationFrame(() => nudge(i + 1)); })(0);
           await first;
+          // The hold runs on its own clock with the player paused on the end frame, so the
+          // player's auto-advance gap (gapMs) can never cut it short or start the next chapter.
+          const holdEnd = (ms) => new Promise((r) => { const end = performance.now() + ms;
+            (function n(i) { if (performance.now() >= end) { fit.style.opacity = ""; return r(); } fit.style.opacity = i % 2 ? "0.999" : "1"; requestAnimationFrame(() => n(i + 1)); })(0); });
           for (const id of ids) {
             window.__player.set({ scene: id, t: 0 }); window.__player.play();
             const dur = window.__player.scenes().find((s) => s.id === id).duration;
-            await new Promise((r) => { const tick = () => window.__player.state().t >= dur + hold || window.__player.state().scene !== id ? r() : requestAnimationFrame(tick); tick(); });
-            window.__player.pause();
+            await new Promise((r) => { const tick = () => window.__player.state().t >= dur || window.__player.state().scene !== id ? r() : requestAnimationFrame(tick); tick(); });
+            window.__player.pause(); window.__player.set({ t: dur });
+            await holdEnd(hold);
           }
           // A still stage sends no frames, so a pending read() would wait forever: stopping
           // the track ends the stream and the read returns done.

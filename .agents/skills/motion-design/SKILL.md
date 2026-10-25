@@ -14,7 +14,7 @@ Use this skill when motion carries meaning. It covers the story, the timing, the
 3. **Build an animatic with final timing and rough visuals.** It needs a scrubber, pause and chapter ticks. Get the pacing approved before any polish.
 4. **Block the key poses, then polish the in-betweens:** easing, stagger, overlap and secondary motion.
 5. **Verify in a real browser on the GPU.** Judge motion by watching it play. Stills only prove layout. See [verify-export.md](references/verify-export.md).
-6. **Export to video** when the piece has to travel to feeds that do not run JavaScript.
+6. **Export to video** when the piece has to travel to feeds that do not run JavaScript. Encode in the page with WebCodecs, never a PNG or screenshot per frame (user instruction, 2026-10-19); see [verify-export.md](references/verify-export.md).
 
 ## Decision rules
 

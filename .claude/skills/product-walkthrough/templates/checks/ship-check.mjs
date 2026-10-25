@@ -19,6 +19,8 @@ import { parseArgs } from "./lib/browser.mjs";
 const args = parseArgs();
 const dir = path.resolve(args.dir || ".");
 const problems = [], warnings = [];
+// Same rule as the player's safeHref: browsers read "/\host" as "//host", so the parsed origin decides.
+const sameOrigin = (h) => { if (typeof h !== "string" || !/^\/(?![\/\\])/.test(h)) return false; try { const base = "https://player.invalid/"; return new URL(h, base).origin === new URL(base).origin; } catch { return false; } };
 const sandbox = { window: {} };
 vm.runInNewContext(fs.readFileSync(path.join(dir, "tour.config.js"), "utf8"), sandbox);
 const C = sandbox.window.TOUR || {};
@@ -44,7 +46,7 @@ for (const id of C.chapters || []) {
   else if (sc.takeaway.trim().split(/\s+/).length > 14) problems.push(`${id}: takeaway has ${sc.takeaway.trim().split(/\s+/).length} words (max 14)`);
   if (!sc.alt) problems.push(`${id}: no alt text describing what the chapter shows`);
   const href = sc.cta && sc.cta.href;
-  if (!href || !/^\/(?!\/)/.test(href)) problems.push(`${id}: CTA href "${href}" is not a same-origin path like /route`);
+  if (!sameOrigin(href)) problems.push(`${id}: CTA href "${href}" is not a same-origin path like /route`);
   if (!(sc.duration > 0)) problems.push(`${id}: duration missing`);
 }
 const total = (C.chapters || []).length;

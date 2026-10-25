@@ -44,9 +44,11 @@ The times above fit the 12 s cycle in ui-loops.md; take yours from the piece's o
 - **Rest.** The frame just before the fade-out (10.983) equals the frame where the intro has landed and no story has started (2.4). Both are the design at rest, so any difference is a story that did not come back. Turn accents and story helpers off for this pair (a `?still` or `accents: false` switch), since pulse rings and sheens run on their own period.
 - **Export window.** A looping export encodes frames `f = 0` to `CYCLE * fps - 1` at `t = f / fps`. Including `t = CYCLE` repeats the first frame at the wrap, which shows as a stutter on every loop.
 
-## In-page WebCodecs export (run end to end 2026-09-28)
+## In-page WebCodecs export (always; run end to end 2026-09-28 and 2026-10-19)
 
-When `render(t)` is a pure function of time and every layer, text included, is drawn into the WebGL canvas, export in the page itself. The CoreWise promo rendered 94 s at 1920x1080, 60 fps (5,640 frames) in 33 s; the file was H.264 High at about 15 Mbit/s, 178 MB.
+Every MP4 of a canvas animation is encoded in the page with WebCodecs. Never read back a PNG or screenshot per frame for ffmpeg to re-encode: the user called that "insanely inefficient" (user instruction, 2026-10-19). Draw every layer, text included, into the canvas so the encoder sees it. The CoreWise promo rendered 94 s at 1920x1080, 60 fps (5,640 frames) in 33 s; the file was H.264 High at about 15 Mbit/s, 178 MB.
+
+**Driven from a script (Playwright), no muxer in the page.** Configure `avc: { format: 'annexb' }`, render and encode frames in batches of about 60 per `page.evaluate`, and return each batch's chunk bytes as a `Uint8Array`. Pipe them into `ffmpeg -f h264 -framerate 60 -i - -c:v copy -bsf:v h264_metadata=colour_primaries=1:transfer_characteristics=13:matrix_coefficients=1:video_full_range_flag=0 -movflags +faststart out.mp4`: a stream copy, with the colour tags written into the stream. Add audio in a second ffmpeg pass that copies the video. fullbuild.ai showreel 2 (2026-10-19, `scripts/export-showreel.mjs --encoder webcodecs`): `avc1.64002A` (High 4.2) at 40 Mbit/s variable, hardware encoder, 1080p60 at about 46 fps, colour patches within 0.6 levels of a lossless 4:2:0 conversion of the canvas.
 
 1. Create a second canvas and renderer at the export resolution. The WebGL context needs `preserveDrawingBuffer: true` so `new VideoFrame(canvas, { timestamp, duration })` reads the finished frame.
 2. Pick the first supported config from `avc1.640033`, `avc1.4d0033`, `avc1.640028`, `avc1.42003e` via `VideoEncoder.isConfigSupported`, with `avc: { format: 'avc' }`.
@@ -92,9 +94,9 @@ ffmpeg -v error -ss 30.5 -t 4 -i out.mp4 -vf "fps=6,scale=480:-1,tile=4x6" -fram
 
 Cut one strip per transition and one strip of the whole piece at 1 fps for pacing. Tile long runs of stills into contact sheets (a page of `<img>` tags screenshotted by the same headed browser), so a full-timeline review costs a few images instead of dozens.
 
-## Frame-stepped PNG export (fallback)
+## Frame-stepped PNG export (fallback, only with the user's OK)
 
-Use this when captions are DOM text or the piece needs ordered trail state the in-page exporter cannot reproduce. It was designed but, as of 2026-09-28, not yet run end to end. Prove it on a short range before relying on it.
+Ask the user before using this. Move DOM captions into the canvas first, so WebCodecs can carry them; reach for this only when that is impossible.
 
 1. Add `renderAt(t, dtFrames)` next to `frame(t)`, which draws without the rAF loop.
 2. Reset the trail buffer, then step `t` from 0 to TOTAL in increments of 1/60 s, calling `renderAt(t, 1)`. The trails need every frame in order, so never skip ahead.

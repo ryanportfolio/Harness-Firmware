@@ -28,8 +28,8 @@ mkdirSync(out, { recursive: true });
 const browser = await (await chromium()).launch({
   headless: false,
   channel: 'chrome',
-  args: ['--window-position=-2400,-2400', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
-}).catch(async () => (await chromium()).launch({ headless: false, args: ['--window-position=-2400,-2400'] }));
+  args: ['--window-position=-2400,-2400', '--mute-audio', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
+}).catch(async () => (await chromium()).launch({ headless: false, args: ['--window-position=-2400,-2400', '--mute-audio'] }));
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const errs = [];
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.text()); });

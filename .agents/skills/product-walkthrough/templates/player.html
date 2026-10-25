@@ -311,7 +311,8 @@ $("back").onclick = () => { if (idx > 0) go(idx - 1); };
 $("skip").onclick = () => done(true);
 $("pause").onclick = togglePlay;
 // CTA: only same-origin paths ("/route") are handed to the host or followed.
-const safeHref = (h) => typeof h === "string" && /^\/(?!\/)/.test(h);
+// Browsers read "/\host" as "//host", so the parsed origin decides, not the first characters.
+const safeHref = (h) => { if (typeof h !== "string" || !/^\/(?![\/\\])/.test(h)) return false; try { return new URL(h, location.href).origin === location.origin; } catch { return false; } };
 $("cta").onclick = (e) => {
   const href = e.currentTarget.getAttribute("href");
   if (!safeHref(href)) { e.preventDefault(); errors.push("cta href is not a same-origin path: " + href); return; }
