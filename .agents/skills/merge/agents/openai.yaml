@@ -1,0 +1,5 @@
+interface:
+  display_name: "Merge"
+  short_description: "Self-review, Opus review loop, CI, squash-merge"
+policy:
+  allow_implicit_invocation: false

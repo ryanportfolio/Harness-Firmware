@@ -1,18 +1,18 @@
 ---
 name: merge
-description: "Merge PRs via Codex loop: /codex-fullreview, fix, /codex-review reruns (3 max) until clean, then CI + squash-merge. Only when user types /merge; then every session PR goes through it + merges."
+description: "Merge PRs: 4 fresh-context self-reviewers + fixes, then Codex loop: /codex-fullreview, fix, /codex-review reruns (3 max) until clean, then CI + squash-merge. Only when user types /merge; then every session PR goes through it + merges."
 disable-model-invocation: true
 ---
 
 # Merge via Codex review loop
 
-Finished work → merged PR: commit, push, open/reuse PR, Codex loop, CI, squash-merge. Same file at repo `.claude/skills/merge/SKILL.md` + global `~/.claude/skills/merge/SKILL.md`; copies identical.
+Finished work → merged PR: commit, push, open/reuse PR, self-review, Codex loop, CI, squash-merge. Same file at repo `.claude/skills/merge/SKILL.md` + global `~/.claude/skills/merge/SKILL.md`; copies identical.
 
 ## Merge mode
 
 User-only start: user types `/merge`. Never self-start, even if PR looks ready.
 
-`/merge` → merge mode ON for rest of session. Announce in plain prose ("Merge mode is on for this session: every PR goes through the Codex loop and merges when clean") so mode survives summaries. While ON:
+`/merge` → merge mode ON for rest of session. Announce in plain prose ("Merge mode is on for this session: every PR gets a self-review, then the Codex loop, and merges when clean") so mode survives summaries. While ON:
 
 - Immediately: every still-open PR this session opened or pushed to → all steps below, one PR at a time. Finished work w/o PR → Step 1 opens one. PRs session never touched → untouched unless user names them.
 - After: every PR session opens/updates → same steps → merge, no further prompt. Re-read this file before each; post-summary, text may be gone from context.
@@ -25,6 +25,7 @@ Mode OFF when: user says so ("stop merging", "stop merge mode", "don't merge thi
 Per PR, mode authorizes:
 
 - commit finished work, push, open/reuse PR;
+- 4 self-review subagents before Codex round 1 (Step 2), billed to user's Claude usage;
 - 1× `/codex-fullreview` + ≤3 `/codex-review` reruns, each billed to user's Codex sub;
 - in-scope fixes for confirmed findings, committed + pushed to PR branch;
 - squash-merge once review loop + CI both pass at same head.
@@ -35,6 +36,7 @@ Review skills' "review ≠ fix authority" rule lifted for in-scope fixes only. S
 
 - `codex-review` + `codex-fullreview` skills, in repo `.claude/skills/` or `~/.claude/skills/`. Either missing → stop, say so.
 - Codex reachable via route review skills accept: `codex login status` = ChatGPT login, or `config.toml` in `$CODEX_HOME` (default `~/.codex`) sets `model_provider` to gateway. Neither → stop before merge, report. Never substitute self-review + call gate passed.
+- Claude Code `Agent` tool for Step 2. Missing → say so, skip to Step 3; Codex loop still runs in full.
 
 ## Step 1: Integrate
 
@@ -55,7 +57,39 @@ Review skills' "review ≠ fix authority" rule lifted for in-scope fixes only. S
 
 Record PR number, target, head SHA.
 
-## Step 2: Review loop
+## Step 2: Self-review
+
+Goal: find + fix what Codex would find, so Codex rounds come back clean more often. Extra layer before Codex, never replaces it: Step 3 runs in full whatever self-review found.
+
+**Areas.** Split change into 4 areas from what PR + session actually involve. Each area = distinct code paths or concerns, little overlap. Examples:
+
+- crawler/CLI: fetching + IO; parsing; rule logic; comparison/diff output + docs.
+- UI: behavior; states + edge cases; accessibility + layout; docs + tests.
+- docs/skill-only PR: each changed file or contract a reviewer can check against the rest of the repo.
+
+**Launch.** 4 `Agent` calls, 1 message, run in parallel. `model` omitted, no `isolation` (worktree isolation breaks rtk git calls). Each brief standalone, reviewer has no session context:
+
+- scope: repo path, base = `origin/<target>` SHA, head SHA, `git diff <base>..<head>` as the diff;
+- files to read + area to cover; other 3 areas named so it stays in its own;
+- bug classes in priority order: false success (reports pass/clean/done when it isn't), then wrong results on common real inputs, then crashes;
+- what earlier rounds already fixed (this session's fix commits + findings), so it hunts new bugs;
+- rules: reproduce every bug before reporting it; fixtures + scratch only under `.tmp/selfreview/<area>/`; never edit repo files, never commit, never push;
+- return: confirmed findings, each w/ severity (🔴/🟡/🟢), file:line, reproduction (command + observed vs expected), suggested fix; then separate list of unconfirmed suspicions.
+
+**While running.** No edits, commits, or pushes: reviewers read working tree. Wait for all 4.
+
+**Triage.** Session verifies each reported finding itself (rerun reproduction or read code); reviewer's word ≠ proof. Then:
+
+- Confirmed, in scope → fix at cause, any severity.
+- Unconfirmed suspicion → quick check; confirmed → fix, else note in report.
+- Refuted → drop, list under "checked and fine".
+- Fix needs user decision (behavior change, tradeoff, scope growth) → ask.
+
+All self-review fixes = 1 commit naming findings. Run relevant local checks + regressions for each fix, push. Record head SHA → Step 3 round 1 reviews it. 0 confirmed → no commit, go to Step 3.
+
+Self-review costs no Codex budget. Doesn't count as a Codex round.
+
+## Step 3: Codex review loop
 
 Each round: `git fetch origin <target>`, scope = full PR branch diff vs `origin/<target>` at current head SHA. Each review skill's contract applies in full: preflight, background launch, own run dir, its 1 auto-retry, verify every finding.
 
@@ -73,19 +107,21 @@ Each round: `git fetch origin <target>`, scope = full PR branch diff vs `origin/
 
 Fix at cause, run relevant local checks, round's fixes = 1 commit naming findings, push. Leave unrelated work alone.
 
+**Self-check before each rerun.** Codex round found something → after fixing, before push: session itself checks for related cases of same bug kind (same input class, same pattern in sibling code paths, same missing guard elsewhere). Reproduce each one found, fix in same commit. Goal: rerun doesn't find the sibling of a bug just fixed. Full 4-reviewer self-review (Step 2) only before round 1, plus again before a rerun when fixes are large (new module or code path, rewrite of a core function, or fix delta bigger than the original change in that area). Rerun budget unchanged.
+
 **Loop end.** Pass = latest round, on current head, confirmed 0 🔴/🟡 (waived excluded). Round 1 passes → no rerun.
 
 - Cap: 3 `/codex-review` reruns after round 1. Check budget before any fix/review. After 3rd rerun: no more commits, no more reviews; anything still needing fix (🔴, 🟡, real-risk caveat) or head moved → PR `blocked`: stop, report open items, leave unmerged. User can hand-fix, waive, or authorize more reruns.
 - Commits loop didn't make (other session, teammate) → reviewed by next round, counts toward cap.
 - Head moves after passing round → verdict void: another `/codex-review` if budget allows, else `blocked`.
 
-## Step 3: CI
+## Step 4: CI
 
 Inspect **all PR checks**: `gh pr checks <number> --json name,bucket,state,workflow,link` or current equivalent. Pending → bounded wait. Failed → diagnose, fix in scope; CI fix moves head → back through `/codex-review` round, same budget. Don't trust branch protection or `MERGEABLE` alone. Verify expected workflows actually ran. Absent/skipped/unavailable required check ≠ pass: explain, hold merge unless repo's established verification contract allows. No-CI repo → local verification contract, report that limit. Never admin-bypass checks.
 
-## Step 4: Merge
+## Step 5: Merge
 
-1. Re-read PR head. ≠ head where loop + CI both passed → back to Step 2; verdict covers only head it saw.
+1. Re-read PR head. ≠ head where loop + CI both passed → back to Step 3; verdict covers only head it saw.
 2. Squash unless user/repo says otherwise: `gh pr merge <number> --squash --match-head-commit <verified-head>`. No head guard available → say so, use guarded API or hold; never merge unreviewed commits.
 3. Confirm PR merged, fetch target, see merge commit. Keep branch unless user asked cleanup. Next change → new task branch from updated target, keep uncommitted work.
 
@@ -93,7 +129,7 @@ Never reset unrelated work, force-push, or push direct to target. Interrupted �
 
 ## Report
 
-Per PR: each round w/ source attribution as review skill presents it, surviving findings, fix commit SHAs, waivers + reasons, CI result. End w/ 1 line: `merged <PR URL> at <head SHA>`, or `blocked` + open items.
+Per PR: self-review first: 4 areas covered, confirmed findings (severity + 1 line each), fix commit SHA (or "0 confirmed"), suspicions left unconfirmed; any later full self-review same way, and each pre-rerun self-check's extra fixes in that round's line. Then each Codex round w/ source attribution as review skill presents it, surviving findings, fix commit SHAs, waivers + reasons, CI result. End w/ 1 line: `merged <PR URL> at <head SHA>`, or `blocked` + open items.
 
 After merges land (each time no PR in flight is still pending), close w/ **ELI5 recap**: super-short bullets, plain words a 5-year-old gets, no jargon/SHAs/skill names, not caveman. One bullet per merged PR = what it's for; one bullet = what session did overall. Example:
 

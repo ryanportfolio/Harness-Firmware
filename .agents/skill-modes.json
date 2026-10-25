@@ -32,7 +32,7 @@
     "lab": "native",
     "long-horizon": "native",
     "long-horizon-workflows": "disabled",
-    "merge": "disabled",
+    "merge": "native",
     "motion-design": "native",
     "optimize-context": "native",
     "opus-fullreview": "native",

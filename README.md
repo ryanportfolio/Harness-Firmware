@@ -72,10 +72,10 @@ The dotted branch is separate: after human review, `sync-starter` can move a gen
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="50 Claude Code skills and 45 Codex skills share project memory. Codex has 45 native workflows." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="50 Claude Code skills and 46 Codex skills share project memory. Codex has 46 native workflows." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
-**50 Claude Code skills · 45 Codex skills · 45 native Codex workflows**
+**50 Claude Code skills · 46 Codex skills · 46 native Codex workflows**
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
 - **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows with explicit capability and safety boundaries; every Claude skill has a maintained native Codex version or is disabled for Codex. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
@@ -130,7 +130,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`astra-review`](.claude/skills/astra-review/SKILL.md) · Cross-vendor review on gpt-6-astra, medium. Same CLI lifecycle as codex-review. Use: /astra-review, 'have Astra review this'.
 - [`codex-fullreview`](.claude/skills/codex-fullreview/SKILL.md) · Full multi-agent Codex review: codex exec runs impartial-review as Manager with fresh sub-reviewers (gpt-6.1-sol, high), then each finding verified. Use: /codex-fullreview, 'full Codex review with sub-reviewers'.
 - [`astra-fullreview`](.claude/skills/astra-fullreview/SKILL.md) · Full multi-agent Codex review on gpt-6-astra, medium. Same lifecycle as codex-fullreview. Use: /astra-fullreview, 'full Astra review with sub-reviewers'.
-- [`merge`](.claude/skills/merge/SKILL.md) · Merge PRs via Codex loop: /codex-fullreview, fix, /codex-review reruns (3 max) until clean, then CI + squash-merge. Only when user types /merge; then every session PR goes through it + merges.
+- [`merge`](.claude/skills/merge/SKILL.md) · Merge PRs: 4 fresh-context self-reviewers + fixes, then Codex loop: /codex-fullreview, fix, /codex-review reruns (3 max) until clean, then CI + squash-merge. Only when user types /merge; then every session PR goes through it + merges.
 - [`claude-review`](.claude/skills/claude-review/SKILL.md) · /claude-review, Claude or Fable asked to review Codex-written code, or cross-vendor review via Claude CLI.
 - [`dare`](.claude/skills/dare/SKILL.md) · /dare, first principles, questioning the problem: 4 fresh stages decompose, audit, recombine, test; immutable goals + constraints kept.
 - [`gauntlet`](.claude/skills/gauntlet/SKILL.md) · Only on explicit /gauntlet: draft → dare → final draft → why → rewrite → arena → commit, stop for /merge. Skills fully; other artifacts need declared apply method + real check.
