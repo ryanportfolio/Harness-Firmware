@@ -69,7 +69,7 @@
       "conversion-ux": ["ui-quality"],
       "deep-plan": ["why"],
       "design-prototypes": ["codex-image-gen"],
-      "gauntlet": ["dare", "why", "arena", "merge"],
+      "gauntlet": ["dare", "why", "arena", "merge", "addskill", "writing"],
       "merge": ["codex-fullreview", "codex-review"],
       "opus-fullreview": ["impartial-review"],
       "security-loop": ["claude-review", "codex-review"],
