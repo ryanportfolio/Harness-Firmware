@@ -4,7 +4,7 @@
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/boot-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/boot-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/boot-dark.svg">
-<img alt="Harness Firmware boots with 50 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
+<img alt="Harness Firmware boots with 51 skills, 6 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
 </picture>
 
 A repository starter for **Claude Code and Codex**. Harness Firmware gives both agents versioned instructions, durable project memory, reusable skills, and workflows for testing and independent review.
@@ -72,19 +72,19 @@ The dotted branch is separate: after human review, `sync-starter` can move a gen
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="50 Claude Code skills and 45 Codex skills share project memory. Codex has 45 native workflows." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="51 Claude Code skills and 46 Codex skills share project memory. Codex has 46 native workflows." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
-**50 Claude Code skills · 45 Codex skills · 45 native Codex workflows**
+**51 Claude Code skills · 46 Codex skills · 46 native Codex workflows**
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
 - **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows with explicit capability and safety boundaries; every Claude skill has a maintained native Codex version or is disabled for Codex. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
 Both runtimes read the committed project topics under `.claude/reference/`. Shared workflows live under `.claude/skills/`; standalone Codex workflows live under `.agents/skills/`.
 
-## 50 workflows, loaded when called
+## 51 workflows, loaded when called
 
-**8 core · 17 discipline · 25 specialist**
+**8 core · 17 discipline · 26 specialist**
 
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
@@ -95,13 +95,13 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/skills-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/skills-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/skills-dark.svg">
-<img alt="A memory map of 50 on-demand workflows grouped into 8 core, 17 discipline, and 25 specialist skills." src="assets/readme/skills-light.svg" width="100%">
+<img alt="A memory map of 51 on-demand workflows grouped into 8 core, 17 discipline, and 26 specialist skills." src="assets/readme/skills-light.svg" width="100%">
 </picture>
 
 </details>
 
 <details>
-<summary><strong>Click to browse all 50 skills</strong></summary>
+<summary><strong>Click to browse all 51 skills</strong></summary>
 
 <!-- skill-list:start -->
 ### core workflows · 8
@@ -135,7 +135,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`dare`](.claude/skills/dare/SKILL.md) · /dare, first principles, questioning the problem: 4 fresh stages decompose, audit, recombine, test; immutable goals + constraints kept.
 - [`gauntlet`](.claude/skills/gauntlet/SKILL.md) · Only on explicit /gauntlet: draft → dare → final draft → why → rewrite → arena → commit, stop for /merge. Skills fully; other artifacts need declared apply method + real check.
 
-### specialist tools · 25
+### specialist tools · 26
 
 - [`fable-mode`](.claude/skills/fable-mode/SKILL.md) · Hard multi-step work, uncertain diagnoses, repeated failures, 'did it work/is it fixed/prove it', or tasks needing careful verification + handoff. Skip routine changes.
 - [`wow-loop`](.claude/skills/wow-loop/SKILL.md) · Evidence-gated review + repair loop, one deliverable or set of like items. Use: /wow-loop, wow factor, 'dial it to 11', target score ('get it to 8/10', 'bring everything under 6 up to 6+'), substantial visual work (3D, animation, UI, rendered docs) needing reference fidelity or repeated correction. Skip routine cosmetic edits + talk about the skill itself.
@@ -159,6 +159,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`bro`](.claude/skills/bro/SKILL.md) · Plain-language restatement. Use: /bro anywhere in msg, 'plain english', 'plain language', 'dumb it down', 'I don't understand', 'what does that mean'.
 - [`session-hub`](.claude/skills/session-hub/SKILL.md) · Coordinate parallel Claude Code sessions via shared append-only HTML hub. Use: /session-hub, 'run parallel sessions on this', joining a hub, or proactively when the checkout shows edits or commits this session didn't make.
 - [`cache-loop`](.claude/skills/cache-loop/SKILL.md) · Caching or stale content.
+- [`seo-loop`](.claude/skills/seo-loop/SKILL.md) · SEO/AEO/GEO fix rounds, measured. Use: /seo-loop, 'improve SEO'.
 - [`coordinate`](.claude/skills/coordinate/SKILL.md) · Coordinate with another named Claude Code session: read its work + recs, critique, send own rec, let it answer, once agreed have it finish; ping user only when a step needs them. Use: /coordinate <session>, 'coordinate / review / go back and forth with another session'.
 - [`servers`](.claude/skills/servers/SKILL.md) · /servers, after starting a dev server, or user asks what's running, which port is which, why browsers are open, or to close old servers and browsers.
 - [`wrapup`](.claude/skills/wrapup/SKILL.md) · /wrapup, or user asks if session is done, OK to archive, or what's left: one verdict from git, the PR, scratch files, running servers or browsers.

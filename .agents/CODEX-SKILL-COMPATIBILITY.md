@@ -24,7 +24,7 @@ for comparison, backup, reconciliation, and discovery checks.
 |---|---|
 | Native | `addskill`, `babysit-ci`, `brainstorming`, `bro`, `caveman`, `enhance-prompt`, `external-review`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `recall`, `refine`, `servers`, `session-hub`, `showpiece`, `wrapup`, `writing`, `writing-plans` |
 | Adapted | `apply-firmware`, `astra-review`, `claude-review`, `codex-review`, `deep-plan`, `init-project`, `lab`, `optimize-context`, `opus-fullreview`, `sync-starter` |
-| Capability-gated | `advocate`, `arena`, `cache-loop`, `conversion-ux`, `dare`, `design-prototypes`, `impartial-review`, `long-horizon`, `motion-design`, `perf-loop`, `product-walkthrough`, `redesign-concepts`, `security-loop`, `ui-quality`, `why`, `wow-loop` |
+| Capability-gated | `advocate`, `arena`, `cache-loop`, `conversion-ux`, `dare`, `design-prototypes`, `impartial-review`, `long-horizon`, `motion-design`, `perf-loop`, `product-walkthrough`, `redesign-concepts`, `security-loop`, `seo-loop`, `ui-quality`, `why`, `wow-loop` |
 | Dangerous | `adopt-repo` |
 | Claude-only | `astra-fullreview`, `codex-fullreview`, `codex-image-gen`, `coordinate`, `gauntlet`, `long-horizon-workflows`, `merge` |
 
@@ -39,6 +39,8 @@ for comparison, backup, reconciliation, and discovery checks.
 `design-prototypes` and `redesign-concepts` need an exposed image generation tool; without one, say so and offer the prompts instead of drawing images in code. `codex-image-gen` is Claude-only: it drives Codex's image tool through `codex exec` from Claude Code, while a Codex session calls its built-in image tool directly.
 
 `perf-loop` is a standalone Codex skill requiring fresh independent measurement and regression reviewers, plus a working measurement path for each performance claim. Benchmarks and competing resource-heavy work run serially on shared hardware. Missing capabilities permit scoped progress but leave the full verification gate incomplete.
+
+`seo-loop` needs Node 20 or newer, network access to the site being measured, and `npx` access to GitHub for willaicite. It keeps a round only after fresh independent integrity and regression reviewers; without agent tools it reports that gap and does not count self-review as the gate. Visual regression checks need headed Chrome; without it, say rendered pages were not checked.
 
 `security-loop` is a standalone Codex skill that needs exposed agent tools for every hunter, critic, and verifier; without them it stops after collecting signals rather than substituting self-review. Its cross-vendor check runs through Claude CLI under `claude-review`'s fail-closed subscription preflight and is reported as unavailable when that preflight fails. Owner-local checks run only first-party code in a fresh worktree with an empty environment; untrusted code stays source-only on this machine.
 

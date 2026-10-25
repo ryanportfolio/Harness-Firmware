@@ -1,0 +1,64 @@
+# Checks: meaning, source, usual fix location
+
+seo-check: can search engines fetch, index + attribute each URL. willaicite: can answer engines fetch a page, read it w/o JS, find something to quote. Neither measures rankings, traffic, real citations.
+
+Sources = Google Search Central. Re-read page before quoting a rule to owner in a report; Google moves + revises them (robots.txt spec moved to `developers.google.com/crawling`, 2025).
+
+## seo-check rules
+
+`fail` = page kept out of index, split across URLs, or signal ignored. `warn` = costs crawl, clarity, snippet control. `info` = human look, never a round target alone.
+
+| Rule | Sev | Meaning | Usual fix location | Source |
+|---|---|---|---|---|
+| `robots-5xx`, `robots-unreachable` | fail | robots.txt errors → Google stops crawling site first 12 h | host/server config, static file | [robots.txt spec](https://developers.google.com/crawling/docs/robots-txt/robots-txt-spec) |
+| `robots-blocks-root` | fail | Googlebot disallowed from `/` (often staging robots.txt shipped) | `robots.txt` or framework robots route | same |
+| `start-unreadable`, `start-noindex` | fail | start URL: no HTML, blocked, or noindex | env-dependent noindex, auth middleware | [block indexing](https://developers.google.com/search/docs/crawling-indexing/block-indexing) |
+| `http-error`, `fetch-error` | fail | linked/sitemap URL → 4xx/5xx or no answer | the link, route, or redirect map | [HTTP status codes](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes) |
+| `sitemap-unreachable`, `sitemap-invalid`, `sitemap-bad-url` | fail | declared sitemap unreadable, or `<loc>` not absolute URL | sitemap generator config | [build a sitemap](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap) |
+| `sitemap-url-blocked`, `sitemap-url-noindex` | fail | sitemap asks Google to index a URL that says "don't" | sitemap filter or page robots setting | same |
+| `canonical-multiple` | fail | >1 rel=canonical → Google ignores all | layout head + page head both emit one | [consolidate duplicate URLs](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls) |
+| `canonical-target-bad` | fail | canonical → error, redirect, noindex or blocked URL | canonical builder (slash, host, locale prefix) | same |
+| `hreflang-invalid`, `hreflang-no-return` | fail | bad language code, or one-way pair Google ignores | i18n head component | [localized versions](https://developers.google.com/search/docs/specialty/international/localized-versions) |
+| `jsonld-invalid` | fail | JSON-LD won't parse → whole block lost | structured-data component (trailing commas, unescaped quotes) | [structured data policies](https://developers.google.com/search/docs/appearance/structured-data/sd-policies) |
+| `title-missing`, `title-empty` | fail | no title for Google to start from | layout head, page metadata | [title links](https://developers.google.com/search/docs/appearance/title-link) |
+| `redirect-chain` | warn | >1 hop | redirect rules: old URL → final URL | [redirects](https://developers.google.com/search/docs/crawling-indexing/301-redirects) |
+| `sitemap-url-redirects`, `sitemap-url-canonicalized` | warn | sitemap lists non-canonical URL | sitemap generator (slash, host, locale) | sitemap page |
+| `sitemap-missing`, `sitemap-redirect`, `sitemap-foreign-url` | warn | no sitemap, or one Google may reject | generator config, robots.txt `Sitemap:` line | sitemap page |
+| `not-in-sitemap`, `orphan` | warn | sitemap + internal links disagree on which pages exist | generator filter, navigation | sitemap page |
+| `canonical-in-body`, `canonical-relative` | warn | canonical Google ignores or may misread | head component | canonical page |
+| `hreflang-relative`, `hreflang-no-self` | warn | hreflang set Google may not trust | i18n head component | localized versions |
+| `title-duplicate`, `description-duplicate` | warn | several indexable pages look like one page | per-page metadata defaults | title links, [snippets](https://developers.google.com/search/docs/appearance/snippet) |
+| `description-missing` | warn | Google writes own snippet | page metadata | snippets |
+| `viewport-missing` | warn | Google indexes mobile rendering | layout head | [mobile-first indexing](https://developers.google.com/search/docs/crawling-indexing/mobile/mobile-sites-mobile-first-indexing) |
+| `jsonld-no-type` | warn | JSON-LD naming nothing | structured-data component | sd policies |
+| `noindex`, `canonical-missing`, `canonical-other-origin`, `linked-url-blocked`, `linked-url-redirects`, `title-long`, `h1-missing`, `img-alt-missing`, `robots-missing`, `sitemap-not-declared`, `sitemap-other-origin`, `sitemap-gzip`, `sitemap-files-skipped`, `canonical-not-checked` | info | look + decide; often intended | | |
+
+`title-long` = 70-char display heuristic, not a Google limit. `h1-missing`, `img-alt-missing` help people + image search; Google requires neither. A11y → `ui-quality`.
+
+Not covered: JS-added tags (compare rendered DOM in headed Chrome when framework injects head tags), rich-result eligibility ([Rich Results Test](https://search.google.com/test/rich-results)), Core Web Vitals (`perf-loop`), Search Console data.
+
+## willaicite dimensions
+
+`--json` → `dimensions[]`: `key`, `weight`, `score` (null = couldn't verify), `evidence[]` (`pass`/`fail`/`warn`/`info`/`unverified` + message), `recommendations[]` (`action`, `why`, `impact`, `effort`). Round target = a `fail`/`warn` evidence line, not score. Severity = willaicite's own evidence status. Fetches: page, homepage, about page, + sitemap pages only if its 10-fetch budget allows (often 0-2; may pick blocked or broken URLs, so read `pagesAudited`).
+
+| Key | Moves it honestly | Gaming risk for integrity reviewer |
+|---|---|---|
+| `crawlerAccess` | robots.txt groups for retrieval crawlers; CDN/firewall bot rules (outside repo → report exact setting) | changing training-crawler rules w/o owner's licensing call |
+| `renderability` | server rendering or prerender of main content | bots get different page than people (cloaking) |
+| `answerReadiness` | plain answer near top, headings matching real questions | FAQ blocks/question headings added only to score; cited replication: formatting-only edits ~useless |
+| `topicalFocus` | title, H1, description naming page's one topic | keyword stuffing |
+| `evidenceDensity` | real figures, quotes, source links owner stands behind | invented stats, quotes, citations |
+| `structuredData` | JSON-LD of what page visibly shows | markup for absent content; self-serving reviews |
+| `freshness` | visible + machine-readable dates changing only w/ real edits | date bumps w/o content change |
+| `entityEeat` | real author, org, about page | invented people, credentials, affiliations |
+| `seoFoundation` | self-referencing canonicals, unique titles + descriptions | none beyond seo-check rules |
+
+`llmsTxt` = informational, unscored. Google's [AI optimization guide](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide): AI search optimization "still SEO"; `llms.txt` + "chunking" not needed for Google Search. Other engines' `llms.txt` use unconfirmed. Never sell `llms.txt` as ranking/citation lever.
+
+## Crawler claims
+
+Each crawler reported w/ the 1 capability it governs; never merged. willaicite's report labels each token retrieval or training: use its labels + list ([registry](https://willaicite.com/crawlers), `src/aiBots.ts`). Googlebot isn't in that list → seo-check's robots rules cover it.
+
+- Retrieval (block = no citations from that engine), e.g. `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`, `Perplexity-User`, `Bingbot` (Copilot), `Applebot`; `Googlebot` feeds Search, AI Overviews, AI Mode.
+- Training (owner's licensing call, no effect on search citations), e.g. `GPTBot`, `ClaudeBot`, `Google-Extended`, `CCBot`, `Applebot-Extended`, `meta-externalagent`.
+- AI Overviews/AI Mode controls: Google's [AI features page](https://developers.google.com/search/docs/appearance/ai-features); read before advising.

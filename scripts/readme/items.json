@@ -230,6 +230,11 @@
       "group": "specialist"
     },
     {
+      "name": "seo-loop",
+      "label": "SEO loop",
+      "group": "specialist"
+    },
+    {
       "name": "adopt-repo",
       "label": "Adopt repo",
       "group": "core"

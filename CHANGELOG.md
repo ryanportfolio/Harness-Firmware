@@ -13,6 +13,18 @@ condensed.
 
 ### Added
 
+- `seo-loop` for Claude and Codex: measured rounds that make a site easier to
+  index and to quote in AI answers. Two deterministic checks gate each round:
+  `scripts/seo-check.mjs`, a zero-dependency crawler for status codes,
+  redirects, robots.txt, sitemap, canonical, noindex, hreflang, titles,
+  descriptions and JSON-LD syntax, and the owner's willaicite audit for AI
+  crawler access, raw-HTML rendering and citation readiness. Its `diff` mode
+  compares two runs and fails on any new finding or lower willaicite score. A
+  round keeps a change only when the targeted findings disappear and a fresh
+  reviewer finds no faked dates, figures, authors, reviews or markup. Ideas from
+  AgriciDaniel/claude-seo (MIT); its weighted scores and word-count rules were
+  left out.
+
 - `motion-design` and `product-walkthrough` for Claude and Codex, moved in from
   personal installs. `motion-design` plans, builds and verifies animation that
   has to read and feel right (explainers, promos, game trailers, hero and UI
