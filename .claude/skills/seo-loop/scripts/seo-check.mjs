@@ -19,8 +19,9 @@
    (start URL unreachable or not HTML). Diff mode takes two seo-check reports or
    two willaicite (geo-audit --json) reports: 0 nothing new, 1 a new fail or warn
    finding or a lower willaicite dimension score, 2 the inputs can't be compared
-   (different tools or start URLs, or a run that never reached its page with
-   HTTP 200). Info findings are left out of the comparison.
+   (different tools or start URLs, a run that never reached its page with
+   HTTP 200, or a finding that vanished only because the later crawl did not
+   fetch its URL). Info findings are left out of the comparison.
 
    Finding ids are stable across runs (rule plus URL or duplicate key), so diff
    can say which findings a round fixed and which it introduced. */
@@ -43,6 +44,25 @@ function usage() {
 
 // ---------- fetching ----------
 
+/** Read at most MAX_BYTES, then cancel, so a huge response never lands in memory whole. */
+async function readCapped(res) {
+  const reader = res.body?.getReader();
+  if (!reader) return '';
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.byteLength;
+    if (size >= MAX_BYTES) {
+      await reader.cancel().catch(() => undefined);
+      break;
+    }
+  }
+  return new TextDecoder('utf-8', { fatal: false }).decode(Buffer.concat(chunks).subarray(0, MAX_BYTES));
+}
+
 async function fetchOnce(url) {
   try {
     const res = await fetch(url, {
@@ -55,10 +75,9 @@ async function fetchOnce(url) {
     const type = headers['content-type'] ?? '';
     let body = null;
     if (res.status >= 200 && res.status < 300 && /html|xml|text\/plain/i.test(type)) {
-      const buf = await res.arrayBuffer();
-      body = new TextDecoder('utf-8', { fatal: false }).decode(buf.byteLength > MAX_BYTES ? buf.slice(0, MAX_BYTES) : buf);
+      body = await readCapped(res);
     } else {
-      await res.arrayBuffer().catch(() => undefined);
+      await res.body?.cancel().catch(() => undefined);
     }
     return { status: res.status, headers, body, error: null };
   } catch (err) {
@@ -259,9 +278,16 @@ function parseArgs(argv) {
 }
 
 async function check(opts) {
-  const start = new URL(/^https?:\/\//i.test(opts.url) ? opts.url : `https://${opts.url}`);
-  start.hash = '';
+  const requested = new URL(/^https?:\/\//i.test(opts.url) ? opts.url : `https://${opts.url}`);
+  requested.hash = '';
+  // Crawl from where the start URL lands (http -> https, apex -> www, /old -> /new):
+  // its origin decides which links are internal, and it is the page judged as the start page.
+  const first = await fetchChain(requested.href);
+  const start = new URL(first.status !== null && first.chain.length > 1 ? first.finalUrl : requested.href);
   const origin = start.origin;
+  // Reuse that response as the start page's own fetch: its last hop is the start page.
+  const prefetched = new Map();
+  if (!first.error && first.status !== null) prefetched.set(start.href, { ...first, chain: [first.chain.at(-1)], finalUrl: start.href });
   const local = /^(localhost|127\.|\[::1\])/.test(start.hostname);
   const delay = opts.delay ?? (local ? 0 : 200);
   const startedAt = new Date().toISOString();
@@ -272,9 +298,12 @@ async function check(opts) {
     'Structured data is checked for valid JSON and a @type, not against Google rich-result requirements.',
     'No rankings, Search Console data, Core Web Vitals or Lighthouse.',
     'An X-Robots-Tag noindex aimed at a named bot other than Googlebot is counted as if it applied to all crawlers.',
+    `Responses are read only up to ${MAX_BYTES / 1e6} MB.`,
   ];
 
-  let fetches = 0;
+  if (start.href !== requested.href) add('start-redirects', 'info', requested.href, `start URL redirects to ${start.href} (${first.chain.map((c) => c.status).join(' -> ')}); crawled from there`);
+
+  let fetches = 1;
   const fetchBudget = opts.maxPages + 50; // room for canonical and hreflang targets outside the crawl
   const pages = new Map();
   const linkedFrom = new Map();
@@ -299,6 +328,7 @@ async function check(opts) {
   for (const s of robots?.sitemaps ?? []) if (!declared.includes(s)) add('sitemap-other-origin', 'info', s, 'robots.txt declares a sitemap on another origin; not checked');
   const sitemapQueue = declared.length ? [...declared] : [origin + '/sitemap.xml'];
   const sitemapFiles = [];
+  const fromIndex = new Set();
   while (sitemapQueue.length && sitemapFiles.length < MAX_SITEMAP_FILES) {
     const smUrl = sitemapQueue.shift();
     if (sitemapFiles.includes(smUrl)) continue;
@@ -307,11 +337,12 @@ async function check(opts) {
     const res = await timed(smUrl);
     if (res.status !== 200 || res.body === null) {
       if (declared.includes(smUrl)) add('sitemap-unreachable', 'fail', smUrl, `sitemap declared in robots.txt answered ${res.status ?? res.error}`);
+      else if (fromIndex.has(smUrl)) add('sitemap-unreachable', 'fail', smUrl, `sitemap listed in a sitemap index answered ${res.status ?? res.error}`);
       else if (!declared.length) add('sitemap-missing', 'warn', smUrl, `no sitemap declared in robots.txt and ${smUrl} answered ${res.status ?? res.error}`);
       continue;
     }
     if (res.chain.length > 1) add('sitemap-redirect', 'warn', smUrl, `sitemap redirects to ${res.finalUrl}`);
-    if (/<sitemapindex\b/i.test(res.body)) xmlLocs(res.body, 'sitemap').forEach((loc) => sitemapQueue.push(loc));
+    if (/<sitemapindex\b/i.test(res.body)) xmlLocs(res.body, 'sitemap').forEach((loc) => { fromIndex.add(loc); sitemapQueue.push(loc); });
     else if (/<urlset\b/i.test(res.body)) xmlLocs(res.body, 'url').forEach((loc) => sitemapUrls.add(loc));
     else add('sitemap-invalid', 'fail', smUrl, 'sitemap is neither a <urlset> nor a <sitemapindex>');
   }
@@ -329,7 +360,8 @@ async function check(opts) {
       pages.set(url, rec);
       return rec;
     }
-    const res = await timed(url);
+    const res = prefetched.get(url) ?? await timed(url);
+    prefetched.delete(url);
     const isHtml = /text\/html|application\/xhtml/i.test(res.headers['content-type'] ?? '');
     const rec = {
       url, blocked: false, status: res.status, finalUrl: res.finalUrl, chain: res.chain, error: res.error,
@@ -376,7 +408,7 @@ async function check(opts) {
   await runQueue(!list);
   if (!truncated && !list) {
     for (const loc of sitemapUrls) { try { if (new URL(loc).origin === origin) enqueue(loc); } catch { /* reported above */ } }
-    await runQueue(false);
+    await runQueue(true); // sitemap-only pages link out too; same page budget
   }
   if (truncated) limits.push(`Crawl stopped at --max-pages ${opts.maxPages}; orphan and not-in-sitemap results cover only what was fetched.`);
 
@@ -413,7 +445,7 @@ async function check(opts) {
     }
     if (!rec.html) continue;
     const h = rec.html;
-    const isStart = url === startRec?.url;
+    const isStart = url === startRec?.url || url === startRec?.finalUrl;
 
     if (rec.noindex) {
       if (isStart) add('start-noindex', 'fail', url, `the start page is noindex (${rec.xRobots ? 'X-Robots-Tag' : 'meta robots'})`);
@@ -508,6 +540,7 @@ async function check(opts) {
     tool: 'seo-check',
     version: 1,
     url: start.href,
+    requestedUrl: requested.href,
     startedAt,
     finishedAt: new Date().toISOString(),
     complete,
@@ -549,7 +582,12 @@ const canonicalUrl = (u) => { try { return new URL(/^https?:\/\//i.test(u) ? u :
 
 function normalize(report, label) {
   if (report?.tool === 'seo-check') {
-    return { kind: 'seo-check', valid: report.complete, url: report.url, findings: report.findings.filter((f) => f.severity !== 'info'), scores: {} };
+    // Every URL the run actually looked at: a finding can only count as fixed if
+    // the later run looked at its URL again.
+    const origin = new URL(report.url).origin;
+    const covered = new Set([report.url, origin, origin + '/robots.txt', ...(report.sitemap?.files ?? [])]);
+    for (const p of report.pages ?? []) { covered.add(p.url); if (p.finalUrl) covered.add(p.finalUrl); }
+    return { kind: 'seo-check', valid: report.complete, url: report.url, covered, findings: report.findings.filter((f) => f.severity !== 'info'), scores: {} };
   }
   if (report?.tool === 'geo-audit') {
     const findings = [];
@@ -581,7 +619,14 @@ function diff(beforePath, afterPath) {
   }
   const before = new Map(a.findings.map((f) => [f.id, f]));
   const after = new Map(b.findings.map((f) => [f.id, f]));
-  const fixed = a.findings.filter((f) => !after.has(f.id));
+  const gone = a.findings.filter((f) => !after.has(f.id));
+  const unchecked = b.covered ? gone.filter((f) => !b.covered.has(f.url)) : [];
+  if (unchecked.length) {
+    process.stderr.write(`${unchecked.length} finding(s) disappeared only because the later run never fetched their URL; rerun with --urls listing them:\n`);
+    for (const f of unchecked) process.stderr.write(`  ${f.rule}  ${f.url}\n`);
+    return 2;
+  }
+  const fixed = gone;
   const added = b.findings.filter((f) => !before.has(f.id));
   const changed = b.findings.filter((f) => before.has(f.id) && before.get(f.id).message !== f.message);
   const unchanged = b.findings.length - added.length;

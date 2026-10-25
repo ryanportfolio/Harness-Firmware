@@ -30,7 +30,8 @@ node .claude/skills/seo-loop/scripts/seo-check.mjs diff <before.json> <after.jso
 
 - seo-check: Node 20+, no deps. Exit 0 no fail, 1 fail findings, 2 incomplete. 200 ms between fetches, none on localhost.
 - willaicite: pinned tag; never `npx geo-audit` (unrelated npm pkg). Audits localhost as is. Always exits 0, prints a score even for 404 or dead page → validity = diff's job.
-- diff: same tool + same start URL. Exit 0 nothing new, 1 new fail/warn or lower willaicite dimension score, 2 not comparable (other tool/URL, page not reached w/ HTTP 200). Info findings ignored.
+- diff: same tool + same start URL. Exit 0 nothing new, 1 new fail/warn or lower willaicite dimension score, 2 not comparable (other tool/URL, page not reached w/ HTTP 200, finding gone only because its URL went unfetched → rerun w/ `--urls`). Info findings ignored.
+- seo-check crawls from where the start URL lands (http → https, apex → www); report `url` = that, `requestedUrl` = given.
 - Paths: `.tmp/seo-loop/<yyyymmdd-hhmm>/round-<n>/`, round-0 = baseline. `<slug>` = URL path, `/` → `-`, start page = `home`.
 
 ## Baseline + triage
