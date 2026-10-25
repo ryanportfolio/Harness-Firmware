@@ -33,7 +33,7 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 | `description-missing` | warn | Google writes own snippet | page metadata | snippets |
 | `viewport-missing` | warn | Google indexes mobile rendering | layout head | [mobile-first indexing](https://developers.google.com/search/docs/crawling-indexing/mobile/mobile-sites-mobile-first-indexing) |
 | `jsonld-no-type` | warn | JSON-LD naming nothing | structured-data component | sd policies |
-| `noindex`, `canonical-missing`, `canonical-other-origin`, `linked-url-blocked`, `linked-url-redirects`, `title-long`, `h1-missing`, `img-alt-missing`, `robots-missing`, `sitemap-not-declared`, `sitemap-other-origin`, `sitemap-gzip`, `sitemap-files-skipped`, `canonical-not-checked`, `start-redirects` | info | look + decide; often intended | | |
+| `noindex`, `canonical-missing`, `canonical-other-origin`, `linked-url-blocked`, `linked-url-redirects`, `title-long`, `h1-missing`, `img-alt-missing`, `robots-missing`, `sitemap-not-declared`, `sitemap-other-origin`, `sitemap-gzip`, `sitemap-files-skipped`, `canonical-not-checked`, `start-redirects`, `listed-url-other-origin` | info | look + decide; often intended | | |
 
 `title-long` = 70-char display heuristic, not a Google limit. `h1-missing`, `img-alt-missing` help people + image search; Google requires neither. A11y → `ui-quality`.
 

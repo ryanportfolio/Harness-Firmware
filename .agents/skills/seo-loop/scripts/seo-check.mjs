@@ -106,7 +106,7 @@ async function fetchChain(url, guard = () => null) {
       let next;
       try { next = new URL(loc, current).href; } catch { return { ...res, chain, finalUrl: current, error: `bad Location header: ${loc}` }; }
       if (chain.some((c) => c.url === next)) return { ...res, chain, finalUrl: next, error: 'redirect loop' };
-      const stop = guard(next);
+      const stop = await guard(next);
       if (stop) return { ...res, body: null, chain, finalUrl: next, error: null, stopped: stop };
       current = next;
       continue;
@@ -305,10 +305,20 @@ function parseArgs(argv) {
 async function check(opts) {
   const requested = new URL(/^https?:\/\//i.test(opts.url) ? opts.url : `https://${opts.url}`);
   requested.hash = '';
+  // robots.txt per origin, fetched once. The start URL and each hop of its redirects
+  // are checked against it before they are requested, like every other fetch.
+  const robotsCache = new Map();
+  const robotsFor = async (o) => {
+    if (!robotsCache.has(o)) robotsCache.set(o, await fetchChain(o + '/robots.txt', (n) => (new URL(n).origin === o ? null : 'redirect leaves the origin; not followed')));
+    const res = robotsCache.get(o);
+    return res.status === 200 && res.body !== null ? parseRobots(res.body) : null;
+  };
+  const startGuard = async (next) => (googlebotAllowed(await robotsFor(new URL(next).origin), next) ? null : 'redirect target is disallowed by robots.txt; not followed');
+  const startBlocked = !googlebotAllowed(await robotsFor(requested.origin), requested.href);
   // Crawl from where the start URL lands (http -> https, apex -> www, /old -> /new):
   // its origin decides which links are internal, and it is the page judged as the start page.
-  const first = await fetchChain(requested.href);
-  const start = new URL(first.status !== null && first.chain.length > 1 ? first.finalUrl : requested.href);
+  const first = startBlocked ? null : await fetchChain(requested.href, startGuard);
+  const start = new URL(first && first.status !== null && first.chain.length > 1 ? first.finalUrl : requested.href);
   const origin = start.origin;
   const publicOrigin = opts.publicOrigin && opts.publicOrigin !== origin ? opts.publicOrigin : null;
   // Read production-origin URLs (canonical, hreflang, sitemap, links) as the same path here.
@@ -319,7 +329,7 @@ async function check(opts) {
   const sameOrigin = (u) => { try { return new URL(u).origin === origin; } catch { return false; } };
   // Reuse that response as the start page's own fetch: its last hop is the start page.
   const prefetched = new Map();
-  if (!first.error && first.status !== null) prefetched.set(start.href, { ...first, chain: [first.chain.at(-1)], finalUrl: start.href });
+  if (first && !first.error && !first.stopped && first.status !== null) prefetched.set(start.href, { ...first, chain: [first.chain.at(-1)], finalUrl: start.href });
   const local = /^(localhost|127\.|\[::1\])/.test(start.hostname);
   const delay = opts.delay ?? (local ? 0 : 200);
   const startedAt = new Date().toISOString();
@@ -333,9 +343,9 @@ async function check(opts) {
     `Responses are read only up to ${MAX_BYTES / 1e6} MB.`,
   ];
 
-  if (start.href !== requested.href) add('start-redirects', 'info', requested.href, `start URL redirects to ${start.href} (${first.chain.map((c) => c.status).join(' -> ')}); crawled from there`);
+  if (start.href !== requested.href) add('start-redirects', 'info', requested.href, `start URL redirects to ${start.href} (${first.chain.map((c) => c.status).join(' -> ')}); crawled from there${first.stopped ? `, but ${first.stopped}` : ''}`);
 
-  let fetches = 1;
+  let fetches = robotsCache.size + (first ? 1 : 0);
   const fetchBudget = opts.maxPages + 50; // room for canonical and hreflang targets outside the crawl
   const pages = new Map();
   const linkedFrom = new Map();
@@ -350,7 +360,8 @@ async function check(opts) {
   let needsPublicOrigin = false;
 
   // robots.txt
-  const robotsRes = await timed(origin + '/robots.txt', originGuard);
+  if (!robotsCache.has(origin)) { fetches++; await robotsFor(origin); }
+  const robotsRes = robotsCache.get(origin);
   if (robotsRes.status === 200 && robotsRes.body !== null) robots = parseRobots(robotsRes.body);
   else if (robotsRes.status !== null && robotsRes.status >= 500) add('robots-5xx', 'fail', origin + '/robots.txt', `robots.txt answered ${robotsRes.status}; Google stops crawling the site for the first 12 hours of robots.txt server errors`);
   else if (robotsRes.error) add('robots-unreachable', 'fail', origin + '/robots.txt', `robots.txt fetch failed (${robotsRes.error}); Google treats that like a server error and stops crawling for the first 12 hours`);
@@ -431,14 +442,18 @@ async function check(opts) {
   const queue = [];
   const queued = new Set();
   const enqueue = (u) => { if (!queued.has(u)) { queued.add(u); queue.push(u); } };
+  // Listed URLs go through the same mapping and origin rule as discovered ones.
+  const readList = (file) => readFileSync(file, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    .map((l) => mapUrl(new URL(l, start).href))
+    .filter((u) => (sameOrigin(u) ? true : (add('listed-url-other-origin', 'info', u, `${file} lists a URL on another origin; not fetched`), false)));
   let list = null;
   if (opts.urls) {
-    list = readFileSync(opts.urls, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => new URL(l, start).href);
+    list = readList(opts.urls);
     list.forEach(enqueue);
   } else {
     enqueue(start.href);
     // --include: URLs to fetch on top of the crawl, e.g. pages a previous run flagged.
-    if (opts.include) readFileSync(opts.include, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).forEach((l) => enqueue(mapUrl(new URL(l, start).href)));
+    if (opts.include) readList(opts.include).forEach(enqueue);
   }
   let crawled = 0;
   let truncated = false;
@@ -629,6 +644,7 @@ async function check(opts) {
       status: r.status ?? null,
       finalUrl: r.finalUrl ?? null,
       redirects: r.chain ? r.chain.length - 1 : 0,
+      stopped: r.stopped ?? null,
       indexable: Boolean(r.indexable),
       inSitemap: inSitemap(r),
       title: r.html?.titles[0] ?? null,
@@ -664,7 +680,8 @@ function normalize(report, label) {
     for (const p of report.pages ?? []) {
       if (p.blocked || p.status === null) continue;
       covered.add(p.url);
-      if (p.finalUrl) covered.add(p.finalUrl);
+      // A redirect the guard stopped never fetched its target.
+      if (p.finalUrl && !p.stopped) covered.add(p.finalUrl);
     }
     return {
       kind: 'seo-check', valid: report.complete, url: report.url, truncated: Boolean(report.truncated), covered,
