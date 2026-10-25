@@ -20,7 +20,7 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 | `sitemap-url-blocked`, `sitemap-url-noindex` | fail | sitemap asks Google to index a URL that says "don't" | sitemap filter or page robots setting | same |
 | `canonical-multiple` | fail | >1 rel=canonical → Google ignores all | layout head + page head both emit one | [consolidate duplicate URLs](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls) |
 | `canonical-target-bad` | fail | canonical → error, redirect, noindex or blocked URL | canonical builder (slash, host, locale prefix) | same |
-| `hreflang-invalid`, `hreflang-no-return` | fail | bad language code, or one-way pair Google ignores | i18n head component | [localized versions](https://developers.google.com/search/docs/specialty/international/localized-versions) |
+| `hreflang-invalid`, `hreflang-no-return` | fail | code outside ISO 639-1 language + optional script + ISO 3166-1 alpha-2 region (`eng`, `es-419`, `en-UK` fail), or one-way pair Google ignores | i18n head component | [localized versions](https://developers.google.com/search/docs/specialty/international/localized-versions) |
 | `jsonld-invalid` | fail | JSON-LD won't parse → whole block lost | structured-data component (trailing commas, unescaped quotes) | [structured data policies](https://developers.google.com/search/docs/appearance/structured-data/sd-policies) |
 | `title-missing`, `title-empty` | fail | no title for Google to start from | layout head, page metadata | [title links](https://developers.google.com/search/docs/appearance/title-link) |
 | `redirect-chain` | warn | >1 hop | redirect rules: old URL → final URL | [redirects](https://developers.google.com/search/docs/crawling-indexing/301-redirects) |

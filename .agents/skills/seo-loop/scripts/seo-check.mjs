@@ -43,7 +43,16 @@ const MAX_REDIRECTS = 10;
 const MAX_SITEMAP_FILES = 50;
 const TITLE_DISPLAY_CHARS = 70;
 const SKIP_EXT = /\.(pdf|jpe?g|png|gif|webp|avif|svg|ico|css|m?js|json|xml|txt|zip|gz|mp4|webm|mov|mp3|wav|ogg|woff2?|ttf|otf|eot)$/i;
-const HREFLANG = /^(x-default|[a-z]{2,3}(-[a-z]{4})?(-([a-z]{2}|\d{3}))?)$/i;
+// Google supports only ISO 639-1 languages and ISO 3166-1 alpha-2 regions (so not eng, es-419, en-UK),
+// plus an optional ISO 15924 script (zh-Hant). Script codes are checked for shape only.
+const ISO_639_1 = new Set('aa ab ae af ak am an ar as av ay az ba be bg bi bm bn bo br bs ca ce ch co cr cs cu cv cy da de dv dz ee el en eo es et eu fa ff fi fj fo fr fy ga gd gl gn gu gv ha he hi ho hr ht hu hy hz ia id ie ig ii ik io is it iu ja jv ka kg ki kj kk kl km kn ko kr ks ku kv kw ky la lb lg li ln lo lt lu lv mg mh mi mk ml mn mr ms mt my na nb nd ne ng nl nn no nr nv ny oc oj om or os pa pi pl ps pt qu rm rn ro ru rw sa sc sd se sg si sk sl sm sn so sq sr ss st su sv sw ta te tg th ti tk tl tn to tr ts tt tw ty ug uk ur uz ve vi vo wa wo xh yi yo za zh zu'.split(' '));
+const ISO_3166_1 = new Set('ad ae af ag ai al am ao aq ar as at au aw ax az ba bb bd be bf bg bh bi bj bl bm bn bo bq br bs bt bv bw by bz ca cc cd cf cg ch ci ck cl cm cn co cr cu cv cw cx cy cz de dj dk dm do dz ec ee eg eh er es et fi fj fk fm fo fr ga gb gd ge gf gg gh gi gl gm gn gp gq gr gs gt gu gw gy hk hm hn hr ht hu id ie il im in io iq ir is it je jm jo jp ke kg kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu lv ly ma mc md me mf mg mh mk ml mm mn mo mp mq mr ms mt mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz om pa pe pf pg ph pk pl pm pn pr ps pt pw py qa re ro rs ru rw sa sb sc sd se sg sh si sj sk sl sm sn so sr ss st sv sx sy sz tc td tf tg th tj tk tl tm tn to tr tt tv tw tz ua ug um us uy uz va vc ve vg vi vn vu wf ws ye yt za zm zw'.split(' '));
+const validHreflang = (value) => {
+  const v = value.toLowerCase();
+  if (v === 'x-default') return true;
+  const m = /^([a-z]{2})(?:-([a-z]{4}))?(?:-([a-z]{2}))?$/.exec(v);
+  return Boolean(m) && ISO_639_1.has(m[1]) && (!m[3] || ISO_3166_1.has(m[3]));
+};
 
 function usage() {
   return 'usage:\n  node seo-check.mjs <url> [--out report.json] [--max-pages 200] [--urls list.txt | --include list.txt] [--delay ms] [--public-origin https://example.com]\n  node seo-check.mjs diff <before.json> <after.json>\n';
@@ -593,7 +602,7 @@ async function check(opts) {
     const self = rec.finalUrl;
     let hasSelf = false;
     for (const alt of h.hreflang) {
-      if (!HREFLANG.test(alt.lang)) { add('hreflang-invalid', 'fail', url, `hreflang="${alt.lang}" is not a valid language or language-region code`, `${url}|${alt.lang}`); continue; }
+      if (!validHreflang(alt.lang)) { add('hreflang-invalid', 'fail', url, `hreflang="${alt.lang}" is not an ISO 639-1 language with an optional script and ISO 3166-1 alpha-2 region, so Google ignores it`, `${url}|${alt.lang}`); continue; }
       if (!/^https?:\/\//i.test(alt.href)) add('hreflang-relative', 'warn', url, `hreflang ${alt.lang} href "${alt.href}" is not a fully qualified URL`, `${url}|${alt.lang}`);
       let target;
       try { target = mapUrl(new URL(alt.href, h.base).href); } catch { add('hreflang-invalid', 'fail', url, `hreflang ${alt.lang} href "${alt.href}" is not a URL`, `${url}|${alt.lang}`); continue; }
@@ -768,10 +777,12 @@ function diff(beforePath, afterPath) {
   // redirect findings only need it fetched.
   const statusRule = /^(http-error|http-no-content|fetch-error|redirect-chain|sitemap-|robots-|start-unreadable|needs-public-origin|linked-url-|listed-url-)/;
   // Sitemap-membership findings also need the later run to have read every sitemap file.
-  const membershipRule = /^(not-in-sitemap|orphan|sitemap-url-)/;
+  const membershipRule = /^(not-in-sitemap|orphan|sitemap-url-|sitemap-bad-url$|sitemap-foreign-url$)/;
+  // Findings about one sitemap entry are settled once a complete later sitemap no longer lists it.
+  const entryRule = /^(sitemap-url-|sitemap-bad-url$|sitemap-foreign-url$)/;
   const settled = (f) => {
     if (membershipRule.test(f.rule) && !b.sitemapComplete) return false;
-    if (f.rule.startsWith('sitemap-url-') && !b.sitemapList.has(f.url)) return true;
+    if (entryRule.test(f.rule) && !b.sitemapList.has(f.url)) return true;
     return (f.urls ?? [f.url]).every((u) => (statusRule.test(f.rule) ? b.covered : b.coveredHtml).has(u));
   };
   const unchecked = b.covered ? gone.filter((f) => !settled(f)) : [];
