@@ -794,6 +794,9 @@ function normalize(report, label) {
       if (p.finalUrl && !p.stopped) covered.add(p.finalUrl);
       if (p.html && p.redirects === 0) coveredHtml.add(p.url);
     }
+    for (const p of report.pages ?? []) {
+      if (!p.blocked && p.redirects > 0 && p.status === 200 && !p.stopped && coveredHtml.has(p.finalUrl)) coveredHtml.add(p.url);
+    }
     return {
       kind: 'seo-check', valid: report.complete, url: report.url, truncated: Boolean(report.truncated), covered, coveredHtml,
       sitemapComplete: report.sitemap?.complete === true, sitemapList: new Set(report.sitemap?.list ?? []),
@@ -876,12 +879,15 @@ function diff(beforePath, afterPath) {
   const fixed = gone;
   const added = b.findings.filter((f) => !before.has(f.id));
   const changed = b.findings.filter((f) => before.has(f.id) && before.get(f.id).message !== f.message);
+  const rank = { warn: 1, fail: 2 };
+  const worse = b.findings.filter((f) => before.has(f.id) && rank[f.severity] > rank[before.get(f.id).severity]);
   const unchanged = b.findings.length - added.length;
   const out = process.stdout;
   out.write(`${a.kind} diff (fail and warn only): ${fixed.length} fixed, ${added.length} new, ${changed.length} changed wording, ${unchanged} still present\n`);
   for (const f of fixed) out.write(`  FIXED  ${f.severity}  ${f.rule}  ${f.url}  ${f.message}\n`);
   for (const f of added) out.write(`  NEW    ${f.severity}  ${f.rule}  ${f.url}  ${f.message}\n`);
   for (const f of changed) out.write(`  CHANGED  ${f.rule}  "${before.get(f.id).message}" -> "${f.message}"\n`);
+  for (const f of worse) out.write(`  WORSE  ${before.get(f.id).severity} -> ${f.severity}  ${f.rule}  ${f.url}  ${f.message}\n`);
   const drops = [];
   for (const key of new Set([...Object.keys(a.scores), ...Object.keys(b.scores)])) {
     const x = a.scores[key] ?? null;
@@ -891,7 +897,7 @@ function diff(beforePath, afterPath) {
     if (x !== null && (y === null || y < x)) drops.push(key);
   }
   for (const { f, extra } of grown) out.write(`  GREW   ${f.severity}  ${f.rule}  now also ${extra.join(', ')}\n`);
-  return added.length || drops.length || grown.length ? 1 : 0;
+  return added.length || worse.length || drops.length || grown.length ? 1 : 0;
 }
 
 // ---------- main ----------
