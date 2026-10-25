@@ -54,7 +54,8 @@ const browser = await (await chromium()).launch({ headless: false, channel: "chr
 try {
   const page = await browser.newPage({ viewport: { width: vp[0], height: vp[1] } });
   page.on("pageerror", (e) => console.log("page error:", e.message));
-  await page.goto(withQuery(url, `capture=1&t=0${args.theme ? `&theme=${args.theme}` : ""}`));
+  // speed=1 overrides a preview speed left in --url: the recording runs at 1x.
+  await page.goto(withQuery(url, `capture=1&t=0&speed=1${args.theme ? `&theme=${args.theme}` : ""}`));
   await page.waitForFunction(() => window.__player && window.__player.ready);
   const ids = args._.length ? args._ : await page.evaluate(() => window.__player.scenes().map((s) => s.id));
   // getDisplayMedia needs a user gesture: an invisible button Playwright clicks.
