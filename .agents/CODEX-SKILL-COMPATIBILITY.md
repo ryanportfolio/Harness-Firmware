@@ -24,7 +24,7 @@ for comparison, backup, reconciliation, and discovery checks.
 |---|---|
 | Native | `addskill`, `babysit-ci`, `brainstorming`, `bro`, `caveman`, `enhance-prompt`, `external-review`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `recall`, `refine`, `servers`, `session-hub`, `showpiece`, `wrapup`, `writing`, `writing-plans` |
 | Adapted | `apply-firmware`, `astra-review`, `claude-review`, `codex-review`, `deep-plan`, `init-project`, `lab`, `optimize-context`, `opus-fullreview`, `sync-starter` |
-| Capability-gated | `advocate`, `arena`, `cache-loop`, `conversion-ux`, `dare`, `design-prototypes`, `impartial-review`, `long-horizon`, `perf-loop`, `redesign-concepts`, `security-loop`, `ui-quality`, `why`, `wow-loop` |
+| Capability-gated | `advocate`, `arena`, `cache-loop`, `conversion-ux`, `dare`, `design-prototypes`, `impartial-review`, `long-horizon`, `motion-design`, `perf-loop`, `product-walkthrough`, `redesign-concepts`, `security-loop`, `ui-quality`, `why`, `wow-loop` |
 | Dangerous | `adopt-repo` |
 | Claude-only | `astra-fullreview`, `codex-fullreview`, `codex-image-gen`, `coordinate`, `gauntlet`, `long-horizon-workflows`, `merge` |
 
@@ -33,6 +33,8 @@ for comparison, backup, reconciliation, and discovery checks.
 `conversion-ux` audits need a way to render the screen at phone and desktop widths and capture it; without one, audit from supplied screenshots or code and list what could not be seen, never claim a visual verdict.
 
 `ui-quality` audits need headed Chrome and Node with `axe-core` and `playwright-core` installable for the probe; without them, audit from code and supplied screenshots, label each finding as not measured, and list what could not be checked.
+
+`motion-design` and `product-walkthrough` verify motion in headed Chrome on the real GPU with `playwright` or `playwright-core` installable, plus process and network approval for the local server and browser launches. Without a browser, say that motion, stills and exports were not checked rather than judging them from code. `product-walkthrough` builds chapters with parallel agents when the session exposes agent tools; without them it builds one chapter after another in the main thread and says so.
 
 `design-prototypes` and `redesign-concepts` need an exposed image generation tool; without one, say so and offer the prompts instead of drawing images in code. `codex-image-gen` is Claude-only: it drives Codex's image tool through `codex exec` from Claude Code, while a Codex session calls its built-in image tool directly.
 

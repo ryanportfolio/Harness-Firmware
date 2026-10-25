@@ -13,6 +13,22 @@ condensed.
 
 ### Added
 
+- `motion-design` and `product-walkthrough` for Claude and Codex, moved in from
+  personal installs. `motion-design` plans, builds and verifies animation that
+  has to read and feel right (explainers, promos, game trailers, hero and UI
+  motion), with a seekable `frame(t)` engine, a stills script and in-page
+  WebCodecs export. `product-walkthrough` builds an onboarding tour that replays
+  a product's real screens, rebuilt from its CSS and markup, while a guide cursor
+  acts, in a player that embeds or exports to MP4. New in this import:
+  `motion-design` gets `references/ui-loops.md` (one story per visual for UI
+  cards, dashboards and mockups, plus cycle and live-page rules) and loop checks
+  for the seam, the empty hold and the rest frame; `product-walkthrough` applies
+  the story rule to each chapter's result, and its determinism check now also
+  compares a chapter's first frame after a replay and after another chapter has
+  played. Ideas adapted from elayadesign/ai-design-skills (MIT). The
+  `ui-quality` and `conversion-ux` descriptions were shortened to keep the Codex
+  skill catalog under its 7,500-character budget.
+
 - `gauntlet` for Claude: one command runs a draft through the quality chain
   used to build `conversion-ux`. The owner confirms a contract, then dare's four
   fresh-context steps run with two owner gates, a final draft is written, one

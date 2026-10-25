@@ -155,6 +155,16 @@
       "group": "specialist"
     },
     {
+      "name": "motion-design",
+      "label": "Motion design",
+      "group": "specialist"
+    },
+    {
+      "name": "product-walkthrough",
+      "label": "Product walkthrough",
+      "group": "specialist"
+    },
+    {
       "name": "codex-image-gen",
       "label": "Codex image gen",
       "group": "specialist"
