@@ -23,15 +23,16 @@ Goal: site easier to index, attribute + quote, via measured rounds on own source
 ## Tools
 
 ```
-node .agents/skills/seo-loop/scripts/seo-check.mjs <url> --out <dir>/seo.json [--max-pages 200] [--urls list.txt]
+node .agents/skills/seo-loop/scripts/seo-check.mjs <url> --out <dir>/seo.json [--max-pages 200] [--urls list.txt | --include list.txt] [--public-origin https://prod.example]
 npx -y github:ryanportfolio/willaicite#v1.4.0 <page-url> --json --out <dir>/geo-<slug>.json
 node .agents/skills/seo-loop/scripts/seo-check.mjs diff <before.json> <after.json>
 ```
 
 - seo-check: Node 20+, no deps. Exit 0 no fail, 1 fail findings, 2 incomplete. 200 ms between fetches, none on localhost.
 - willaicite: pinned tag; never `npx geo-audit` (unrelated npm pkg). Audits localhost as is. Always exits 0, prints a score even for 404 or dead page → validity = diff's job.
-- diff: same tool + same start URL. Exit 0 nothing new, 1 new fail/warn or lower willaicite dimension score, 2 not comparable (other tool/URL, page not reached w/ HTTP 200, finding gone only because its URL went unfetched → rerun w/ `--urls`). Info findings ignored.
-- seo-check crawls from where the start URL lands (http → https, apex → www); report `url` = that, `requestedUrl` = given.
+- diff: same tool + same start URL. Exit 0 nothing new, 1 new fail/warn or lower willaicite dimension score, 2 not comparable (other tool/URL, page not reached w/ HTTP 200, finding gone only because its URL went unfetched → rerun later check w/ `--include`, later run hit page budget earlier didn't). Info findings ignored.
+- seo-check crawls from where the start URL lands (http → https, apex → www); report `url` = that, `requestedUrl` = given. Never fetches other origins or robots-blocked redirect targets.
+- Local preview of a site whose canonical/sitemap/links name the production origin → `--public-origin <prod origin>`; without it run = incomplete (`needs-public-origin`).
 - Paths: `.tmp/seo-loop/<yyyymmdd-hhmm>/round-<n>/`, round-0 = baseline. `<slug>` = URL path, `/` → `-`, start page = `home`.
 
 ## Baseline + triage
@@ -62,7 +63,7 @@ Stop: ≤5 rounds default; 2 consecutive w/o kept fix; next fix needs owner.
 
 Never alone; list pending w/ exact proposed change:
 
-- Training-crawler rules (`GPTBot`, `ClaudeBot`, `Google-Extended`, `CCBot`, `Applebot-Extended`, `meta-externalagent`, others willaicite lists as training): licensing choice. Retrieval crawlers gate citations. Report groups separately, as willaicite labels them.
+- Training-crawler rules (`GPTBot`, `ClaudeBot`, `CCBot`, `Applebot-Extended`, `meta-externalagent`, others willaicite lists as training): licensing choice. `Google-Extended` = Gemini training + Gemini/Vertex grounding, not Search → name both uses. Retrieval crawlers gate citations. Report groups separately, as willaicite labels them.
 - CDN/firewall bot rules: outside repo → report setting.
 - New facts, figures, quotes, authors, credentials, prices, dates; key-page copy (draft via `writing`).
 - Section-wide noindex/robots, URL changes + redirect maps, new pages.

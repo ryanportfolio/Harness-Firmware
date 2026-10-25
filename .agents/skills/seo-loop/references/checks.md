@@ -13,6 +13,8 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 | `robots-5xx`, `robots-unreachable` | fail | robots.txt errors → Google stops crawling site first 12 h | host/server config, static file | [robots.txt spec](https://developers.google.com/crawling/docs/robots-txt/robots-txt-spec) |
 | `robots-blocks-root` | fail | Googlebot disallowed from `/` (often staging robots.txt shipped) | `robots.txt` or framework robots route | same |
 | `start-unreadable`, `start-noindex` | fail | start URL: no HTML, blocked, or noindex | env-dependent noindex, auth middleware | [block indexing](https://developers.google.com/search/docs/crawling-indexing/block-indexing) |
+| `needs-public-origin` | fail | local run, sitemap/canonical name production origin → run incomplete | rerun w/ `--public-origin <prod origin>` (measurement setup, not the site) | |
+| `parse-error` | fail | page HTML couldn't be read by the checker | check the page by hand; report the checker bug | |
 | `http-error`, `fetch-error` | fail | linked/sitemap URL → 4xx/5xx or no answer | the link, route, or redirect map | [HTTP status codes](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes) |
 | `sitemap-unreachable`, `sitemap-invalid`, `sitemap-bad-url` | fail | declared sitemap unreadable, or `<loc>` not absolute URL | sitemap generator config | [build a sitemap](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap) |
 | `sitemap-url-blocked`, `sitemap-url-noindex` | fail | sitemap asks Google to index a URL that says "don't" | sitemap filter or page robots setting | same |
@@ -31,7 +33,7 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 | `description-missing` | warn | Google writes own snippet | page metadata | snippets |
 | `viewport-missing` | warn | Google indexes mobile rendering | layout head | [mobile-first indexing](https://developers.google.com/search/docs/crawling-indexing/mobile/mobile-sites-mobile-first-indexing) |
 | `jsonld-no-type` | warn | JSON-LD naming nothing | structured-data component | sd policies |
-| `noindex`, `canonical-missing`, `canonical-other-origin`, `linked-url-blocked`, `linked-url-redirects`, `title-long`, `h1-missing`, `img-alt-missing`, `robots-missing`, `sitemap-not-declared`, `sitemap-other-origin`, `sitemap-gzip`, `sitemap-files-skipped`, `canonical-not-checked` | info | look + decide; often intended | | |
+| `noindex`, `canonical-missing`, `canonical-other-origin`, `linked-url-blocked`, `linked-url-redirects`, `title-long`, `h1-missing`, `img-alt-missing`, `robots-missing`, `sitemap-not-declared`, `sitemap-other-origin`, `sitemap-gzip`, `sitemap-files-skipped`, `canonical-not-checked`, `start-redirects` | info | look + decide; often intended | | |
 
 `title-long` = 70-char display heuristic, not a Google limit. `h1-missing`, `img-alt-missing` help people + image search; Google requires neither. A11y → `ui-quality`.
 
@@ -57,8 +59,9 @@ Not covered: JS-added tags (compare rendered DOM in headed Chrome when framework
 
 ## Crawler claims
 
-Each crawler reported w/ the 1 capability it governs; never merged. willaicite's report labels each token retrieval or training: use its labels + list ([registry](https://willaicite.com/crawlers), `src/aiBots.ts`). Googlebot isn't in that list → seo-check's robots rules cover it.
+Each crawler reported w/ every use it controls; never merged w/ another token. willaicite's report labels each token retrieval or training: use its labels + list ([registry](https://willaicite.com/crawlers), `src/aiBots.ts`). Googlebot isn't in that list → seo-check's robots rules cover it.
 
 - Retrieval (block = no citations from that engine), e.g. `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`, `Perplexity-User`, `Bingbot` (Copilot), `Applebot`; `Googlebot` feeds Search, AI Overviews, AI Mode.
-- Training (owner's licensing call, no effect on search citations), e.g. `GPTBot`, `ClaudeBot`, `Google-Extended`, `CCBot`, `Applebot-Extended`, `meta-externalagent`.
+- Training (owner's licensing call, no effect on search citations), e.g. `GPTBot`, `ClaudeBot`, `CCBot`, `Applebot-Extended`, `meta-externalagent`.
+- `Google-Extended`: Gemini model training **and** grounding in Gemini Apps + Vertex AI Grounding with Google Search; no effect on Google Search inclusion or ranking, incl. AI Overviews/AI Mode (served from `Googlebot`). Blocking it can remove a site from Gemini-grounded answers → owner's call w/ both uses named ([Google common crawlers](https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers#google-extended)).
 - AI Overviews/AI Mode controls: Google's [AI features page](https://developers.google.com/search/docs/appearance/ai-features); read before advising.

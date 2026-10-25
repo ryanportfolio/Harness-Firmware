@@ -7,13 +7,20 @@
    Google renders pages later, but canonical, noindex and hreflang belong in the
    server's HTML. Zero dependencies, Node 20 or newer.
 
-     node seo-check.mjs <url> [--out report.json] [--max-pages 200] [--urls list.txt] [--delay ms]
+     node seo-check.mjs <url> [--out report.json] [--max-pages 200] [--urls list.txt | --include list.txt] [--delay ms] [--public-origin https://example.com]
      node seo-check.mjs diff <before.json> <after.json>
 
    Check mode crawls internal links breadth-first from <url>, then fetches the
    sitemap URLs it has not seen, until --max-pages HTML fetches. --urls checks
-   only the listed URLs (one per line) plus robots.txt and the sitemap. URLs
-   robots.txt disallows for Googlebot are reported, not fetched.
+   only the listed URLs (one per line) plus robots.txt and the sitemap;
+   --include crawls as usual and also fetches the listed URLs. URLs
+   robots.txt disallows for Googlebot are reported, not fetched, and so are
+   redirects into them. Nothing outside the audited origin is fetched.
+
+   --public-origin: when <url> is a local preview of a site whose canonical,
+   hreflang, sitemap and link URLs name the production origin, those URLs are
+   read as the same paths on the preview. Without it, a local run whose sitemap
+   lists another origin is reported incomplete.
 
    Exit codes, check mode: 0 no fail findings, 1 fail findings, 2 incomplete
    (start URL unreachable or not HTML). Diff mode takes two seo-check reports or
@@ -39,7 +46,7 @@ const SKIP_EXT = /\.(pdf|jpe?g|png|gif|webp|avif|svg|ico|css|m?js|json|xml|txt|z
 const HREFLANG = /^(x-default|[a-z]{2,3}(-[a-z]{4})?(-([a-z]{2}|\d{3}))?)$/i;
 
 function usage() {
-  return 'usage:\n  node seo-check.mjs <url> [--out report.json] [--max-pages 200] [--urls list.txt] [--delay ms]\n  node seo-check.mjs diff <before.json> <after.json>\n';
+  return 'usage:\n  node seo-check.mjs <url> [--out report.json] [--max-pages 200] [--urls list.txt | --include list.txt] [--delay ms] [--public-origin https://example.com]\n  node seo-check.mjs diff <before.json> <after.json>\n';
 }
 
 // ---------- fetching ----------
@@ -86,8 +93,9 @@ async function fetchOnce(url) {
   }
 }
 
-/** Follow redirects by hand so the chain is visible. */
-async function fetchChain(url) {
+/** Follow redirects by hand so the chain is visible. `guard(next)` returns a
+    reason to stop before fetching a hop (robots.txt, another origin), or null. */
+async function fetchChain(url, guard = () => null) {
   const chain = [];
   let current = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -98,6 +106,8 @@ async function fetchChain(url) {
       let next;
       try { next = new URL(loc, current).href; } catch { return { ...res, chain, finalUrl: current, error: `bad Location header: ${loc}` }; }
       if (chain.some((c) => c.url === next)) return { ...res, chain, finalUrl: next, error: 'redirect loop' };
+      const stop = guard(next);
+      if (stop) return { ...res, body: null, chain, finalUrl: next, error: null, stopped: stop };
       current = next;
       continue;
     }
@@ -141,6 +151,12 @@ function rulesFor(robots, agent) {
   return chosen.flatMap((g) => g.rules);
 }
 
+/** Rules and URL paths compare in one form: non-ASCII and spaces percent-encoded
+    as UTF-8, existing escapes upper-cased. `Disallow: /café` then matches `/caf%C3%A9`. */
+const encodeForMatch = (s) => s
+  .replace(/[^\x21-\x7e]/gu, (c) => encodeURIComponent(c))
+  .replace(/%[0-9a-f]{2}/gi, (e) => e.toUpperCase());
+
 function patternMatches(pattern, path) {
   const anchored = pattern.endsWith('$');
   const body = (anchored ? pattern.slice(0, -1) : pattern).replace(/[.+?^{}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
@@ -150,12 +166,13 @@ function patternMatches(pattern, path) {
 function googlebotAllowed(robots, url) {
   if (!robots) return true;
   const u = new URL(url);
-  const path = u.pathname + u.search;
+  const path = encodeForMatch(u.pathname + u.search);
   if (u.pathname === '/robots.txt') return true;
   let best = null;
   for (const rule of rulesFor(robots, 'googlebot')) {
-    if (!patternMatches(rule.pattern, path)) continue;
-    const len = rule.pattern.length;
+    const pattern = encodeForMatch(rule.pattern);
+    if (!patternMatches(pattern, path)) continue;
+    const len = pattern.length;
     if (!best || len > best.len || (len === best.len && rule.allow)) best = { allow: rule.allow, len };
   }
   return best ? best.allow : true;
@@ -172,10 +189,13 @@ function xmlLocs(xml, parent) {
 
 // ---------- HTML ----------
 
+// Out-of-range numeric references (&#x110000;) become U+FFFD, as browsers do, instead of throwing.
+const codePoint = (n) => (Number.isInteger(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '�');
+
 function decodeEntities(s) {
   return s
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => codePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => codePoint(Number(d)))
     .replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 }
@@ -260,14 +280,19 @@ function jsonldTypes(blocks) {
 // ---------- check mode ----------
 
 function parseArgs(argv) {
-  const opts = { url: null, out: null, maxPages: 200, urls: null, delay: null };
+  const opts = { url: null, out: null, maxPages: 200, urls: null, include: null, delay: null, publicOrigin: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const need = () => { const v = argv[++i]; if (v === undefined) throw new Error(`${a} needs a value`); return v; };
     if (a === '--out') opts.out = need();
     else if (a === '--max-pages') opts.maxPages = Number(need());
     else if (a === '--urls') opts.urls = need();
+    else if (a === '--include') opts.include = need();
     else if (a === '--delay') opts.delay = Number(need());
+    else if (a === '--public-origin') {
+      const v = need();
+      try { opts.publicOrigin = new URL(v).origin; } catch { throw new Error(`--public-origin "${v}" is not a URL`); }
+    }
     else if (a.startsWith('-')) throw new Error(`unknown option ${a}`);
     else if (!opts.url) opts.url = a;
     else throw new Error(`unexpected argument ${a}`);
@@ -285,6 +310,13 @@ async function check(opts) {
   const first = await fetchChain(requested.href);
   const start = new URL(first.status !== null && first.chain.length > 1 ? first.finalUrl : requested.href);
   const origin = start.origin;
+  const publicOrigin = opts.publicOrigin && opts.publicOrigin !== origin ? opts.publicOrigin : null;
+  // Read production-origin URLs (canonical, hreflang, sitemap, links) as the same path here.
+  const mapUrl = (u) => {
+    if (!publicOrigin) return u;
+    try { const x = new URL(u); return x.origin === publicOrigin ? origin + x.pathname + x.search + x.hash : u; } catch { return u; }
+  };
+  const sameOrigin = (u) => { try { return new URL(u).origin === origin; } catch { return false; } };
   // Reuse that response as the start page's own fetch: its last hop is the start page.
   const prefetched = new Map();
   if (!first.error && first.status !== null) prefetched.set(start.href, { ...first, chain: [first.chain.at(-1)], finalUrl: start.href });
@@ -307,15 +339,18 @@ async function check(opts) {
   const fetchBudget = opts.maxPages + 50; // room for canonical and hreflang targets outside the crawl
   const pages = new Map();
   const linkedFrom = new Map();
-  const timed = async (url) => {
+  const timed = async (url, guard) => {
     if (fetches > 0 && delay > 0) await sleep(delay);
     fetches++;
-    return fetchChain(url);
+    return fetchChain(url, guard);
   };
+  const originGuard = (next) => (sameOrigin(next) ? null : 'redirect leaves the audited origin; not followed');
+  let robots = null;
+  const pageGuard = (next) => originGuard(next) ?? (googlebotAllowed(robots, next) ? null : 'redirect target is disallowed by robots.txt; not followed');
+  let needsPublicOrigin = false;
 
   // robots.txt
-  const robotsRes = await timed(origin + '/robots.txt');
-  let robots = null;
+  const robotsRes = await timed(origin + '/robots.txt', originGuard);
   if (robotsRes.status === 200 && robotsRes.body !== null) robots = parseRobots(robotsRes.body);
   else if (robotsRes.status !== null && robotsRes.status >= 500) add('robots-5xx', 'fail', origin + '/robots.txt', `robots.txt answered ${robotsRes.status}; Google stops crawling the site for the first 12 hours of robots.txt server errors`);
   else if (robotsRes.error) add('robots-unreachable', 'fail', origin + '/robots.txt', `robots.txt fetch failed (${robotsRes.error}); Google treats that like a server error and stops crawling for the first 12 hours`);
@@ -324,8 +359,9 @@ async function check(opts) {
 
   // sitemaps
   const sitemapUrls = new Set();
-  const declared = (robots?.sitemaps ?? []).filter((s) => { try { return new URL(s).origin === origin; } catch { return false; } });
-  for (const s of robots?.sitemaps ?? []) if (!declared.includes(s)) add('sitemap-other-origin', 'info', s, 'robots.txt declares a sitemap on another origin; not checked');
+  const robotsSitemaps = (robots?.sitemaps ?? []).map(mapUrl);
+  const declared = robotsSitemaps.filter(sameOrigin);
+  for (const s of robotsSitemaps) if (!declared.includes(s)) add('sitemap-other-origin', 'info', s, 'robots.txt declares a sitemap on another origin; not fetched');
   const sitemapQueue = declared.length ? [...declared] : [origin + '/sitemap.xml'];
   const sitemapFiles = [];
   const fromIndex = new Set();
@@ -334,7 +370,7 @@ async function check(opts) {
     if (sitemapFiles.includes(smUrl)) continue;
     sitemapFiles.push(smUrl);
     if (/\.gz$/i.test(smUrl)) { add('sitemap-gzip', 'info', smUrl, 'gzipped sitemap not read'); continue; }
-    const res = await timed(smUrl);
+    const res = await timed(smUrl, originGuard);
     if (res.status !== 200 || res.body === null) {
       if (declared.includes(smUrl)) add('sitemap-unreachable', 'fail', smUrl, `sitemap declared in robots.txt answered ${res.status ?? res.error}`);
       else if (fromIndex.has(smUrl)) add('sitemap-unreachable', 'fail', smUrl, `sitemap listed in a sitemap index answered ${res.status ?? res.error}`);
@@ -342,14 +378,23 @@ async function check(opts) {
       continue;
     }
     if (res.chain.length > 1) add('sitemap-redirect', 'warn', smUrl, `sitemap redirects to ${res.finalUrl}`);
-    if (/<sitemapindex\b/i.test(res.body)) xmlLocs(res.body, 'sitemap').forEach((loc) => { fromIndex.add(loc); sitemapQueue.push(loc); });
-    else if (/<urlset\b/i.test(res.body)) xmlLocs(res.body, 'url').forEach((loc) => sitemapUrls.add(loc));
+    if (/<sitemapindex\b/i.test(res.body)) {
+      for (const loc of xmlLocs(res.body, 'sitemap').map(mapUrl)) {
+        if (sameOrigin(loc)) { fromIndex.add(loc); sitemapQueue.push(loc); }
+        else add('sitemap-other-origin', 'info', loc, `sitemap index ${smUrl} lists a sitemap on another origin; not fetched`);
+      }
+    } else if (/<urlset\b/i.test(res.body)) xmlLocs(res.body, 'url').forEach((loc) => sitemapUrls.add(mapUrl(loc)));
     else add('sitemap-invalid', 'fail', smUrl, 'sitemap is neither a <urlset> nor a <sitemapindex>');
   }
   if (sitemapQueue.length) add('sitemap-files-skipped', 'info', origin, `${sitemapQueue.length} sitemap files beyond the first ${MAX_SITEMAP_FILES} not read`);
   if (!declared.length && sitemapUrls.size) add('sitemap-not-declared', 'info', origin + '/robots.txt', 'sitemap.xml exists but robots.txt has no Sitemap line');
   for (const loc of sitemapUrls) {
-    try { if (new URL(loc).origin !== origin) add('sitemap-foreign-url', 'warn', loc, 'sitemap lists a URL on another origin'); } catch { add('sitemap-bad-url', 'fail', loc, 'sitemap <loc> is not a valid absolute URL'); }
+    try {
+      if (new URL(loc).origin !== origin) {
+        if (local && !publicOrigin) needsPublicOrigin = true;
+        else add('sitemap-foreign-url', 'warn', loc, 'sitemap lists a URL on another origin');
+      }
+    } catch { add('sitemap-bad-url', 'fail', loc, 'sitemap <loc> is not a valid absolute URL'); }
   }
 
   const getPage = async (url) => {
@@ -360,12 +405,20 @@ async function check(opts) {
       pages.set(url, rec);
       return rec;
     }
-    const res = prefetched.get(url) ?? await timed(url);
+    const res = prefetched.get(url) ?? await timed(url, pageGuard);
     prefetched.delete(url);
     const isHtml = /text\/html|application\/xhtml/i.test(res.headers['content-type'] ?? '');
+    let html = null;
+    let parseError = null;
+    if (isHtml && res.body !== null) {
+      try {
+        html = parseHtml(res.body, res.finalUrl);
+        html.links = [...new Set(html.links.map(mapUrl))];
+      } catch (err) { parseError = err?.message ?? String(err); }
+    }
     const rec = {
       url, blocked: false, status: res.status, finalUrl: res.finalUrl, chain: res.chain, error: res.error,
-      html: isHtml && res.body !== null ? parseHtml(res.body, res.finalUrl) : null,
+      stopped: res.stopped ?? null, html, parseError,
       xRobots: (res.headers['x-robots-tag'] ?? '').toLowerCase(),
     };
     rec.noindex = /\bnoindex\b|\bnone\b/.test(`${rec.xRobots},${rec.html?.robots ?? ''}`);
@@ -384,6 +437,8 @@ async function check(opts) {
     list.forEach(enqueue);
   } else {
     enqueue(start.href);
+    // --include: URLs to fetch on top of the crawl, e.g. pages a previous run flagged.
+    if (opts.include) readFileSync(opts.include, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).forEach((l) => enqueue(mapUrl(new URL(l, start).href)));
   }
   let crawled = 0;
   let truncated = false;
@@ -395,10 +450,10 @@ async function check(opts) {
       if (!rec) { truncated = true; return; }
       crawled++;
       // A redirect target is a page of its own: check it even when nothing links to it.
-      if (!rec.blocked && rec.chain.length > 1 && new URL(rec.finalUrl).origin === origin) enqueue(rec.finalUrl);
+      if (!rec.blocked && rec.chain.length > 1 && sameOrigin(rec.finalUrl)) enqueue(rec.finalUrl);
       if (!follow || !rec.html) continue;
       for (const link of rec.html.links) {
-        if (new URL(link).origin !== origin) continue;
+        if (!sameOrigin(link)) continue;
         if (!linkedFrom.has(link)) linkedFrom.set(link, new Set());
         linkedFrom.get(link).add(rec.finalUrl);
         if (!SKIP_EXT.test(new URL(link).pathname)) enqueue(link);
@@ -407,43 +462,44 @@ async function check(opts) {
   };
   await runQueue(!list);
   if (!truncated && !list) {
-    for (const loc of sitemapUrls) { try { if (new URL(loc).origin === origin) enqueue(loc); } catch { /* reported above */ } }
+    for (const loc of sitemapUrls) if (sameOrigin(loc)) enqueue(loc);
     await runQueue(true); // sitemap-only pages link out too; same page budget
   }
-  if (truncated) limits.push(`Crawl stopped at --max-pages ${opts.maxPages}; orphan and not-in-sitemap results cover only what was fetched.`);
+  if (truncated) limits.push(`Crawl stopped at --max-pages ${opts.maxPages}; orphan results cover only links on fetched pages.`);
 
   const startRec = pages.get(list ? list[0] : start.href);
-  const complete = Boolean(startRec && !startRec.blocked && startRec.html);
 
   // per-page findings
   const canonicalOf = (rec) => {
     const c = rec.html?.canonicals ?? [];
     if (c.length !== 1) return null;
-    try { return new URL(c[0], rec.finalUrl).href; } catch { return null; }
+    try { return mapUrl(new URL(c[0], rec.finalUrl).href); } catch { return null; }
   };
   const inSitemap = (rec) => sitemapUrls.has(rec.url) || sitemapUrls.has(rec.finalUrl);
   const linkedInfo = (url) => { const f = linkedFrom.get(url); return f ? ` (linked from ${[...f].slice(0, 3).join(', ')}${f.size > 3 ? ` and ${f.size - 3} more` : ''})` : ''; };
 
-  for (const rec of [...pages.values()]) {
+  const judge = async (rec) => {
     const { url } = rec;
     if (rec.blocked) {
       if (sitemapUrls.has(url)) add('sitemap-url-blocked', 'fail', url, 'sitemap lists a URL robots.txt disallows for Googlebot');
       else if (linkedFrom.has(url)) add('linked-url-blocked', 'info', url, `internal link to a URL robots.txt disallows for Googlebot${linkedInfo(url)}`);
-      continue;
+      return;
     }
-    if (rec.error || rec.status === null) { add('fetch-error', 'fail', url, `fetch failed: ${rec.error}${linkedInfo(url)}`); continue; }
+    if (rec.error || rec.status === null) { add('fetch-error', 'fail', url, `fetch failed: ${rec.error}${linkedInfo(url)}`); return; }
     const finalStatus = rec.status;
     if (finalStatus >= 400) {
       add('http-error', 'fail', url, `HTTP ${finalStatus}${rec.chain.length > 1 ? ` after redirect to ${rec.finalUrl}` : ''}${linkedInfo(url)}${inSitemap(rec) ? ' (listed in the sitemap)' : ''}`);
-      continue;
+      return;
     }
     if (rec.chain.length > 2) add('redirect-chain', 'warn', url, `${rec.chain.length - 1} redirect hops: ${rec.chain.map((c) => `${c.status} ${c.url}`).join(' -> ')}`);
     if (rec.chain.length > 1) {
-      if (sitemapUrls.has(url)) add('sitemap-url-redirects', 'warn', url, `sitemap lists a redirecting URL; list ${rec.finalUrl} instead`);
-      else if (linkedFrom.has(url)) add('linked-url-redirects', 'info', url, `internal links point at a redirect to ${rec.finalUrl}${linkedInfo(url)}`);
-      continue; // the target is checked as its own page when it is crawled
+      const note = rec.stopped ? ` (${rec.stopped})` : '';
+      if (sitemapUrls.has(url)) add('sitemap-url-redirects', 'warn', url, `sitemap lists a redirecting URL; list ${rec.finalUrl} instead${note}`);
+      else if (linkedFrom.has(url)) add('linked-url-redirects', 'info', url, `internal links point at a redirect to ${rec.finalUrl}${note}${linkedInfo(url)}`);
+      return; // the target is checked as its own page when it is crawled
     }
-    if (!rec.html) continue;
+    if (rec.parseError) { add('parse-error', 'fail', url, `HTML could not be read: ${rec.parseError}`); return; }
+    if (!rec.html) return;
     const h = rec.html;
     const isStart = url === startRec?.url || url === startRec?.finalUrl;
 
@@ -470,7 +526,10 @@ async function check(opts) {
     else if (!/^https?:\/\//i.test(h.canonicals[0])) add('canonical-relative', 'warn', url, `canonical "${h.canonicals[0]}" is relative; Google recommends an absolute URL`);
     const canon = canonicalOf(rec);
     if (canon && canon !== rec.finalUrl) {
-      if (new URL(canon).origin !== origin) add('canonical-other-origin', 'info', url, `canonical points to another origin: ${canon}`);
+      if (!sameOrigin(canon)) {
+        if (local && !publicOrigin) needsPublicOrigin = true;
+        add('canonical-other-origin', 'info', url, `canonical points to another origin: ${canon}`);
+      }
       else {
         const target = await getPage(canon);
         if (!target) add('canonical-not-checked', 'info', url, `canonical target ${canon} not fetched (page budget)`);
@@ -488,12 +547,12 @@ async function check(opts) {
       if (!HREFLANG.test(alt.lang)) { add('hreflang-invalid', 'fail', url, `hreflang="${alt.lang}" is not a valid language or language-region code`, `${url}|${alt.lang}`); continue; }
       if (!/^https?:\/\//i.test(alt.href)) add('hreflang-relative', 'warn', url, `hreflang ${alt.lang} href "${alt.href}" is not a fully qualified URL`, `${url}|${alt.lang}`);
       let target;
-      try { target = new URL(alt.href, self).href; } catch { add('hreflang-invalid', 'fail', url, `hreflang ${alt.lang} href "${alt.href}" is not a URL`, `${url}|${alt.lang}`); continue; }
+      try { target = mapUrl(new URL(alt.href, self).href); } catch { add('hreflang-invalid', 'fail', url, `hreflang ${alt.lang} href "${alt.href}" is not a URL`, `${url}|${alt.lang}`); continue; }
       if (target === self) { hasSelf = true; continue; }
-      if (new URL(target).origin !== origin) continue;
+      if (!sameOrigin(target)) continue;
       const other = await getPage(target);
-      if (!other || other.blocked || !other.html) continue;
-      const returns = other.html.hreflang.some((b) => { try { return new URL(b.href, other.finalUrl).href === self; } catch { return false; } });
+      if (!other || other.blocked || !other.html) continue; // the target's own status is judged as its own page
+      const returns = other.html.hreflang.some((b) => { try { return mapUrl(new URL(b.href, other.finalUrl).href) === self; } catch { return false; } });
       if (!returns) add('hreflang-no-return', 'fail', url, `${target} (${alt.lang}) does not link back with hreflang; Google ignores one-way pairs`, `${url}|${target}`);
     }
     if (h.hreflang.length && !hasSelf) add('hreflang-no-self', 'warn', url, 'hreflang set does not include this page itself');
@@ -505,20 +564,35 @@ async function check(opts) {
       for (const e of errors) add('jsonld-invalid', 'fail', url, `JSON-LD does not parse: ${e}`, `${url}|${e.split(':')[0]}`);
       if (!errors.length && !types.length) add('jsonld-no-type', 'warn', url, 'JSON-LD has no @type');
     }
+  };
+
+  // Judging a page can fetch its canonical or hreflang targets; judge those too,
+  // so every fetched page gets the same checks.
+  const judged = new Set();
+  for (let pending = [...pages.values()]; pending.length; pending = [...pages.values()].filter((r) => !judged.has(r.url))) {
+    for (const rec of pending) {
+      judged.add(rec.url);
+      await judge(rec);
+    }
   }
+
+  const startOk = Boolean(startRec && !startRec.blocked && startRec.html);
+  if (needsPublicOrigin) add('needs-public-origin', 'fail', start.href, 'local run, but the sitemap or canonical URLs name another origin; rerun with --public-origin <production origin> so those pages are checked here');
+  const complete = startOk && !needsPublicOrigin;
 
   // site-wide findings
   const canonicalPages = [...pages.values()].filter((r) => r.indexable && (!canonicalOf(r) || canonicalOf(r) === r.finalUrl));
   const groupBy = (items, key) => items.reduce((m, r) => { const k = key(r); if (k) (m.get(k) ?? m.set(k, []).get(k)).push(r.url); return m; }, new Map());
   for (const [title, urls] of groupBy(canonicalPages, (r) => r.html.titles[0])) {
-    if (urls.length > 1) add('title-duplicate', 'warn', urls[0], `${urls.length} pages share the title "${title}": ${urls.join(', ')}`, title);
+    if (urls.length > 1) { add('title-duplicate', 'warn', urls[0], `${urls.length} pages share the title "${title}": ${urls.join(', ')}`, title); findings.at(-1).urls = urls; }
   }
   for (const [desc, urls] of groupBy(canonicalPages, (r) => r.html.descriptions[0]?.trim())) {
-    if (urls.length > 1) add('description-duplicate', 'warn', urls[0], `${urls.length} pages share one meta description: ${urls.join(', ')}`, desc);
+    if (urls.length > 1) { add('description-duplicate', 'warn', urls[0], `${urls.length} pages share one meta description: ${urls.join(', ')}`, desc); findings.at(-1).urls = urls; }
   }
   if (sitemapUrls.size && !list) {
+    // A fact about a fetched page, true however far the crawl got.
     for (const r of canonicalPages) {
-      if (!inSitemap(r)) add('not-in-sitemap', truncated ? 'info' : 'warn', r.url, 'indexable page missing from the sitemap');
+      if (!inSitemap(r)) add('not-in-sitemap', 'warn', r.url, 'indexable page missing from the sitemap');
     }
     for (const loc of sitemapUrls) {
       const r = pages.get(loc);
@@ -527,7 +601,7 @@ async function check(opts) {
       }
     }
   }
-  if (!complete) add('start-unreadable', 'fail', start.href, startRec?.blocked ? 'robots.txt disallows the start URL for Googlebot' : `start URL gave no HTML (${startRec?.status ?? startRec?.error ?? 'not fetched'})`);
+  if (!startOk) add('start-unreadable', 'fail', start.href, startRec?.blocked ? 'robots.txt disallows the start URL for Googlebot' : `start URL gave no HTML (${startRec?.status ?? startRec?.error ?? 'not fetched'})`);
 
   const order = { fail: 0, warn: 1, info: 2 };
   findings.sort((a, b) => order[a.severity] - order[b.severity] || a.rule.localeCompare(b.rule) || a.id.localeCompare(b.id));
@@ -546,8 +620,9 @@ async function check(opts) {
     complete,
     truncated,
     fetches,
+    publicOrigin,
     robots: { status: robotsRes.status, sitemaps: robots?.sitemaps ?? [] },
-    sitemap: { files: sitemapFiles, urls: sitemapUrls.size },
+    sitemap: { files: sitemapFiles, urls: sitemapUrls.size, list: [...sitemapUrls] },
     pages: [...pages.values()].map((r) => ({
       url: r.url,
       blocked: r.blocked,
@@ -582,12 +657,20 @@ const canonicalUrl = (u) => { try { return new URL(/^https?:\/\//i.test(u) ? u :
 
 function normalize(report, label) {
   if (report?.tool === 'seo-check') {
-    // Every URL the run actually looked at: a finding can only count as fixed if
-    // the later run looked at its URL again.
+    // Every URL the run fetched and got an answer from. A finding counts as fixed
+    // only if the later run fetched its URL again (a robots.txt block is not a fetch).
     const origin = new URL(report.url).origin;
     const covered = new Set([report.url, origin, origin + '/robots.txt', ...(report.sitemap?.files ?? [])]);
-    for (const p of report.pages ?? []) { covered.add(p.url); if (p.finalUrl) covered.add(p.finalUrl); }
-    return { kind: 'seo-check', valid: report.complete, url: report.url, covered, findings: report.findings.filter((f) => f.severity !== 'info'), scores: {} };
+    for (const p of report.pages ?? []) {
+      if (p.blocked || p.status === null) continue;
+      covered.add(p.url);
+      if (p.finalUrl) covered.add(p.finalUrl);
+    }
+    return {
+      kind: 'seo-check', valid: report.complete, url: report.url, truncated: Boolean(report.truncated), covered,
+      sitemapRead: (report.sitemap?.files ?? []).length > 0, sitemapList: new Set(report.sitemap?.list ?? []),
+      findings: report.findings.filter((f) => f.severity !== 'info'), scores: {},
+    };
   }
   if (report?.tool === 'geo-audit') {
     const findings = [];
@@ -619,11 +702,18 @@ function diff(beforePath, afterPath) {
   }
   const before = new Map(a.findings.map((f) => [f.id, f]));
   const after = new Map(b.findings.map((f) => [f.id, f]));
+  if (a.kind === 'seo-check' && b.truncated && !a.truncated) {
+    process.stderr.write(`${afterPath} stopped at its page budget and ${beforePath} did not; rerun with a higher --max-pages\n`);
+    return 2;
+  }
   const gone = a.findings.filter((f) => !after.has(f.id));
-  const unchecked = b.covered ? gone.filter((f) => !b.covered.has(f.url)) : [];
+  // Sitemap-membership findings are settled by reading the later sitemap; the rest need their pages fetched again.
+  const settled = (f) => (f.rule.startsWith('sitemap-url-') && b.sitemapRead && !b.sitemapList.has(f.url))
+    || (f.urls ?? [f.url]).every((u) => b.covered.has(u));
+  const unchecked = b.covered ? gone.filter((f) => !settled(f)) : [];
   if (unchecked.length) {
-    process.stderr.write(`${unchecked.length} finding(s) disappeared only because the later run never fetched their URL; rerun with --urls listing them:\n`);
-    for (const f of unchecked) process.stderr.write(`  ${f.rule}  ${f.url}\n`);
+    process.stderr.write(`${unchecked.length} finding(s) disappeared without the later run fetching their URL again (no longer linked or listed, robots-blocked, or past the page budget). Not counted as fixed; rerun the later check with --include <file listing them>:\n`);
+    for (const f of unchecked) process.stderr.write(`  ${f.rule}  ${(f.urls ?? [f.url]).filter((u) => !b.covered.has(u)).join(', ')}\n`);
     return 2;
   }
   const fixed = gone;
