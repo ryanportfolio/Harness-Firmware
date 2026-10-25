@@ -393,11 +393,17 @@ async function check(opts) {
   const sitemapUrls = new Set();
   const robotsSitemaps = (robots?.sitemaps ?? []).map(mapUrl);
   const declared = robotsSitemaps.filter(sameOrigin);
-  for (const s of robotsSitemaps) if (!declared.includes(s)) add('sitemap-other-origin', 'info', s, 'robots.txt declares a sitemap on another origin; not fetched');
-  const sitemapQueue = declared.length ? [...declared] : [origin + '/sitemap.xml'];
+  let sitemapComplete = true; // every sitemap file found was read; membership findings depend on it
+  for (const s of robotsSitemaps) {
+    if (declared.includes(s)) continue;
+    sitemapComplete = false;
+    add('sitemap-other-origin', 'info', s, 'robots.txt declares a sitemap on another origin; not fetched');
+    // A local preview whose robots.txt names the production sitemap never reads the real sitemap.
+    if (local && !publicOrigin) needsPublicOrigin = true;
+  }
+  const sitemapQueue = robotsSitemaps.length ? [...declared] : [origin + '/sitemap.xml'];
   const sitemapFiles = [];
   const fromIndex = new Set();
-  let sitemapComplete = true; // every sitemap file found was read; membership findings depend on it
   while (sitemapQueue.length && sitemapFiles.length < MAX_SITEMAP_FILES) {
     const smUrl = sitemapQueue.shift();
     if (sitemapFiles.includes(smUrl)) continue;
@@ -537,6 +543,10 @@ async function check(opts) {
       else if (linkedFrom.has(url)) add('linked-url-redirects', 'info', url, `internal links point at a redirect to ${rec.finalUrl}${note}${linkedInfo(url)}`);
       return; // the target is checked as its own page when it is crawled
     }
+    if (finalStatus === 204 || finalStatus === 205) {
+      add('http-no-content', 'fail', url, `HTTP ${finalStatus}: no content for Google to index${linkedInfo(url)}${inSitemap(rec) ? ' (listed in the sitemap)' : ''}`);
+      return;
+    }
     if (rec.parseError) { add('parse-error', 'fail', url, `HTML could not be read: ${rec.parseError}`); return; }
     if (!rec.html) return;
     const h = rec.html;
@@ -617,7 +627,7 @@ async function check(opts) {
 
   // A complete run read the start page itself: HTTP 200, no redirect, HTML (not 206 or 204).
   const startOk = Boolean(startRec && !startRec.blocked && startRec.status === 200 && startRec.chain.length === 1 && startRec.html);
-  if (needsPublicOrigin) add('needs-public-origin', 'fail', start.href, 'local run, but the sitemap or canonical URLs name another origin; rerun with --public-origin <production origin> so those pages are checked here');
+  if (needsPublicOrigin) add('needs-public-origin', 'fail', start.href, 'local run, but robots.txt, the sitemap or canonical URLs name another origin; rerun with --public-origin <production origin> so those pages are checked here');
   const complete = startOk && !needsPublicOrigin;
 
   // site-wide findings
@@ -631,7 +641,8 @@ async function check(opts) {
   }
   if (sitemapUrls.size && !list) {
     // A fact about a fetched page, true however far the crawl got.
-    for (const r of canonicalPages) {
+    // Only when every sitemap file was read: an unread file may list the page.
+    if (sitemapComplete) for (const r of canonicalPages) {
       if (!inSitemap(r)) add('not-in-sitemap', 'warn', r.url, 'indexable page missing from the sitemap');
     }
     for (const loc of sitemapUrls) {
@@ -755,7 +766,7 @@ function diff(beforePath, afterPath) {
   // Sitemap-membership findings are settled by reading the later sitemap; the rest need their pages fetched again.
   // Findings read from a page's HTML need that page's HTML read again; status and
   // redirect findings only need it fetched.
-  const statusRule = /^(http-error|fetch-error|redirect-chain|sitemap-|robots-|start-unreadable|needs-public-origin|linked-url-|listed-url-)/;
+  const statusRule = /^(http-error|http-no-content|fetch-error|redirect-chain|sitemap-|robots-|start-unreadable|needs-public-origin|linked-url-|listed-url-)/;
   // Sitemap-membership findings also need the later run to have read every sitemap file.
   const membershipRule = /^(not-in-sitemap|orphan|sitemap-url-)/;
   const settled = (f) => {

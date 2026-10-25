@@ -13,9 +13,9 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 | `robots-server-error`, `robots-unreachable` | fail | robots.txt 5xx, 429 or no answer → Google stops crawling site first 12 h | host/server config, static file | [robots.txt spec](https://developers.google.com/crawling/docs/robots-txt/robots-txt-spec) |
 | `robots-blocks-root` | fail | Googlebot disallowed from `/` (often staging robots.txt shipped) | `robots.txt` or framework robots route | same |
 | `start-unreadable`, `start-noindex` | fail | start URL: no HTML, blocked, or noindex | env-dependent noindex, auth middleware | [block indexing](https://developers.google.com/search/docs/crawling-indexing/block-indexing) |
-| `needs-public-origin` | fail | local run, sitemap/canonical name production origin → run incomplete | rerun w/ `--public-origin <prod origin>` (measurement setup, not the site) | |
+| `needs-public-origin` | fail | local run, robots.txt sitemap line, sitemap or canonical names production origin → run incomplete | rerun w/ `--public-origin <prod origin>` (measurement setup, not the site) | |
 | `parse-error` | fail | page HTML couldn't be read by the checker | check the page by hand; report the checker bug | |
-| `http-error`, `fetch-error` | fail | linked/sitemap URL → 4xx/5xx or no answer | the link, route, or redirect map | [HTTP status codes](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes) |
+| `http-error`, `http-no-content`, `fetch-error` | fail | linked/sitemap URL → 4xx/5xx, 204/205 (nothing to index), or no answer | the link, route, or redirect map | [HTTP status codes](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes) |
 | `sitemap-unreachable`, `sitemap-invalid`, `sitemap-bad-url` | fail | declared sitemap unreadable, or `<loc>` not absolute URL | sitemap generator config | [build a sitemap](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap) |
 | `sitemap-url-blocked`, `sitemap-url-noindex` | fail | sitemap asks Google to index a URL that says "don't" | sitemap filter or page robots setting | same |
 | `canonical-multiple` | fail | >1 rel=canonical → Google ignores all | layout head + page head both emit one | [consolidate duplicate URLs](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls) |
@@ -26,7 +26,7 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 | `redirect-chain` | warn | >1 hop | redirect rules: old URL → final URL | [redirects](https://developers.google.com/search/docs/crawling-indexing/301-redirects) |
 | `sitemap-url-redirects`, `sitemap-url-canonicalized` | warn | sitemap lists non-canonical URL | sitemap generator (slash, host, locale) | sitemap page |
 | `sitemap-missing`, `sitemap-redirect`, `sitemap-foreign-url` | warn | no sitemap, or one Google may reject | generator config, robots.txt `Sitemap:` line | sitemap page |
-| `not-in-sitemap`, `orphan` | warn | sitemap + internal links disagree on which pages exist | generator filter, navigation | sitemap page |
+| `not-in-sitemap`, `orphan` | warn | sitemap + internal links disagree on which pages exist (`not-in-sitemap` only when every sitemap file was read) | generator filter, navigation | sitemap page |
 | `canonical-in-body`, `canonical-relative` | warn | canonical Google ignores or may misread | head component | canonical page |
 | `hreflang-relative`, `hreflang-no-self` | warn | hreflang set Google may not trust | i18n head component | localized versions |
 | `title-duplicate`, `description-duplicate` | warn | several indexable pages look like one page | per-page metadata defaults | title links, [snippets](https://developers.google.com/search/docs/appearance/snippet) |
