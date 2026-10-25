@@ -23,13 +23,14 @@ for (const a of args._.length ? args._ : ["scenes"]) {
 }
 const sources = files.map((f) => [f, fs.readFileSync(f, "utf8")]);
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-// Only the scenes' own <style> blocks join the haystack, so a class named in a
-// querySelector string never counts as a rule. A block written as <style>${css}</style>
-// brings in the template string that `css` names in the same file.
+// Each scene is checked against the product CSS plus its own <style> blocks only: the
+// player removes a scene's markup, styles included, before mounting the next, and a class
+// named in a querySelector string never counts as a rule. A block written as
+// <style>${css}</style> brings in the template string that `css` names in the same file.
 const named = (s, id) => (new RegExp(`\\b(?:const|let|var)\\s+${reEsc(id)}\\s*=\\s*\`([^\`]*)\``).exec(s) || [])[1] || "";
-const styles = sources.flatMap(([, s]) => [...s.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].flatMap((m) =>
-  [m[1], ...[...m[1].matchAll(/\$\{\s*([A-Za-z_$][\w$]*)\s*\}/g)].map((v) => named(s, v[1]))]));
-const haystack = cssFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n") + "\n" + styles.join("\n");
+const stylesOf = (s) => [...s.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].flatMap((m) =>
+  [m[1], ...[...m[1].matchAll(/\$\{\s*([A-Za-z_$][\w$]*)\s*\}/g)].map((v) => named(s, v[1]))]);
+const productCss = cssFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n");
 // A class starting with a digit (Tailwind's 2xl:) is written `.\32 xl\:grid` in CSS;
 // minifiers may drop the space when the next character is not a hex digit.
 const selector = (c) => {
@@ -37,10 +38,11 @@ const selector = (c) => {
   const m = /^(-?)(\d)(.*)$/.exec(c);
   return "\\." + (m ? `${reEsc(m[1])}\\\\3${m[2]} ?${body(m[3])}` : body(c));
 };
-const has = (c) => new RegExp(selector(c) + "(?![a-zA-Z0-9_-]|\\\\)").test(haystack);
+const has = (c, haystack) => new RegExp(selector(c) + "(?![a-zA-Z0-9_-]|\\\\)").test(haystack);
 
 let total = 0;
 for (const [file, raw] of sources) {
+  const haystack = productCss + "\n" + stylesOf(raw).join("\n");
   // Blank out simple ${...} expressions (no nested template) so quotes inside them
   // cannot end a class="..." early; nested templates stay and get scanned themselves.
   const src = raw.replace(/\$\{[^{}`]*\}/g, " ");
@@ -49,7 +51,7 @@ for (const [file, raw] of sources) {
   for (const m of src.matchAll(/class="([^"]*)"/g)) add(m[1]);
   for (const m of src.matchAll(/class='([^']*)'/g)) add(m[1]);
   for (const m of src.matchAll(/classList\.(?:add|remove|toggle)\(([^)]*)\)/g)) for (const s of m[1].matchAll(/["'`]([^"'`]+)["'`]/g)) add(s[1]);
-  const missing = [...used].filter((c) => !ignore.some((p) => c === p || c.startsWith(p + "/") || (p.endsWith("-") && c.startsWith(p))) && !has(c)).sort();
+  const missing = [...used].filter((c) => !ignore.some((p) => c === p || c.startsWith(p + "/") || (p.endsWith("-") && c.startsWith(p))) && !has(c, haystack)).sort();
   total += missing.length;
   console.log(`${file}: ${missing.length ? `${missing.length} without a rule\n  ${missing.join("\n  ")}` : "all classes found"}`);
 }
