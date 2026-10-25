@@ -198,13 +198,27 @@ function googlebotAllowed(robots, url) {
 // Sitemap elements may carry a namespace prefix (<sm:urlset xmlns:sm="...">).
 const NS = '(?:[A-Za-z_][\\w.-]*:)?';
 const hasRoot = (xml, name) => new RegExp(`<${NS}${name}\\b`, 'i').test(xml);
-// A cut-off or malformed file must not pass as a complete sitemap: the root closes at the end,
-// and every entry opens, closes and carries one <loc>.
+// XML well-formedness without a parser: only the five predefined entities or character references
+// (sitemaps carry no DTD), no stray '<', properly nested tags, one root element and nothing after it.
+function xmlSyntaxOk(xml) {
+  const body = xml.replace(/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<!DOCTYPE[^>]*>/gi, ' ');
+  if (/&(?!(?:lt|gt|amp|quot|apos|#\d+|#x[\da-f]+);)/i.test(body)) return false;
+  const tag = /<(\/?)([A-Za-z_][\w.:-]*)((?:\s+[^\s=/>]+\s*=\s*(?:"[^"<]*"|'[^'<]*'))*)\s*(\/?)>|</g;
+  const stack = [];
+  let start = -1, end = -1;
+  for (let m; (m = tag.exec(body));) {
+    if (!m[2] || end >= 0) return false; // a stray '<', or markup after the root element
+    if (start < 0) start = m.index;
+    if (m[1]) { if (m[3] || m[4] || stack.pop() !== m[2]) return false; }
+    else if (!m[4]) stack.push(m[2]);
+    if (!stack.length) end = m.index + m[0].length;
+  }
+  return end >= 0 && !/\S/.test(body.slice(0, start) + body.slice(end));
+}
+// A cut-off or malformed file must not pass as a complete sitemap: the XML is well formed,
+// and every entry carries one <loc>.
 const count = (xml, re) => xml.match(new RegExp(re, 'gi'))?.length ?? 0;
-const wellFormed = (xml, root, entry) =>
-  new RegExp(`</${NS}${root}\\s*>\\s*$`, 'i').test(xml)
-  && count(xml, `<${NS}${entry}\\b`) === count(xml, `</${NS}${entry}\\s*>`)
-  && count(xml, `<${NS}${entry}\\b`) === xmlLocs(xml, entry).length;
+const wellFormed = (xml, entry) => xmlSyntaxOk(xml) && count(xml, `<${NS}${entry}\\b`) === xmlLocs(xml, entry).length;
 
 function xmlLocs(xml, parent) {
   const re = new RegExp(`<${NS}${parent}\\b[\\s\\S]*?<${NS}loc>\\s*([\\s\\S]*?)\\s*</${NS}loc>`, 'gi');
@@ -382,7 +396,8 @@ async function check(opts) {
   if (start.href !== requested.href) add('start-redirects', 'info', requested.href, `start URL redirects to ${start.href} (${first.chain.map((c) => c.status).join(' -> ')}); crawled from there${first.stopped ? `, but ${first.stopped}` : ''}`);
 
   let fetches = robotsCache.size + (first ? 1 : 0);
-  const fetchBudget = opts.maxPages + 50; // room for canonical and hreflang targets outside the crawl
+  const fetchBudget = opts.maxPages + 50; // page requests; room for canonical and hreflang targets outside the crawl
+  let pageFetches = 0;
   const pages = new Map();
   const linkedFrom = new Map();
   const timed = async (url, guard) => {
@@ -441,9 +456,9 @@ async function check(opts) {
     if (res.chain.length > 1) add('sitemap-redirect', 'warn', smUrl, `sitemap redirects to ${res.finalUrl}`);
     const [root, entry] = hasRoot(res.body, 'sitemapindex') ? ['sitemapindex', 'sitemap'] : hasRoot(res.body, 'urlset') ? ['urlset', 'url'] : [];
     if (!root) { sitemapComplete = false; add('sitemap-invalid', 'fail', smUrl, 'sitemap is neither a <urlset> nor a <sitemapindex>'); continue; }
-    if (!wellFormed(res.body, root, entry)) {
+    if (!wellFormed(res.body, entry)) {
       sitemapComplete = false; // entries read so far are still crawled, but membership is not trusted
-      add('sitemap-invalid', 'fail', smUrl, `sitemap XML is cut off or malformed: needs a closing </${root}> and one <loc> in every closed <${entry}>`);
+      add('sitemap-invalid', 'fail', smUrl, `sitemap XML is cut off or malformed (unclosed or misnested tags, a bare &, stray <, or a <${entry}> without one <loc>); Google may reject the file`);
     }
     if (root === 'sitemapindex') {
       for (const loc of xmlLocs(res.body, 'sitemap').map(mapUrl)) {
@@ -466,12 +481,14 @@ async function check(opts) {
 
   const getPage = async (url) => {
     if (pages.has(url)) return pages.get(url);
-    if (fetches >= fetchBudget) return null;
     if (!googlebotAllowed(robots, url)) {
       const rec = { url, blocked: true };
       pages.set(url, rec);
       return rec;
     }
+    // The budget counts page requests only: robots.txt, sitemap files and the already-fetched start page are free.
+    if (!prefetched.has(url) && pageFetches >= fetchBudget) return null;
+    if (!prefetched.has(url)) pageFetches++;
     const res = prefetched.get(url) ?? await timed(url, pageGuard);
     prefetched.delete(url);
     const isHtml = /text\/html|application\/xhtml/i.test(res.headers['content-type'] ?? '');
@@ -585,7 +602,11 @@ async function check(opts) {
 
     if (rec.noindex) {
       if (isStart) add('start-noindex', 'fail', url, `the start page is noindex (${rec.xRobots ? 'X-Robots-Tag' : 'meta robots'})`);
-      else if (inSitemap(rec)) add('sitemap-url-noindex', 'fail', url, 'sitemap lists a noindex page');
+      else if (inSitemap(rec)) {
+        add('sitemap-url-noindex', 'fail', url, 'sitemap lists a noindex page');
+        // Set by meta robots alone: clearing it takes the page's HTML read again, not just a fetch.
+        if (!/\bnoindex\b|\bnone\b/.test(rec.xRobots)) findings.at(-1).via = 'meta';
+      }
       else add('noindex', 'info', url, 'page is noindex; confirm that is intended');
     }
     if (!h.viewport) add('viewport-missing', 'warn', url, 'no <meta name="viewport">; Google indexes the mobile rendering');
@@ -806,16 +827,17 @@ function diff(beforePath, afterPath) {
   const membershipRule = /^(not-in-sitemap|orphan|sitemap-url-|sitemap-bad-url$|sitemap-foreign-url$)/;
   // Findings about one sitemap entry are settled once a complete later sitemap no longer lists it.
   const entryRule = /^(sitemap-url-|sitemap-bad-url$|sitemap-foreign-url$)/;
+  const coverage = (f) => (statusRule.test(f.rule) && f.via !== 'meta' ? b.covered : b.coveredHtml);
   const settled = (f) => {
     if (membershipRule.test(f.rule) && !b.sitemapComplete) return false;
     if (entryRule.test(f.rule) && !b.sitemapList.has(f.url)) return true;
-    return (f.urls ?? [f.url]).every((u) => (statusRule.test(f.rule) ? b.covered : b.coveredHtml).has(u));
+    return (f.urls ?? [f.url]).every((u) => coverage(f).has(u));
   };
   const unchecked = b.covered ? gone.filter((f) => !settled(f)) : [];
   if (unchecked.length) {
     process.stderr.write(`${unchecked.length} finding(s) disappeared without the later run rechecking their URL (no longer linked or listed, robots-blocked, past the page budget, or no longer HTML). Not counted as fixed; check those URLs, and rerun the later check with --include <file listing them> where they still exist:\n`);
     for (const f of unchecked) {
-      const missing = (f.urls ?? [f.url]).filter((u) => !(statusRule.test(f.rule) ? b.covered : b.coveredHtml).has(u));
+      const missing = (f.urls ?? [f.url]).filter((u) => !coverage(f).has(u));
       const why = missing.length ? missing.join(', ') : `${f.url} (the later run did not read every sitemap file)`;
       process.stderr.write(`  ${f.rule}  ${why}\n`);
     }
