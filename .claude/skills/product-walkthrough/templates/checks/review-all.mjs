@@ -27,6 +27,9 @@ try {
   const themes = args.themes ? String(args.themes).split(",") : await page.evaluate(() => window.__player.themes);
   const only = args._;
   const meta = [];
+  // Errors from boot (an actor that did not register, a scene file that threw) belong to no chapter.
+  const startup = await page.evaluate(() => window.__player.errors.map(String));
+  if (startup.length) { console.log("player startup errors:", JSON.stringify(startup)); failed++; }
   for (const s of list) {
     if (only.length && !only.includes(s.id)) continue;
     const before = await page.evaluate(() => window.__player.errors.length);
@@ -62,7 +65,7 @@ ${themes.map((th) => `<div style="display:flex;gap:4px;padding:2px 4px">${shots[
   const missing = await page.evaluate(() => window.__player.missing);
   if (missing.length) { console.log("missing scene files:", missing.join(", ")); failed++; }
   if (page.consoleErrors.length) console.log("console errors:", page.consoleErrors.slice(0, 10));
-  fs.writeFileSync(path.join(OUT, "meta.json"), JSON.stringify({ url, themes, points, chapters: meta, missing }, null, 1));
+  fs.writeFileSync(path.join(OUT, "meta.json"), JSON.stringify({ url, themes, points, startup, chapters: meta, missing }, null, 1));
   console.log(`sheets in ${OUT}`);
 } finally {
   await browser.close();

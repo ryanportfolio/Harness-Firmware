@@ -25,6 +25,7 @@ const base = cfg.baseUrl.replace(/\/$/, "");
 const secretFile = cfg.secretFile.replace(/^~(?=[\\/])/, os.homedir());
 const STATE = path.join(os.tmpdir(), "walkthrough-session-" + crypto.createHash("sha1").update(path.resolve(cfgPath)).digest("hex").slice(0, 10) + ".json");
 
+const secrets = []; // the account, once read, for redacting error messages
 const browser = await launch();
 const context = await browser.newContext({ viewport: cfg.viewport || { width: 1440, height: 900 }, ...(fs.existsSync(STATE) ? { storageState: STATE } : {}) });
 const page = await context.newPage();
@@ -36,6 +37,7 @@ async function login() {
   if ((await loggedIn()) === (cfg.check.status || 200)) { console.log("session reused"); return; }
   const [user, password] = fs.readFileSync(secretFile, "utf8").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   if (!user || !password) throw new Error(`secret file needs two lines (user, password): ${secretFile}`);
+  secrets.push(user, password);
   await page.goto(base + cfg.login.url, { waitUntil: "load" });
   for (const sel of cfg.login.before || []) { const el = page.locator(sel).first(); if (await el.count()) await el.click().catch(() => {}); }
   await page.locator(cfg.login.user).first().fill(user);
@@ -61,7 +63,8 @@ try {
     await mod.default({ page, shot, base, context });
   }
 } catch (e) {
-  console.error("ERR", e.message);
+  // A failed fill() quotes its value in Playwright's call log, so the account is redacted.
+  console.error("ERR", secrets.reduce((m, s) => m.split(s).join("[redacted]"), String(e && e.message)));
   process.exitCode = 1;
 } finally {
   await browser.close();
