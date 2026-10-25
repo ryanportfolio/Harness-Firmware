@@ -233,6 +233,11 @@
       "name": "dare",
       "label": "DARE",
       "group": "discipline"
+    },
+    {
+      "name": "gauntlet",
+      "label": "Gauntlet",
+      "group": "discipline"
     }
   ]
 }
