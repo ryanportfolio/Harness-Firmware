@@ -33,8 +33,9 @@
    finding, a warn that became a fail, a duplicate group that grew, an indexable
    page lost, or a lower willaicite dimension score), 2 the inputs can't be
    compared (different tools, script versions or requested URLs, an incomplete
-   run, a later run that hit its page budget when the earlier did not, or a
-   finding that vanished without the later run rechecking it). Info findings
+   run, a later run that hit its page budget when the earlier did not, a
+   finding that vanished without the later run rechecking it, or a page the
+   earlier run found indexable that the later run did not check). Info findings
    are left out of the comparison.
 
    Finding ids are stable across runs (rule plus URL or duplicate key), so diff
@@ -95,6 +96,21 @@ async function readCapped(res, max) {
 
 const decodeUtf8 = (bytes) => new TextDecoder('utf-8', { fatal: false }).decode(bytes);
 
+/** Pages decode the way browsers pick an encoding: a byte order mark, then the Content-Type
+    charset, then a <meta charset> or http-equiv declaration in the first 1024 bytes, else UTF-8.
+    A meta declaring UTF-16 means UTF-8 (the bytes that held it were ASCII); an unknown label
+    falls back to UTF-8. */
+function decodePage(bytes, type) {
+  const bom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 'utf-8'
+    : bytes[0] === 0xff && bytes[1] === 0xfe ? 'utf-16le'
+      : bytes[0] === 0xfe && bytes[1] === 0xff ? 'utf-16be' : null;
+  const meta = /<meta(?=[\s/])[^>]*?charset\s*=\s*["']?([\w.:-]+)/i.exec(bytes.subarray(0, 1024).toString('latin1'))?.[1];
+  const label = bom
+    ?? /charset\s*=\s*["']?([\w.:-]+)/i.exec(type)?.[1]
+    ?? (meta && /^utf-?16/i.test(meta) ? 'utf-8' : meta);
+  try { return new TextDecoder(label ?? 'utf-8').decode(bytes); } catch { return decodeUtf8(bytes); }
+}
+
 /** Pages: the body is read for HTML, XML and text responses, and for responses with no
     content type (sniffed later). Files (robots.txt, sitemaps): read whatever the content
     type, since Google reads them by URL, not by type. */
@@ -111,7 +127,7 @@ async function fetchOnce(url, { file = false, max = MAX_BYTES } = {}) {
     let body = null, bytes = null, truncated = false;
     if (res.status >= 200 && res.status < 300 && (file || !type || /html|xml|text\/plain/i.test(type))) {
       ({ bytes, truncated } = await readCapped(res, max));
-      body = decodeUtf8(bytes);
+      body = file ? decodeUtf8(bytes) : decodePage(bytes, type);
     } else {
       await res.body?.cancel().catch(() => undefined);
     }
@@ -207,10 +223,20 @@ const encodeForMatch = (s) => s
   });
 
 function patternMatches(pattern, path) {
-  // Only a final $ anchors; a $ elsewhere is a literal character.
+  // Only a final $ anchors; a $ elsewhere is a literal character. Matched without a regex,
+  // backtracking only to the last *, so many wildcards can't stall the crawl.
   const anchored = pattern.endsWith('$');
-  const body = (anchored ? pattern.slice(0, -1) : pattern).replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-  return new RegExp('^' + body + (anchored ? '$' : '')).test(path);
+  const p = anchored ? pattern.slice(0, -1) : pattern;
+  let i = 0, j = 0, star = -1, mark = 0;
+  while (j < path.length) {
+    if (p[i] === '*') { star = i++; mark = j; }
+    else if (i < p.length && p[i] === path[j]) { i++; j++; }
+    else if (i === p.length && !anchored) return true;
+    else if (star >= 0) { i = star + 1; j = ++mark; }
+    else return false;
+  }
+  while (p[i] === '*') i++;
+  return i === p.length;
 }
 
 // Robots directives from meta robots or X-Robots-Tag, comma separated. "googlebot: noindex" carries a
@@ -218,16 +244,23 @@ function patternMatches(pattern, path) {
 // A past unavailable_after date keeps the page out of results, so it counts as noindex.
 const VALUE_DIRECTIVES = new Set(['max-snippet', 'max-image-preview', 'max-video-preview', 'unavailable_after']);
 function hasNoindex(directives, now = Date.now()) {
-  return directives.split(',').some((raw) => {
-    let d = raw.trim().toLowerCase();
+  const parts = directives.split(',');
+  for (let i = 0; i < parts.length; i++) {
+    let d = parts[i].trim().toLowerCase();
     const prefixed = /^([a-z0-9_-]+)\s*:\s*(.*)$/.exec(d);
     if (prefixed && !VALUE_DIRECTIVES.has(prefixed[1])) d = prefixed[2];
     if (d === 'noindex' || d === 'none') return true;
     const until = /^unavailable_after\s*:\s*(.+)$/.exec(d);
-    if (!until) return false;
-    const t = Date.parse(until[1]);
-    return !Number.isNaN(t) && t < now;
-  });
+    if (!until) continue;
+    // RFC 822 and 850 dates hold a comma ("Wed, 03 Dec 2025 13:09:53 GMT"): rejoin the next piece.
+    let t = Date.parse(until[1]);
+    if (Number.isNaN(t) && i + 1 < parts.length) {
+      t = Date.parse(`${until[1]},${parts[i + 1]}`);
+      if (!Number.isNaN(t)) i++;
+    }
+    if (!Number.isNaN(t) && t < now) return true;
+  }
+  return false;
 }
 
 function googlebotAllowed(robots, url) {
@@ -308,13 +341,18 @@ const FORMATS = {
 /** Parse one sitemap file: XML (urlset, sitemapindex, RSS 2.0, Atom 1.0) or text (one URL per line).
     Returns { kind, locs, problem } where problem explains why the file can't be trusted whole. */
 function parseSitemap(text) {
-  const body = text.replace(/^\uFEFF/, '');
+  let body = text.replace(/^\uFEFF/, '');
   if (!/^\s*</.test(body)) {
     const locs = body.split(/\r\n|\r|\n/).map((l) => l.trim()).filter(Boolean);
     return { kind: 'text', locs, problem: null };
   }
+  // A prefix bound to the sitemap or Atom namespace names the same elements as no prefix
+  // (<urlset xmlns="..." xmlns:s="..."><s:url>), so those prefixes are dropped.
+  for (const [, prefix] of body.matchAll(/\sxmlns:([A-Za-z_][\w.-]*)\s*=\s*["'](?:http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9|http:\/\/www\.w3\.org\/2005\/Atom)["']/g)) {
+    body = body.replace(new RegExp(`<(/?)${escapeRe(prefix)}:`, 'g'), '<$1');
+  }
   const root = xmlRoot(body);
-  const format = FORMATS[root];
+  const format = Object.hasOwn(FORMATS, root ?? '') ? FORMATS[root] : null;
   if (!format) return { kind: null, locs: [], problem: `the root element is <${root ?? '?'}>, not <urlset>, <sitemapindex>, RSS or Atom` };
   const prepared = prepareXml(body);
   const { entries, bad } = xmlEntries(prepared, format.entry);
@@ -373,7 +411,8 @@ const text = (html) => decodeEntities(html.replace(/<[^>]*>/g, ' ')).replace(/\s
 
 // Elements whose content is text, not markup. Their content is set aside in one left-to-right
 // pass together with comments, so "<!--" inside a script or a tag inside a title stays text.
-const RAW_TEXT = new Set(['script', 'style', 'template', 'textarea', 'title', 'xmp', 'noembed', 'noframes']);
+// <noscript> is text too: Google reads pages with scripting on.
+const RAW_TEXT = new Set(['script', 'style', 'template', 'textarea', 'title', 'xmp', 'noembed', 'noframes', 'noscript']);
 // Google stops reading <head> metadata at the first element that does not belong in <head>.
 const HEAD_ELEMENTS = new Set(['html', 'head', 'title', 'meta', 'link', 'script', 'style', 'base', 'noscript', 'template']);
 
@@ -381,7 +420,8 @@ function parseHtml(html, pageUrl) {
   const jsonld = [];
   const titleTexts = [];
   let doc = '';
-  const opener = new RegExp(`<!--|<(${[...RAW_TEXT].join('|')})(?=[\\s/>])(${ATTRS})>`, 'gi');
+  // Every tag is matched whole, so "<script>" or "<!--" inside a quoted attribute stays attribute text.
+  const opener = new RegExp(`<!--|<(/?)([A-Za-z][\\w:-]*)(${ATTRS})>`, 'g');
   let pos = 0;
   for (let m; (m = (opener.lastIndex = pos, opener.exec(html)));) {
     doc += html.slice(pos, m.index);
@@ -390,22 +430,23 @@ function parseHtml(html, pageUrl) {
       pos = end === -1 ? html.length : end + 3;
       continue;
     }
-    const name = m[1].toLowerCase();
+    const name = m[2].toLowerCase();
+    if (m[1] || !RAW_TEXT.has(name)) { doc += m[0]; pos = m.index + m[0].length; continue; }
     const close = new RegExp(`</${name}\\s*>`, 'gi');
     close.lastIndex = m.index + m[0].length;
     const c = close.exec(html);
     const inner = html.slice(m.index + m[0].length, c ? c.index : html.length);
     pos = c ? c.index + c[0].length : html.length;
-    if (name === 'script' && (attrs(m[2]).type ?? '').trim().toLowerCase() === 'application/ld+json') jsonld.push(inner);
+    if (name === 'script' && (attrs(m[3]).type ?? '').trim().toLowerCase() === 'application/ld+json') jsonld.push(inner);
     // Kept as an empty element so the head scan sees where it was; the text is looked up by index.
     if (name === 'title') { doc += `<title data-seo-title="${titleTexts.length}"></title>`; titleTexts.push(decodeEntities(inner).replace(/\s+/g, ' ').trim()); }
-    else if (name === 'script' || name === 'style' || name === 'template') doc += `<${name}></${name}>`;
+    else doc += `<${name}></${name}>`;
   }
   doc += html.slice(pos);
   doc = doc.replace(/<!DOCTYPE[^>]*>|<\?[\s\S]*?\?>/gi, '');
 
   // The head ends at </head>, <body>, the first element outside HEAD_ELEMENTS, or the first
-  // non-blank text. <noscript> in the head is read as text (scripting is on for Google).
+  // non-blank text. Raw-text elements are empty placeholders here.
   let headEnd = doc.length;
   let headBreaker = null;
   const tag = new RegExp(`<(/?)([A-Za-z][\\w:-]*)(${ATTRS})>`, 'g');
@@ -413,12 +454,6 @@ function parseHtml(html, pageUrl) {
   for (let m; (m = tag.exec(doc));) {
     if (/\S/.test(decodeEntities(doc.slice(last, m.index)))) { headEnd = last; headBreaker = 'text'; break; }
     const name = m[2].toLowerCase();
-    if (!m[1] && name === 'noscript') {
-      const end = doc.toLowerCase().indexOf('</noscript', tag.lastIndex);
-      tag.lastIndex = end === -1 ? doc.length : end;
-      last = tag.lastIndex;
-      continue;
-    }
     if ((m[1] && name === 'head') || (!m[1] && name === 'body')) { headEnd = m.index; break; }
     if (!m[1] && !HEAD_ELEMENTS.has(name)) { headEnd = m.index; headBreaker = `<${name}>`; break; }
     last = tag.lastIndex;
@@ -1161,14 +1196,25 @@ function diff(beforePath, afterPath) {
   const lost = [];
   if (b.kind === 'seo-check') {
     const indexableAfter = (u) => b.pages.get(u)?.indexable && (!b.pages.get(u).canonical || b.pages.get(u).canonical === b.pages.get(u).finalUrl);
+    // Only a full, untruncated crawl can show that a page is gone; otherwise its state is unknown.
+    const unknown = [];
     for (const p of a.pages.values()) {
       if (!p.indexable || (p.canonical && p.canonical !== p.finalUrl)) continue;
       const q = b.pages.get(p.url);
-      if (!q) { if (b.mode === 'crawl' && !b.truncated) lost.push([p.url, 'no longer found by the crawl (not linked from crawled pages or listed in the sitemap)']); continue; }
+      if (!q) {
+        if (b.mode === 'crawl' && !b.truncated) lost.push([p.url, 'no longer found by the crawl (not linked from crawled pages or listed in the sitemap)']);
+        else unknown.push(p.url);
+        continue;
+      }
       if (q.indexable && (!q.canonical || q.canonical === q.finalUrl)) continue;
       if (q.redirects > 0 && !q.stopped && indexableAfter(q.finalUrl)) continue;
       if (q.indexable && q.canonical && indexableAfter(q.canonical)) continue;
       lost.push([p.url, q.noindex ? 'now noindex' : q.blocked ? 'now blocked by robots.txt' : q.canonical && q.canonical !== q.finalUrl ? `now canonical to ${q.canonical}, which is not an indexable page here` : q.redirects > 0 ? `now redirects to ${q.finalUrl}, which is not an indexable page here` : `now answers ${q.status ?? 'nothing'}${q.html ? '' : ' without HTML'}`]);
+    }
+    if (unknown.length) {
+      process.stderr.write(`${unknown.length} page(s) indexable in ${beforePath} were not checked by the later ${b.mode === 'crawl' ? 'crawl (it stopped at its page budget)' : '--urls run'}, so the gate can't tell whether they are still indexable. Rerun the later check ${b.mode === 'crawl' ? 'with --include <file listing them>' : 'with them added to the --urls list'}:\n`);
+      for (const u of unknown) process.stderr.write(`  ${u}\n`);
+      return 2;
     }
   }
 
