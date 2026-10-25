@@ -186,8 +186,12 @@ function googlebotAllowed(robots, url) {
 
 // ---------- sitemap ----------
 
+// Sitemap elements may carry a namespace prefix (<sm:urlset xmlns:sm="...">).
+const NS = '(?:[A-Za-z_][\\w.-]*:)?';
+const hasRoot = (xml, name) => new RegExp(`<${NS}${name}\\b`, 'i').test(xml);
+
 function xmlLocs(xml, parent) {
-  const re = new RegExp(`<${parent}\\b[\\s\\S]*?<loc>\\s*([\\s\\S]*?)\\s*</loc>`, 'gi');
+  const re = new RegExp(`<${NS}${parent}\\b[\\s\\S]*?<${NS}loc>\\s*([\\s\\S]*?)\\s*</${NS}loc>`, 'gi');
   const out = [];
   for (const m of xml.matchAll(re)) out.push(decodeEntities(m[1].replace(/^<!\[CDATA\[|\]\]>$/g, '')));
   return out;
@@ -206,6 +210,9 @@ function decodeEntities(s) {
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 }
 
+// The inside of a start tag: quoted values may contain `>` (href="/f?q=3>2").
+const ATTRS = `(?:"[^"]*"|'[^']*'|[^'">])*`;
+
 function attrs(s) {
   const out = {};
   for (const m of (s ?? '').matchAll(/([^\s=/>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g)) {
@@ -219,7 +226,7 @@ const text = (html) => decodeEntities(html.replace(/<[^>]*>/g, ' ')).replace(/\s
 function parseHtml(html, pageUrl) {
   let doc = html.replace(/<!--[\s\S]*?-->/g, '');
   const jsonld = [];
-  doc = doc.replace(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi, (_, a, body) => {
+  doc = doc.replace(new RegExp(`<script\\b(${ATTRS})>([\\s\\S]*?)<\\/script\\s*>`, 'gi'), (_, a, body) => {
     if ((attrs(a).type ?? '').trim().toLowerCase() === 'application/ld+json') jsonld.push(body);
     return '';
   });
@@ -228,7 +235,7 @@ function parseHtml(html, pageUrl) {
   const head = headEnd === -1 ? doc : doc.slice(0, headEnd);
   const body = headEnd === -1 ? '' : doc.slice(headEnd);
 
-  const tags = (src, name) => [...src.matchAll(new RegExp(`<${name}\\b([^>]*)>`, 'gi'))].map((m) => attrs(m[1]));
+  const tags = (src, name) => [...src.matchAll(new RegExp(`<${name}\\b(${ATTRS})>`, 'gi'))].map((m) => attrs(m[1]));
   const baseHref = tags(head, 'base')[0]?.href;
   let base = pageUrl;
   try { if (baseHref) base = new URL(baseHref, pageUrl).href; } catch { /* keep page URL */ }
@@ -376,7 +383,8 @@ async function check(opts) {
   if (!robotsCache.has(origin)) { fetches++; await robotsFor(origin); }
   const robotsRes = robotsCache.get(origin);
   if (robotsRes.status === 200 && robotsRes.body !== null) robots = parseRobots(robotsRes.body);
-  else if (robotsRes.status !== null && robotsRes.status >= 500) add('robots-5xx', 'fail', origin + '/robots.txt', `robots.txt answered ${robotsRes.status}; Google stops crawling the site for the first 12 hours of robots.txt server errors`);
+  // Google treats 429 like a server error, not like a missing file.
+  else if (robotsRes.status !== null && (robotsRes.status >= 500 || robotsRes.status === 429)) add('robots-server-error', 'fail', origin + '/robots.txt', `robots.txt answered ${robotsRes.status}; Google stops crawling the site for the first 12 hours of robots.txt server errors (429 counts as one)`);
   else if (robotsRes.error) add('robots-unreachable', 'fail', origin + '/robots.txt', `robots.txt fetch failed (${robotsRes.error}); Google treats that like a server error and stops crawling for the first 12 hours`);
   else add('robots-missing', 'info', origin + '/robots.txt', `no robots.txt (HTTP ${robotsRes.status}); crawlers treat that as "allow everything"`);
   if (robots && !googlebotAllowed(robots, origin + '/')) add('robots-blocks-root', 'fail', origin + '/robots.txt', 'robots.txt disallows / for Googlebot');
@@ -389,27 +397,30 @@ async function check(opts) {
   const sitemapQueue = declared.length ? [...declared] : [origin + '/sitemap.xml'];
   const sitemapFiles = [];
   const fromIndex = new Set();
+  let sitemapComplete = true; // every sitemap file found was read; membership findings depend on it
   while (sitemapQueue.length && sitemapFiles.length < MAX_SITEMAP_FILES) {
     const smUrl = sitemapQueue.shift();
     if (sitemapFiles.includes(smUrl)) continue;
     sitemapFiles.push(smUrl);
-    if (/\.gz$/i.test(smUrl)) { add('sitemap-gzip', 'info', smUrl, 'gzipped sitemap not read'); continue; }
+    if (/\.gz$/i.test(smUrl)) { sitemapComplete = false; add('sitemap-gzip', 'info', smUrl, 'gzipped sitemap not read'); continue; }
     const res = await timed(smUrl, originGuard);
     if (res.status !== 200 || res.body === null) {
+      sitemapComplete = false;
       if (declared.includes(smUrl)) add('sitemap-unreachable', 'fail', smUrl, `sitemap declared in robots.txt answered ${res.status ?? res.error}`);
       else if (fromIndex.has(smUrl)) add('sitemap-unreachable', 'fail', smUrl, `sitemap listed in a sitemap index answered ${res.status ?? res.error}`);
       else if (!declared.length) add('sitemap-missing', 'warn', smUrl, `no sitemap declared in robots.txt and ${smUrl} answered ${res.status ?? res.error}`);
       continue;
     }
     if (res.chain.length > 1) add('sitemap-redirect', 'warn', smUrl, `sitemap redirects to ${res.finalUrl}`);
-    if (/<sitemapindex\b/i.test(res.body)) {
+    if (hasRoot(res.body, 'sitemapindex')) {
       for (const loc of xmlLocs(res.body, 'sitemap').map(mapUrl)) {
         if (sameOrigin(loc)) { fromIndex.add(loc); sitemapQueue.push(loc); }
-        else add('sitemap-other-origin', 'info', loc, `sitemap index ${smUrl} lists a sitemap on another origin; not fetched`);
+        else { sitemapComplete = false; add('sitemap-other-origin', 'info', loc, `sitemap index ${smUrl} lists a sitemap on another origin; not fetched`); }
       }
-    } else if (/<urlset\b/i.test(res.body)) xmlLocs(res.body, 'url').forEach((loc) => sitemapUrls.add(mapUrl(loc)));
-    else add('sitemap-invalid', 'fail', smUrl, 'sitemap is neither a <urlset> nor a <sitemapindex>');
+    } else if (hasRoot(res.body, 'urlset')) xmlLocs(res.body, 'url').forEach((loc) => sitemapUrls.add(mapUrl(loc)));
+    else { sitemapComplete = false; add('sitemap-invalid', 'fail', smUrl, 'sitemap is neither a <urlset> nor a <sitemapindex>'); }
   }
+  if (sitemapQueue.length) sitemapComplete = false;
   if (sitemapQueue.length) add('sitemap-files-skipped', 'info', origin, `${sitemapQueue.length} sitemap files beyond the first ${MAX_SITEMAP_FILES} not read`);
   if (!declared.length && sitemapUrls.size) add('sitemap-not-declared', 'info', origin + '/robots.txt', 'sitemap.xml exists but robots.txt has no Sitemap line');
   for (const loc of sitemapUrls) {
@@ -604,7 +615,8 @@ async function check(opts) {
     }
   }
 
-  const startOk = Boolean(startRec && !startRec.blocked && startRec.html);
+  // A complete run read the start page itself: HTTP 200, no redirect, HTML (not 206 or 204).
+  const startOk = Boolean(startRec && !startRec.blocked && startRec.status === 200 && startRec.chain.length === 1 && startRec.html);
   if (needsPublicOrigin) add('needs-public-origin', 'fail', start.href, 'local run, but the sitemap or canonical URLs name another origin; rerun with --public-origin <production origin> so those pages are checked here');
   const complete = startOk && !needsPublicOrigin;
 
@@ -629,7 +641,7 @@ async function check(opts) {
       }
     }
   }
-  if (!startOk) add('start-unreadable', 'fail', start.href, startRec?.blocked ? 'robots.txt disallows the start URL for Googlebot' : `start URL gave no HTML (${startRec?.status ?? startRec?.error ?? 'not fetched'})`);
+  if (!startOk) add('start-unreadable', 'fail', start.href, startRec?.blocked ? 'robots.txt disallows the start URL for Googlebot' : `start page was not read as HTML with HTTP 200 (got ${startRec?.status ?? startRec?.error ?? 'nothing: not fetched'})`);
 
   const order = { fail: 0, warn: 1, info: 2 };
   findings.sort((a, b) => order[a.severity] - order[b.severity] || a.rule.localeCompare(b.rule) || a.id.localeCompare(b.id));
@@ -650,7 +662,7 @@ async function check(opts) {
     fetches,
     publicOrigin,
     robots: { status: robotsRes.status, sitemaps: robots?.sitemaps ?? [] },
-    sitemap: { files: sitemapFiles, urls: sitemapUrls.size, list: [...sitemapUrls] },
+    sitemap: { files: sitemapFiles, complete: sitemapComplete, urls: sitemapUrls.size, list: [...sitemapUrls] },
     pages: [...pages.values()].map((r) => ({
       url: r.url,
       blocked: r.blocked,
@@ -701,7 +713,7 @@ function normalize(report, label) {
     }
     return {
       kind: 'seo-check', valid: report.complete, url: report.url, truncated: Boolean(report.truncated), covered, coveredHtml,
-      sitemapRead: (report.sitemap?.files ?? []).length > 0, sitemapList: new Set(report.sitemap?.list ?? []),
+      sitemapComplete: report.sitemap?.complete === true, sitemapList: new Set(report.sitemap?.list ?? []),
       findings: report.findings.filter((f) => f.severity !== 'info'), scores: {},
     };
   }
@@ -744,12 +756,21 @@ function diff(beforePath, afterPath) {
   // Findings read from a page's HTML need that page's HTML read again; status and
   // redirect findings only need it fetched.
   const statusRule = /^(http-error|fetch-error|redirect-chain|sitemap-|robots-|start-unreadable|needs-public-origin|linked-url-|listed-url-)/;
-  const settled = (f) => (f.rule.startsWith('sitemap-url-') && b.sitemapRead && !b.sitemapList.has(f.url))
-    || (f.urls ?? [f.url]).every((u) => (statusRule.test(f.rule) ? b.covered : b.coveredHtml).has(u));
+  // Sitemap-membership findings also need the later run to have read every sitemap file.
+  const membershipRule = /^(not-in-sitemap|orphan|sitemap-url-)/;
+  const settled = (f) => {
+    if (membershipRule.test(f.rule) && !b.sitemapComplete) return false;
+    if (f.rule.startsWith('sitemap-url-') && !b.sitemapList.has(f.url)) return true;
+    return (f.urls ?? [f.url]).every((u) => (statusRule.test(f.rule) ? b.covered : b.coveredHtml).has(u));
+  };
   const unchecked = b.covered ? gone.filter((f) => !settled(f)) : [];
   if (unchecked.length) {
     process.stderr.write(`${unchecked.length} finding(s) disappeared without the later run rechecking their URL (no longer linked or listed, robots-blocked, past the page budget, or no longer HTML). Not counted as fixed; check those URLs, and rerun the later check with --include <file listing them> where they still exist:\n`);
-    for (const f of unchecked) process.stderr.write(`  ${f.rule}  ${(f.urls ?? [f.url]).filter((u) => !(statusRule.test(f.rule) ? b.covered : b.coveredHtml).has(u)).join(', ')}\n`);
+    for (const f of unchecked) {
+      const missing = (f.urls ?? [f.url]).filter((u) => !(statusRule.test(f.rule) ? b.covered : b.coveredHtml).has(u));
+      const why = missing.length ? missing.join(', ') : `${f.url} (the later run did not read every sitemap file)`;
+      process.stderr.write(`  ${f.rule}  ${why}\n`);
+    }
     return 2;
   }
   // A duplicate group that keeps its id but gains pages is a regression for those pages.

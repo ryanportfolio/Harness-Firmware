@@ -10,7 +10,7 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 
 | Rule | Sev | Meaning | Usual fix location | Source |
 |---|---|---|---|---|
-| `robots-5xx`, `robots-unreachable` | fail | robots.txt errors → Google stops crawling site first 12 h | host/server config, static file | [robots.txt spec](https://developers.google.com/crawling/docs/robots-txt/robots-txt-spec) |
+| `robots-server-error`, `robots-unreachable` | fail | robots.txt 5xx, 429 or no answer → Google stops crawling site first 12 h | host/server config, static file | [robots.txt spec](https://developers.google.com/crawling/docs/robots-txt/robots-txt-spec) |
 | `robots-blocks-root` | fail | Googlebot disallowed from `/` (often staging robots.txt shipped) | `robots.txt` or framework robots route | same |
 | `start-unreadable`, `start-noindex` | fail | start URL: no HTML, blocked, or noindex | env-dependent noindex, auth middleware | [block indexing](https://developers.google.com/search/docs/crawling-indexing/block-indexing) |
 | `needs-public-origin` | fail | local run, sitemap/canonical name production origin → run incomplete | rerun w/ `--public-origin <prod origin>` (measurement setup, not the site) | |
