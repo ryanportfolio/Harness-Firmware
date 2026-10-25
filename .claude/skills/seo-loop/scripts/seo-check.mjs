@@ -221,20 +221,24 @@ function xmlSyntaxOk(xml) {
 const httpUrl = (u) => { try { return /^https?:$/.test(new URL(u).protocol); } catch { return false; } };
 const count = (xml, re) => xml.match(new RegExp(re, 'gi'))?.length ?? 0;
 const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, ' ');
+// Closed entries (<url>, <sitemap>) with their namespace prefix; a <loc> counts only in the entry's own
+// namespace, so <image:loc> inside a <url> is not the page's location.
+const xmlEntries = (xml, entry) => [...uncommented(xml).matchAll(new RegExp(`<(${NS})${entry}\\b[^>]*(?<!/)>([\\s\\S]*?)</\\1${entry}\\s*>`, 'gi'))]
+  .map((m) => ({ prefix: escapeRe(m[1]), body: m[2] }));
 function entriesOk(xml, entry) {
-  let closedEntries = 0;
-  for (const m of xml.matchAll(new RegExp(`<(${NS})${entry}\\b[^>]*>([\\s\\S]*?)</\\1${entry}\\s*>`, 'gi'))) {
-    closedEntries++;
-    if (count(m[2], `<${escapeRe(m[1])}loc\\s*>`) !== 1) return false;
-  }
-  return closedEntries === count(xml, `<${NS}${entry}\\b`);
+  const entries = xmlEntries(xml, entry);
+  return entries.length === count(uncommented(xml), `<${NS}${entry}\\b`)
+    && entries.every((e) => count(e.body, `<${e.prefix}loc\\s*>`) === 1);
 }
 const wellFormed = (xml, entry) => xmlSyntaxOk(xml) && entriesOk(xml, entry);
 
 function xmlLocs(xml, parent) {
-  const re = new RegExp(`<${NS}${parent}\\b[\\s\\S]*?<${NS}loc>\\s*([\\s\\S]*?)\\s*</${NS}loc>`, 'gi');
   const out = [];
-  for (const m of xml.matchAll(re)) out.push(decodeEntities(m[1].replace(/^<!\[CDATA\[|\]\]>$/g, '')));
+  for (const { prefix, body } of xmlEntries(xml, parent)) {
+    const m = new RegExp(`<${prefix}loc\\s*>\\s*([\\s\\S]*?)\\s*</${prefix}loc\\s*>`, 'i').exec(body);
+    if (m) out.push(decodeEntities(m[1].replace(/^<!\[CDATA\[|\]\]>$/g, '')));
+  }
   return out;
 }
 
@@ -597,7 +601,12 @@ async function check(opts) {
       const note = rec.stopped ? ` (${rec.stopped})` : '';
       if (sitemapUrls.has(url)) add('sitemap-url-redirects', 'warn', url, `sitemap lists a redirecting URL; list ${rec.finalUrl} instead${note}`);
       else if (linkedFrom.has(url)) add('linked-url-redirects', 'info', url, `internal links point at a redirect to ${rec.finalUrl}${note}${linkedInfo(url)}`);
-      return; // the target is checked as its own page when it is crawled
+      // The target is checked as its own page. The crawl queues it already; a redirect reached
+      // through a canonical or hreflang target is fetched here so the judge loop checks it too.
+      if (!rec.stopped && !rec.error && sameOrigin(rec.finalUrl) && !pages.has(rec.finalUrl) && !(await getPage(rec.finalUrl))) {
+        overBudget.add(rec.finalUrl);
+      }
+      return;
     }
     if (finalStatus === 204 || finalStatus === 205) {
       add('http-no-content', 'fail', url, `HTTP ${finalStatus}: no content for Google to index${linkedInfo(url)}${inSitemap(rec) ? ' (listed in the sitemap)' : ''}`);
@@ -689,6 +698,7 @@ async function check(opts) {
   // so every fetched page gets the same checks.
   const judged = new Set();
   const hreflangUnchecked = new Set(); // hreflang targets past the fetch budget
+  const overBudget = new Set(); // redirect targets past the fetch budget
   for (let pending = [...pages.values()]; pending.length; pending = [...pages.values()].filter((r) => !judged.has(r.url))) {
     for (const rec of pending) {
       judged.add(rec.url);
@@ -696,6 +706,7 @@ async function check(opts) {
     }
   }
   if (hreflangUnchecked.size) limits.push(`${hreflangUnchecked.size} hreflang target(s) past the fetch budget were not checked for return links: ${[...hreflangUnchecked].slice(0, 5).join(', ')}`);
+  if (overBudget.size) limits.push(`${overBudget.size} redirect target(s) past the fetch budget were not checked: ${[...overBudget].slice(0, 5).join(', ')}`);
 
   // A complete run read the start page itself: HTTP 200, no redirect, HTML (not 206 or 204).
   const startOk = Boolean(startRec && !startRec.blocked && startRec.status === 200 && startRec.chain.length === 1 && startRec.html);
