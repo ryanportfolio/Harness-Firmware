@@ -18,7 +18,7 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 | `http-error`, `http-no-content`, `fetch-error` | fail | linked/sitemap URL → 4xx/5xx, 204/205 (nothing to index), or no answer | the link, route, or redirect map | [HTTP status codes](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes) |
 | `sitemap-unreachable`, `sitemap-invalid`, `sitemap-bad-url` | fail | declared sitemap unreadable (error, robots-blocked, blocked redirect), cut off or malformed, or `<loc>` not absolute URL | sitemap generator config | [build a sitemap](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap) |
 | `sitemap-url-blocked`, `sitemap-url-noindex` | fail | sitemap asks Google to index a URL that says "don't" (meta robots, or X-Robots-Tag on any file type) | sitemap filter or page robots setting | same |
-| `canonical-multiple` | fail | >1 rel=canonical → Google ignores all | layout head + page head both emit one | [consolidate duplicate URLs](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls) |
+| `canonical-multiple`, `canonical-invalid` | fail | >1 rel=canonical, or one that isn't a valid http(s) URL → Google ignores it | layout head + page head both emit one | [consolidate duplicate URLs](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls) |
 | `canonical-target-bad` | fail | canonical → error, redirect, noindex or blocked URL | canonical builder (slash, host, locale prefix) | same |
 | `hreflang-invalid`, `hreflang-no-return`, `hreflang-target-blocked` | fail | code outside ISO 639-1 language + optional script + ISO 3166-1 alpha-2 region (`eng`, `es-419`, `en-UK` fail), one-way pair, or alternate robots-blocked so Google cannot confirm the pair | i18n head component | [localized versions](https://developers.google.com/search/docs/specialty/international/localized-versions) |
 | `jsonld-invalid` | fail | JSON-LD won't parse → whole block lost | structured-data component (trailing commas, unescaped quotes) | [structured data policies](https://developers.google.com/search/docs/appearance/structured-data/sd-policies) |
@@ -41,7 +41,7 @@ Not covered: JS-added tags (compare rendered DOM in headed Chrome when framework
 
 ## willaicite dimensions
 
-`--json` → `dimensions[]`: `key`, `weight`, `score` (null = couldn't verify), `evidence[]` (`pass`/`fail`/`warn`/`info`/`unverified` + message), `recommendations[]` (`action`, `why`, `impact`, `effort`). Round target = a `fail`/`warn` evidence line, not score. Severity = willaicite's own evidence status. Fetches: page, homepage, about page, + sitemap pages only if its 10-fetch budget allows (often 0-2; may pick blocked or broken URLs, so read `pagesAudited`).
+`--json` → `dimensions[]`: `key`, `weight`, `score` (null = couldn't verify), `evidence[]` (`pass`/`fail`/`warn`/`info`/`unverified` + message), `recommendations[]` (`action`, `why`, `impact`, `effort`). Round target = a `fail`/`warn` evidence line, not score. Severity = willaicite's own evidence status. Evidence has no ids → failure gone while its dimension has `unverified` evidence in later run = not comparable (diff exit 2), not fixed. Fetches: page, homepage, about page, + sitemap pages only if its 10-fetch budget allows (often 0-2; may pick blocked or broken URLs, so read `pagesAudited`).
 
 | Key | Moves it honestly | Gaming risk for integrity reviewer |
 |---|---|---|

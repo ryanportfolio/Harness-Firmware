@@ -113,6 +113,7 @@ async function fetchChain(url, guard = () => null, rewrite = (u) => u) {
     const res = await fetchOnce(current);
     chain.push({ url: current, status: res.status });
     const loc = res.headers.location;
+    if ([301, 302, 303, 307, 308].includes(res.status) && !loc) return { ...res, body: null, chain, finalUrl: current, error: `HTTP ${res.status} redirect without a Location header` };
     if (res.status >= 300 && res.status < 400 && loc) {
       let next;
       try { next = rewrite(new URL(loc, current).href); } catch { return { ...res, chain, finalUrl: current, error: `bad Location header: ${loc}` }; }
@@ -217,8 +218,18 @@ function xmlSyntaxOk(xml) {
 }
 // A cut-off or malformed file must not pass as a complete sitemap: the XML is well formed,
 // and every entry carries one <loc>.
+const httpUrl = (u) => { try { return /^https?:$/.test(new URL(u).protocol); } catch { return false; } };
 const count = (xml, re) => xml.match(new RegExp(re, 'gi'))?.length ?? 0;
-const wellFormed = (xml, entry) => xmlSyntaxOk(xml) && count(xml, `<${NS}${entry}\\b`) === xmlLocs(xml, entry).length;
+const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function entriesOk(xml, entry) {
+  let closedEntries = 0;
+  for (const m of xml.matchAll(new RegExp(`<(${NS})${entry}\\b[^>]*>([\\s\\S]*?)</\\1${entry}\\s*>`, 'gi'))) {
+    closedEntries++;
+    if (count(m[2], `<${escapeRe(m[1])}loc\\s*>`) !== 1) return false;
+  }
+  return closedEntries === count(xml, `<${NS}${entry}\\b`);
+}
+const wellFormed = (xml, entry) => xmlSyntaxOk(xml) && entriesOk(xml, entry);
 
 function xmlLocs(xml, parent) {
   const re = new RegExp(`<${NS}${parent}\\b[\\s\\S]*?<${NS}loc>\\s*([\\s\\S]*?)\\s*</${NS}loc>`, 'gi');
@@ -462,6 +473,7 @@ async function check(opts) {
     }
     if (root === 'sitemapindex') {
       for (const loc of xmlLocs(res.body, 'sitemap').map(mapUrl)) {
+        if (!httpUrl(loc)) { sitemapComplete = false; add('sitemap-bad-url', 'fail', loc, `sitemap index ${smUrl} lists a <loc> that is not an absolute http(s) URL; that sitemap is never read`); continue; }
         if (sameOrigin(loc)) { fromIndex.add(loc); sitemapQueue.push(loc); }
         else { sitemapComplete = false; add('sitemap-other-origin', 'info', loc, `sitemap index ${smUrl} lists a sitemap on another origin; not fetched`); }
       }
@@ -472,11 +484,12 @@ async function check(opts) {
   if (!declared.length && sitemapUrls.size) add('sitemap-not-declared', 'info', origin + '/robots.txt', 'sitemap.xml exists but robots.txt has no Sitemap line');
   for (const loc of sitemapUrls) {
     try {
+      if (!httpUrl(loc)) throw new Error('not http(s)');
       if (new URL(loc).origin !== origin) {
         if (local && !publicOrigin) needsPublicOrigin = true;
         else add('sitemap-foreign-url', 'warn', loc, 'sitemap lists a URL on another origin');
       }
-    } catch { add('sitemap-bad-url', 'fail', loc, 'sitemap <loc> is not a valid absolute URL'); }
+    } catch { add('sitemap-bad-url', 'fail', loc, 'sitemap <loc> is not a valid absolute http(s) URL'); }
   }
 
   const getPage = async (url) => {
@@ -561,7 +574,7 @@ async function check(opts) {
   const canonicalOf = (rec) => {
     const c = rec.html?.canonicals ?? [];
     if (c.length !== 1) return null;
-    try { return mapUrl(new URL(c[0], rec.html.base).href); } catch { return null; }
+    try { const u = new URL(c[0], rec.html.base); return /^https?:$/.test(u.protocol) ? mapUrl(u.href) : null; } catch { return null; }
   };
   const inSitemap = (rec) => sitemapUrls.has(rec.url) || sitemapUrls.has(rec.finalUrl);
   const linkedInfo = (url) => { const f = linkedFrom.get(url); return f ? ` (linked from ${[...f].slice(0, 3).join(', ')}${f.size > 3 ? ` and ${f.size - 3} more` : ''})` : ''; };
@@ -624,8 +637,9 @@ async function check(opts) {
     if (h.bodyCanonicals.length && !h.canonicals.length) add('canonical-in-body', 'warn', url, 'rel=canonical sits in <body>, where Google ignores it');
     if (h.canonicals.length > 1) add('canonical-multiple', 'fail', url, `${h.canonicals.length} rel=canonical tags; Google ignores all of them`);
     else if (h.canonicals.length === 0) add('canonical-missing', 'info', url, 'no rel=canonical; Google picks the canonical itself');
-    else if (!/^https?:\/\//i.test(h.canonicals[0])) add('canonical-relative', 'warn', url, `canonical "${h.canonicals[0]}" is relative; Google recommends an absolute URL`);
     const canon = canonicalOf(rec);
+    if (h.canonicals.length === 1 && !canon) add('canonical-invalid', 'fail', url, `canonical "${h.canonicals[0]}" is not a valid http(s) URL; Google ignores it`);
+    else if (h.canonicals.length === 1 && !/^https?:\/\//i.test(h.canonicals[0])) add('canonical-relative', 'warn', url, `canonical "${h.canonicals[0]}" is relative; Google recommends an absolute URL`);
     if (canon && canon !== rec.finalUrl) {
       if (!sameOrigin(canon)) {
         if (local && !publicOrigin) needsPublicOrigin = true;
@@ -646,9 +660,11 @@ async function check(opts) {
     let hasSelf = false;
     for (const alt of h.hreflang) {
       if (!validHreflang(alt.lang)) { add('hreflang-invalid', 'fail', url, `hreflang="${alt.lang}" is not an ISO 639-1 language with an optional script and ISO 3166-1 alpha-2 region, so Google ignores it`, `${url}|${alt.lang}`); continue; }
-      if (!/^https?:\/\//i.test(alt.href)) add('hreflang-relative', 'warn', url, `hreflang ${alt.lang} href "${alt.href}" is not a fully qualified URL`, `${url}|${alt.lang}`);
       let target;
-      try { target = mapUrl(new URL(alt.href, h.base).href); } catch { add('hreflang-invalid', 'fail', url, `hreflang ${alt.lang} href "${alt.href}" is not a URL`, `${url}|${alt.lang}`); continue; }
+      try { target = new URL(alt.href, h.base).href; } catch { target = null; }
+      if (!target || !httpUrl(target)) { add('hreflang-invalid', 'fail', url, `hreflang ${alt.lang} href "${alt.href}" is not an http(s) URL`, `${url}|${alt.lang}`); continue; }
+      if (!/^https?:\/\//i.test(alt.href)) add('hreflang-relative', 'warn', url, `hreflang ${alt.lang} href "${alt.href}" is not a fully qualified URL`, `${url}|${alt.lang}`);
+      target = mapUrl(target);
       if (target === self) { hasSelf = true; continue; }
       if (!sameOrigin(target)) continue;
       const other = await getPage(target);
@@ -787,9 +803,11 @@ function normalize(report, label) {
   if (report?.tool === 'geo-audit') {
     const findings = [];
     const scores = {};
+    const unverified = new Set(); // dimensions with a check that could not run
     for (const d of report.dimensions ?? []) {
       scores[d.key] = d.score;
       for (const e of d.evidence ?? []) {
+        if (e.status === 'unverified') unverified.add(d.key);
         if (e.status !== 'fail' && e.status !== 'warn') continue;
         // Counts inside messages change as a round makes progress; the id ignores them.
         findings.push({ id: `geo:${d.key}|${e.message.replace(/\d+/g, '#')}`, rule: `geo:${d.key}`, severity: e.status, url: report.url, message: e.message });
@@ -799,7 +817,7 @@ function normalize(report, label) {
     // never answered; pagesAudited lists only pages that answered 200.
     const url = canonicalUrl(report.url);
     const reached = report.finalUrl !== null && (report.pagesAudited ?? []).includes(url);
-    return { kind: 'geo-audit', valid: reached && report.overallScore !== null, url, findings, scores };
+    return { kind: 'geo-audit', valid: reached && report.overallScore !== null, url, findings, scores, unverified };
   }
   throw new Error(`${label} is neither a seo-check nor a geo-audit report`);
 }
@@ -833,6 +851,16 @@ function diff(beforePath, afterPath) {
     if (entryRule.test(f.rule) && !b.sitemapList.has(f.url)) return true;
     return (f.urls ?? [f.url]).every((u) => coverage(f).has(u));
   };
+  if (b.kind === 'geo-audit') {
+    // willaicite gives its checks no ids, so a failure that vanished while its dimension
+    // has unverified checks may only have become unverifiable.
+    const unsure = gone.filter((f) => b.unverified.has(f.rule.slice(4)));
+    if (unsure.length) {
+      process.stderr.write(`${unsure.length} finding(s) disappeared while their dimension has checks the later run could not verify. Not counted as fixed; rerun the later audit:\n`);
+      for (const f of unsure) process.stderr.write(`  ${f.rule}  ${f.message}\n`);
+      return 2;
+    }
+  }
   const unchecked = b.covered ? gone.filter((f) => !settled(f)) : [];
   if (unchecked.length) {
     process.stderr.write(`${unchecked.length} finding(s) disappeared without the later run rechecking their URL (no longer linked or listed, robots-blocked, past the page budget, or no longer HTML). Not counted as fixed; check those URLs, and rerun the later check with --include <file listing them> where they still exist:\n`);
