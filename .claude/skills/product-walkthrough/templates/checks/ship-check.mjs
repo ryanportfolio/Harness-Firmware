@@ -27,8 +27,13 @@ const C = sandbox.window.TOUR || {};
 
 if (!C.parentOrigin || C.parentOrigin === "*") {
   (args["allow-star-origin"] ? warnings : problems).push(`parentOrigin is "${C.parentOrigin || "*"}": set the host's exact origin (and serve the player with CSP frame-ancestors for that origin)`);
-} else if (!/^https:\/\/[^/]+$/.test(C.parentOrigin) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(C.parentOrigin)) {
-  problems.push(`parentOrigin "${C.parentOrigin}" is not an https origin like https://app.example.com`);
+} else {
+  // The player compares the string with event.origin as is, so it must already be the
+  // canonical origin: lowercase host, no default port, path, query or fragment.
+  let canonical = "";
+  try { canonical = new URL(C.parentOrigin).origin; } catch {}
+  if (canonical !== C.parentOrigin) problems.push(`parentOrigin "${C.parentOrigin}" is not written as a browser reports it${canonical && canonical !== "null" ? ` (use "${canonical}")` : ""}`);
+  else if (!/^https:\/\//.test(C.parentOrigin) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(C.parentOrigin)) problems.push(`parentOrigin "${C.parentOrigin}" is not an https origin like https://app.example.com`);
 }
 if (C.reducedMotion === "ignore") warnings.push('reducedMotion is "ignore": viewers who ask for less motion get the full animation');
 

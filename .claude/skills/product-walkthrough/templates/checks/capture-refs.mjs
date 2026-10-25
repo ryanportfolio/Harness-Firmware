@@ -3,7 +3,8 @@
 // node checks/capture-refs.mjs --config checks/capture-refs.json --out <screenshots>/<project>/walkthrough/refs \
 //   checks/steps/library.mjs [checks/steps/chat.mjs ...] [--keep-session]
 //
-// The test account lives in a secret file (line 1: email or username, line 2: password),
+// The test account lives in a secret file (line 1: email or username, line 2: password,
+// read exactly as written),
 // created with the `secret-file` skill where installed, or by hand. This script reads it, never prints it,
 // and never writes it anywhere. The logged-in session is cached in the OS temp folder
 // between steps and deleted at the end unless --keep-session is passed (that file holds
@@ -35,7 +36,9 @@ const loggedIn = () => page.evaluate((u) => fetch(u, { credentials: "include" })
 async function login() {
   await page.goto(base + "/", { waitUntil: "load" });
   if ((await loggedIn()) === (cfg.check.status || 200)) { console.log("session reused"); return; }
-  const [user, password] = fs.readFileSync(secretFile, "utf8").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  // The password line is kept exactly as written: spaces at either end can be part of it.
+  const lines = fs.readFileSync(secretFile, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/);
+  const user = (lines[0] || "").trim(), password = lines[1] || "";
   if (!user || !password) throw new Error(`secret file needs two lines (user, password): ${secretFile}`);
   secrets.push(user, password);
   await page.goto(base + cfg.login.url, { waitUntil: "load" });

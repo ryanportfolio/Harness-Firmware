@@ -19,10 +19,12 @@ window.TOUR = {
   // How the product switches theme on <html>. Each theme lists the classes and attributes
   // it sets; the player removes the other themes' classes and attributes first. `ink` is
   // the caption text colour for that theme (needed in embed mode, where the page is
-  // transparent and the host's background shows behind the caption).
-  // Examples: { dark: { class: "dark", ink: "#f1f1f4" }, light: { ink: "#16161a" } }
+  // transparent and the host's background shows behind the caption). `page` is the
+  // standalone page colour behind stage and caption, used when the product CSS paints no
+  // body background; keep it in contrast with `ink`.
+  // Examples: { dark: { class: "dark", ink: "#f1f1f4", page: "#101014" }, light: { ink: "#16161a", page: "#f4f4f6" } }
   //           { dark: {}, "night-light": { attrs: { "data-theme": "night-light" } } }
-  themes: { dark: { class: "dark", ink: "#f1f1f4" }, light: { ink: "#16161a" } },
+  themes: { dark: { class: "dark", ink: "#f1f1f4", page: "#101014" }, light: { ink: "#16161a", page: "#f4f4f6" } },
   defaultTheme: "dark",
 
   // Chapter files in scenes/, in play order (without .js).

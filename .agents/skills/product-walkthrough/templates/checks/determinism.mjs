@@ -2,7 +2,7 @@
 // in order or after jumping to the end and back. Catches state carried between frames,
 // CSS transitions on animated elements, and Math.random() in frame(). The default points
 // include the first and last frame, so a replay (end, then back to 0) must match the fresh
-// start. With more than one chapter, the first frame must also match after another
+// start. With more than one chapter, the first frame must also match after each other
 // chapter has played to its end, which catches state a scene leaves on the page.
 //
 // node checks/determinism.mjs --url http://127.0.0.1:4173/player.html [--points 0,0.1,0.3,0.5,0.7,0.9,1] [--themes dark,light] [chapterId ...]
@@ -66,19 +66,24 @@ try {
         const i = diff(fresh[t], again);
         if (i >= 0) { bad++; console.log(`${s.id} [${theme}] MISMATCH at t=${t}\n  in order: ${fresh[t][i]}\n  after jump: ${again[i]}`); }
       }
-      const other = all.find((o) => o.id !== s.id);
-      if (other) {
+      const others = all.filter((o) => o.id !== s.id);
+      if (others.length) {
         // The reference comes from a page of its own: on the shared page an earlier leak
         // would already be in the "fresh" start and both sides would match.
         const own = await openPlayer(browser, withQuery(url, `t=0&scene=${s.id}&theme=${theme}`));
         const start = (await snap(0, own)).out;
         await own.close();
-        await page.evaluate((id) => window.__player.set({ scene: id, t: 0 }), other.id);
-        for (const f of [...points, 1]) await snap(Math.round(other.duration * f));
-        await page.evaluate((id) => window.__player.set({ scene: id, t: 0 }), s.id);
-        const back = (await snap(0)).out;
-        const i = diff(start, back);
-        if (i >= 0) { bad++; console.log(`${s.id} [${theme}] MISMATCH at t=0 after scrubbing ${other.id} to its end\n  fresh: ${start[i]}\n  after ${other.id}: ${back[i]}`); }
+        // Every chapter that can come before this one (Next, Back, the dots), each on a new
+        // page, so one chapter cannot reset or hide what another leaked.
+        for (const other of others) {
+          const pg = await openPlayer(browser, withQuery(url, `t=0&scene=${other.id}&theme=${theme}`));
+          for (const f of [...points, 1]) await snap(Math.round(other.duration * f), pg);
+          await pg.evaluate((id) => window.__player.set({ scene: id, t: 0 }), s.id);
+          const back = (await snap(0, pg)).out;
+          await pg.close();
+          const i = diff(start, back);
+          if (i >= 0) { bad++; console.log(`${s.id} [${theme}] MISMATCH at t=0 after scrubbing ${other.id} to its end\n  fresh: ${start[i]}\n  after ${other.id}: ${back[i]}`); }
+        }
       }
       if (bad) fails++;
       console.log(`${s.id} [${theme}]: ${bad ? "FAIL" : "deterministic"}${anims.size ? `; CSS animations (wall-clock, not scrubbable): ${[...anims].slice(0, 5).join(", ")}` : ""}`);

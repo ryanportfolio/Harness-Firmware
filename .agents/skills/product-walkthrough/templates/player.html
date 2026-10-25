@@ -10,6 +10,7 @@
   :root{--wt-accent:#6d5efc}
   html,body{height:100%;margin:0;overflow:hidden}
   :where(body){font-family:system-ui,-apple-system,"Segoe UI",sans-serif} /* zero specificity: product CSS wins */
+  :where(html:not(.wt-embed)) :where(body){background:var(--wt-page)} /* a theme's page colour; embed stays transparent */
   #wt-wrap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
   #wt-fit{position:relative;transform-origin:50% 50%;flex:none}
   #wt-root{position:absolute;inset:0;overflow:hidden;border-radius:18px;box-shadow:0 30px 120px -30px rgba(0,0,0,.6),0 0 0 1px rgba(127,127,127,.25)}
@@ -171,6 +172,8 @@ function applyTheme(id) {
   // Caption text colour. In embed mode the page is transparent, so inherited body colour
   // can vanish against the host's background; each theme names its ink.
   if (th.ink) html.style.setProperty("--wt-ink", th.ink); else html.style.removeProperty("--wt-ink");
+  // Standalone page colour behind the caption, for when the product CSS paints no body background.
+  if (th.page) html.style.setProperty("--wt-page", th.page); else html.style.removeProperty("--wt-page");
   theme = id;
 }
 
@@ -236,10 +239,12 @@ if (EMBED) {
 // In embed mode Tab stays inside the caption controls, since the iframe covers the host page.
 const focusables = () => [...document.querySelectorAll("#wt-dots button, #wt-btns .wt-btn")].filter((el) => !el.disabled && el.offsetParent !== null);
 addEventListener("keydown", (e) => {
-  const onControl = e.target && e.target.closest && e.target.closest("button, a, input, select");
+  // Arrows stay with fields that use them (the dev scrubber); Space stays with buttons and links, which it presses.
+  const onField = e.target && e.target.closest && e.target.closest("input, select, textarea, [contenteditable]");
+  const onControl = onField || (e.target && e.target.closest && e.target.closest("button, a"));
   if (e.key === "Escape" && EMBED) { e.preventDefault(); done(true); }
-  else if (e.key === "ArrowRight" && !onControl) { e.preventDefault(); next(); }
-  else if (e.key === "ArrowLeft" && !onControl) { e.preventDefault(); if (idx > 0) go(idx - 1); }
+  else if (e.key === "ArrowRight" && !onField) { e.preventDefault(); next(); }
+  else if (e.key === "ArrowLeft" && !onField) { e.preventDefault(); if (idx > 0) go(idx - 1); }
   else if (e.key === " " && !onControl) { e.preventDefault(); togglePlay(); }
   else if (e.key === "Tab" && EMBED) {
     const f = focusables(); if (!f.length) return;
@@ -272,7 +277,7 @@ function render() {
     const dip = tapP >= 0 && tapP < 1 ? Math.sin(Math.PI * tapP) * 4 : 0;
     actorEl.style.opacity = String((a.opacity === undefined ? 1 : a.opacity) * actorFade);
     actorEl.style.transform = `translate(${a.x - box.w / 2}px,${a.y - box.h / 2 + dip}px) scale(${k})`;
-    try { actorInst.frame(t / 1000, lastDt / 1000, { size, expression: a.expr, look: { x: a.lookX || 0, y: a.lookY || 0 }, excite: a.excite || .25, press: tapP >= 0 && tapP < 1 ? tapP : 0, theme }); }
+    try { actorInst.frame(t / 1000, lastDt / 1000, { size, expression: a.expr, look: { x: a.lookX || 0, y: a.lookY || 0 }, excite: a.excite ?? .25, press: tapP >= 0 && tapP < 1 ? tapP : 0, theme }); }
     catch (e) { errors.push("actor: " + e.message); }
     if (tapP >= 0 && tapP < 1.4) { const tp = tipOffset(size), r = tapP / 1.4; ripple.style.left = (a.x + tp.x) + "px"; ripple.style.top = (a.y + tp.y) + "px"; ripple.style.opacity = String(1 - r); ripple.style.transform = `scale(${1 + r * 4})`; }
     else ripple.style.opacity = "0";
