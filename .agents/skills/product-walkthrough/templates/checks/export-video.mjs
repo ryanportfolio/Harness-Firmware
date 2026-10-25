@@ -63,6 +63,11 @@ try {
   await page.evaluate(({ ids, fps, hold, bitrate, width, height }) => {
     document.getElementById("wt-rec").onclick = async () => {
       const R = window.__rec = { chunks: [], frames: 0, captured: 0, err: null, done: false };
+      // A magenta cover over the stage marks its box in the first frames; the crop comes from
+      // it, since the product's own pixels can be black right up to (or well inside) its edges.
+      const mark = document.createElement("div");
+      mark.style.cssText = "position:absolute;inset:0;background:#f0f;z-index:1000;pointer-events:none";
+      document.getElementById("wt-fit").appendChild(mark);
       try {
         window.__player.set({ scene: ids[0], t: 0 });
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: fps }, audio: false, preferCurrentTab: true });
@@ -104,18 +109,25 @@ try {
         })();
 
         // Captured frames follow the real window, which the display can clamp, and pad the
-        // element with pure black. Find the stage's box in the first frame (pixels that are
-        // not pure black; the stage paints its own background) and crop every frame to it.
+        // element with pure black. Find the stage's box in the first frame (the magenta
+        // cover's pixels), crop every frame to it, and skip frames that still show the cover.
         let crop = null;
+        const magenta = (d, i) => d[i] > 200 && d[i + 1] < 60 && d[i + 2] > 200;
         const findCrop = (frame) => {
           const fw = frame.displayWidth, fh = frame.displayHeight, c = new OffscreenCanvas(fw, fh), x = c.getContext("2d");
           x.drawImage(frame, 0, 0); const d = x.getImageData(0, 0, fw, fh).data;
           let x0 = fw, y0 = fh, x1 = -1, y1 = -1;
           for (let y = 0; y < fh; y += 2) for (let i = y * fw * 4, xx = 0; xx < fw; xx += 2, i += 8) {
-            if (d[i] > 3 || d[i + 1] > 3 || d[i + 2] > 3) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+            if (magenta(d, i)) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (y < y0) y0 = y; if (y > y1) y1 = y; }
           }
-          if (x1 < 0) return { sx: 0, sy: 0, sw: fw, sh: fh };
+          if (x1 < 0) return null;
           return { sx: x0, sy: y0, sw: Math.min(fw, x1 + 2) - x0, sh: Math.min(fh, y1 + 2) - y0 };
+        };
+        const covered = (frame) => {
+          const c = new OffscreenCanvas(8, 8), x = c.getContext("2d");
+          x.drawImage(frame, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, 8, 8); const d = x.getImageData(0, 0, 8, 8).data;
+          for (let i = 0; i < d.length; i += 4) if (!magenta(d, i)) return false;
+          return true;
         };
         const emit = (frame) => {
           const { sx, sy, sw, sh } = crop;
@@ -129,7 +141,16 @@ try {
           const { value: frame, done } = await reader.read();
           if (done) break;
           R.captured++;
-          if (t0 === null) { crop = findCrop(frame); R.crop = { ...crop, fw: frame.displayWidth, fh: frame.displayHeight }; t0 = frame.timestamp; R.startedAt = performance.now(); gotFirst(); }
+          if (!crop) {
+            const fw = frame.displayWidth, fh = frame.displayHeight;
+            crop = findCrop(frame); frame.close();
+            if (!crop) throw new Error("the stage cover did not show in the first captured frame, so the stage box is unknown");
+            R.crop = { ...crop, fw, fh }; mark.remove(); continue;
+          }
+          if (t0 === null) {
+            if (covered(frame)) { frame.close(); continue; } // frames painted before the cover came off
+            t0 = frame.timestamp; R.startedAt = performance.now(); gotFirst();
+          }
           // Fill the constant-rate grid up to this frame's time with the previous frame.
           const due = Math.floor((frame.timestamp - t0) / step);
           if (prev) { while (R.frames < due) emit(prev); prev.close(); }
@@ -140,6 +161,7 @@ try {
         if (prev) { const end = Math.round(((R.endedAt || performance.now()) - R.startedAt) * 1000 / step); do emit(prev); while (R.frames < end); prev.close(); }
         await enc.flush();
       } catch (e) { R.err = String((e && e.stack) || e); }
+      mark.remove();
       R.done = true;
     };
   }, { ids, fps, hold, bitrate, width, height });

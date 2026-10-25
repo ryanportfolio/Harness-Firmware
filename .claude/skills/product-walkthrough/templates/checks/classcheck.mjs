@@ -22,11 +22,14 @@ for (const a of args._.length ? args._ : ["scenes"]) {
   else files.push(a);
 }
 const sources = files.map((f) => [f, fs.readFileSync(f, "utf8")]);
-// Only the scenes' own <style> blocks join the haystack, so a class named in a
-// querySelector string never counts as a rule.
-const styles = sources.flatMap(([, s]) => [...s.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]));
-const haystack = cssFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n") + "\n" + styles.join("\n");
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Only the scenes' own <style> blocks join the haystack, so a class named in a
+// querySelector string never counts as a rule. A block written as <style>${css}</style>
+// brings in the template string that `css` names in the same file.
+const named = (s, id) => (new RegExp(`\\b(?:const|let|var)\\s+${reEsc(id)}\\s*=\\s*\`([^\`]*)\``).exec(s) || [])[1] || "";
+const styles = sources.flatMap(([, s]) => [...s.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].flatMap((m) =>
+  [m[1], ...[...m[1].matchAll(/\$\{\s*([A-Za-z_$][\w$]*)\s*\}/g)].map((v) => named(s, v[1]))]));
+const haystack = cssFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n") + "\n" + styles.join("\n");
 // A class starting with a digit (Tailwind's 2xl:) is written `.\32 xl\:grid` in CSS;
 // minifiers may drop the space when the next character is not a hex digit.
 const selector = (c) => {
