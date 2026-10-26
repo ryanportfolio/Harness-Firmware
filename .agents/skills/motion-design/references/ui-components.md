@@ -2,7 +2,7 @@
 
 Motion inside a product: buttons, popovers, tooltips, toasts, drawers, tabs, lists and drag gestures. These pieces are seen many times a day, so this file is about restraint, response and staying inside the frame budget. Films, heroes and loops follow the rest of this skill.
 
-Adapted from Emil Kowalski's skills ([emilkowalski/skills](https://github.com/emilkowalski/skills): `emil-design-eng`, `review-animations` and `animation-performance`, read 2026-10-26), MIT licence in [ui-components.LICENSE](ui-components.LICENSE). The values are his practice from Vercel, Linear, Sonner and Vaul. They are craft defaults, not standards: tune them by eye and cite them as Craft.
+Adapted from Emil Kowalski's skills ([emilkowalski/skills](https://github.com/emilkowalski/skills): `emil-design-eng`, `review-animations` and `animation-performance`, read 2026-10-26), MIT licence in [ui-components.LICENSE](ui-components.LICENSE). The values are his practice from Vercel, Linear, Sonner and Vaul. They are his practice, not standards: tune them by eye, and when citing one, attribute it to Kowalski rather than to a design system.
 
 ## Should it animate at all
 
@@ -23,12 +23,12 @@ Every animation needs an answer to "why does this move?": spatial consistency (a
 
 | Motion | Easing |
 |---|---|
-| Entering, or dismissed by the user | Ease-out: it moves at once, so the UI feels like it heard the user |
+| Entering, or leaving (dismissed by the user or timed out) | Ease-out: it moves at once, so the UI feels like it responded |
 | Moving or morphing while on screen | Ease-in-out |
 | Hover and colour changes | `ease` |
 | Constant motion (marquee, progress bar) | Linear |
 
-Never ease-in on UI. It delays movement at the moment the user is watching: a dropdown with ease-in at 300 ms feels slower than ease-out at 300 ms. The skill's "element leaves: ease in" rule is for scene and film exits, where the element is leaving a composition on its own; a popover or toast the user closes eases out and runs faster than its entrance.
+Never ease-in on UI. It delays movement at the moment the user is watching: a dropdown with ease-in at 300 ms feels slower than ease-out at 300 ms. The skill's "element leaves: ease in" rule is for scene and film exits; a popover, menu or toast that leaves, by the user's hand or on a timer, eases out and runs faster than its entrance.
 
 The built-in CSS curves are weak. Starting points:
 
@@ -47,7 +47,7 @@ Use the project's existing motion tokens first. The design-system token tables a
 | Dropdowns, selects | 150 to 250 ms |
 | Modals, drawers | 200 to 500 ms |
 
-Keep UI animation under 300 ms. A 180 ms select feels more responsive than a 400 ms one, and a faster spinner makes the same load feel shorter.
+Keep UI animation under 300 ms; modals and drawers can run to 500 ms. A 180 ms select feels more responsive than a 400 ms one, and a faster spinner makes the same load feel shorter.
 
 ## Component rules
 
@@ -58,19 +58,19 @@ Keep UI animation under 300 ms. A 180 ms select feels more responsive than a 400
 | Popover, dropdown, menu | Scale from the trigger: `transform-origin` at the trigger, or Base UI's `var(--transform-origin)`. Modals are the exception: they belong to the viewport, so they stay centred. |
 | Row of tooltips | Delay the first one. Once one is open, open its neighbours instantly with no transition (`transition-duration: 0ms` on a `data-instant` state). |
 | Triggered rapidly (toasts added, toggles) | CSS transitions, not keyframes. A transition retargets from where it is; a keyframe animation restarts from zero. |
-| Enter animation without JavaScript | `@starting-style { opacity: 0; transform: translateY(100%); }` inside the rule. The fallback is a `data-mounted` attribute set after the first render. |
+| Enter animation without JavaScript | `@starting-style { opacity: 0; transform: translateY(100%); }` inside a rule that also sets a `transition` on those properties; without the transition nothing animates. The fallback is a `data-mounted` attribute set after the first render. |
 | Crossfade shows two overlapping states | Add `filter: blur(2px)` during the transition so the eye reads one changing object. Keep animated blur under 20 px; it is expensive, worst in Safari. |
 | Press that confirms something (hold to delete) | Slow on press, fast on release: the overlay fills over 2 s linear while held and snaps back in 200 ms ease-out. Slow where the user decides, fast where the system responds. |
 | Group entering together | Stagger 30 to 80 ms between items, and never block input while it plays. Material 1 gives 20 ms or less for list items (see [principles.md](principles.md)); 30 to 80 ms is Kowalski's practice. |
 | Moving by an element's own size | `translateY(100%)`: percentages are relative to the element, so it works at any height. This is how Sonner and Vaul hide toasts and drawers. |
-| Spring | Bounce 0.1 to 0.3 at most, and only for drag-to-dismiss or playful pieces. Motion's `{ type: "spring", duration: 0.5, bounce: 0.2 }` is easier to reason about than mass, stiffness and damping. Springs keep their velocity when interrupted, which suits gestures the user may reverse. |
+| Spring | Bounce 0.1 to 0.3 at most, and only for drag-to-dismiss or playful pieces. Motion's `{ type: "spring", visualDuration: 0.5, bounce: 0.2 }` is easier to reason about than mass, stiffness and damping, and lands on time next to timed motion (the skill's spring rule). Springs keep their velocity when interrupted, which suits gestures the user may reverse. |
 | Decorative motion that follows the mouse | Pass the value through `useSpring` instead of applying it directly, so it has momentum. Only for decoration; a functional chart stays direct. |
 | List items entering and leaving | Opacity and height have to work together. There is no formula; tune until it feels right. |
 | Personality | Match the component. A playful piece can bounce; a dashboard is crisp and fast. Sonner runs a little slower than usual with `ease`, to feel elegant. |
 
 ### clip-path patterns
 
-`clip-path: inset(top right bottom left)` eats into the element from each side and animates on the compositor in current Chrome and Firefox.
+`clip-path: inset(top right bottom left)` eats into the element from each side. Chrome and Firefox can animate it on the compositor; support elsewhere is uneven, so test on Safari and a phone.
 
 - **Reveal on scroll:** from `inset(0 0 100% 0)` to `inset(0 0 0 0)` when the element enters the viewport (`IntersectionObserver`, once).
 - **Tabs with clean colour changes:** duplicate the tab list, style the copy as active, clip the copy to the active tab and animate the clip on change. The text colour changes exactly at the edge, which separate colour transitions cannot do.
@@ -79,7 +79,7 @@ Keep UI animation under 300 ms. A 180 ms select feels more responsive than a 400
 
 ## Gestures and drag
 
-- **Dismiss on a flick.** Compute velocity as distance over elapsed ms; dismiss when it passes about 0.11 px/ms, whatever the distance. Don't make the user drag past a threshold.
+- **Dismiss on a flick.** Compute velocity as distance over elapsed ms. Dismiss when the drag passes the distance threshold or the velocity passes about 0.11 px/ms, so a quick flick is enough on its own.
 - **Resist past the edge.** Dragging beyond a boundary moves the element less the further it goes. Allow the over-drag with rising friction instead of a hard stop.
 - **Capture the pointer** once dragging starts (`setPointerCapture`), so the drag survives the pointer leaving the element.
 - **Ignore extra touches** after the drag begins, or a second finger makes the element jump.
@@ -91,7 +91,7 @@ At 60 Hz a frame has 16.7 ms; at 120 Hz, which most phones and many laptops now 
 
 | Tier | Properties | Cost per frame |
 |---|---|---|
-| Composite only | `transform`, `opacity`; in current Chrome and Firefox also `filter`, `clip-path`, `background-color` | Cheapest |
+| Composite only | `transform` and `opacity` reliably; `filter`, `clip-path` and `background-color` in current Chrome and Firefox, with uneven support elsewhere (test on Safari and a phone) | Cheapest |
 | Paint and composite | `box-shadow`, `border-radius`, `color` | Redraw every frame |
 | Layout, paint and composite | `width`, `height`, `padding`, `margin`, `top`, `left`, `border-width` | Most expensive, and it moves the neighbours too |
 
@@ -104,14 +104,14 @@ At 60 Hz a frame has 16.7 ms; at 120 Hz, which most phones and many laptops now 
 
 | Driver | Thread |
 |---|---|
-| `requestAnimationFrame` loops (GSAP, `motion/react` components) | Main thread, always |
-| Web Animations API (`element.animate()`, Motion's `animate()`) and CSS transitions or keyframes | Can run off the main thread |
+| `requestAnimationFrame` loops (GSAP, Motion's `x`/`y`/`scale` shorthands, hand-written loops) | Main thread, always |
+| Web Animations API (`element.animate()`, Motion's `animate()`, Motion components given a full `transform` string) and CSS transitions or keyframes | Can run off the main thread |
 
 Traps:
 
 - **`transition: all`.** It animates whatever changes next, layout properties included. List the properties.
 - **Motion that plays while the page is busy** (navigation, data fetching, hydration) drops frames when it runs on the main thread. Vercel's dashboard tab indicator used a Framer Motion shared layout animation and stuttered while the next page loaded; a CSS animation fixed it. Use CSS or WAAPI for these.
-- **Framer Motion shorthands.** `x`, `y`, `scale` and `rotate` are CSS variables under the hood and are not hardware-accelerated. When the animation has to survive a busy main thread, animate the string: `animate={{ transform: "translateX(100px)" }}`.
+- **Framer Motion shorthands.** `x`, `y`, `scale` and `rotate` are computed on the main thread every frame and are not hardware-accelerated. When the animation has to survive a busy main thread, animate the string: `animate={{ transform: "translateX(100px)" }}`.
 - **React state per frame.** A hand-rolled animation that calls `setState` in a rAF, pointer, scroll or drag handler re-renders every frame. Write to `ref.current.style.transform` or a motion value instead.
 - **Inherited CSS variables.** Vaul's drag got laggy past about 20 items because the drag distance was a CSS variable on the container, and changing it recalculates styles for every descendant. Set `transform` on the moving element. Suspect this whenever a transform animation gets worse as content grows.
 - **`will-change`.** Browsers already promote elements animating `transform` or `opacity`. Add `will-change: transform` only to the animating element and only after you see a 1 px shift at the start or end, or measure dropped frames. Never on `*` or large containers: every layer costs GPU memory.

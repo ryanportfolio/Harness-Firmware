@@ -25,7 +25,7 @@ These are defaults. Tune them by eye.
 | Situation | Rule |
 |---|---|
 | Element arrives | Ease out (cubic or quint). Never scale up from 0: start at 0.9 or larger, or come down from above 1 for a slam. |
-| Element leaves | Ease in, at about 75% of the entrance duration. This is for scene and film exits; a UI element the user dismisses eases out, faster than it entered ([ui-components.md](references/ui-components.md)). |
+| Element leaves | Ease in, at about 75% of the entrance duration. This is for scene and film exits; a UI element that leaves, whether the user dismissed it or it timed out, eases out, faster than it entered ([ui-components.md](references/ui-components.md)). |
 | Element moves while on screen | Ease in-out. |
 | Physical or playful motion | Use a spring set by `visualDuration` and `bounce`, so it lands on the beat and the bounce plays after it. |
 | Duration | Scale it with distance and area. UI: 150 to 300 ms. Scene morphs: 0.8 to 2.4 s. |
@@ -39,7 +39,7 @@ These are defaults. Tune them by eye.
 | Anything that loops | Run the seam, empty-hold and rest checks before export, and export frames 0 to `CYCLE * fps - 1`. See [verify-export.md](references/verify-export.md#loop-checks-seam-empty-hold-and-rest). |
 | Game trailer | Gameplay by 2 s, hook by 15 s, logo only on the end slate, 90 s or less, cuts on the music's hits. Every system shot shows risk, reward and power spike to someone who never played. See [story.md](references/story.md#game-trailer). |
 | Impact | Hitstop plus shake on the victim, not only the camera; hold frames for weight; few, fast smears. Sources in [principles.md](references/principles.md#impact). |
-| Control | Anything that loops or runs past 10 s gets pause. Scrub and chapter ticks always exist in the dev build (a `?t=` seek for capture); expose them to viewers only when the owner wants them. No reduced-motion version by default: motion is the point. Build one only when the owner asks, per [accessibility.md](references/accessibility.md). |
+| Control | Anything that loops or runs past 10 s gets pause. Scrub and chapter ticks always exist in the dev build (a `?t=` seek for capture); expose them to viewers only when the owner wants them. Films and animated pieces get no reduced-motion version by default, because motion is the point; build one only when the owner asks, per [accessibility.md](references/accessibility.md). Product UI always honours reduced motion ([ui-components.md](references/ui-components.md#reduced-motion)). |
 | Flash | At most 3 flashes in any 1 s, or space them 334 ms apart; keep flashed area under about 20% of the frame; no saturated red flashes. A full-screen white or inverted hit frame counts as a flash. |
 | Cut pace | Set by what the viewer must read, never a target number. Measured game trailers average 1.3 to 4.25 s per shot. Cut on action, keep the subject in the same screen region across the cut. See [camera-cut.md](references/camera-cut.md). |
 | Camera | One camera per shot, every move eased from 0 to speed and back. In 3D, shake rotates and never translates. Longer lens, smaller shake. |

@@ -43,7 +43,7 @@ The probe uses `fail` for candidates associated with WCAG A or AA. Confirm the c
 | RC9 | Content shown on hover or focus can be dismissed with Escape, hovered itself, and stays until dismissed | WCAG 1.4.13 AA | Manual |
 | RC10 | Nothing essential depends on hover; touch screens have none | Craft | Manual |
 | RC11 | A skip link or landmarks let keyboard users pass repeated navigation | WCAG 2.4.1 A | Probe `axe` (landmarks, best practice); manual |
-| RC12 | Hover styles sit inside `@media (hover: hover) and (pointer: fine)`; on touch a tap applies `:hover` and it stays until the next tap elsewhere | Craft | Probe `phone:ungated-hover` (same-origin stylesheets only); fixes in [mobile.md](mobile.md) |
+| RC12 | Hover styles sit inside `@media (hover: hover) and (pointer: fine)`; on touch a tap applies `:hover` and it stays until the next tap elsewhere | Craft | Probe `phone:ungated-hover` (same-origin stylesheets only; it accepts `(hover)`, `(hover: hover)` or `(pointer: fine)` alone, so whether both conditions are present is manual); fixes in [mobile.md](mobile.md) |
 | RC13 | A tap shows the control's own press feedback at once: an `:active` style or `pointerdown` handler, no browser tap highlight over it, `touch-action: manipulation` on controls | Craft | Probe `phone:tap-highlight` for the highlight; feedback timing is manual on a phone |
 
 ## Operate and understand

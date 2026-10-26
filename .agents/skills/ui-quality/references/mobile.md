@@ -1,6 +1,6 @@
 # Mobile web
 
-The CSS and meta-tag fixes that make a web app behave on a phone: hover that sticks after a tap, the grey tap flash, `100vh` under the browser bars, inputs that zoom the page, slow taps, pull-to-refresh, the notch, long-press text selection, carousels that scroll the page, and the status bar colour. Use it when a screen targets phones, a PWA, a bottom sheet, a carousel or a full-screen layout, or when something "works in Chrome but feels wrong on my phone". Motion itself is in `motion-design`'s UI components reference.
+The CSS and meta-tag fixes that make a web app behave on a phone: hover that sticks after a tap, the grey tap flash, `100vh` under the browser bars, inputs that zoom the page, slow taps, pull-to-refresh, the notch, long-press text selection, carousels that scroll the page, and the status bar colour. Use it when a screen targets phones, a PWA, a bottom sheet, a carousel or a full-screen layout, or when something "works in Chrome but feels wrong on my phone". Motion itself is in `motion-design`'s `references/ui-components.md` when that skill is installed.
 
 Adapted from Emil Kowalski's `mobile-native` skill ([emilkowalski/skills](https://github.com/emilkowalski/skills), read 2026-10-26), MIT licence in [kowalski.LICENSE](kowalski.LICENSE). Each fix is Craft or browser behaviour unless a rule ID says otherwise.
 
@@ -37,7 +37,7 @@ Adapted from Emil Kowalski's `mobile-native` skill ([emilkowalski/skills](https:
 
 **Input zoom.** iOS Safari zooms when focus lands in an input whose font is under 16 px and does not zoom back out. Set `input, textarea, select { font-size: 16px; }`, or inside `@media (pointer: coarse)` when the desktop design wants smaller text. While there, set the keyboard: `inputmode="numeric"` for codes, `inputmode="decimal"` for amounts, `type="email"` and `type="tel"`, `autocapitalize="none"` and `autocorrect="off"` for usernames and codes, `enterkeyhint="send"`, `"search"` or `"done"`.
 
-**Slow taps.** Two causes. Browsers can wait about 300 ms after a tap to see whether a double-tap zoom follows; `touch-action: manipulation` on `button, a, [role="button"]` removes the wait where `width=device-width` alone does not. And feedback on `click` arrives when the finger lifts, which reads as lag; style `:active` or listen to `pointerdown`. Keep press feedback at 100 to 160 ms with ease-out.
+**Slow taps.** Two causes. Browsers can wait about 300 ms after a tap to see whether a double-tap zoom follows; `touch-action: manipulation` on `button, a, [role="button"]` removes the wait where `width=device-width` alone does not. And feedback on `click` arrives when the finger lifts, which reads as lag; style `:active` or listen to `pointerdown`. Show it as the finger lands (MO4: within 100 ms) and let it run 100 to 160 ms with ease-out. If `:active` never shows on an iPhone, add a passive no-op `touchstart` listener on the document (`document.addEventListener('touchstart', () => {}, { passive: true })`); some iOS versions apply `:active` only then. Check it on the device.
 
 **Overscroll.** In an app with its own scroll areas, a drawer dragged down or a canvas, scrolling past the top triggers pull-to-refresh on Android and the whole-page bounce on iOS. Set `overscroll-behavior: none` on `html, body`, and `overscroll-behavior: contain` on inner scrollers (sheet content, chat lists) so they keep their own bounce without moving the page. Leave the root alone on a scrolling document where pull-to-refresh is welcome. Never use a `touchmove` listener with `preventDefault()`: it blocks scrolling and makes the listener non-passive.
 
@@ -45,9 +45,9 @@ Adapted from Emil Kowalski's `mobile-native` skill ([emilkowalski/skills](https:
 
 **Long-press selection.** On `button, [role="button"]`, tabs, chips and drag handles: `user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;`. Never on `body`: people copy addresses, error messages and order numbers.
 
-**Gesture axes.** `touch-action` names what the browser may still do. `pan-y` on a horizontal carousel leaves vertical scrolling to the browser; `pan-x` on a vertical sheet handle leaves horizontal; `none` only on an element that really handles every axis (a slider, a drag-to-dismiss surface), or the user cannot scroll past it. A carousel built on native scrolling needs none of this: `scroll-snap-type: x mandatory` on the track and `scroll-snap-align: start` on slides.
+**Gesture axes.** `touch-action` names what the browser may still do. `pan-y` on a horizontal carousel leaves vertical scrolling to the browser; `pan-x` on a vertical sheet handle leaves horizontal; `none` only on an element that really handles every axis (a slider, a drag-to-dismiss surface), or the user cannot scroll past it. A control that works only by dragging also needs a single tap or click alternative (RC8). A carousel built on native scrolling needs none of this: `scroll-snap-type: x mandatory` on the track and `scroll-snap-align: start` on slides.
 
-**Status bar.** Give each scheme its own colour, matched to the top of the page (the header background, not the brand colour), plus `color-scheme`. In Next.js use the `viewport` export's `themeColor`. A theme switched by class needs the tag updated from JavaScript. For an installed PWA, the manifest's `theme_color` and `background_color` and `apple-mobile-web-app-status-bar-style` are the same decision.
+**Status bar.** Give each scheme its own colour, matched to the top of the page (the header background, not the brand colour), plus `color-scheme` when a dark theme ships. Safari 26 is reported to ignore `theme-color` and tint its bars from the page's top background or a fixed header instead, so also give `html` or `body` a background that matches the header. In Next.js use the `viewport` export's `themeColor`. A theme switched by class needs the tag updated from JavaScript. For an installed PWA, the manifest's `theme_color` and `background_color` and `apple-mobile-web-app-status-bar-style` are the same decision.
 
 ## Baseline for a new phone-facing app
 
@@ -55,7 +55,6 @@ Adapted from Emil Kowalski's `mobile-native` skill ([emilkowalski/skills](https:
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
-<meta name="color-scheme" content="light dark" />
 ```
 
 ```css
@@ -65,8 +64,8 @@ html {
   overscroll-behavior: none;      /* drop for a scrolling document */
 }
 input, textarea, select { font-size: 16px; }
-button, a, [role="button"] {
-  touch-action: manipulation;
+button, a, [role="button"] { touch-action: manipulation; }
+button, [role="button"] { /* not links: inline links are content */
   user-select: none;
   -webkit-user-select: none;
 }
@@ -75,7 +74,7 @@ button, a, [role="button"] {
 }
 ```
 
-`interactive-widget=resizes-content` makes the software keyboard shrink the layout viewport on Android Chrome, so `100dvh` and bottom-pinned inputs react to it as they do on iOS. Replace the colours with the page's own.
+`interactive-widget=resizes-content` makes Android Chrome shrink the layout viewport, and `100dvh` with it, when the software keyboard opens, so bottom-pinned inputs stay above the keyboard. iOS Safari ignores the setting and does not resize the layout viewport for the keyboard; there, position against `window.visualViewport` or test on an iPhone. Replace the colours with the page's own. Add `<meta name="color-scheme" content="light dark" />` only when a dark theme ships: it turns form controls and the default background dark, which breaks a light-only page that sets dark text.
 
 ## Never ship
 

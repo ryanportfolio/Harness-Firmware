@@ -1114,47 +1114,69 @@ async function phone(url) {
       const { roots, all, style, sel, topRect, framesShow } = window.__uq;
       const ungated = new Set(), unread = new Set();
       let hoverNone = false;
+      // the queries of a media list; Chrome turns an alternative with an unknown feature into "not all", which never matches
+      const queriesOf = (media) => (media?.mediaText ?? '').split(',').map((q) => q.trim()).filter((q) => q && q !== 'not all');
       // (hover), (hover: hover) and (pointer: fine) leave touch-only screens out, but only when every
       // comma-separated query asks for one; "not" or "or" can let a phone in, so those count as ungated
       const asksHover = (media) => {
-        const queries = (media?.mediaText ?? '').split(',').map((q) => q.trim()).filter(Boolean);
+        const queries = queriesOf(media);
         return queries.length > 0 && queries.every((q) => !/\b(not|or)\b/i.test(q) && /\(\s*(any-)?(hover\s*(:\s*hover\s*)?|pointer\s*:\s*fine\s*)\)/.test(q));
       };
-      const walk = (rules, gated) => {
+      const printOnly = (media) => { const queries = queriesOf(media); return queries.length > 0 && queries.every((q) => /^(only\s+)?print\b/i.test(q)); };
+      // a nested selector with its parents, so `.a { &:hover {} }` reads ".a:hover"
+      const nested = (parent, s) => !parent ? s : s.includes('&') ? s.replace(/&/g, parent) : `${parent} ${s}`;
+      // flags a declaration block that applies while hovering and sits outside every hover gate: a :hover
+      // rule's own declarations, or rules and declarations nested under one. A :hover rule that only holds
+      // a gated @media (Tailwind v4 before minification) has no declarations of its own and passes.
+      const walk = (rules, gated, hover, parent) => {
         for (const rule of rules) {
+          if (printOnly(rule.media)) continue;
           // media rules and @import carry a media list; both can gate what they hold
           const inside = gated || asksHover(rule.media);
           if (/\(\s*(any-)?hover\s*:\s*none\s*\)/.test(rule.media?.mediaText ?? '')) hoverNone = true;
-          if (rule.selectorText?.includes(':hover') && !inside) ungated.add(rule.selectorText);
+          const label = rule.selectorText ? nested(parent, rule.selectorText) : parent;
+          const hovering = rule.selectorText?.includes(':hover') ? label : hover;
+          if (hovering && !inside && rule.style?.length) ungated.add(hovering);
           if (rule.styleSheet) read(rule.styleSheet, inside);
           // nested CSS and grouping rules hold rules of their own
-          if (rule.cssRules) walk(rule.cssRules, inside);
+          if (rule.cssRules) walk(rule.cssRules, inside, hovering, label);
         }
       };
       const read = (sheet, gated) => {
+        if (sheet.disabled || printOnly(sheet.media)) return;
         let rules;
         try { rules = sheet.cssRules; } catch { unread.add(sheet.href || 'inline'); return; }
-        walk(rules, gated || asksHover(sheet.media));
+        walk(rules, gated || asksHover(sheet.media), null, '');
       };
       for (const root of roots()) for (const sheet of [...(root.styleSheets || []), ...(root.adoptedStyleSheets || [])]) read(sheet, false);
       const smallInputs = [], flash = [];
       // visibility: hidden keeps a box, so check the element itself as well as the frames around it
       const shown = (el) => { const r = topRect(el); return r.width && r.height && (el.checkVisibility?.({ visibilityProperty: true }) ?? el.getClientRects().length > 0) && framesShow(el); };
       for (const el of all('input, textarea, select')) {
-        if (el.localName === 'input' && /^(hidden|checkbox|radio|range|color|file|button|submit|reset|image)$/.test(el.type)) continue;
+        // a disabled field never takes focus, so it never zooms
+        if (el.disabled || (el.localName === 'input' && /^(hidden|checkbox|radio|range|color|file|button|submit|reset|image)$/.test(el.type))) continue;
         const px = parseFloat(style(el).fontSize);
         if (shown(el) && px < 16) smallInputs.push(`${sel(el)} ${Math.round(px * 10) / 10}px`);
       }
+      // any colour syntax the browser understands (rgb, oklch, color(), color-mix): paint it and read the alpha back
+      const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+      const alphaOf = (c) => {
+        if (!c || c === 'transparent') return 0;
+        if (!ctx) { const parts = c.match(/rgba?\(([^)]*)\)/)?.[1].split(/[\s,/]+/).filter(Boolean); return !parts ? 1 : parts.length > 3 ? parseFloat(parts[3]) : 1; }
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = '#0000';
+        ctx.fillStyle = c;
+        ctx.fillRect(0, 0, 1, 1);
+        return ctx.getImageData(0, 0, 1, 1).data[3];
+      };
       for (const el of all('a[href], button, [role=button], [role=link], [role=tab], summary, label, select, input:not([type=hidden])')) {
         const c = style(el).webkitTapHighlightColor || '';
-        const parts = c.match(/rgba?\(([^)]*)\)/)?.[1].split(/[\s,/]+/).filter(Boolean);
-        const alpha = !parts ? 0 : parts.length > 3 ? parseFloat(parts[3]) : 1;
-        if (shown(el) && alpha > 0) flash.push(`${sel(el)} ${c}`);
+        if (shown(el) && alphaOf(c) > 0) flash.push(`${sel(el)} ${c}`);
       }
       return { ungated: [...ungated], unread: [...unread], hoverNone, smallInputs, flash };
     });
     if (feel.ungated.length) {
-      add({ check: 'phone:ungated-hover', url, viewport: '375 touch', wcag: [], level: 'craft', severity: 'review', selector: feel.ungated.slice(0, 12).join('; '), measured: `${feel.ungated.length} :hover rules outside a (hover: hover) media query; on touch a tap applies them and they stay until the next tap elsewhere${feel.hoverNone ? '; the page also has (hover: none) rules, which may undo some of them' : ''}` });
+      add({ check: 'phone:ungated-hover', url, viewport: '375 touch', wcag: [], level: 'craft', severity: 'review', selector: feel.ungated.slice(0, 12).join('; '), measured: `${feel.ungated.length} hover selectors with styles outside a media query that leaves touch screens out ((hover), (hover: hover) or (pointer: fine)); on touch a tap applies them and they stay until the next tap elsewhere${feel.hoverNone ? '; the page also has (hover: none) rules, which may undo some of them' : ''}` });
     }
     if (feel.unread.length) notes.push(`${url}: phone:ungated-hover could not read ${feel.unread.length} cross-origin stylesheet(s), first ${feel.unread[0]}`);
     if (feel.smallInputs.length) {
