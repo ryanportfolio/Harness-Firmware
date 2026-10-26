@@ -35,7 +35,8 @@
    compared (different tools, script versions or requested URLs, an incomplete
    run, a later run that hit its page budget when the earlier did not, a
    finding that vanished without the later run rechecking it, or a page the
-   earlier run found indexable that the later run did not check). Info findings
+   earlier run found indexable that the later run did not check). A confirmed
+   regression exits 1 even when other findings can't be compared. Info findings
    are left out of the comparison.
 
    Finding ids are stable across runs (rule plus URL or duplicate key), so diff
@@ -96,19 +97,29 @@ async function readCapped(res, max) {
 
 const decodeUtf8 = (bytes) => new TextDecoder('utf-8', { fatal: false }).decode(bytes);
 
-/** Pages decode the way browsers pick an encoding: a byte order mark, then the Content-Type
-    charset, then a <meta charset> or http-equiv declaration in the first 1024 bytes, else UTF-8.
-    A meta declaring UTF-16 means UTF-8 (the bytes that held it were ASCII); an unknown label
-    falls back to UTF-8. */
+/** Pages decode the way browsers pick an encoding: a byte order mark, then a known Content-Type
+    charset, then the prescan of the first 1024 bytes (a <meta charset>, or http-equiv content-type
+    with a charset, outside comments; else an <?xml encoding>), else UTF-8. A prescan that finds
+    UTF-16 means UTF-8 (the bytes that held it were ASCII), and x-user-defined means windows-1252. */
+const encodingOf = (label) => { try { return label ? new TextDecoder(label.trim()).encoding : null; } catch { return null; } };
+function prescanEncoding(bytes) {
+  const start = bytes.subarray(0, 1024).toString('latin1');
+  let found = null;
+  for (const m of start.replace(/<!--[\s\S]*?(?:-->|$)/g, ' ').matchAll(new RegExp(`<meta(?=[\\s/])(${ATTRS})(?:>|$)`, 'gi'))) {
+    const a = attrs(m[1]);
+    const content = (a['http-equiv'] ?? '').trim().toLowerCase() === 'content-type' ? a.content : undefined;
+    found = encodingOf(a.charset ?? /charset\s*=\s*["']?([^\s;"']+)/i.exec(content ?? '')?.[1]);
+    if (found) break;
+  }
+  found ??= encodingOf(/^<\?xml[^>]*?\sencoding\s*=\s*["']([^"'>]+)/.exec(start)?.[1]);
+  return found?.startsWith('utf-16') ? 'utf-8' : found === 'x-user-defined' ? 'windows-1252' : found;
+}
 function decodePage(bytes, type) {
   const bom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 'utf-8'
     : bytes[0] === 0xff && bytes[1] === 0xfe ? 'utf-16le'
       : bytes[0] === 0xfe && bytes[1] === 0xff ? 'utf-16be' : null;
-  const meta = /<meta(?=[\s/])[^>]*?charset\s*=\s*["']?([\w.:-]+)/i.exec(bytes.subarray(0, 1024).toString('latin1'))?.[1];
-  const label = bom
-    ?? /charset\s*=\s*["']?([\w.:-]+)/i.exec(type)?.[1]
-    ?? (meta && /^utf-?16/i.test(meta) ? 'utf-8' : meta);
-  try { return new TextDecoder(label ?? 'utf-8').decode(bytes); } catch { return decodeUtf8(bytes); }
+  const label = bom ?? encodingOf(/charset\s*=\s*["']?([^\s;"']+)/i.exec(type)?.[1]) ?? prescanEncoding(bytes) ?? 'utf-8';
+  return new TextDecoder(label).decode(bytes);
 }
 
 /** Pages: the body is read for HTML, XML and text responses, and for responses with no
@@ -201,7 +212,11 @@ function parseRobots(text) {
     }
     // Only a rule line ends a run of user-agent lines (Crawl-delay and unknown keys do not).
     lastWasAgent = false;
-    if (group && value) group.rules.push({ allow: key === 'allow', pattern: value });
+    if (!group || !value) continue;
+    group.rules.push({ allow: key === 'allow', pattern: value });
+    // Google: "Allow: /dir/index.htm..." also allows the directory itself (/dir/).
+    const slash = value.lastIndexOf('/');
+    if (key === 'allow' && slash >= 0 && value.startsWith('/index.htm', slash)) group.rules.push({ allow: true, pattern: `${value.slice(0, slash + 1)}$` });
   }
   return { groups, sitemaps };
 }
@@ -239,28 +254,35 @@ function patternMatches(pattern, path) {
   return i === p.length;
 }
 
-// Robots directives from meta robots or X-Robots-Tag, comma separated. "googlebot: noindex" carries a
-// user-agent prefix; max-snippet, max-image-preview, max-video-preview and unavailable_after carry values.
-// A past unavailable_after date keeps the page out of results, so it counts as noindex.
+// Robots directives from meta robots or X-Robots-Tag, comma separated, one header or meta tag per line.
+// "googlebot: noindex" carries a user-agent prefix that holds for the rest of its line; directives for
+// another crawler (bingbot, googlebot-news) don't apply to Google web search. max-snippet,
+// max-image-preview, max-video-preview and unavailable_after carry values. A past unavailable_after
+// date keeps the page out of results, so it counts as noindex.
 const VALUE_DIRECTIVES = new Set(['max-snippet', 'max-image-preview', 'max-video-preview', 'unavailable_after']);
+const DIRECTIVE_START = /^(?:[a-z0-9_-]+\s*:|(?:all|index|follow|noindex|nofollow|none|noarchive|nocache|nosnippet|notranslate|noimageindex|indexifembedded)\s*$)/;
 function hasNoindex(directives, now = Date.now()) {
-  const parts = directives.split(',');
-  for (let i = 0; i < parts.length; i++) {
-    let d = parts[i].trim().toLowerCase();
-    const prefixed = /^([a-z0-9_-]+)\s*:\s*(.*)$/.exec(d);
-    if (prefixed && !VALUE_DIRECTIVES.has(prefixed[1])) d = prefixed[2];
-    if (d === 'noindex' || d === 'none') return true;
-    const until = /^unavailable_after\s*:\s*(.+)$/.exec(d);
-    if (!until) continue;
-    // RFC 822 and 850 dates hold a comma ("Wed, 03 Dec 2025 13:09:53 GMT"): rejoin the next piece.
-    let t = Date.parse(until[1]);
-    if (Number.isNaN(t) && i + 1 < parts.length) {
-      t = Date.parse(`${until[1]},${parts[i + 1]}`);
-      if (!Number.isNaN(t)) i++;
+  return directives.split('\n').some((line) => {
+    const parts = line.split(',');
+    let forGoogle = true;
+    for (let i = 0; i < parts.length; i++) {
+      let d = parts[i].trim().toLowerCase();
+      const prefixed = /^([a-z0-9_-]+)\s*:\s*(.*)$/.exec(d);
+      if (prefixed && !VALUE_DIRECTIVES.has(prefixed[1])) { forGoogle = prefixed[1] === 'googlebot'; d = prefixed[2]; }
+      if (!forGoogle) continue;
+      if (d === 'noindex' || d === 'none') return true;
+      const until = /^unavailable_after\s*:\s*(.+)$/.exec(d);
+      if (!until) continue;
+      // A date may hold commas ("Wed, 03 Dec 2025 13:09:53 GMT"): it runs to the next directive.
+      let value = until[1];
+      while (i + 1 < parts.length && !DIRECTIVE_START.test(parts[i + 1].trim().toLowerCase())) value += `,${parts[++i]}`;
+      // Only a date with its year counts: V8 reads "Dec 3" as 2001.
+      if (!/\b\d{4}\b|\b\d{1,2}-[a-z]{3}-\d{2}\b/i.test(value)) continue;
+      const t = Date.parse(value);
+      if (!Number.isNaN(t) && t < now) return true;
     }
-    if (!Number.isNaN(t) && t < now) return true;
-  }
-  return false;
+    return false;
+  });
 }
 
 function googlebotAllowed(robots, url) {
@@ -346,11 +368,12 @@ function parseSitemap(text) {
     const locs = body.split(/\r\n|\r|\n/).map((l) => l.trim()).filter(Boolean);
     return { kind: 'text', locs, problem: null };
   }
+  // Well-formedness is judged on the file as written, before prefixes are dropped.
+  const syntaxOk = xmlSyntaxOk(body);
   // A prefix bound to the sitemap or Atom namespace names the same elements as no prefix
-  // (<urlset xmlns="..." xmlns:s="..."><s:url>), so those prefixes are dropped.
-  for (const [, prefix] of body.matchAll(/\sxmlns:([A-Za-z_][\w.-]*)\s*=\s*["'](?:http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9|http:\/\/www\.w3\.org\/2005\/Atom)["']/g)) {
-    body = body.replace(new RegExp(`<(/?)${escapeRe(prefix)}:`, 'g'), '<$1');
-  }
+  // (<urlset xmlns="..." xmlns:s="..."><s:url>), so those prefixes are dropped in one pass.
+  const prefixes = new Set([...prepareXml(body).matchAll(/\sxmlns:([A-Za-z_][\w.-]*)\s*=\s*["'](?:http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9|http:\/\/www\.w3\.org\/2005\/Atom)["']/g)].map((m) => m[1]));
+  if (prefixes.size) body = body.replace(new RegExp(`<(/?)(?:${[...prefixes].map(escapeRe).join('|')}):`, 'g'), '<$1');
   const root = xmlRoot(body);
   const format = Object.hasOwn(FORMATS, root ?? '') ? FORMATS[root] : null;
   if (!format) return { kind: null, locs: [], problem: `the root element is <${root ?? '?'}>, not <urlset>, <sitemapindex>, RSS or Atom` };
@@ -359,7 +382,7 @@ function parseSitemap(text) {
   const found = entries.map((e) => format.loc(e));
   const locs = found.filter((l) => l.length === 1).map((l) => decodeEntities(l[0]).trim());
   let problem = null;
-  if (!xmlSyntaxOk(body)) problem = 'the XML is cut off or malformed (unclosed or misnested tags, a bare &, stray <, or text after the root element)';
+  if (!syntaxOk) problem = 'the XML is cut off or malformed (unclosed or misnested tags, a bare &, stray <, or text after the root element)';
   else if (bad) problem = `a <${format.entry}> never closes, nests or self-closes`;
   else if (root !== 'rss' && found.some((l) => l.length !== 1)) problem = `a <${format.entry}> does not hold exactly one location`;
   return { kind: root, locs, problem };
@@ -395,7 +418,11 @@ function decodeEntities(s) {
 
 // The inside of a start tag: quoted values may contain `>` (href="/f?q=3>2"). A stray quote
 // followed by space or the tag's end (content="x"") is skipped, as browsers do.
-const ATTRS = `(?:"[^"]*"|'[^']*'|[^'">]|["'](?=[\\s/>]))*`;
+// A tag's attributes, as a browser reads them: a quote opens a value only right after '=' (alt=Joe's
+// is one unquoted value), and an unclosed quoted value runs to the end of the input. Every tag regex
+// ends in (?:>|$), so a tag without its '>' takes the rest of the input and no match ever fails and
+// rescans the page.
+const ATTRS = `(?:[^>=]+|=\\s*"[^"]*(?:"|$)|=\\s*'[^']*(?:'|$)|=)*`;
 
 function attrs(s) {
   const out = {};
@@ -414,18 +441,22 @@ const text = (html) => decodeEntities(html.replace(/<[^>]*>/g, ' ')).replace(/\s
 // <noscript> is text too: Google reads pages with scripting on.
 const RAW_TEXT = new Set(['script', 'style', 'template', 'textarea', 'title', 'xmp', 'noembed', 'noframes', 'noscript']);
 // Google stops reading <head> metadata at the first element that does not belong in <head>.
-const HEAD_ELEMENTS = new Set(['html', 'head', 'title', 'meta', 'link', 'script', 'style', 'base', 'noscript', 'template']);
+// <noframes> stays in <head> too: the HTML parser reads it there as text.
+const HEAD_ELEMENTS = new Set(['html', 'head', 'title', 'meta', 'link', 'script', 'style', 'base', 'noscript', 'template', 'noframes']);
 
 function parseHtml(html, pageUrl) {
   const jsonld = [];
   const titleTexts = [];
   let doc = '';
   // Every tag is matched whole, so "<script>" or "<!--" inside a quoted attribute stays attribute text.
-  const opener = new RegExp(`<!--|<(/?)([A-Za-z][\\w:-]*)(${ATTRS})>`, 'g');
+  const opener = new RegExp(`<!--|<(/?)([A-Za-z][\\w:-]*)(${ATTRS})(?:>|$)`, 'g');
   let pos = 0;
   for (let m; (m = (opener.lastIndex = pos, opener.exec(html)));) {
     doc += html.slice(pos, m.index);
     if (m[0] === '<!--') {
+      // <!--> and <!---> are complete (empty) comments.
+      const short = /^-?>/.exec(html.slice(m.index + 4, m.index + 6));
+      if (short) { pos = m.index + 4 + short[0].length; continue; }
       const end = html.indexOf('-->', m.index + 4);
       pos = end === -1 ? html.length : end + 3;
       continue;
@@ -449,7 +480,7 @@ function parseHtml(html, pageUrl) {
   // non-blank text. Raw-text elements are empty placeholders here.
   let headEnd = doc.length;
   let headBreaker = null;
-  const tag = new RegExp(`<(/?)([A-Za-z][\\w:-]*)(${ATTRS})>`, 'g');
+  const tag = new RegExp(`<(/?)([A-Za-z][\\w:-]*)(${ATTRS})(?:>|$)`, 'g');
   let last = 0;
   for (let m; (m = tag.exec(doc));) {
     if (/\S/.test(decodeEntities(doc.slice(last, m.index)))) { headEnd = last; headBreaker = 'text'; break; }
@@ -465,7 +496,7 @@ function parseHtml(html, pageUrl) {
   if (headBreaker && !/<\/head\s*>/i.test(body)) headBreaker = null;
 
   // (?=[\s/>]): <img-comparison-slider> is not an <img>.
-  const tags = (src, name) => [...src.matchAll(new RegExp(`<${name}(?=[\\s/>])(${ATTRS})>`, 'gi'))].map((m) => attrs(m[1]));
+  const tags = (src, name) => [...src.matchAll(new RegExp(`<${name}(?=[\\s/>])(${ATTRS})(?:>|$)`, 'gi'))].map((m) => attrs(m[1]));
   const baseHref = tags(head, 'base')[0]?.href;
   let base = pageUrl;
   try { if (baseHref) base = new URL(baseHref, pageUrl).href; } catch { /* keep page URL */ }
@@ -496,7 +527,7 @@ function parseHtml(html, pageUrl) {
     headBreaker, // what ended <head> before its </head>, or null
     titles,
     descriptions: metaContent('description'),
-    robots: [...metaContent('robots', allMetas), ...metaContent('googlebot', allMetas)].join(',').toLowerCase(),
+    robots: [...metaContent('robots', allMetas), ...metaContent('googlebot', allMetas)].join('\n').toLowerCase(), // one meta tag per line
     viewport: metaContent('viewport').length > 0,
     // href stays null when absent, so <link rel=canonical> with no href is not read as "this page".
     canonicals: headLinks.filter((l) => relHas(l, 'canonical')).map((l) => l.href?.trim() ?? null),
@@ -547,6 +578,7 @@ function parseArgs(argv) {
     else throw new Error(`unexpected argument ${a}`);
   }
   if (!opts.url) throw new Error('missing <url>');
+  if (opts.urls && opts.include) throw new Error('--urls and --include cannot be combined; add the URLs to the --urls list');
   if (!Number.isInteger(opts.maxPages) || opts.maxPages < 1) throw new Error('--max-pages must be a positive integer');
   return opts;
 }
@@ -758,7 +790,7 @@ async function check(opts) {
       xRobots: (res.headers['x-robots-tag'] ?? '').toLowerCase(),
     };
     if (rec.truncated) bigPages.add(url);
-    rec.noindex = hasNoindex(`${rec.xRobots},${rec.html?.robots ?? ''}`);
+    rec.noindex = hasNoindex(`${rec.xRobots}\n${rec.html?.robots ?? ''}`);
     rec.indexable = rec.status === 200 && rec.chain.length === 1 && rec.html !== null && !rec.noindex;
     pages.set(url, rec);
     return rec;
@@ -885,7 +917,7 @@ async function check(opts) {
     if (rec.truncated) add('page-truncated', 'info', url, `page is over ${MAX_BYTES / 1e6} MB; only the first ${MAX_BYTES / 1e6} MB was checked`);
 
     if (rec.noindex) {
-      if (isStart) add('start-noindex', 'fail', url, `the start page is noindex (${rec.xRobots ? 'X-Robots-Tag' : 'meta robots'})`);
+      if (isStart) add('start-noindex', 'fail', url, `the start page is noindex (${hasNoindex(rec.xRobots) ? 'X-Robots-Tag' : 'meta robots'})`);
       else if (inSitemap(rec)) {
         add('sitemap-url-noindex', 'fail', url, 'sitemap lists a noindex page');
         // Set by meta robots alone: clearing it takes the page's HTML read again, not just a fetch.
@@ -1142,6 +1174,14 @@ function diff(beforePath, afterPath) {
     return refuse(`${afterPath} stopped at its page budget and ${beforePath} did not; rerun with a higher --max-pages`);
   }
   const gone = a.findings.filter((f) => !after.has(f.id));
+  // What the later run could not settle. A confirmed regression still exits 1; otherwise these exit 2.
+  const notes = [];
+  const unsettled = new Set();
+  // How to recheck: a truncated run needs a bigger budget (listed URLs count against it too),
+  // a --urls run needs the URLs on its list (--include doesn't combine with --urls).
+  const recheck = b.truncated ? 'rerun both checks with a higher --max-pages'
+    : b.mode === 'urls' ? 'add them to the --urls list of the later check'
+      : 'rerun the later check with --include <file listing them>';
 
   if (b.kind === 'geo-audit') {
     // willaicite gives its checks no ids and picks its extra pages itself, so a failure that
@@ -1150,9 +1190,8 @@ function diff(beforePath, afterPath) {
     const sampleShrank = [...a.audited].some((u) => !b.audited.has(u));
     const unsure = gone.filter((f) => b.unverified.has(f.rule.slice(4)) || sampleShrank);
     if (unsure.length) {
-      process.stderr.write(`${unsure.length} finding(s) disappeared while ${sampleShrank ? 'the later audit sampled different pages' : 'their dimension has checks the later run could not verify'}. Not counted as fixed; rerun the later audit:\n`);
-      for (const f of unsure) process.stderr.write(`  ${f.rule}  ${f.message}\n`);
-      return 2;
+      unsure.forEach((f) => unsettled.add(f));
+      notes.push(`${unsure.length} finding(s) disappeared while ${sampleShrank ? 'the later audit sampled different pages' : 'their dimension has checks the later run could not verify'}. Not counted as fixed; rerun the later audit:\n${unsure.map((f) => `  ${f.rule}  ${f.message}\n`).join('')}`);
     }
   }
 
@@ -1181,13 +1220,12 @@ function diff(beforePath, afterPath) {
     };
     const unchecked = gone.filter((f) => !settled(f));
     if (unchecked.length) {
-      process.stderr.write(`${unchecked.length} finding(s) disappeared without the later run rechecking their URL (robots-blocked, past the page budget, no longer HTML, a --urls run, or a sitemap not read in full). Not counted as fixed; check those URLs, and rerun the later check with --include <file listing them> where they still exist:\n`);
-      for (const f of unchecked) {
+      unchecked.forEach((f) => unsettled.add(f));
+      const lines = unchecked.map((f) => {
         const missing = [...(f.urls ?? [f.url]).filter((u) => !coverage(f).has(u)), ...(f.deps ?? []).filter((u) => !depChecked(f, u))];
-        const why = missing.length ? missing.join(', ') : `${f.url} (the later run did not read every sitemap file, or was a --urls run)`;
-        process.stderr.write(`  ${f.rule}  ${why}\n`);
-      }
-      return 2;
+        return `  ${f.rule}  ${missing.length ? missing.join(', ') : `${f.url} (needs a full crawl that reads every sitemap file)`}\n`;
+      });
+      notes.push(`${unchecked.length} finding(s) disappeared without the later run rechecking their URL (robots-blocked, past the page budget, no longer HTML, a --urls run, or a sitemap not read in full). Not counted as fixed; check those URLs and, where they still exist, ${recheck}:\n${lines.join('')}`);
     }
   }
 
@@ -1212,22 +1250,20 @@ function diff(beforePath, afterPath) {
       lost.push([p.url, q.noindex ? 'now noindex' : q.blocked ? 'now blocked by robots.txt' : q.canonical && q.canonical !== q.finalUrl ? `now canonical to ${q.canonical}, which is not an indexable page here` : q.redirects > 0 ? `now redirects to ${q.finalUrl}, which is not an indexable page here` : `now answers ${q.status ?? 'nothing'}${q.html ? '' : ' without HTML'}`]);
     }
     if (unknown.length) {
-      process.stderr.write(`${unknown.length} page(s) indexable in ${beforePath} were not checked by the later ${b.mode === 'crawl' ? 'crawl (it stopped at its page budget)' : '--urls run'}, so the gate can't tell whether they are still indexable. Rerun the later check ${b.mode === 'crawl' ? 'with --include <file listing them>' : 'with them added to the --urls list'}:\n`);
-      for (const u of unknown) process.stderr.write(`  ${u}\n`);
-      return 2;
+      notes.push(`${unknown.length} page(s) indexable in ${beforePath} were not checked by the later run (${b.truncated ? 'it stopped at its page budget' : 'a --urls run'}), so the gate can't tell whether they are still indexable; ${recheck}:\n${unknown.map((u) => `  ${u}\n`).join('')}`);
     }
   }
 
   // A duplicate group that keeps its id but gains pages is a regression for those pages.
   const grown = b.findings.filter((f) => f.urls && before.get(f.id)?.urls).map((f) => ({ f, extra: f.urls.filter((u) => !before.get(f.id).urls.includes(u)) })).filter((g) => g.extra.length);
-  const fixed = gone;
+  const fixed = gone.filter((f) => !unsettled.has(f));
   const added = b.findings.filter((f) => !before.has(f.id));
   const changed = b.findings.filter((f) => before.has(f.id) && before.get(f.id).message !== f.message);
   const rank = { warn: 1, fail: 2 };
   const worse = b.findings.filter((f) => before.has(f.id) && rank[f.severity] > rank[before.get(f.id).severity]);
   const unchanged = b.findings.length - added.length;
   const out = process.stdout;
-  out.write(`${a.kind} diff (fail and warn only): ${fixed.length} fixed, ${added.length} new, ${changed.length} changed wording, ${unchanged} still present${lost.length ? `, ${lost.length} indexable page(s) lost` : ''}\n`);
+  out.write(`${a.kind} diff (fail and warn only): ${fixed.length} fixed${unsettled.size ? ` (${unsettled.size} more gone but not rechecked)` : ''}, ${added.length} new, ${changed.length} changed wording, ${unchanged} still present${lost.length ? `, ${lost.length} indexable page(s) lost` : ''}\n`);
   for (const f of fixed) out.write(`  FIXED  ${f.severity}  ${f.rule}  ${f.url}  ${f.message}\n`);
   for (const f of added) out.write(`  NEW    ${f.severity}  ${f.rule}  ${f.url}  ${f.message}\n`);
   for (const f of changed) out.write(`  CHANGED  ${f.rule}  "${before.get(f.id).message}" -> "${f.message}"\n`);
@@ -1242,7 +1278,9 @@ function diff(beforePath, afterPath) {
     if (x !== null && (y === null || y < x)) drops.push(key);
   }
   for (const { f, extra } of grown) out.write(`  GREW   ${f.severity}  ${f.rule}  now also ${extra.join(', ')}\n`);
-  return added.length || worse.length || lost.length || drops.length || grown.length ? 1 : 0;
+  for (const n of notes) process.stderr.write(n);
+  if (added.length || worse.length || lost.length || drops.length || grown.length) return 1;
+  return notes.length ? 2 : 0;
 }
 
 // ---------- main ----------
