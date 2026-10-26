@@ -17,7 +17,9 @@ Goal: site easier to index, attribute + quote, via measured rounds on own source
 - `local` (default): rounds measured on production build served locally (Scope).
 - `live`: each round deployed, then measured on prod. Owner names it (`$seo-loop live`), or skill proposes it + asks when no local target (Scope) instead of stopping at triage only. Never chosen alone; unattended → `local`.
 - `live` fits only if all hold: small site, deploy + rollback in minutes; owner accepts each change reaches prod before it's measured; every fix = integrity.md "Allowed w/o asking" class or copy owner approved. Else `local`, or triage only.
-- Before first `live` deploy, record: deploy cmd (or merge → auto-deploy), current prod build id, how to confirm live build, rollback cmd. Rollback unknown → no deploy.
+- Before first `live` deploy, record: deploy cmd (or merge → auto-deploy), last good SHA + its prod build id, build marker computed from the deployed tree (asset hash, just-changed string), rollback cmd (e.g. same deploy from a clean checkout at last good SHA). Rollback unknown → no deploy.
+- Deploy from a clean checkout at the merge SHA. CLI deploy may upload a different folder than cwd (link keyed by folder path, e.g. `railway up` from a git worktree uploaded the main checkout) → marker check on prod catches it.
+- Merge + deploy: owner's word per round, or a standing go the owner states for live rounds on that site in that session; never inferred. Copy approved before build, then checked word for word vs approved draft on every page it lands on. Policy items (Owner decisions) never covered by a standing go.
 - Rankings + real citations lag in both modes.
 
 ## Scope
@@ -28,7 +30,7 @@ Goal: site easier to index, attribute + quote, via measured rounds on own source
 - No real data locally: build or site process fails for want of a DB/API URL, or any key page empty (no list items, 404, error page), because its data lives in a private DB, CMS or API the owner hasn't supplied as seed data, DB dump or staging DB → no local target. Fixture data the agent writes doesn't count (checks would score invented text). No deploy preview (Measure target). No stand-in renderer fed by prod pages/API: it isn't the production build, and every crawl multiplies prod requests. No real data locally, can't separate (previous bullet), or production build won't serve locally for another reason → triage only, measured on live prod (read-only), no rounds; report says why + lists what's missing (real-data target, or what the local build needs) as pending owner decision. Owner opts into `live` (Mode) → rounds on prod instead; its fixture rows only pre-check rendered HTML (Rounds), never measured.
 - Build identity: record commit SHA, build + serve cmds, URL; confirm served page = that build (marker in HTML, or a just-changed string).
 - Key pages ≤5: start page + 1 per template (article, product, docs, landing) + owner's picks. No source → pick distinct layouts from nav/sitemap. seo-check crawls site; willaicite per key page.
-- No permission to change hosting, CDN, DNS, Search Console, firewall, publish, deploy. `live`: merge + deploy per round on owner's word only (Rounds); rest stays off-limits.
+- No permission to change hosting, CDN, DNS, Search Console, firewall, publish, deploy. `live`: merge + deploy per round on owner's go only (Mode); rest stays off-limits.
 
 ## Tools
 
@@ -38,8 +40,8 @@ npx -y github:ryanportfolio/willaicite#v1.4.0 <page-url> --json --out <dir>/geo-
 node .agents/skills/seo-loop/scripts/seo-check.mjs diff <before.json> <after.json>
 ```
 
-- seo-check: Node 20+, no deps. Exit 0 no fail, 1 fail findings, 2 incomplete. 200 ms between fetches, none on localhost; `--delay <ms>` overrides, never lower on prod.
-- willaicite: pinned tag; never `npx geo-audit` (unrelated npm pkg). Audits localhost as is. Always exits 0, prints a score even for 404 or dead page → validity = diff's job.
+- seo-check: Node 20+, no deps. Exit 0 no fail, 1 fail findings, 2 incomplete. 200 ms between fetches, none on localhost; `--delay <ms>` overrides, never lower on prod. Same `--max-pages` both sides of a diff. Follows links on every page, canonical or not (sort/filter/page query links fill the budget fast); truncated crawl skips sitemap-only pages + orphan results cover fetched pages only → partial.
+- willaicite: pinned tag; never `npx geo-audit` (unrelated npm pkg). Audits localhost as is, no origin flag: correct canonical to prod reads "points away" locally (seoFoundation drops, e.g. 30 → 0) → known artifact, never "fix" it; `live` → willaicite on prod only. Always exits 0, prints a score even for 404 or dead page → validity = diff's job.
 - diff: same tool, script version + requested URL. Exit 0 nothing new; 1 regression: new fail/warn, warn → fail, duplicate group grew, indexable page `LOST` (now noindex, blocked, broken, canonical/redirect to a non-indexable page, or no longer found by the crawl), lower willaicite dimension score; 2 not comparable: incomplete run, crawls landed on different origins (new baseline needed), later run hit page budget earlier didn't, earlier indexable page not rechecked (`--urls` run or truncated crawl), earlier indexable page now redirecting to or naming as canonical a same-origin page the later run didn't fetch, finding gone w/o its URL (or a cross-page target) rechecked, `--urls` run for sitemap-membership findings, willaicite failure gone while its sample shrank or its dimension has unverified checks. Info findings ignored.
 - Exit 2 for a page that still exists → crawl: rerun later check w/ `--include <its URL>`; `--urls` run: add it to the list (the two flags don't combine); page budget hit: rerun both w/ higher `--max-pages`. A regression found alongside still exits 1. Removed broken link or sitemap file → settles itself once a full crawl w/ complete sitemap no longer references it. Consolidated page (301 or canonical) → not `LOST` while its target is indexable (a target the later run didn't fetch → exit 2, recheck the target; a target on another origin counts as lost); if the old URL is no longer linked, `--include` it so the redirect is seen.
 - seo-check crawls from where the start URL lands (http → https, apex → www); report `url` = that, `requestedUrl` = given. Never fetches other origins (robots.txt redirects excepted, as Google follows them) or robots-blocked redirect targets. Reads Google's way: robots.txt any content type, typo keys, product-token user agents; pages up to 15 MB; sitemaps as XML, text, RSS, Atom, gzip up to 50 MB; `<head>` ends at its first non-head element; robots meta anywhere in the page.
@@ -48,7 +50,7 @@ node .agents/skills/seo-loop/scripts/seo-check.mjs diff <before.json> <after.jso
 
 ## Baseline + triage
 
-Request names no finding ("improve SEO", skill alone) → triage; else baseline, then rounds. Scope says triage only (audit request, no repo, no local target w/o `live`) → triage, whatever the request names. `live`: target = prod, baseline + 0b = prod crawls.
+Request names no finding ("improve SEO", skill alone) → triage; else baseline, then rounds. Scope says triage only (audit request, no repo, no local target w/o `live`) → triage, whatever the request names. `live`: target = prod, baseline + 0b = fresh prod crawls before first live round; any origin change (host URL → own domain) → new baseline (diff exit 2 across origins).
 
 1. Run both tools on target → round-0. Read output, not only exit codes.
 2. Run again → round-0b; diff each pair. Any fixed/new → find drift cause (date-relative freshness, A/B, random content), record before rounds.
@@ -59,26 +61,26 @@ willaicite overall score = context, never target: weights = judgment from studie
 
 ## Rounds
 
-1 implementer, 1 fix class/round (1 rule or 1 dimension finding), usually 1 template/config change. Record first: target finding ids, expected effect, pages to watch.
+1 implementer, 1 fix class/round (1 rule or 1 dimension finding), usually 1 template/config change. Record first: target finding ids, expected effect, pages to watch, expected diff exit-1 items (`LOST` pages + new findings an owner-approved change causes, e.g. noindex on a section). Diff exit 1 passes only if a script matches every exit-1 line to that list; eyeballing ≠ check. Copy/markup change → grep repo checks + scratch tests for old strings, update them.
 
 `local` round:
 
 1. Edit source. Content/markup → integrity first.
 2. Rebuild + serve as baseline; confirm build identity.
 3. Rerun seo-check on site; willaicite on key pages + every page change touches.
-4. Diff vs last kept state. Keep only if: target findings gone, diff exit 0 everywhere else, project build + tests pass.
+4. Diff vs last kept state. Keep only if: target findings gone, diff exit 0 (or exit 1 w/ every item expected) everywhere else, project build + tests pass.
 5. Independent review (below). Confirmed issue → fix + re-measure, or revert.
 6. Fail → revert this round only. Next round ← full record, not best result.
 
 `live` round:
 
 1. Edit source. Content/markup → integrity first.
-2. Pre-check changed HTML locally: script passes a few hand-made fixture rows straight to the page renderer, prod credentials out of env. No prod traffic; no stand-in fed by prod pages/API (Scope). Output = eyeball + review input only, never scored, diffed or shipped.
+2. Pre-check changed HTML locally: script passes a few hand-made fixture rows straight to the page renderer, prod credentials out of env. No prod traffic; no stand-in fed by prod pages/API (Scope). Output = eyeball + review input only, never scored, diffed or shipped. Proves templates only (head tags, escaping, copy); new SQL or route → "unverified until a prod request succeeds". Prefer existing queries.
 3. Project build + tests pass. Independent review (below), before merge. Confirmed issue → fix, or drop round.
-4. PR → repo's review gate (Codex) → merge + deploy only on owner's word. Ask w/ rollback cmd named: go covers running it on regression.
-5. Confirm live build identity (asset hash, just-changed string). Old build still served → wait/recheck, no measuring.
+4. PR → repo's PR review gate → merge + deploy (Mode) only on owner's go. Ask w/ rollback cmd named: go covers running it whenever step 7 says roll back.
+5. Confirm live build identity: marker from deployed tree on prod. Old build or wrong marker → stop, no measuring. Hit every new or changed route once (200, expected content type + content) before crawling.
 6. seo-check on prod (default 200 ms between fetches; say so in report), willaicite on key pages + every page change touches. Diff vs previous prod crawl, never a local run (different origins → exit 2).
-7. Keep: target findings gone, diff exit 0 elsewhere. Regression → rollback cmd (redeploy previous build, or revert PR through same gate), confirm old build identity, recrawl → diff exit 0 vs pre-deploy crawl. Redeploy rollback → revert PR follows so source = prod. Next round ← full record.
+7. Keep only if: target findings gone, diff exit 0 (or exit 1 w/ every item expected) elsewhere. Exit 2 → fix comparability (Tools), re-measure, no next round; still exit 2 → roll back. Any other miss (regression, target finding still there, route check failed) → roll back, unless owner explicitly OKs keeping it live. Roll back = rollback cmd (redeploy last good SHA, or revert PR through same gate), confirm old marker, recrawl → diff exit 0 vs pre-deploy crawl. Redeploy rollback → revert PR follows so source = prod. Next round ← full record.
 
 Stop: ≤5 rounds default; 2 consecutive w/o kept fix; next fix needs owner.
 
@@ -105,7 +107,7 @@ Reviewer → confirmed / refuted / unresolved + evidence paths. Unavailable → 
 
 ## Report
 
-Outcome: **Target met** (chosen findings gone, reviews pass) / **Improved, target unmet** / **Inconclusive** (runs not comparable, review missing) / **No kept fix** / **Triage only**. Mode first. Before/after table (finding counts per rule, willaicite dimension scores per page), kept + discarded rounds, pending owner decisions, evidence paths, seo-check `limits` + willaicite `limitations`. `live` adds per round: PR, deployed build id, rollback run or not; states changes reached prod before measurement, prod crawls ran at 200 ms between fetches.
+Outcome: **Target met** (chosen findings gone, reviews pass) / **Improved, target unmet** / **Inconclusive** (runs not comparable, review missing) / **No kept fix** / **Triage only**. Mode first. Before/after table (finding counts per rule, willaicite dimension scores per page), kept + discarded rounds, pending owner decisions, evidence paths, seo-check `limits` + willaicite `limitations`. `live` adds per round: PR, merge SHA + prod marker, route checks, rollback run or owner-OK'd keep; states changes reached prod before measurement, prod crawls ran at 200 ms between fetches.
 
 Effects lag Google recrawl → owner recheck: Search Console page indexing + performance, Bing Webmaster Tools, 4-6 weeks post-deploy; offer reminder. Never claim ranking/citation gains.
 
