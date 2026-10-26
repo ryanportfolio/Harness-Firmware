@@ -106,8 +106,10 @@ const encodingOf = (label) => { try { return label ? new TextDecoder(label.trim(
 function prescanEncoding(bytes) {
   const start = bytes.subarray(0, 1024).toString('latin1');
   let found = null;
-  for (const m of start.replace(/<!--[\s\S]*?(?:-->|$)/g, ' ').matchAll(new RegExp(`<meta(?=[\\s/])(${ATTRS})(?:>|$)`, 'gi'))) {
-    const a = attrs(m[1]);
+  // Comments, tags and bogus comments read whole, so a <meta> inside a quoted attribute value is not one.
+  for (const m of start.matchAll(new RegExp(`<!--[\\s\\S]*?(?:-->|$)|${TAG}|<[!/?][^>]*(?:>|$)`, 'g'))) {
+    if (m[1] || m[2]?.toLowerCase() !== 'meta') continue;
+    const a = attrs(m[3]);
     const content = (a['http-equiv'] ?? '').trim().toLowerCase() === 'content-type' ? a.content : undefined;
     found = encodingOf(a.charset ?? /charset\s*=\s*["']?([^\s;"']+)/i.exec(content ?? '')?.[1]);
     if (found) break;
@@ -463,6 +465,8 @@ function decodeEntities(s) {
 // ends in (?:>|$), so a tag without its '>' takes the rest of the input and no match ever fails and
 // rescans the page.
 const ATTRS = `(?:[^>=]+|=\\s*"[^"]*(?:"|$)|=\\s*'[^']*(?:'|$)|=)*`;
+// A start or end tag: its name runs to whitespace, '/' or '>' as in a browser (<a.b> is not an <a>).
+const TAG = `<(/?)([A-Za-z][^\\s/>]*)(${ATTRS})(?:>|$)`;
 
 function attrs(s) {
   const out = {};
@@ -474,8 +478,6 @@ function attrs(s) {
   return out;
 }
 
-const text = (html) => decodeEntities(html.replace(/<[^>]*(?:>|$)/g, ' ')).replace(/\s+/g, ' ').trim();
-
 // Elements whose content is text, not markup. Their content is set aside in one left-to-right
 // pass together with comments, so "<!--" inside a script or a tag inside a title stays text.
 // <noscript> is text too: Google reads pages with scripting on.
@@ -483,13 +485,22 @@ const RAW_TEXT = new Set(['script', 'style', 'template', 'textarea', 'title', 'x
 // Google stops reading <head> metadata at the first element that does not belong in <head>.
 // <noframes> stays in <head> too: the HTML parser reads it there as text.
 const HEAD_ELEMENTS = new Set(['html', 'head', 'title', 'meta', 'link', 'script', 'style', 'base', 'noscript', 'template', 'noframes']);
+// Name codes for parseHtml's tag list: HEAD_ELEMENTS first, then the other names the checks read;
+// any other name is OTHER. Codes start at 1, so an end tag is stored as the negative code.
+const CODED = [...HEAD_ELEMENTS, 'body', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'img'];
+const NAME_CODE = new Map(CODED.map((n, i) => [n, i + 1]));
+const OTHER = CODED.length + 1;
+const HEAD = NAME_CODE.get('head'), BODY = NAME_CODE.get('body'), H1 = NAME_CODE.get('h1');
+// Elements whose attributes parseHtml reads.
+const KEEP_ATTRS = new Set(['base', 'title', 'meta', 'link', 'a', 'img']);
 
 function parseHtml(html, pageUrl) {
   const jsonld = [];
   const titleTexts = [];
   let doc = '';
   // Every tag is matched whole, so "<script>" or "<!--" inside a quoted attribute stays attribute text.
-  const opener = new RegExp(`<!--|<(/?)([A-Za-z][\\w:-]*)(${ATTRS})(?:>|$)`, 'g');
+  // DOCTYPE and bogus comments (<!x>, <?x>, </ x>, </>) end at the first '>' and are dropped.
+  const opener = new RegExp(`<!--|${TAG}|<[!?][^>]*(?:>|$)|</(?![A-Za-z])[^>]*(?:>|$)`, 'g');
   let pos = 0;
   for (let m; (m = (opener.lastIndex = pos, opener.exec(html)));) {
     doc += html.slice(pos, m.index);
@@ -501,9 +512,11 @@ function parseHtml(html, pageUrl) {
       pos = end === -1 ? html.length : end + 3;
       continue;
     }
+    if (m[2] === undefined) { pos = m.index + m[0].length; continue; }
     const name = m[2].toLowerCase();
     if (m[1] || !RAW_TEXT.has(name)) { doc += m[0]; pos = m.index + m[0].length; continue; }
-    const close = new RegExp(`</${name}\\s*>`, 'gi');
+    // As in a browser, </script foo> and </script/> close a script too.
+    const close = new RegExp(`</${name}(?=[\\s/>])${ATTRS}(?:>|$)`, 'gi');
     close.lastIndex = m.index + m[0].length;
     const c = close.exec(html);
     const inner = html.slice(m.index + m[0].length, c ? c.index : html.length);
@@ -514,45 +527,74 @@ function parseHtml(html, pageUrl) {
     else doc += `<${name}></${name}>`;
   }
   doc += html.slice(pos);
-  // <?...> is a bogus comment in HTML and ends at the first '>'; either one left open runs to the end.
-  doc = doc.replace(/<!DOCTYPE[^>]*(?:>|$)|<\?[^>]*(?:>|$)/gi, '');
+
+  // Every tag in one pass, each matched whole, so tag-shaped text inside a quoted attribute value
+  // (title="<meta name=robots content=noindex>") stays attribute text. Names are read whole:
+  // <img-comparison-slider> is not an <img>. Each tag keeps its position and a name code (OTHER for
+  // names no check reads; negative for an end tag) in typed arrays, so a 15 MB page of tiny tags
+  // stays small; attributes are kept only for the tags read below.
+  let ats = new Int32Array(1024), ends = new Int32Array(1024), codes = new Int8Array(1024), n = 0;
+  const grow = (a) => { const b = new a.constructor(a.length * 2); b.set(a); return b; };
+  const kept = new Map([...KEEP_ATTRS].map((name) => [name, []]));
+  const tag = new RegExp(TAG, 'g');
+  for (let m; (m = tag.exec(doc));) {
+    if (n === ats.length) { ats = grow(ats); ends = grow(ends); codes = grow(codes); }
+    const name = m[2].toLowerCase();
+    const code = NAME_CODE.get(name) ?? OTHER;
+    ats[n] = m.index; ends[n] = tag.lastIndex; codes[n] = m[1] ? -code : code; n++;
+    if (!m[1]) kept.get(name)?.push({ at: m.index, raw: m[3] });
+  }
 
   // The head ends at </head>, <body>, the first element outside HEAD_ELEMENTS, or the first
   // non-blank text. Raw-text elements are empty placeholders here.
   let headEnd = doc.length;
   let headBreaker = null;
-  const tag = new RegExp(`<(/?)([A-Za-z][\\w:-]*)(${ATTRS})(?:>|$)`, 'g');
   let last = 0;
-  for (let m; (m = tag.exec(doc));) {
-    if (/\S/.test(decodeEntities(doc.slice(last, m.index)))) { headEnd = last; headBreaker = 'text'; break; }
-    const name = m[2].toLowerCase();
-    if ((m[1] && name === 'head') || (!m[1] && name === 'body')) { headEnd = m.index; break; }
-    if (!m[1] && !HEAD_ELEMENTS.has(name)) { headEnd = m.index; headBreaker = `<${name}>`; break; }
-    last = tag.lastIndex;
+  for (let i = 0; i < n; i++) {
+    if (/\S/.test(decodeEntities(doc.slice(last, ats[i])))) { headEnd = last; headBreaker = 'text'; break; }
+    if (codes[i] === -HEAD || codes[i] === BODY) { headEnd = ats[i]; break; }
+    if (codes[i] > HEAD_ELEMENTS.size) {
+      headEnd = ats[i];
+      headBreaker = `<${new RegExp(TAG, 'y').exec(doc.slice(ats[i], ends[i]))[2].toLowerCase()}>`;
+      break;
+    }
+    last = ends[i];
   }
   if (headEnd === doc.length && /\S/.test(doc.slice(last))) headEnd = last;
-  const head = doc.slice(0, headEnd);
-  const body = doc.slice(headEnd);
+  const inHead = (t) => t.at < headEnd;
   // Only worth reporting when the page meant more head to follow.
-  if (headBreaker && !/<\/head\s*>/i.test(body)) headBreaker = null;
+  let closedLater = false;
+  for (let i = 0; i < n && !closedLater; i++) closedLater = codes[i] === -HEAD && ats[i] >= headEnd;
+  if (headBreaker && !closedLater) headBreaker = null;
 
-  // (?=[\s/>]): <img-comparison-slider> is not an <img>.
-  const tags = (src, name) => [...src.matchAll(new RegExp(`<${name}(?=[\\s/>])(${ATTRS})(?:>|$)`, 'gi'))].map((m) => attrs(m[1]));
-  const baseHref = tags(head, 'base')[0]?.href;
+  const tags = (name, where = () => true) => kept.get(name).filter(where).map((t) => attrs(t.raw));
+  // An unclosed <h1> ends at the next heading, as in a browser, or at the end of the page. Each scan
+  // stops at the next <h1> at the latest, so the scans never overlap.
+  const h1 = [];
+  for (let i = 0; i < n; i++) {
+    if (codes[i] !== H1 || ats[i] < headEnd) continue;
+    let j = i + 1;
+    while (j < n && codes[j] !== -H1 && !(codes[j] >= H1 && codes[j] < H1 + 6)) j++;
+    // Its text with the tags inside it removed: matching from the end of the <h1> finds the same
+    // tags as the pass above (quoted '>' included).
+    const inner = doc.slice(ends[i], j < n ? ats[j] : doc.length).replace(new RegExp(TAG, 'g'), ' ');
+    h1.push(decodeEntities(inner).replace(/\s+/g, ' ').trim());
+  }
+  const baseHref = tags('base', inHead)[0]?.href;
   let base = pageUrl;
   try { if (baseHref) base = new URL(baseHref, pageUrl).href; } catch { /* keep page URL */ }
 
-  const titles = tags(head, 'title').map((t) => titleTexts[Number(t['data-seo-title'])] ?? '');
-  const metas = tags(head, 'meta');
+  const titles = tags('title', inHead).map((t) => titleTexts[Number(t['data-seo-title'])] ?? '');
+  const metas = tags('meta', inHead);
   const metaContent = (name, list = metas) => list.filter((m) => (m.name ?? '').toLowerCase() === name).map((m) => m.content ?? '');
   // Google honors robots meta tags anywhere in the page, body included.
-  const allMetas = tags(doc, 'meta');
+  const allMetas = tags('meta');
   const relHas = (l, token) => (l.rel ?? '').toLowerCase().split(/\s+/).includes(token);
-  const headLinks = tags(head, 'link');
-  const bodyLinks = tags(body, 'link');
+  const headLinks = tags('link', inHead);
+  const bodyLinks = tags('link', (t) => !inHead(t));
 
   const links = [];
-  for (const a of tags(doc, 'a')) {
+  for (const a of tags('a')) {
     const href = (a.href ?? '').trim();
     if (!href || /^(#|mailto:|tel:|javascript:|data:)/i.test(href)) continue;
     try {
@@ -574,9 +616,8 @@ function parseHtml(html, pageUrl) {
     canonicals: headLinks.filter((l) => relHas(l, 'canonical')).map((l) => l.href?.trim() ?? null),
     bodyCanonicals: bodyLinks.filter((l) => relHas(l, 'canonical')).map((l) => l.href?.trim() ?? null),
     hreflang: headLinks.filter((l) => relHas(l, 'alternate') && l.hreflang !== undefined).map((l) => ({ lang: l.hreflang.trim(), href: (l.href ?? '').trim() })),
-    // An unclosed <h1> ends at the next heading, as in a browser, or at the end of the page.
-    h1: [...body.matchAll(/<h1(?=[\s>])[^>]*(?:>|$)([\s\S]*?)(?:<\/h1\s*>|(?=<h[1-6][\s>])|$)/gi)].map((m) => text(m[1])),
-    imgsNoAlt: tags(body, 'img').filter((i) => !('alt' in i)).length,
+    h1,
+    imgsNoAlt: tags('img', (t) => !inHead(t)).filter((i) => !('alt' in i)).length,
     jsonld,
     links: [...new Set(links)],
   };
@@ -766,7 +807,14 @@ async function check(opts) {
       }
     }
     if (tooLarge) { sitemapComplete = false; add('sitemap-too-large', 'fail', smUrl, `sitemap is over ${SITEMAP_MAX_BYTES / 1024 / 1024} MB uncompressed; Google rejects it`); continue; }
-    const parsed = parseSitemap(body);
+    let parsed;
+    // A pathological file (one tag with a million attributes) can overflow the pattern stack; that
+    // file is unreadable, not the whole run.
+    try { parsed = parseSitemap(body); } catch (err) {
+      sitemapComplete = false;
+      add('sitemap-invalid', 'fail', smUrl, `sitemap could not be read (${err?.message ?? err}); Google may reject the file`);
+      continue;
+    }
     // The undeclared fallback answering with an HTML page (a single-page app's catch-all) is no sitemap.
     if (!parsed.kind && smUrl === fallback && !declared.length && /html/i.test(res.headers['content-type'] ?? '') && xmlRoot(body) === 'html') {
       unreadable(smUrl, 'answered with an HTML page');
@@ -1303,12 +1351,21 @@ function diff(beforePath, afterPath) {
     const consolidates = (u) => indexableAfter(u) || Boolean(b.pages.get(u)?.indexable && b.pages.get(u).canonical && indexableAfter(b.pages.get(u).canonical));
     // Only a full, untruncated crawl can show that a page is gone; otherwise its state is unknown.
     const unknown = [];
+    // A same-origin canonical target the later run never fetched (page budget, a --urls list) is
+    // unknown, not a page that stopped being indexable. A full crawl fetches every one; one on another
+    // origin is never fetched by any run, so pointing there stays a loss.
+    const sameOrigin = (u) => { try { return new URL(u).origin === new URL(b.url).origin; } catch { return false; } };
+    const unchecked = (u) => !b.pages.has(u) && sameOrigin(u) && (b.mode !== 'crawl' || b.truncated);
+    const uncheckedCanonical = (r) => Boolean(r?.indexable && r.canonical && r.canonical !== r.finalUrl && unchecked(r.canonical));
+    const unknownTargets = new Set();
     for (const p of a.pages.values()) {
       if (!p.indexable || (p.canonical && p.canonical !== p.finalUrl)) continue;
       const q = b.pages.get(p.url);
       // The start URL now redirects: consolidation if it lands on an indexable page.
       if (!q && p.url === b.requested && b.url !== b.requested) {
-        if (!consolidates(b.url)) lost.push([p.url, `now redirects to ${b.url}, which is not an indexable page here`]);
+        if (consolidates(b.url)) continue;
+        if (uncheckedCanonical(b.pages.get(b.url))) unknownTargets.add(b.pages.get(b.url).canonical);
+        else lost.push([p.url, `now redirects to ${b.url}, which is not an indexable page here`]);
         continue;
       }
       if (!q) {
@@ -1319,10 +1376,23 @@ function diff(beforePath, afterPath) {
       if (q.indexable && (!q.canonical || q.canonical === q.finalUrl)) continue;
       if (q.redirects > 0 && !q.stopped && consolidates(q.finalUrl)) continue;
       if (q.indexable && q.canonical && indexableAfter(q.canonical)) continue;
+      // A redirect's own record holds the response it landed on. That page is indexable when it
+      // answered 200 with HTML and no noindex, so only a canonical it names can be left unchecked.
+      if (q.redirects > 0 && !q.stopped && q.status === 200 && q.html && !q.noindex) {
+        if (!q.canonical || q.canonical === q.finalUrl || indexableAfter(q.canonical)) continue;
+        if (unchecked(q.canonical)) { unknownTargets.add(q.canonical); continue; }
+      }
+      if (q.redirects === 0 && uncheckedCanonical(q)) { unknownTargets.add(q.canonical); continue; }
       lost.push([p.url, q.blocked ? 'now blocked by robots.txt' : q.redirects > 0 ? `now redirects to ${q.finalUrl}, which is not an indexable page here` : q.noindex ? 'now noindex' : q.canonical && q.canonical !== q.finalUrl ? `now canonical to ${q.canonical}, which is not an indexable page here` : `now answers ${q.status ?? 'nothing'}${q.html ? '' : ' without HTML'}`]);
     }
     if (unknown.length) {
       notes.push(`${unknown.length} page(s) indexable in ${beforePath} were not checked by the later run (${b.truncated ? 'it stopped at its page budget' : 'a --urls run'}), so the gate can't tell whether they are still indexable; ${recheck}:\n${unknown.map((u) => `  ${u}\n`).join('')}`);
+    }
+    // A target already in the list above needs no second mention.
+    const listed = new Set(unknown);
+    const targets = [...unknownTargets].filter((u) => !listed.has(u));
+    if (targets.length) {
+      notes.push(`Pages indexable in ${beforePath} now redirect to, or name as canonical, ${targets.length} page(s) the later run did not check (${b.truncated ? 'it stopped at its page budget' : 'a --urls run'}), so the gate can't tell whether they still land on an indexable page; ${recheck}:\n${targets.map((u) => `  ${u}\n`).join('')}`);
     }
   }
 
