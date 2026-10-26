@@ -50,8 +50,8 @@ LICENSE/NOTICE files in the skill folder.
 Homegrown skills are MIT, same as the template (see its [`LICENSE`](https://github.com/ryanportfolio/Harness-Firmware/blob/main/LICENSE)).
 
 Runtime coverage follows `.agents/skill-modes.json` and the skill folders: `astra-fullreview`,
-`codex-fullreview`, `coordinate`, `gauntlet`, `long-horizon-workflows` and `merge` are Claude-only, `external-review`
-is Codex-only, and every other active skill ships in both runtimes. `recall` and
+`codex-fullreview`, `codex-image-gen`, `coordinate`, `gauntlet` and `long-horizon-workflows` are Claude-only, `external-review`
+and `opus-fullreview` are Codex-only, and every other active skill ships in both runtimes. `recall` and
 `why` share names with unrelated pstack skills; ours predate the pstack ports
 (initial release, 2026-07-04) and do different jobs.
 

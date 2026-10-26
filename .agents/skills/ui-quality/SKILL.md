@@ -1,6 +1,6 @@
 ---
 name: ui-quality
-description: "Everyday UI quality floor (forms, dashboards, settings): build every state; audit by measuring rendered page (axe-core, focus, reflow, contrast). Use: $ui-quality, 'audit accessibility', 'is this UI production-ready', 'check this page on mobile'. Ambitious look → showpiece; conversion → conversion-ux."
+description: "UI quality floor (forms, dashboards, settings): build every state; audit by measuring the page (axe-core, focus, reflow, contrast). Use: $ui-quality, 'audit accessibility', 'is this UI production-ready', 'check this page on mobile'. Ambitious look → showpiece; conversion → conversion-ux."
 ---
 
 # UI quality
