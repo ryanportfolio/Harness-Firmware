@@ -17,7 +17,8 @@ Goal: site easier to index, attribute + quote, via measured rounds on own source
 - `local` (default): rounds measured on production build served locally (Scope).
 - `live`: each round deployed, then measured on prod. Owner names it (`$seo-loop live`), or skill proposes it + asks when no local target (Scope) instead of stopping at triage only. Never chosen alone; unattended → `local`.
 - `live` fits only if all hold: small site, deploy + rollback in minutes; owner accepts each change reaches prod before it's measured; every fix = integrity.md "Allowed w/o asking" class or copy owner approved. Else `local`, or triage only.
-- Before first `live` deploy, record: deploy cmd (or merge → auto-deploy), last good SHA + its prod build id, build marker computed from the deployed tree (asset hash, just-changed string), rollback cmd (e.g. same deploy from a clean checkout at last good SHA). Rollback unknown → no deploy.
+- Before first `live` deploy, record: deploy cmd (or merge → auto-deploy), last good SHA + its prod build id, rollback cmd (e.g. same deploy from a clean checkout at last good SHA). Rollback unknown → no deploy.
+- Build marker, chosen per round before deploy: something this round changed (new route, tag, string). Asset hash only when assets changed; else blind (old build passes).
 - Deploy from a clean checkout at the merge SHA. CLI deploy may upload a different folder than cwd (link keyed by folder path, e.g. `railway up` from a git worktree uploaded the main checkout) → marker check on prod catches it.
 - Merge + deploy: owner's word per round, or a standing go the owner states for live rounds on that site in that session; never inferred. Copy approved before build, then checked word for word vs approved draft on every page it lands on. Policy items (Owner decisions) never covered by a standing go.
 - Rankings + real citations lag in both modes.
@@ -61,7 +62,7 @@ willaicite overall score = context, never target: weights = judgment from studie
 
 ## Rounds
 
-1 implementer, 1 fix class/round (1 rule or 1 dimension finding), usually 1 template/config change. Record first: target finding ids, expected effect, pages to watch, expected diff exit-1 items (`LOST` pages + new findings an owner-approved change causes, e.g. noindex on a section). Diff exit 1 passes only if a script matches every exit-1 line to that list; eyeballing ≠ check. Copy/markup change → grep repo checks + scratch tests for old strings, update them.
+1 implementer, 1 fix class/round (1 rule or 1 dimension finding), usually 1 template/config change. Record first: target finding ids, expected effect, pages to watch, expected diff exit-1 items (`LOST` pages + new findings an owner-approved change causes, e.g. noindex on a section), each as rule + URL pattern (rule alone lets a real regression on another page pass). Diff exit 1 passes only if a script matches every exit-1 line to that list; eyeballing ≠ check. Copy/markup change → grep repo checks + scratch tests for old strings, update them.
 
 `local` round:
 
@@ -78,7 +79,7 @@ willaicite overall score = context, never target: weights = judgment from studie
 2. Pre-check changed HTML locally: script passes a few hand-made fixture rows straight to the page renderer, prod credentials out of env. No prod traffic; no stand-in fed by prod pages/API (Scope). Output = eyeball + review input only, never scored, diffed or shipped. Proves templates only (head tags, escaping, copy); new SQL or route → "unverified until a prod request succeeds". Prefer existing queries.
 3. Project build + tests pass. Independent review (below), before merge. Confirmed issue → fix, or drop round.
 4. PR → repo's PR review gate → merge + deploy (Mode) only on owner's go. Ask w/ rollback cmd named: go covers running it whenever step 7 says roll back.
-5. Confirm live build identity: marker from deployed tree on prod. Old build or wrong marker → stop, no measuring. Hit every new or changed route once (200, expected content type + content) before crawling.
+5. Confirm live build identity: this round's marker (Mode) on prod. Missing → stop, no measuring. Hit every new or changed route once (200, expected content type + content) before crawling. Integrity lens's 3-UA fetch on DB-backed routes runs here, not pre-merge; reviewer marks it "deferred to prod", not unresolved.
 6. seo-check on prod (default 200 ms between fetches; say so in report), willaicite on key pages + every page change touches. Diff vs previous prod crawl, never a local run (different origins → exit 2).
 7. Keep only if: target findings gone, diff exit 0 (or exit 1 w/ every item expected) elsewhere. Exit 2 → fix comparability (Tools), re-measure, no next round; still exit 2 → roll back. Any other miss (regression, target finding still there, route check failed) → roll back, unless owner explicitly OKs keeping it live. Roll back = rollback cmd (redeploy last good SHA, or revert PR through same gate), confirm old marker, recrawl → diff exit 0 vs pre-deploy crawl. Redeploy rollback → revert PR follows so source = prod. Next round ← full record.
 
@@ -107,7 +108,7 @@ Reviewer → confirmed / refuted / unresolved + evidence paths. Unavailable → 
 
 ## Report
 
-Outcome: **Target met** (chosen findings gone, reviews pass) / **Improved, target unmet** / **Inconclusive** (runs not comparable, review missing) / **No kept fix** / **Triage only**. Mode first. Before/after table (finding counts per rule, willaicite dimension scores per page), kept + discarded rounds, pending owner decisions, evidence paths, seo-check `limits` + willaicite `limitations`. `live` adds per round: PR, merge SHA + prod marker, route checks, rollback run or owner-OK'd keep; states changes reached prod before measurement, prod crawls ran at 200 ms between fetches.
+Outcome: **Target met** (chosen findings gone, reviews pass) / **Improved, target unmet** / **Inconclusive** (runs not comparable, review missing) / **No kept fix** / **Triage only**. Mode first. Before/after table (finding counts per rule, willaicite dimension scores per page), kept + discarded rounds, pending owner decisions, evidence paths, seo-check `limits` + willaicite `limitations`. Diff exit 1 w/ every item expected → "exit 1, all N lines expected", not regression. `live` adds per round: PR, merge SHA + prod marker, route checks + deferred UA fetch, rollback run or owner-OK'd keep; states changes reached prod before measurement, prod crawls ran at 200 ms between fetches.
 
 Effects lag Google recrawl → owner recheck: Search Console page indexing + performance, Bing Webmaster Tools, 4-6 weeks post-deploy; offer reminder. Never claim ranking/citation gains.
 
