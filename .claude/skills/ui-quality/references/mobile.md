@@ -24,7 +24,7 @@ Adapted from Emil Kowalski's `mobile-native` skill ([emilkowalski/skills](https:
 | Pull-to-refresh or rubber band moves the app | `overscroll-behavior: none` on the root, `contain` on inner scrollers | Craft |
 | Content stops at the notch, or a bar sits under it | `viewport-fit=cover` plus `env(safe-area-inset-*)` padding | Craft |
 | Long-press selects a button's label | `user-select: none` on controls only | Craft |
-| Swiping a carousel scrolls the page | `touch-action: pan-y` on the horizontal gesture surface, or native scroll snap | Craft |
+| Swiping a carousel scrolls the page | `touch-action: pan-y pinch-zoom` on the horizontal gesture surface, or native scroll snap | Craft |
 | Status bar colour fights the page | One `theme-color` per colour scheme | Craft |
 
 ## The fixes
@@ -45,7 +45,7 @@ Adapted from Emil Kowalski's `mobile-native` skill ([emilkowalski/skills](https:
 
 **Long-press selection.** On `button, [role="button"]`, tabs, chips and drag handles: `user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;`. Never on `body`: people copy addresses, error messages and order numbers.
 
-**Gesture axes.** `touch-action` names what the browser may still do. `pan-y` on a horizontal carousel leaves vertical scrolling to the browser; `pan-x` on a vertical sheet handle leaves horizontal; `none` only on an element that really handles every axis (a slider, a drag-to-dismiss surface), or the user cannot scroll past it. A control that works only by dragging also needs a single tap or click alternative (RC8). A carousel built on native scrolling needs none of this: `scroll-snap-type: x mandatory` on the track and `scroll-snap-align: start` on slides.
+**Gesture axes.** `touch-action` names what the browser may still do. `pan-y pinch-zoom` on a horizontal carousel leaves vertical scrolling and pinch zoom to the browser; `pan-x pinch-zoom` on a vertical sheet handle leaves horizontal scrolling and zoom. Bare `pan-x` or `pan-y` also blocks pinch zoom on that surface, so keep `pinch-zoom` unless the element handles zoom itself; `none` only on an element that really handles every axis (a slider, a drag-to-dismiss surface), or the user cannot scroll past it. A control that works only by dragging also needs a single tap or click alternative (RC8). A carousel built on native scrolling needs none of this: `scroll-snap-type: x mandatory` on the track and `scroll-snap-align: start` on slides.
 
 **Status bar.** Give each scheme its own colour, matched to the top of the page (the header background, not the brand colour), plus `color-scheme` when a dark theme ships. Safari 26 is reported to ignore `theme-color` and tint its bars from the page's top background or a fixed header instead, so also give `html` or `body` a background that matches the header. In Next.js use the `viewport` export's `themeColor`. A theme switched by class needs the tag updated from JavaScript. For an installed PWA, the manifest's `theme_color` and `background_color` and `apple-mobile-web-app-status-bar-style` are the same decision.
 
@@ -87,7 +87,7 @@ button, [role="button"] { /* not links: inline links are content */
 | Press feedback on `click` only | `:active` or `pointerdown` |
 | `touchmove` with `preventDefault()` to stop overscroll | `overscroll-behavior` |
 | `user-select: none` on `body` | Only on controls |
-| `touch-action: none` on something the user scrolls past | `pan-x` or `pan-y` |
+| `touch-action: none` on something the user scrolls past | `pan-x pinch-zoom` or `pan-y pinch-zoom` |
 | `env(safe-area-inset-*)` without `viewport-fit=cover` | Add the meta tag |
 | One `theme-color` for both schemes | One per `prefers-color-scheme` |
 | User-agent sniffing for touch | `(hover)` and `(pointer)` media queries |

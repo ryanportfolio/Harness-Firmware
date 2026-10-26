@@ -1117,10 +1117,11 @@ async function phone(url) {
       // the queries of a media list; Chrome turns an alternative with an unknown feature into "not all", which never matches
       const queriesOf = (media) => (media?.mediaText ?? '').split(',').map((q) => q.trim()).filter((q) => q && q !== 'not all');
       // (hover), (hover: hover) and (pointer: fine) leave touch-only screens out, but only when every
-      // comma-separated query asks for one; "not" or "or" can let a phone in, so those count as ungated
+      // comma-separated query asks for one; "not" or "or" can let a phone in, so those count as ungated.
+      // any-hover and any-pointer describe a secondary input (a mouse on a touch phone), so they never gate
       const asksHover = (media) => {
         const queries = queriesOf(media);
-        return queries.length > 0 && queries.every((q) => !/\b(not|or)\b/i.test(q) && /\(\s*(any-)?(hover\s*(:\s*hover\s*)?|pointer\s*:\s*fine\s*)\)/.test(q));
+        return queries.length > 0 && queries.every((q) => !/\b(not|or)\b/i.test(q) && /\(\s*(hover\s*(:\s*hover\s*)?|pointer\s*:\s*fine\s*)\)/.test(q));
       };
       const printOnly = (media) => { const queries = queriesOf(media); return queries.length > 0 && queries.every((q) => /^(only\s+)?print\b/i.test(q)); };
       // a nested selector with its parents, so `.a { &:hover {} }` reads ".a:hover"
@@ -1153,8 +1154,8 @@ async function phone(url) {
       // visibility: hidden keeps a box, so check the element itself as well as the frames around it
       const shown = (el) => { const r = topRect(el); return r.width && r.height && (el.checkVisibility?.({ visibilityProperty: true }) ?? el.getClientRects().length > 0) && framesShow(el); };
       for (const el of all('input, textarea, select')) {
-        // a disabled field never takes focus, so it never zooms
-        if (el.disabled || (el.localName === 'input' && /^(hidden|checkbox|radio|range|color|file|button|submit|reset|image)$/.test(el.type))) continue;
+        // a disabled field never takes focus, so it never zooms; :disabled also covers a disabled fieldset
+        if (el.matches(':disabled') || (el.localName === 'input' && /^(hidden|checkbox|radio|range|color|file|button|submit|reset|image)$/.test(el.type))) continue;
         const px = parseFloat(style(el).fontSize);
         if (shown(el) && px < 16) smallInputs.push(`${sel(el)} ${Math.round(px * 10) / 10}px`);
       }
