@@ -1097,7 +1097,7 @@ async function phone(url) {
       for (const el of all('a[href], button, input:not([type=hidden]), select, textarea, [role=button], [role=link], [role=tab], [role=checkbox], [role=switch], [tabindex]:not([tabindex="-1"])')) {
         // the size on the page, after any scaling of the frames around it
         const r = topRect(el);
-        if (!r.width || !r.height || !framesShow(el)) continue;
+        if (!r.width || !r.height || !(el.checkVisibility?.({ visibilityProperty: true }) ?? el.getClientRects().length > 0) || !framesShow(el)) continue;
         // inline links inside running text are exempt from target size
         if (el.localName === 'a' && style(el).display === 'inline' && el.parentElement && ownText(el.parentElement)) continue;
         const w = r.width * k, h = r.height * k;
@@ -1114,8 +1114,12 @@ async function phone(url) {
       const { roots, all, style, sel, topRect, framesShow } = window.__uq;
       const ungated = new Set(), unread = new Set();
       let hoverNone = false;
-      // (hover), (hover: hover) and (pointer: fine) all leave touch-only screens out
-      const asksHover = (media) => /\(\s*(any-)?(hover\s*(:\s*hover\s*)?|pointer\s*:\s*fine\s*)\)/.test(media?.mediaText ?? '');
+      // (hover), (hover: hover) and (pointer: fine) leave touch-only screens out, but only when every
+      // comma-separated query asks for one; "not" or "or" can let a phone in, so those count as ungated
+      const asksHover = (media) => {
+        const queries = (media?.mediaText ?? '').split(',').map((q) => q.trim()).filter(Boolean);
+        return queries.length > 0 && queries.every((q) => !/\b(not|or)\b/i.test(q) && /\(\s*(any-)?(hover\s*(:\s*hover\s*)?|pointer\s*:\s*fine\s*)\)/.test(q));
+      };
       const walk = (rules, gated) => {
         for (const rule of rules) {
           // media rules and @import carry a media list; both can gate what they hold
@@ -1134,7 +1138,8 @@ async function phone(url) {
       };
       for (const root of roots()) for (const sheet of [...(root.styleSheets || []), ...(root.adoptedStyleSheets || [])]) read(sheet, false);
       const smallInputs = [], flash = [];
-      const shown = (el) => { const r = topRect(el); return r.width && r.height && framesShow(el); };
+      // visibility: hidden keeps a box, so check the element itself as well as the frames around it
+      const shown = (el) => { const r = topRect(el); return r.width && r.height && (el.checkVisibility?.({ visibilityProperty: true }) ?? el.getClientRects().length > 0) && framesShow(el); };
       for (const el of all('input, textarea, select')) {
         if (el.localName === 'input' && /^(hidden|checkbox|radio|range|color|file|button|submit|reset|image)$/.test(el.type)) continue;
         const px = parseFloat(style(el).fontSize);
