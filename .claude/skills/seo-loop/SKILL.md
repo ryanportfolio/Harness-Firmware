@@ -16,7 +16,7 @@ Goal: site easier to index, attribute + quote, via measured rounds on own source
 
 - Site + source repo; edits via source → build → PR. Never edit live site. Audit request or no repo → triage only.
 - Measure target: production build served locally (host's build + preview cmd), else deploy preview. Dev server = diagnostic only. Live prod = read-only baseline.
-- No real data locally (private DB; no seed, dump or staging DB from the owner) → local build renders no real pages, and no deploy preview either (it can run the site's workers against prod and is often noindexed). Triage only on live prod, no rounds; report says why.
+- No real data locally: build + serve first; any key page empty (no list items, 404, error page) because its data lives in a private DB, CMS or API the owner hasn't supplied as seed data, DB dump or staging DB → no local target. Prod credentials in env files and fixture data the agent writes don't count (local build would read or write prod; checks would score invented text). No deploy preview either: one with its own DB starts empty, one whose env names the prod DB runs this branch's code + migrations against prod, both inherit prod tokens + background jobs, and Vercel previews are noindexed. No stand-in renderer fed by prod pages/API (not the production build; every crawl multiplies prod requests). → Triage only, measured on live prod (read-only), no rounds; report says why + lists the real-data target as pending owner decision.
 - Build identity: record commit SHA, build + serve cmds, URL; confirm served page = that build (marker in HTML, or a just-changed string).
 - Key pages ≤5: start page + 1 per template (article, product, docs, landing) + owner's picks. No source → pick distinct layouts from nav/sitemap. seo-check crawls site; willaicite per key page.
 - No permission to change hosting, CDN, DNS, Search Console, firewall, publish, deploy.
@@ -39,12 +39,12 @@ node .claude/skills/seo-loop/scripts/seo-check.mjs diff <before.json> <after.jso
 
 ## Baseline + triage
 
-Request names no finding ("improve SEO", skill alone) → triage; else baseline, then rounds.
+Request names no finding ("improve SEO", skill alone) → triage; else baseline, then rounds. Scope says triage only (audit request, no repo, no real data) → triage, whatever the request names.
 
 1. Run both tools on target → round-0. Read output, not only exit codes.
 2. Run again → round-0b; diff each pair. Any fixed/new → find drift cause (date-relative freshness, A/B, random content), record before rounds.
 3. Triage table, no edits. Columns: finding (seo-check rule, or willaicite dimension + evidence line), pages, severity, why (checks.md row; willaicite: its recommendation `why`), fix location, effort, owner input? Same issue in both tools → 1 row, higher severity. Order: access + indexing fails (robots, status, noindex, canonical, crawler access, renderability) → other fails → warns; tie → more pages first. Info → count line under table.
-4. Stop; user picks focus. Unattended → table = report, outcome "triage only".
+4. Stop; user picks focus. Unattended → table = report, outcome "triage only". No real data → a picked focus waits for the owner's real-data target (Owner decisions); re-baseline on it first.
 
 willaicite overall score = context, never target: weights = judgment from studies; its cited replication found formatting-only edits ~useless.
 
@@ -69,7 +69,7 @@ Never alone; list pending w/ exact proposed change:
 - CDN/firewall bot rules: outside repo → report setting.
 - New facts, figures, quotes, authors, credentials, prices, dates; key-page copy (draft via `writing`).
 - Section-wide noindex/robots, URL changes + redirect maps, new pages.
-- Real-data measure target for a site whose data can't be served locally: seed data, DB dump, or staging DB.
+- Real-data measure target for a site whose data can't be served locally (Scope), supplied by the owner: seed data or DB dump loaded into a local DB, or a staging DB whose host ≠ prod's (a copied prod `DATABASE_URL` is prod). Run the site process only, never workers, migrations or jobs holding prod tokens. Dump w/ private rows (users, emails, sessions, tokens, drafts) → outside repo + round folders, deleted at cleanup; else seed or anonymize. Data ≠ prod's published state, or static data making date-relative text drift → say so in report; record drift in Baseline step 2.
 
 ## Independent review
 
