@@ -32,8 +32,9 @@
    (geo-audit --json) reports: 0 nothing new, 1 a regression (a new fail or warn
    finding, a warn that became a fail, a duplicate group that grew, an indexable
    page lost, or a lower willaicite dimension score), 2 the inputs can't be
-   compared (different tools, script versions or requested URLs, an incomplete
-   run, a later run that hit its page budget when the earlier did not, a
+   compared (different tools, script versions, requested URLs or landing
+   origins, an incomplete run, a later run that hit its page budget when the
+   earlier did not, a
    finding that vanished without the later run rechecking it, or a page the
    earlier run found indexable that the later run did not check). A confirmed
    regression exits 1 even when other findings can't be compared. Info findings
@@ -254,7 +255,8 @@ function patternMatches(pattern, path) {
   return i === p.length;
 }
 
-// Robots directives from meta robots or X-Robots-Tag, comma separated, one header or meta tag per line.
+// Robots directives from meta robots or X-Robots-Tag, comma separated, one line per meta tag (all
+// X-Robots-Tag headers arrive as one line).
 // "googlebot: noindex" carries a user-agent prefix; a directive for another crawler (bingbot,
 // googlebot-news) doesn't apply to Google web search. The prefix covers only its own directive:
 // fetch joins repeated X-Robots-Tag headers with ", ", so "bingbot: nofollow" and a separate
@@ -262,7 +264,9 @@ function patternMatches(pattern, path) {
 // max-image-preview, max-video-preview and unavailable_after carry values. A past unavailable_after
 // date keeps the page out of results, so it counts as noindex.
 const VALUE_DIRECTIVES = new Set(['max-snippet', 'max-image-preview', 'max-video-preview', 'unavailable_after']);
-const DIRECTIVE_START = /^(?:[a-z0-9_-]+\s*:|(?:all|index|follow|noindex|nofollow|none|noarchive|nocache|nosnippet|notranslate|noimageindex|indexifembedded)\s*$)/;
+// A piece that starts the next directive: "name:" or a bare word (noindex, noai, noodp). The pieces
+// of a date hold digits or spaces.
+const DIRECTIVE_START = /^(?:[a-z0-9_-]+\s*:|[a-z][a-z_-]*\s*$)/;
 function hasNoindex(directives, now = Date.now()) {
   return directives.split('\n').some((line) => {
     const parts = line.split(',');
@@ -1061,6 +1065,7 @@ async function check(opts) {
     mode: list ? 'urls' : 'crawl',
     url: start.href,
     requestedUrl: requested.href,
+    startHops: first && first.status !== null ? first.chain.length - 1 : 0,
     startedAt,
     finishedAt: new Date().toISOString(),
     complete,
@@ -1125,9 +1130,10 @@ function normalize(report, label) {
     for (const p of report.pages ?? []) {
       if (!p.blocked && p.redirects > 0 && p.status === 200 && !p.stopped && coveredHtml.has(p.finalUrl)) coveredHtml.add(p.url);
     }
-    // A start URL that redirects was fetched too; the crawl started where it landed.
+    // A start URL that redirects was fetched too; the crawl started where it landed. With more than
+    // one hop, a redirect-chain finding on it is reported only when a crawled page links to it.
     const requested = report.requestedUrl ?? report.url;
-    if (report.complete && requested !== report.url) {
+    if (report.complete && requested !== report.url && (report.startHops ?? Infinity) <= 1) {
       covered.add(requested);
       if (coveredHtml.has(report.url)) coveredHtml.add(requested);
     }
@@ -1140,6 +1146,8 @@ function normalize(report, label) {
       sitemapComplete: report.sitemap?.complete === true, sitemapFiles: new Set(report.sitemap?.files ?? []),
       sitemapList: new Set(report.sitemap?.list ?? []),
       findings: report.findings.filter((f) => f.severity !== 'info'), scores: {},
+      // A fail or warn can drop to info when a run is truncated (orphan); that is not a fix.
+      infoIds: new Set(report.findings.filter((f) => f.severity === 'info').map((f) => f.id)),
     };
   }
   if (report?.tool === 'geo-audit') {
@@ -1177,18 +1185,21 @@ function diff(beforePath, afterPath) {
   for (const [r, p] of [[a, beforePath], [b, afterPath]]) {
     if (!r.valid) return refuse(`${p} is incomplete (page not reached with HTTP 200, or nothing verified); not comparable`);
   }
+  if (a.kind === 'seo-check' && new URL(a.url).origin !== new URL(b.url).origin) {
+    return refuse(`the earlier run crawled ${new URL(a.url).origin} and the later one ${new URL(b.url).origin}; pages on different origins can't be matched. Take a new baseline on the new origin`);
+  }
   const before = new Map(a.findings.map((f) => [f.id, f]));
   const after = new Map(b.findings.map((f) => [f.id, f]));
   const gone = a.findings.filter((f) => !after.has(f.id));
   // What the later run could not settle. A confirmed regression still exits 1; otherwise these exit 2.
   const notes = [];
   if (a.kind === 'seo-check' && b.truncated && !a.truncated) {
-    notes.push(`${afterPath} stopped at its page budget and ${beforePath} did not; rerun with a higher --max-pages\n`);
+    notes.push(`${afterPath} stopped at its page budget and ${beforePath} did not; rerun the later check with a higher --max-pages\n`);
   }
   const unsettled = new Set();
   // How to recheck: a truncated run needs a bigger budget (listed URLs count against it too),
   // a --urls run needs the URLs on its list (--include doesn't combine with --urls).
-  const recheck = b.truncated ? 'rerun both checks with a higher --max-pages'
+  const recheck = b.truncated ? `rerun ${a.truncated ? 'both checks' : 'the later check'} with a higher --max-pages`
     : b.mode === 'urls' ? 'add them to the --urls list of the later check'
       : 'rerun the later check with --include <file listing them>';
 
@@ -1221,6 +1232,7 @@ function diff(beforePath, afterPath) {
     // A cross-page finding's target needs its HTML read again, unless the source page no longer points at it.
     const depChecked = (f, u) => b.coveredHtml.has(u) || !b.refs.get(f.url)?.has(u);
     const settled = (f) => {
+      if (b.infoIds.has(f.id)) return false;
       if (membershipRule.test(f.rule) && (!b.sitemapComplete || b.mode !== 'crawl')) return false;
       if (entryRule.test(f.rule) && !b.sitemapList.has(f.url)) return true;
       if (fileRule.test(f.rule) && b.sitemapComplete && !b.sitemapFiles.has(f.url)) return true;
@@ -1243,6 +1255,8 @@ function diff(beforePath, afterPath) {
   const lost = [];
   if (b.kind === 'seo-check') {
     const indexableAfter = (u) => b.pages.get(u)?.indexable && (!b.pages.get(u).canonical || b.pages.get(u).canonical === b.pages.get(u).finalUrl);
+    // Indexable itself, or indexable and canonical to a page that is.
+    const consolidates = (u) => indexableAfter(u) || Boolean(b.pages.get(u)?.indexable && b.pages.get(u).canonical && indexableAfter(b.pages.get(u).canonical));
     // Only a full, untruncated crawl can show that a page is gone; otherwise its state is unknown.
     const unknown = [];
     for (const p of a.pages.values()) {
@@ -1250,7 +1264,7 @@ function diff(beforePath, afterPath) {
       const q = b.pages.get(p.url);
       // The start URL now redirects: consolidation if it lands on an indexable page.
       if (!q && p.url === b.requested && b.url !== b.requested) {
-        if (!indexableAfter(b.url)) lost.push([p.url, `now redirects to ${b.url}, which is not an indexable page here`]);
+        if (!consolidates(b.url)) lost.push([p.url, `now redirects to ${b.url}, which is not an indexable page here`]);
         continue;
       }
       if (!q) {
@@ -1259,9 +1273,9 @@ function diff(beforePath, afterPath) {
         continue;
       }
       if (q.indexable && (!q.canonical || q.canonical === q.finalUrl)) continue;
-      if (q.redirects > 0 && !q.stopped && indexableAfter(q.finalUrl)) continue;
+      if (q.redirects > 0 && !q.stopped && consolidates(q.finalUrl)) continue;
       if (q.indexable && q.canonical && indexableAfter(q.canonical)) continue;
-      lost.push([p.url, q.noindex ? 'now noindex' : q.blocked ? 'now blocked by robots.txt' : q.canonical && q.canonical !== q.finalUrl ? `now canonical to ${q.canonical}, which is not an indexable page here` : q.redirects > 0 ? `now redirects to ${q.finalUrl}, which is not an indexable page here` : `now answers ${q.status ?? 'nothing'}${q.html ? '' : ' without HTML'}`]);
+      lost.push([p.url, q.blocked ? 'now blocked by robots.txt' : q.redirects > 0 ? `now redirects to ${q.finalUrl}, which is not an indexable page here` : q.noindex ? 'now noindex' : q.canonical && q.canonical !== q.finalUrl ? `now canonical to ${q.canonical}, which is not an indexable page here` : `now answers ${q.status ?? 'nothing'}${q.html ? '' : ' without HTML'}`]);
     }
     if (unknown.length) {
       notes.push(`${unknown.length} page(s) indexable in ${beforePath} were not checked by the later run (${b.truncated ? 'it stopped at its page budget' : 'a --urls run'}), so the gate can't tell whether they are still indexable; ${recheck}:\n${unknown.map((u) => `  ${u}\n`).join('')}`);
