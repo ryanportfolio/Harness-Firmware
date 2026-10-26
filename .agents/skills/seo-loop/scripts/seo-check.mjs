@@ -389,9 +389,12 @@ function xmlEntries(prepared, entry) {
 
 // The location in each entry, read only in the entry's own namespace (so <image:loc> inside a <url>
 // is not the page's location). RSS items carry <link>URL</link>, Atom entries <link href="URL"/>.
+// <loc> may carry attributes (<loc xmlns="...">); quoted values stop at '<', as in xmlSyntaxOk. RSS <link>
+// takes none, and an Atom <link href> in an item (its prefix dropped in parseSitemap) is not the item's link.
+const XML_ATTRS = `(?:\\s+[^\\s=/>]+\\s*=\\s*(?:"[^"<]*"|'[^'<]*'))*\\s*`;
 const FORMATS = {
-  urlset: { entry: 'url', loc: (e) => [...e.body.matchAll(new RegExp(`<${e.prefix}loc\\s*>([^<]*)</${e.prefix}loc\\s*>`, 'gi'))].map((m) => m[1]) },
-  sitemapindex: { entry: 'sitemap', loc: (e) => [...e.body.matchAll(new RegExp(`<${e.prefix}loc\\s*>([^<]*)</${e.prefix}loc\\s*>`, 'gi'))].map((m) => m[1]) },
+  urlset: { entry: 'url', loc: (e) => [...e.body.matchAll(new RegExp(`<${e.prefix}loc${XML_ATTRS}>([^<]*)</${e.prefix}loc\\s*>`, 'gi'))].map((m) => m[1]) },
+  sitemapindex: { entry: 'sitemap', loc: (e) => [...e.body.matchAll(new RegExp(`<${e.prefix}loc${XML_ATTRS}>([^<]*)</${e.prefix}loc\\s*>`, 'gi'))].map((m) => m[1]) },
   rss: { entry: 'item', loc: (e) => [...e.body.matchAll(/<link\s*>([^<]*)<\/link\s*>/gi)].map((m) => m[1]) },
   feed: { entry: 'entry', loc: (e) => [...e.body.matchAll(/<link\b([^>]*?)\/?(?:>|$)/gi)].map((m) => attrs(m[1])).filter((a) => !a.rel || a.rel === 'alternate').map((a) => escapeXml(a.href ?? '')).slice(0, 1) },
 };
@@ -681,6 +684,7 @@ async function check(opts) {
     `Pages are read up to ${MAX_BYTES / 1024 / 1024} MB, as Google reads them; markup past that is ignored.`,
   ];
 
+  if (first && !first.error && first.status !== null && first.status < 400 && first.chain.length > 2) add('redirect-chain', 'warn', requested.href, `${first.chain.length - 1} redirect hops: ${first.chain.map((c) => `${c.status} ${c.url}`).join(' -> ')}`);
   if (start.href !== requested.href) add('start-redirects', 'info', requested.href, `start URL redirects to ${start.href} (${first.chain.map((c) => c.status).join(' -> ')}); crawled from there${first.stopped ? `, but ${first.stopped}` : ''}`);
 
   let fetches = robotsCache.size + (first ? 1 : 0);
@@ -1107,7 +1111,6 @@ async function check(opts) {
     mode: list ? 'urls' : 'crawl',
     url: start.href,
     requestedUrl: requested.href,
-    startHops: first && first.status !== null ? first.chain.length - 1 : 0,
     startedAt,
     finishedAt: new Date().toISOString(),
     complete,
@@ -1172,10 +1175,9 @@ function normalize(report, label) {
     for (const p of report.pages ?? []) {
       if (!p.blocked && p.redirects > 0 && p.status === 200 && !p.stopped && coveredHtml.has(p.finalUrl)) coveredHtml.add(p.url);
     }
-    // A start URL that redirects was fetched too; the crawl started where it landed. With more than
-    // one hop, a redirect-chain finding on it is reported only when a crawled page links to it.
+    // A start URL that redirects was fetched too, and its redirect chain judged; the crawl started where it landed.
     const requested = report.requestedUrl ?? report.url;
-    if (report.complete && requested !== report.url && (report.startHops ?? Infinity) <= 1) {
+    if (report.complete && requested !== report.url) {
       covered.add(requested);
       if (coveredHtml.has(report.url)) coveredHtml.add(requested);
     }
