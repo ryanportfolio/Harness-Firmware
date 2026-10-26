@@ -197,7 +197,9 @@ function parseRobots(text) {
   for (const raw of text.replace(/^\uFEFF/, '').split(/\r\n|\r|\n/)) {
     const line = raw.replace(/#.*$/, '').trim();
     // "key: value"; Google also accepts "key value" when the line has exactly two tokens.
-    const m = line.match(/^([a-z][a-z -]*?)\s*:\s*(.*)$/i) ?? line.match(/^([a-z-]+)\s+(\S+)$/i);
+    const colon = line.indexOf(':');
+    const name = colon > 0 ? line.slice(0, colon).trimEnd() : '';
+    const m = /^[a-z][a-z -]*$/i.test(name) ? [line, name, line.slice(colon + 1)] : line.match(/^([a-z-]+)\s+(\S+)$/i);
     if (!m) continue;
     const key = ROBOTS_KEYS[m[1].toLowerCase().replace(/\s+/g, ' ')];
     const value = m[2].trim();
@@ -239,20 +241,21 @@ const encodeForMatch = (s) => s
   });
 
 function patternMatches(pattern, path) {
-  // Only a final $ anchors; a $ elsewhere is a literal character. Matched without a regex,
-  // backtracking only to the last *, so many wildcards can't stall the crawl.
+  // Only a final $ anchors; a $ elsewhere is a literal character. Without a regex: the first
+  // piece is a prefix and each later piece is found leftmost after the one before, which is
+  // exact for '*' wildcards and linear in the path, however many wildcards there are.
   const anchored = pattern.endsWith('$');
-  const p = anchored ? pattern.slice(0, -1) : pattern;
-  let i = 0, j = 0, star = -1, mark = 0;
-  while (j < path.length) {
-    if (p[i] === '*') { star = i++; mark = j; }
-    else if (i < p.length && p[i] === path[j]) { i++; j++; }
-    else if (i === p.length && !anchored) return true;
-    else if (star >= 0) { i = star + 1; j = ++mark; }
-    else return false;
+  const pieces = (anchored ? pattern.slice(0, -1) : pattern).split('*');
+  if (!path.startsWith(pieces[0])) return false;
+  let pos = pieces[0].length;
+  if (pieces.length === 1) return !anchored || pos === path.length;
+  for (const piece of pieces.slice(1, -1)) {
+    const at = path.indexOf(piece, pos);
+    if (at < 0) return false;
+    pos = at + piece.length;
   }
-  while (p[i] === '*') i++;
-  return i === p.length;
+  const last = pieces.at(-1);
+  return anchored ? path.length - last.length >= pos && path.endsWith(last) : path.indexOf(last, pos) >= 0;
 }
 
 // Robots directives from meta robots or X-Robots-Tag, comma separated, one line per meta tag (all
@@ -295,29 +298,54 @@ function hasNoindex(directives, now = Date.now()) {
 function googlebotAllowed(robots, url) {
   if (!robots) return true;
   const u = new URL(url);
-  const path = encodeForMatch(u.pathname + u.search);
   if (u.pathname === '/robots.txt') return true;
-  let best = null;
-  for (const rule of rulesFor(robots, 'googlebot')) {
-    const pattern = encodeForMatch(rule.pattern);
-    if (!patternMatches(pattern, path)) continue;
-    const len = pattern.length;
-    if (!best || len > best.len || (len === best.len && rule.allow)) best = { allow: rule.allow, len };
+  // Built once per robots.txt: the googlebot rules encoded and grouped by the literal text before
+  // their first '*' (a final $ dropped), which a matching path must start with. A path then tests
+  // only the groups its own prefixes name, so many rules times many URLs stays cheap.
+  if (!robots.googlebot) {
+    const byPrefix = new Map();
+    for (const r of rulesFor(robots, 'googlebot')) {
+      const pattern = encodeForMatch(r.pattern);
+      const star = pattern.indexOf('*');
+      const prefix = star >= 0 ? pattern.slice(0, star) : pattern.replace(/\$$/, '');
+      if (!byPrefix.has(prefix)) byPrefix.set(prefix, []);
+      byPrefix.get(prefix).push({ allow: r.allow, pattern });
+    }
+    robots.googlebot = { byPrefix, lengths: [...new Set([...byPrefix.keys()].map((p) => p.length))], answers: new Map() };
   }
-  return best ? best.allow : true;
+  const path = encodeForMatch(u.pathname + u.search);
+  const known = robots.googlebot.answers.get(path);
+  if (known !== undefined) return known;
+  let best = null;
+  for (const n of robots.googlebot.lengths) {
+    if (n > path.length) continue;
+    for (const rule of robots.googlebot.byPrefix.get(path.slice(0, n)) ?? []) {
+      if (!patternMatches(rule.pattern, path)) continue;
+      const len = rule.pattern.length;
+      if (!best || len > best.len || (len === best.len && rule.allow)) best = { allow: rule.allow, len };
+    }
+  }
+  const allowed = best ? best.allow : true;
+  robots.googlebot.answers.set(path, allowed);
+  return allowed;
 }
 
 // ---------- sitemap ----------
 
 // Sitemap elements may carry a namespace prefix (<sm:urlset xmlns:sm="...">).
 const NS = '(?:[A-Za-z_][\\w.-]*:)?';
+// Comments, CDATA, processing instructions and DOCTYPE. Each one left open runs to the end of the
+// input, so a malformed file is read in one pass: a scan that failed would restart at every later '<'.
+const XML_NON_ELEMENTS = /<!--[\s\S]*?(?:-->|$)|<!\[CDATA\[[\s\S]*?(?:\]\]>|$)|<\?[\s\S]*?(?:\?>|$)|<!DOCTYPE[^>]*(?:>|$)/gi;
+const closes = (m) => (m.startsWith('<!--') ? m.endsWith('-->') : m.startsWith('<![') ? m.endsWith(']]>') : m.startsWith('<?') ? m.endsWith('?>') : m.endsWith('>'));
 // The root element's local name: the first element after the prolog (declaration, comments, DOCTYPE).
-const xmlRoot = (xml) => /<(?:[A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)/.exec(
-  xml.replace(/<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!DOCTYPE[^>]*>|<!\[CDATA\[[\s\S]*?\]\]>/gi, ' '))?.[1].toLowerCase() ?? null;
+const xmlRoot = (xml) => /<(?:[A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)/.exec(xml.replace(XML_NON_ELEMENTS, ' '))?.[1].toLowerCase() ?? null;
 // XML well-formedness without a parser: only the five predefined entities or character references
 // (sitemaps carry no DTD), no stray '<', properly nested tags, one root element and nothing after it.
 function xmlSyntaxOk(xml) {
-  const body = xml.replace(/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<!DOCTYPE[^>]*>/gi, ' ');
+  let open = false;
+  const body = xml.replace(XML_NON_ELEMENTS, (m) => { if (!closes(m)) open = true; return ' '; });
+  if (open) return false; // a comment, CDATA section, declaration or DOCTYPE that never closes
   if (/&(?!(?:lt|gt|amp|quot|apos|#\d+|#x[\da-f]+);)/i.test(body)) return false;
   const tag = /<(\/?)([A-Za-z_][\w.:-]*)((?:\s+[^\s=/>]+\s*=\s*(?:"[^"<]*"|'[^'<]*'))*)\s*(\/?)>|</g;
   const stack = [];
@@ -335,12 +363,13 @@ const httpUrl = (u) => { try { return /^https?:$/.test(new URL(u).protocol); } c
 const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // Comments removed and CDATA turned into escaped text, so neither can be mistaken for entries.
 const escapeXml = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const prepareXml = (xml) => xml.replace(/<!--[\s\S]*?-->/g, ' ').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_, t) => escapeXml(t));
+const prepareXml = (xml) => xml.replace(/<!--[\s\S]*?(?:-->|$)/g, ' ').replace(/<!\[CDATA\[([\s\S]*?)(?:\]\]>|$)/g, (_, t) => escapeXml(t));
 
 /** Entries (<url>, <sitemap>, <item>, <entry>) in one linear pass over their open and close tags.
     `bad` = an entry that never closes, nests, or self-closes. */
 function xmlEntries(prepared, entry) {
-  const re = new RegExp(`<(/?)(${NS})${entry}(?=[\\s/>])[^>]*?(/?)>`, 'gi');
+  // A tag left open runs to the end of the input (and leaves its entry unclosed).
+  const re = new RegExp(`<(/?)(${NS})${entry}(?=[\\s/>])[^>]*?(/?)(?:>|$)`, 'gi');
   const entries = [];
   let open = null, opened = 0, bad = false;
   for (const m of prepared.matchAll(re)) {
@@ -361,10 +390,10 @@ function xmlEntries(prepared, entry) {
 // The location in each entry, read only in the entry's own namespace (so <image:loc> inside a <url>
 // is not the page's location). RSS items carry <link>URL</link>, Atom entries <link href="URL"/>.
 const FORMATS = {
-  urlset: { entry: 'url', loc: (e) => [...e.body.matchAll(new RegExp(`<${e.prefix}loc\\s*>([\\s\\S]*?)</${e.prefix}loc\\s*>`, 'gi'))].map((m) => m[1]) },
-  sitemapindex: { entry: 'sitemap', loc: (e) => [...e.body.matchAll(new RegExp(`<${e.prefix}loc\\s*>([\\s\\S]*?)</${e.prefix}loc\\s*>`, 'gi'))].map((m) => m[1]) },
-  rss: { entry: 'item', loc: (e) => [...e.body.matchAll(/<link\s*>([\s\S]*?)<\/link\s*>/gi)].map((m) => m[1]) },
-  feed: { entry: 'entry', loc: (e) => [...e.body.matchAll(/<link\b([^>]*?)\/?>/gi)].map((m) => attrs(m[1])).filter((a) => !a.rel || a.rel === 'alternate').map((a) => escapeXml(a.href ?? '')).slice(0, 1) },
+  urlset: { entry: 'url', loc: (e) => [...e.body.matchAll(new RegExp(`<${e.prefix}loc\\s*>([^<]*)</${e.prefix}loc\\s*>`, 'gi'))].map((m) => m[1]) },
+  sitemapindex: { entry: 'sitemap', loc: (e) => [...e.body.matchAll(new RegExp(`<${e.prefix}loc\\s*>([^<]*)</${e.prefix}loc\\s*>`, 'gi'))].map((m) => m[1]) },
+  rss: { entry: 'item', loc: (e) => [...e.body.matchAll(/<link\s*>([^<]*)<\/link\s*>/gi)].map((m) => m[1]) },
+  feed: { entry: 'entry', loc: (e) => [...e.body.matchAll(/<link\b([^>]*?)\/?(?:>|$)/gi)].map((m) => attrs(m[1])).filter((a) => !a.rel || a.rel === 'alternate').map((a) => escapeXml(a.href ?? '')).slice(0, 1) },
 };
 
 /** Parse one sitemap file: XML (urlset, sitemapindex, RSS 2.0, Atom 1.0) or text (one URL per line).
@@ -441,7 +470,7 @@ function attrs(s) {
   return out;
 }
 
-const text = (html) => decodeEntities(html.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+const text = (html) => decodeEntities(html.replace(/<[^>]*(?:>|$)/g, ' ')).replace(/\s+/g, ' ').trim();
 
 // Elements whose content is text, not markup. Their content is set aside in one left-to-right
 // pass together with comments, so "<!--" inside a script or a tag inside a title stays text.
@@ -481,7 +510,8 @@ function parseHtml(html, pageUrl) {
     else doc += `<${name}></${name}>`;
   }
   doc += html.slice(pos);
-  doc = doc.replace(/<!DOCTYPE[^>]*>|<\?[\s\S]*?\?>/gi, '');
+  // <?...> is a bogus comment in HTML and ends at the first '>'; either one left open runs to the end.
+  doc = doc.replace(/<!DOCTYPE[^>]*(?:>|$)|<\?[^>]*(?:>|$)/gi, '');
 
   // The head ends at </head>, <body>, the first element outside HEAD_ELEMENTS, or the first
   // non-blank text. Raw-text elements are empty placeholders here.
@@ -540,7 +570,8 @@ function parseHtml(html, pageUrl) {
     canonicals: headLinks.filter((l) => relHas(l, 'canonical')).map((l) => l.href?.trim() ?? null),
     bodyCanonicals: bodyLinks.filter((l) => relHas(l, 'canonical')).map((l) => l.href?.trim() ?? null),
     hreflang: headLinks.filter((l) => relHas(l, 'alternate') && l.hreflang !== undefined).map((l) => ({ lang: l.hreflang.trim(), href: (l.href ?? '').trim() })),
-    h1: [...body.matchAll(/<h1(?=[\s>])[^>]*>([\s\S]*?)<\/h1\s*>/gi)].map((m) => text(m[1])),
+    // An unclosed <h1> ends at the next heading, as in a browser, or at the end of the page.
+    h1: [...body.matchAll(/<h1(?=[\s>])[^>]*(?:>|$)([\s\S]*?)(?:<\/h1\s*>|(?=<h[1-6][\s>])|$)/gi)].map((m) => text(m[1])),
     imgsNoAlt: tags(body, 'img').filter((i) => !('alt' in i)).length,
     jsonld,
     links: [...new Set(links)],
@@ -598,10 +629,12 @@ async function check(opts) {
   // robots.txt redirects are followed across origins, up to five hops (RFC 9309), and the
   // file is read whatever its content type, up to Google's 500 KiB.
   const robotsCache = new Map();
+  const robotsParsed = new Map();
   const robotsFor = async (o) => {
     if (!robotsCache.has(o)) robotsCache.set(o, await fetchChain(o + '/robots.txt', () => null, (u) => u, { maxRedirects: ROBOTS_MAX_REDIRECTS, file: true, max: ROBOTS_MAX_BYTES }));
     const res = robotsCache.get(o);
-    return res.status === 200 && res.body !== null ? parseRobots(res.body) : null;
+    if (!robotsParsed.has(o)) robotsParsed.set(o, res.status === 200 && res.body !== null ? parseRobots(res.body) : null);
+    return robotsParsed.get(o);
   };
   const startGuard = async (next) => (googlebotAllowed(await robotsFor(new URL(next).origin), next) ? null : 'redirect target is disallowed by robots.txt; not followed');
   const startBlocked = !googlebotAllowed(await robotsFor(requested.origin), requested.href);
@@ -668,7 +701,7 @@ async function check(opts) {
   // robots.txt
   if (!robotsCache.has(origin)) { fetches++; await robotsFor(origin); }
   const robotsRes = robotsCache.get(origin);
-  if (robotsRes.status === 200 && robotsRes.body !== null) robots = parseRobots(robotsRes.body);
+  if (robotsRes.status === 200 && robotsRes.body !== null) robots = await robotsFor(origin);
   // Google treats 429 like a server error, not like a missing file.
   else if (robotsRes.status !== null && (robotsRes.status >= 500 || robotsRes.status === 429)) add('robots-server-error', 'fail', origin + '/robots.txt', `robots.txt answered ${robotsRes.status}; Google stops crawling the site for the first 12 hours of robots.txt server errors (429 counts as one)`);
   // Too many redirects or a loop: Google stops following and treats robots.txt as missing.
@@ -697,6 +730,7 @@ async function check(opts) {
   const fallback = origin + '/sitemap.xml';
   const sitemapQueue = robotsSitemaps.length ? [...new Set(declared)] : [fallback];
   const sitemapFiles = [];
+  const sitemapSeen = new Set(sitemapQueue);
   const fromIndex = new Set();
   const unreadable = (smUrl, why) => {
     sitemapComplete = false;
@@ -749,7 +783,7 @@ async function check(opts) {
         const loc = mapUrl(raw);
         if (!sameOrigin(loc)) { otherOriginSitemap(loc, `sitemap index ${smUrl}`); continue; }
         fromIndex.add(loc);
-        if (!sitemapFiles.includes(loc) && !sitemapQueue.includes(loc)) sitemapQueue.push(loc);
+        if (!sitemapSeen.has(loc)) { sitemapSeen.add(loc); sitemapQueue.push(loc); }
       }
     } else parsed.locs.forEach((loc) => sitemapUrls.add(mapUrl(loc)));
   }
@@ -814,8 +848,10 @@ async function check(opts) {
     })
     .filter((u) => (sameOrigin(u) ? true : (add('listed-url-other-origin', 'info', u, `${file} lists a URL on another origin; not fetched`), false)));
   let list = null;
+  let listed = new Set();
   if (opts.urls) {
     list = readList(opts.urls);
+    listed = new Set(list);
     // The start page is always read: whether the run is complete depends on it.
     enqueue(start.href);
     list.forEach(enqueue);
@@ -833,7 +869,7 @@ async function check(opts) {
       const rec = await getPage(url);
       if (!rec) { truncated = true; return; }
       // In a --urls run the start page is read for completeness only; --max-pages counts the listed URLs.
-      if (!list || url !== start.href || list.includes(url)) crawled++;
+      if (!list || url !== start.href || listed.has(url)) crawled++;
       // A redirect target is a page of its own: check it even when nothing links to it.
       if (!rec.blocked && rec.chain.length > 1 && sameOrigin(rec.finalUrl)) enqueue(rec.finalUrl);
       if (!follow || !rec.html) continue;
@@ -972,6 +1008,7 @@ async function check(opts) {
     // hreflang
     const self = rec.finalUrl;
     let hasSelf = false;
+    const altSeen = new Set();
     for (const alt of h.hreflang) {
       if (!validHreflang(alt.lang)) { add('hreflang-invalid', 'fail', url, `hreflang="${alt.lang}" is not an ISO 639-1 language with an optional script and ISO 3166-1 alpha-2 region, so Google ignores it`, `${url}|${alt.lang}`); continue; }
       let target;
@@ -980,7 +1017,8 @@ async function check(opts) {
       if (!/^https?:\/\//i.test(alt.href)) add('hreflang-relative', 'warn', url, `hreflang ${alt.lang} href "${alt.href}" is not a fully qualified URL`, `${url}|${alt.lang}`);
       target = mapUrl(target);
       if (target === self) { hasSelf = true; continue; }
-      if (!sameOrigin(target)) continue;
+      if (!sameOrigin(target) || altSeen.has(target)) continue;
+      altSeen.add(target);
       const other = await getPage(target);
       if (!other) { hreflangUnchecked.add(target); budgetSkipped.add(target); continue; }
       if (other.blocked) { add('hreflang-target-blocked', 'fail', url, `${target} (${alt.lang}) is disallowed by robots.txt, so Google cannot confirm the pair`, `${url}|${target}`); findings.at(-1).deps = [target]; continue; }
@@ -988,8 +1026,10 @@ async function check(opts) {
       if (!other.error && other.chain?.length > 1) { add('hreflang-target-redirects', 'warn', url, `${target} (${alt.lang}) redirects to ${other.finalUrl}; list the final URL`, `${url}|${target}`); findings.at(-1).deps = [target]; continue; }
       if (!other.html) continue; // the target's own status is judged as its own page
       // A return entry counts only with a valid code, as Google reads it.
-      const returns = other.html.hreflang.some((b) => { try { return validHreflang(b.lang) && mapUrl(new URL(b.href, other.html.base).href) === self; } catch { return false; } });
-      if (!returns) { add('hreflang-no-return', 'fail', url, `${target} (${alt.lang}) does not link back with hreflang; Google ignores one-way pairs`, `${url}|${target}`); findings.at(-1).deps = [target]; }
+      if (!hreflangReturns.has(target)) {
+        hreflangReturns.set(target, new Set(other.html.hreflang.flatMap((b) => { try { return validHreflang(b.lang) ? [mapUrl(new URL(b.href, other.html.base).href)] : []; } catch { return []; } })));
+      }
+      if (!hreflangReturns.get(target).has(self)) { add('hreflang-no-return', 'fail', url, `${target} (${alt.lang}) does not link back with hreflang; Google ignores one-way pairs`, `${url}|${target}`); findings.at(-1).deps = [target]; }
     }
     if (h.hreflang.length && !hasSelf) add('hreflang-no-self', 'warn', url, 'hreflang set does not include this page itself');
 
@@ -1006,6 +1046,7 @@ async function check(opts) {
   // so every fetched page gets the same checks.
   const judged = new Set();
   const hreflangUnchecked = new Set(); // hreflang targets past the fetch budget
+  const hreflangReturns = new Map(); // hreflang target -> the URLs its valid entries name
   const budgetSkipped = new Set(); // canonical, hreflang and redirect targets past the fetch budget
   const overBudget = new Set(); // redirect targets past the fetch budget
   for (let pending = [...pages.values()]; pending.length; pending = [...pages.values()].filter((r) => !judged.has(r.url))) {
@@ -1283,7 +1324,7 @@ function diff(beforePath, afterPath) {
   }
 
   // A duplicate group that keeps its id but gains pages is a regression for those pages.
-  const grown = b.findings.filter((f) => f.urls && before.get(f.id)?.urls).map((f) => ({ f, extra: f.urls.filter((u) => !before.get(f.id).urls.includes(u)) })).filter((g) => g.extra.length);
+  const grown = b.findings.filter((f) => f.urls && before.get(f.id)?.urls).map((f) => { const had = new Set(before.get(f.id).urls); return { f, extra: f.urls.filter((u) => !had.has(u)) }; }).filter((g) => g.extra.length);
   const fixed = gone.filter((f) => !unsettled.has(f));
   const added = b.findings.filter((f) => !before.has(f.id));
   const changed = b.findings.filter((f) => before.has(f.id) && before.get(f.id).message !== f.message);
