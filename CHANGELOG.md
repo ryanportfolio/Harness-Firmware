@@ -184,7 +184,25 @@ condensed.
   CI pass at the same head, it squash-merges. `/merge` also turns on merge mode for
   the rest of the session: open PRs the session already made go through the loop
   right away, and every later PR goes through it and merges without another prompt. Round one no longer runs `codex-review` alongside
-  `codex-fullreview`. User-invoke only; Claude Code only.
+  `codex-fullreview`. User-invoke only.
+- `merge` runs a self-review before the first Codex round. Four fresh-context
+  subagents each review one area of the PR, chosen from what the change
+  involves. Each reports the bugs it reproduced (scratch files go under
+  `.tmp/selfreview/`) and, separately, suspicions it could not confirm. The
+  session verifies and fixes each confirmed finding in one commit, then starts
+  `codex-fullreview`. After a Codex round finds bugs, the session checks for
+  related cases of the same kind before the rerun; a full self-review repeats
+  only when the fixes are large. Codex stays the merge gate.
+- `merge` now has a Codex version, started by typing `$merge`. It runs the
+  same steps with Claude Opus as the reviewer through Claude CLI:
+  `opus-fullreview` for round one, then up to 3 `opus-review` reruns
+  (`claude-review` with Opus where `opus-review` is not installed). Its
+  self-review uses three fresh agents instead of four. To fit the new entry in
+  the Codex skill catalog budget, the Codex descriptions of `conversion-ux`,
+  `opus-fullreview`, `showpiece` and `ui-quality` are a few words shorter.
+  Projects that copied the earlier `"merge": "disabled"` entry from the
+  template should switch it to `"native"` in `.agents/skill-modes.json` when
+  they update.
 - `codex-fullreview` falls back to the global Codex skill at
   `~/.agents/skills/impartial-review/SKILL.md` when the reviewed repository has no
   `.agents/skills/impartial-review/SKILL.md`, so it runs outside template repos.

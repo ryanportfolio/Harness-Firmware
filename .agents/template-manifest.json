@@ -70,7 +70,7 @@
       "deep-plan": ["why"],
       "design-prototypes": ["codex-image-gen"],
       "gauntlet": ["dare", "why", "arena", "merge", "addskill", "writing"],
-      "merge": ["codex-fullreview", "codex-review"],
+      "merge": ["codex-fullreview", "codex-review", "opus-fullreview", "claude-review"],
       "opus-fullreview": ["impartial-review"],
       "product-walkthrough": ["motion-design"],
       "security-loop": ["claude-review", "codex-review"],
