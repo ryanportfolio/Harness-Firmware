@@ -48,7 +48,7 @@ import { dirname } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
 const UA = 'Mozilla/5.0 (compatible; seo-check/1; +https://github.com/ryanportfolio/Harness-Firmware)';
-const MAX_BYTES = 5_000_000; // HTML pages
+const MAX_BYTES = 15 * 1024 * 1024; // HTML pages: Google reads the first 15 MB and ignores the rest
 const SITEMAP_MAX_BYTES = 50 * 1024 * 1024; // Google's limit for one uncompressed sitemap
 const SITEMAP_MAX_URLS = 50_000;
 const ROBOTS_MAX_BYTES = 500 * 1024; // Google ignores robots.txt content past 500 KiB
@@ -678,7 +678,7 @@ async function check(opts) {
     'Structured data is checked for valid JSON and a @type, not against Google rich-result requirements.',
     'No rankings, Search Console data, Core Web Vitals or Lighthouse.',
     'Repeated X-Robots-Tag headers arrive joined, so a user-agent prefix is read as covering only its own directive; a bare noindex after "otherbot: ..." counts for Google.',
-    `Responses are read only up to ${MAX_BYTES / 1e6} MB.`,
+    `Pages are read up to ${MAX_BYTES / 1024 / 1024} MB, as Google reads them; markup past that is ignored.`,
   ];
 
   if (start.href !== requested.href) add('start-redirects', 'info', requested.href, `start URL redirects to ${start.href} (${first.chain.map((c) => c.status).join(' -> ')}); crawled from there${first.stopped ? `, but ${first.stopped}` : ''}`);
@@ -827,7 +827,7 @@ async function check(opts) {
     const rec = {
       url, blocked: false, status: res.status, finalUrl: res.finalUrl, chain: res.chain, error: res.error,
       stopped: res.stopped ?? null, html, parseError, type,
-      // Cut at MAX_BYTES: markup past the cut was never read, so the page is not fully checked.
+      // Cut at MAX_BYTES, where Google stops reading too: the page is judged on what Google sees.
       truncated: Boolean(res.truncated),
       xRobots: (res.headers['x-robots-tag'] ?? '').toLowerCase(),
     };
@@ -958,7 +958,7 @@ async function check(opts) {
     }
     const h = rec.html;
     const isStart = url === startRec?.url || url === startRec?.finalUrl;
-    if (rec.truncated) add('page-truncated', 'info', url, `page is over ${MAX_BYTES / 1e6} MB; only the first ${MAX_BYTES / 1e6} MB was checked`);
+    if (rec.truncated) add('page-truncated', 'info', url, `page is over ${MAX_BYTES / 1024 / 1024} MB; Google indexes only the first ${MAX_BYTES / 1024 / 1024} MB, so anything after it (links, robots meta, structured data) does not count`);
 
     if (rec.noindex) {
       if (isStart) add('start-noindex', 'fail', url, `the start page is noindex (${hasNoindex(rec.xRobots) ? 'X-Robots-Tag' : 'meta robots'})`);
@@ -1060,7 +1060,7 @@ async function check(opts) {
   if (overBudget.size) limits.push(`${overBudget.size} redirect target(s) past the fetch budget were not checked: ${[...overBudget].slice(0, 5).join(', ')}`);
   // Targets left unchecked by the budget make the run as partial as a cut-off crawl.
   if (budgetSkipped.size) { truncated = true; limits.push(`Fetch budget (--max-pages + 50) ran out while checking canonical, hreflang and redirect targets: ${budgetSkipped.size} not checked.`); }
-  if (bigPages.size) limits.push(`${bigPages.size} page(s) over ${MAX_BYTES / 1e6} MB were checked only up to the cut: ${[...bigPages].slice(0, 5).join(', ')}`);
+  if (bigPages.size) limits.push(`${bigPages.size} page(s) over ${MAX_BYTES / 1024 / 1024} MB were checked up to the cut, where Google stops reading: ${[...bigPages].slice(0, 5).join(', ')}`);
 
   // A complete run read the start page itself: HTTP 200, no redirect, HTML (not 206 or 204).
   const startOk = Boolean(startRec && !startRec.blocked && startRec.status === 200 && startRec.chain.length === 1 && startRec.html);
@@ -1167,7 +1167,7 @@ function normalize(report, label) {
       covered.add(p.url);
       // A redirect the guard stopped never fetched its target.
       if (p.finalUrl && !p.stopped) covered.add(p.finalUrl);
-      if (p.html && p.redirects === 0 && !p.truncated) coveredHtml.add(p.url);
+      if (p.html && p.redirects === 0) coveredHtml.add(p.url);
     }
     for (const p of report.pages ?? []) {
       if (!p.blocked && p.redirects > 0 && p.status === 200 && !p.stopped && coveredHtml.has(p.finalUrl)) coveredHtml.add(p.url);
