@@ -16,11 +16,7 @@ Goal: site easier to index, attribute + quote, via measured rounds on own source
 
 - Site + source repo; edits via source → build → PR. Never edit live site. Audit request or no repo → triage only.
 - Measure target: production build served locally (host's build + preview cmd), else deploy preview. Dev server = diagnostic only. Live prod = read-only baseline.
-- No real data locally (private DB, no seed or dump) → local build renders no real pages. Measure a local snapshot build instead; can't build one → triage only on live prod, report says why.
-  - Snapshot: URLs from a read-only seo-check crawl of live prod + key pages, fetched once from the live site's public pages/API, serially, ≥200 ms apart, ≤ that crawl's `--max-pages`, only paths robots.txt allows. Saved to `round-0/snapshot/`; build identity adds its path + hash.
-  - Build: this checkout's site code renders from the snapshot only and never contacts the live site (seo-check doesn't throttle localhost). URL not in snapshot → 404 + `x-snapshot-missing` header; its findings excluded + listed. Never prod credentials, a DB connection or host env (`railway run`, `vercel env pull`, host `.env*`); DB URLs = unroutable dummy (`postgres://invalid.invalid/x`).
-  - Exactness: per key page, diff round-0 snapshot-build HTML vs the snapshot's live HTML; record checkout + deployed SHAs (≠ → differences may be code). Differing regions + routes the build implements itself (not site code) = approximate: findings there can't be a round target; regressions there still block keep.
-  - Round-0 + round-0b run on the snapshot build.
+- No real data locally (private DB; no seed, dump or staging DB from the owner) → local build renders no real pages, and no deploy preview either (it can run the site's workers against prod and is often noindexed). Triage only on live prod, no rounds; report says why.
 - Build identity: record commit SHA, build + serve cmds, URL; confirm served page = that build (marker in HTML, or a just-changed string).
 - Key pages ≤5: start page + 1 per template (article, product, docs, landing) + owner's picks. No source → pick distinct layouts from nav/sitemap. seo-check crawls site; willaicite per key page.
 - No permission to change hosting, CDN, DNS, Search Console, firewall, publish, deploy.
@@ -73,7 +69,7 @@ Never alone; list pending w/ exact proposed change:
 - CDN/firewall bot rules: outside repo → report setting.
 - New facts, figures, quotes, authors, credentials, prices, dates; key-page copy (draft via `writing`).
 - Section-wide noindex/robots, URL changes + redirect maps, new pages.
-- Real-data measure target when the site's data can't be served locally: seed data, DB dump, or staging DB.
+- Real-data measure target for a site whose data can't be served locally: seed data, DB dump, or staging DB.
 
 ## Independent review
 
