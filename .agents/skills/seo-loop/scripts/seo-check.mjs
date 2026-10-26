@@ -255,8 +255,10 @@ function patternMatches(pattern, path) {
 }
 
 // Robots directives from meta robots or X-Robots-Tag, comma separated, one header or meta tag per line.
-// "googlebot: noindex" carries a user-agent prefix that holds for the rest of its line; directives for
-// another crawler (bingbot, googlebot-news) don't apply to Google web search. max-snippet,
+// "googlebot: noindex" carries a user-agent prefix; a directive for another crawler (bingbot,
+// googlebot-news) doesn't apply to Google web search. The prefix covers only its own directive:
+// fetch joins repeated X-Robots-Tag headers with ", ", so "bingbot: nofollow" and a separate
+// "noindex" header arrive as one list, and a bare noindex has to count for Google. max-snippet,
 // max-image-preview, max-video-preview and unavailable_after carry values. A past unavailable_after
 // date keeps the page out of results, so it counts as noindex.
 const VALUE_DIRECTIVES = new Set(['max-snippet', 'max-image-preview', 'max-video-preview', 'unavailable_after']);
@@ -264,12 +266,13 @@ const DIRECTIVE_START = /^(?:[a-z0-9_-]+\s*:|(?:all|index|follow|noindex|nofollo
 function hasNoindex(directives, now = Date.now()) {
   return directives.split('\n').some((line) => {
     const parts = line.split(',');
-    let forGoogle = true;
     for (let i = 0; i < parts.length; i++) {
       let d = parts[i].trim().toLowerCase();
       const prefixed = /^([a-z0-9_-]+)\s*:\s*(.*)$/.exec(d);
-      if (prefixed && !VALUE_DIRECTIVES.has(prefixed[1])) { forGoogle = prefixed[1] === 'googlebot'; d = prefixed[2]; }
-      if (!forGoogle) continue;
+      if (prefixed && !VALUE_DIRECTIVES.has(prefixed[1])) {
+        if (prefixed[1] !== 'googlebot') continue;
+        d = prefixed[2];
+      }
       if (d === 'noindex' || d === 'none') return true;
       const until = /^unavailable_after\s*:\s*(.+)$/.exec(d);
       if (!until) continue;
@@ -636,7 +639,7 @@ async function check(opts) {
     'Raw HTML only: tags added by JavaScript in the browser are not seen.',
     'Structured data is checked for valid JSON and a @type, not against Google rich-result requirements.',
     'No rankings, Search Console data, Core Web Vitals or Lighthouse.',
-    'An X-Robots-Tag noindex aimed at a named bot other than Googlebot is counted as if it applied to all crawlers.',
+    'Repeated X-Robots-Tag headers arrive joined, so a user-agent prefix is read as covering only its own directive; a bare noindex after "otherbot: ..." counts for Google.',
     `Responses are read only up to ${MAX_BYTES / 1e6} MB.`,
   ];
 
@@ -1122,6 +1125,12 @@ function normalize(report, label) {
     for (const p of report.pages ?? []) {
       if (!p.blocked && p.redirects > 0 && p.status === 200 && !p.stopped && coveredHtml.has(p.finalUrl)) coveredHtml.add(p.url);
     }
+    // A start URL that redirects was fetched too; the crawl started where it landed.
+    const requested = report.requestedUrl ?? report.url;
+    if (report.complete && requested !== report.url) {
+      covered.add(requested);
+      if (coveredHtml.has(report.url)) coveredHtml.add(requested);
+    }
     return {
       kind: 'seo-check', version: report.version ?? 1, valid: report.complete, url: report.url, requested: report.requestedUrl ?? report.url,
       mode: report.mode ?? 'crawl', truncated: Boolean(report.truncated), covered, coveredHtml,
@@ -1170,12 +1179,12 @@ function diff(beforePath, afterPath) {
   }
   const before = new Map(a.findings.map((f) => [f.id, f]));
   const after = new Map(b.findings.map((f) => [f.id, f]));
-  if (a.kind === 'seo-check' && b.truncated && !a.truncated) {
-    return refuse(`${afterPath} stopped at its page budget and ${beforePath} did not; rerun with a higher --max-pages`);
-  }
   const gone = a.findings.filter((f) => !after.has(f.id));
   // What the later run could not settle. A confirmed regression still exits 1; otherwise these exit 2.
   const notes = [];
+  if (a.kind === 'seo-check' && b.truncated && !a.truncated) {
+    notes.push(`${afterPath} stopped at its page budget and ${beforePath} did not; rerun with a higher --max-pages\n`);
+  }
   const unsettled = new Set();
   // How to recheck: a truncated run needs a bigger budget (listed URLs count against it too),
   // a --urls run needs the URLs on its list (--include doesn't combine with --urls).
@@ -1239,6 +1248,11 @@ function diff(beforePath, afterPath) {
     for (const p of a.pages.values()) {
       if (!p.indexable || (p.canonical && p.canonical !== p.finalUrl)) continue;
       const q = b.pages.get(p.url);
+      // The start URL now redirects: consolidation if it lands on an indexable page.
+      if (!q && p.url === b.requested && b.url !== b.requested) {
+        if (!indexableAfter(b.url)) lost.push([p.url, `now redirects to ${b.url}, which is not an indexable page here`]);
+        continue;
+      }
       if (!q) {
         if (b.mode === 'crawl' && !b.truncated) lost.push([p.url, 'no longer found by the crawl (not linked from crawled pages or listed in the sitemap)']);
         else unknown.push(p.url);

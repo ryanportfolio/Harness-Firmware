@@ -37,7 +37,7 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 | `jsonld-no-type` | warn | JSON-LD naming nothing | structured-data component | sd policies |
 | `noindex`, `canonical-missing`, `canonical-other-origin`, `linked-url-blocked`, `linked-url-redirects`, `title-long`, `h1-missing`, `img-alt-missing`, `robots-missing`, `sitemap-not-declared`, `sitemap-other-origin`, `sitemap-files-skipped`, `canonical-not-checked`, `start-redirects`, `listed-url-other-origin`, `listed-url-invalid`, `start-links-other-origin`, `page-truncated` | info | look + decide; often intended | | |
 
-Noindex = a standalone `noindex` or `none` in meta robots (anywhere in the page) or X-Robots-Tag, or a past `unavailable_after`. `title-long` = 70-char display heuristic, not a Google limit. `h1-missing`, `img-alt-missing` help people + image search; Google requires neither. A11y → `ui-quality`.
+Noindex = a standalone `noindex` or `none` in meta robots (anywhere in the page) or X-Robots-Tag, or a past `unavailable_after` (a full date with its year); a directive prefixed for another crawler (`bingbot: noindex`) does not count. `title-long` = 70-char display heuristic, not a Google limit. `h1-missing`, `img-alt-missing` help people + image search; Google requires neither. A11y → `ui-quality`.
 
 Not covered: JS-added tags (compare rendered DOM in headed Chrome when framework injects head tags), rich-result eligibility ([Rich Results Test](https://search.google.com/test/rich-results)), Core Web Vitals (`perf-loop`), Search Console data.
 
