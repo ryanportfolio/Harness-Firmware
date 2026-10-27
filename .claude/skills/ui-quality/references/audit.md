@@ -51,7 +51,7 @@ Useful options, only when needed:
 | `--strict` | Return 1 for candidate failures; it does not replace verification |
 | `--allow-error-status` | Audit a page that answers with an HTTP error on purpose, such as a designed 404 page |
 
-Check names: `axe,contrast,focus,reflow,spacing,textscale,motion,shift,dark,phone`. Skipping axe also removes the evidence needed by composited contrast and dark contrast. Run probes sequentially on shared hardware. The probe closes its browser; close any verification browser and stop any server you started when finished.
+Check names: `axe,contrast,focus,reflow,spacing,textscale,motion,shift,dark,phone,page`. Skipping axe also removes the evidence needed by composited contrast and dark contrast. Run probes sequentially on shared hardware. The probe closes its browser; close any verification browser and stop any server you started when finished.
 
 ## 3. Read output in this order
 
@@ -73,6 +73,7 @@ Use these rule groups in [rules.md](rules.md):
 | `motion:*` | MO1, MO2. Verify whether motion is essential and whether long-running motion has a pause control. |
 | `shift:*` | ST1. Report measured load interval; it is not whole-visit CLS. |
 | `phone:*` | RC7; `phone:no-mobile-layout` is RE4, `phone:input-zoom` RE7, `phone:ungated-hover` RC12, `phone:tap-highlight` RC13; fixes in [mobile.md](mobile.md). Under 44 px is AAA/advice; check AA's 24 px size or spacing exceptions separately. |
+| `page:*` | IN1 through IN6: `page:failed-request` IN1, `page:error` IN2, `page:broken-image` IN3, `page:font-fallback` IN4, `page:video-stuck` IN5, `page:white-flash` IN6. Open the resource address or the error's location; for a flash, compare the `-early` screenshot with the settled page. |
 
 For each candidate choose **confirmed**, **dismissed** (state the evidence that disproves it), or **unresolved** (state the missing check). Group repeated manifestations of the same defect, preserving all affected states and widths. Never average measurements across widths or turn a candidate count into a count of confirmed defects.
 
@@ -86,6 +87,11 @@ Common traps when verifying:
 - `phone:no-mobile-layout` means a phone lays the page out at desktop width and shrinks it. The touch-target sizes on that page are scaled to what the phone shows; axe's target-size rows are not. A page built only for desktop does this on purpose; the row still describes what a phone user gets.
 - `phone:ungated-hover` reads only same-origin stylesheets and lists each hover selector whose styles sit outside a hover or fine-pointer media query once, with nested selectors written out (`.a { &:hover {} }` reads `.a:hover`); print-only and disabled sheets are skipped; a note says when cross-origin sheets could not be read. A hover rule that changes only a link colour still sticks after a tap but costs little; one that moves, scales or reveals content matters more. Tailwind v4's `hover:` is already gated.
 - `phone:input-zoom` and `phone:tap-highlight` come from Chrome's touch emulation. They show the CSS that causes the behaviour; the zoom and the flash themselves appear only on a real phone.
+- The `page:` checks watch one desktop load plus the settle time. `page:failed-request` lists each request that failed or answered HTTP 400 or higher, except the document itself and requests the page or browser cancelled (`net::ERR_ABORTED`). A signed-out API call answering 401, or a third-party script an ad blocker or firewall stops, also appears; decide whether the page needs the resource. One missing file often shows up twice, as a failed request and as a broken image, stuck video or font fallback.
+- `page:error` collects uncaught exceptions and unhandled promise rejections, not `console.error` calls. Its location is the first stack frame, which can sit inside a library rather than the code that called it.
+- `page:font-fallback` reads which font Chrome drew the h1's first text with. A web font passes when it loaded and drew the text. A named font with no `@font-face` passes when it is installed on the machine running the probe, so it can still be missing for visitors who lack it.
+- `page:video-stuck` reports media errors, autoplay videos left paused, videos with no frame and no poster, and autoplay without `muted` or `playsinline` even when the video played here. Bundled Chromium cannot play H.264, so error 4 there is not proof; the row says when that applies.
+- `page:white-flash` compares the `-early` screenshot, taken 350 ms after DOMContentLoaded, with the settled page, and fires only when the first is at least 90% near-white and the second at most 50%. A page that is white anyway is never flagged. A locally served page loads fast, so a flash that ends sooner is missed; throttle the network or check the deployed site to see the longer one a visitor gets.
 - Five occlusion samples suggest coverage; they do not prove every pixel is hidden. Confirm before assigning a WCAG failure.
 - Low contrast in the worst 5% may come from a border/icon inside a sampled line box. Check the text itself; filters, blend modes and dynamic backgrounds can need manual measurement.
 - Contrast over images accounts for the opacity of the text and of every box around it, including a faded box's own background, and says so in the row. A fade-in still running when the probe measured lowers the ratio; check the settled page.
