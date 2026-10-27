@@ -5,7 +5,9 @@
    human: contrast over images and gradients, focus visibility and focus hidden
    under sticky UI, clickable elements Tab cannot reach, reflow at 320 and 640
    CSS px, text spacing, text-only enlargement, reduced motion, layout shift
-   during load, dark mode contrast. What axe could not decide is listed, not
+   during load, dark mode contrast, and at phone width touch targets, hover
+   rules a tap leaves stuck, inputs iOS zooms into and the browser's tap
+   flash. What axe could not decide is listed, not
    dropped. axe runs inside every iframe; the probe's own checks of names,
    focus, contrast and targets also reach open shadow roots and same-origin
    iframes.
@@ -1095,7 +1097,7 @@ async function phone(url) {
       for (const el of all('a[href], button, input:not([type=hidden]), select, textarea, [role=button], [role=link], [role=tab], [role=checkbox], [role=switch], [tabindex]:not([tabindex="-1"])')) {
         // the size on the page, after any scaling of the frames around it
         const r = topRect(el);
-        if (!r.width || !r.height || !framesShow(el)) continue;
+        if (!r.width || !r.height || !(el.checkVisibility?.({ visibilityProperty: true }) ?? el.getClientRects().length > 0) || !framesShow(el)) continue;
         // inline links inside running text are exempt from target size
         if (el.localName === 'a' && style(el).display === 'inline' && el.parentElement && ownText(el.parentElement)) continue;
         const w = r.width * k, h = r.height * k;
@@ -1105,6 +1107,84 @@ async function phone(url) {
     }, scale);
     if (small.length) {
       add({ check: 'phone:touch-target', url, viewport: '375 touch', wcag: ['2.5.5'], level: 'AAA', severity: 'advisory', selector: small.slice(0, 12).join('; '), measured: `${small.length} controls under 44x44 ${scale < 1 ? 'px as the phone shows them' : 'CSS px'}`, threshold: '44 pt (Apple HIG), 48 dp (Material); WCAG AA minimum is 24 px, which axe target-size checks' });
+    }
+    // the CSS behind three things only a real phone shows: hover a tap leaves stuck,
+    // inputs iOS Safari zooms into on focus, and the browser's own tap flash
+    const feel = await page.evaluate(() => {
+      const { roots, all, style, sel, topRect, framesShow } = window.__uq;
+      const ungated = new Set(), unread = new Set();
+      let hoverNone = false;
+      // the queries of a media list; Chrome turns an alternative with an unknown feature into "not all", which never matches
+      const queriesOf = (media) => (media?.mediaText ?? '').split(',').map((q) => q.trim()).filter((q) => q && q !== 'not all');
+      // (hover), (hover: hover) and (pointer: fine) leave touch-only screens out, but only when every
+      // comma-separated query asks for one; "not" or "or" can let a phone in, so those count as ungated.
+      // any-hover and any-pointer describe a secondary input (a mouse on a touch phone), so they never gate
+      const asksHover = (media) => {
+        const queries = queriesOf(media);
+        return queries.length > 0 && queries.every((q) => !/\b(not|or)\b/i.test(q) && /\(\s*(hover\s*(:\s*hover\s*)?|pointer\s*:\s*fine\s*)\)/.test(q));
+      };
+      const printOnly = (media) => { const queries = queriesOf(media); return queries.length > 0 && queries.every((q) => /^(only\s+)?print\b/i.test(q)); };
+      // a nested selector with its parents, so `.a { &:hover {} }` reads ".a:hover"
+      const nested = (parent, s) => !parent ? s : s.includes('&') ? s.replace(/&/g, parent) : `${parent} ${s}`;
+      // flags a declaration block that applies while hovering and sits outside every hover gate: a :hover
+      // rule's own declarations, or rules and declarations nested under one. A :hover rule that only holds
+      // a gated @media (Tailwind v4 before minification) has no declarations of its own and passes.
+      const walk = (rules, gated, hover, parent) => {
+        for (const rule of rules) {
+          if (printOnly(rule.media)) continue;
+          // media rules and @import carry a media list; both can gate what they hold
+          const inside = gated || asksHover(rule.media);
+          if (/\(\s*(any-)?hover\s*:\s*none\s*\)/.test(rule.media?.mediaText ?? '')) hoverNone = true;
+          const label = rule.selectorText ? nested(parent, rule.selectorText) : parent;
+          const hovering = rule.selectorText?.includes(':hover') ? label : hover;
+          if (hovering && !inside && rule.style?.length) ungated.add(hovering);
+          if (rule.styleSheet) read(rule.styleSheet, inside);
+          // nested CSS and grouping rules hold rules of their own
+          if (rule.cssRules) walk(rule.cssRules, inside, hovering, label);
+        }
+      };
+      const read = (sheet, gated) => {
+        if (sheet.disabled || printOnly(sheet.media)) return;
+        let rules;
+        try { rules = sheet.cssRules; } catch { unread.add(sheet.href || 'inline'); return; }
+        walk(rules, gated || asksHover(sheet.media), null, '');
+      };
+      for (const root of roots()) for (const sheet of [...(root.styleSheets || []), ...(root.adoptedStyleSheets || [])]) read(sheet, false);
+      const smallInputs = [], flash = [];
+      // visibility: hidden keeps a box, so check the element itself as well as the frames around it
+      const shown = (el) => { const r = topRect(el); return r.width && r.height && (el.checkVisibility?.({ visibilityProperty: true }) ?? el.getClientRects().length > 0) && framesShow(el); };
+      for (const el of all('input, textarea, select')) {
+        // a disabled field never takes focus, so it never zooms; :disabled also covers a disabled fieldset
+        if (el.matches(':disabled') || (el.localName === 'input' && /^(hidden|checkbox|radio|range|color|file|button|submit|reset|image)$/.test(el.type))) continue;
+        const px = parseFloat(style(el).fontSize);
+        if (shown(el) && px < 16) smallInputs.push(`${sel(el)} ${Math.round(px * 10) / 10}px`);
+      }
+      // any colour syntax the browser understands (rgb, oklch, color(), color-mix): paint it and read the alpha back
+      const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+      const alphaOf = (c) => {
+        if (!c || c === 'transparent') return 0;
+        if (!ctx) { const parts = c.match(/rgba?\(([^)]*)\)/)?.[1].split(/[\s,/]+/).filter(Boolean); return !parts ? 1 : parts.length > 3 ? parseFloat(parts[3]) : 1; }
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = '#0000';
+        ctx.fillStyle = c;
+        ctx.fillRect(0, 0, 1, 1);
+        return ctx.getImageData(0, 0, 1, 1).data[3];
+      };
+      for (const el of all('a[href], button, [role=button], [role=link], [role=tab], summary, label, select, input:not([type=hidden])')) {
+        const c = style(el).webkitTapHighlightColor || '';
+        if (shown(el) && alphaOf(c) > 0) flash.push(`${sel(el)} ${c}`);
+      }
+      return { ungated: [...ungated], unread: [...unread], hoverNone, smallInputs, flash };
+    });
+    if (feel.ungated.length) {
+      add({ check: 'phone:ungated-hover', url, viewport: '375 touch', wcag: [], level: 'craft', severity: 'review', selector: feel.ungated.slice(0, 12).join('; '), measured: `${feel.ungated.length} hover selectors with styles outside a media query that leaves touch screens out ((hover), (hover: hover) or (pointer: fine)); on touch a tap applies them and they stay until the next tap elsewhere${feel.hoverNone ? '; the page also has (hover: none) rules, which may undo some of them' : ''}` });
+    }
+    if (feel.unread.length) notes.push(`${url}: phone:ungated-hover could not read ${feel.unread.length} cross-origin stylesheet(s), first ${feel.unread[0]}`);
+    if (feel.smallInputs.length) {
+      add({ check: 'phone:input-zoom', url, viewport: '375 touch', wcag: [], level: 'craft', severity: 'review', selector: feel.smallInputs.slice(0, 12).join('; '), measured: `${feel.smallInputs.length} text fields under 16 CSS px${scale < 1 ? `, shown smaller still at ${Math.round(scale * 100)}%` : ''}; iOS Safari zooms the page when one takes focus and does not zoom back out`, threshold: '16 px' });
+    }
+    if (feel.flash.length) {
+      add({ check: 'phone:tap-highlight', url, viewport: '375 touch', wcag: [], level: 'craft', severity: 'review', selector: feel.flash.slice(0, 12).join('; '), measured: `${feel.flash.length} controls keep the browser's tap highlight, a translucent box iOS Safari and Android Chrome flash over the control on every tap; set -webkit-tap-highlight-color: transparent and give each control its own :active style` });
     }
   } finally {
     await context.close();
@@ -1199,6 +1279,7 @@ const notMeasured = [
   'Under text spacing and enlarged text: text that overlaps its neighbours in a box that does not hide overflow; only cut-off text is measured, at 1280 px only.',
   'Canvas, WebGL and media content. Inside cross-origin iframes only axe runs; focus markers, names, contrast over images and targets there are not measured. Reflow, text stress, motion and layout shift look at the top page only. Closed shadow roots are not reached.',
   'Text whose colour comes from `filter`, `mix-blend-mode` or `background-clip: text`; contrast over images accounts for colour and opacity only.',
+  'Phone behaviour only hardware shows: the input zoom, tap delay and tap flash themselves, hover left behind after a tap, safe areas, the software keyboard and overscroll. The phone checks report the CSS behind three of them; hover rules in cross-origin stylesheets are not read.',
 ];
 const report = { generated: new Date().toISOString(), browser: browserInfo, urls: opts.urls, skipped: [...opts.skip], counts, pages, findings, axeUndecided: undecided, notes, notMeasured, screenshots: shots };
 writeFileSync(join(opts.out, 'report.json'), JSON.stringify(report, null, 2));

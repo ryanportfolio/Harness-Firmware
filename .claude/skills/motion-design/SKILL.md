@@ -1,11 +1,13 @@
 ---
 name: motion-design
-description: "Animation that must read + feel right: explainers, promos, trailers, hero/UI motion, UI card loops, kinetic type, WebGL particles. Not static layout."
+description: "Animation that must read + feel right: explainers, promos, trailers, hero/UI motion, component transitions + gestures, UI card loops, kinetic type, WebGL particles, janky animation. Not static layout."
 ---
 
 # Motion design
 
 Use this skill when motion carries meaning. It covers the story, the timing, the craft rules, a deterministic web engine and how to verify the result. It does not replace live tuning: when the `lab` skill exists, use it to let the user dial in values by eye. When `wow-loop` exists, use it for repeated review-and-repair rounds on one piece.
+
+Motion inside a product (buttons, popovers, tooltips, toasts, drawers, drag gestures) or an animation that drops frames skips the story workflow below: read [ui-components.md](references/ui-components.md) and follow it.
 
 ## Workflow
 
@@ -23,7 +25,7 @@ These are defaults. Tune them by eye.
 | Situation | Rule |
 |---|---|
 | Element arrives | Ease out (cubic or quint). Never scale up from 0: start at 0.9 or larger, or come down from above 1 for a slam. |
-| Element leaves | Ease in, at about 75% of the entrance duration. |
+| Element leaves | Ease in, at about 75% of the entrance duration. This is for scene and film exits; a UI element that leaves, whether the user dismissed it or it timed out, eases out, faster than it entered ([ui-components.md](references/ui-components.md)). |
 | Element moves while on screen | Ease in-out. |
 | Physical or playful motion | Use a spring set by `visualDuration` and `bounce`, so it lands on the beat and the bounce plays after it. |
 | Duration | Scale it with distance and area. UI: 150 to 300 ms. Scene morphs: 0.8 to 2.4 s. |
@@ -37,7 +39,7 @@ These are defaults. Tune them by eye.
 | Anything that loops | Run the seam, empty-hold and rest checks before export, and export frames 0 to `CYCLE * fps - 1`. See [verify-export.md](references/verify-export.md#loop-checks-seam-empty-hold-and-rest). |
 | Game trailer | Gameplay by 2 s, hook by 15 s, logo only on the end slate, 90 s or less, cuts on the music's hits. Every system shot shows risk, reward and power spike to someone who never played. See [story.md](references/story.md#game-trailer). |
 | Impact | Hitstop plus shake on the victim, not only the camera; hold frames for weight; few, fast smears. Sources in [principles.md](references/principles.md#impact). |
-| Control | Anything that loops or runs past 10 s gets pause. Scrub and chapter ticks always exist in the dev build (a `?t=` seek for capture); expose them to viewers only when the owner wants them. No reduced-motion version by default: motion is the point. Build one only when the owner asks, per [accessibility.md](references/accessibility.md). |
+| Control | Anything that loops or runs past 10 s gets pause. Scrub and chapter ticks always exist in the dev build (a `?t=` seek for capture); expose them to viewers only when the owner wants them. Films and animated pieces get no reduced-motion version by default, because motion is the point; build one only when the owner asks, per [accessibility.md](references/accessibility.md). Product UI always honours reduced motion ([ui-components.md](references/ui-components.md#reduced-motion)). |
 | Flash | At most 3 flashes in any 1 s, or space them 334 ms apart; keep flashed area under about 20% of the frame; no saturated red flashes. A full-screen white or inverted hit frame counts as a flash. |
 | Cut pace | Set by what the viewer must read, never a target number. Measured game trailers average 1.3 to 4.25 s per shot. Cut on action, keep the subject in the same screen region across the cut. See [camera-cut.md](references/camera-cut.md). |
 | Camera | One camera per shot, every move eased from 0 to speed and back. In 3D, shake rotates and never translates. Longer lens, smaller shake. |
@@ -67,6 +69,7 @@ These are defaults. Tune them by eye.
 ## Resources
 
 - [principles.md](references/principles.md): who teaches what, with sources, perception and learning research, UI motion tokens, plus the claims that could not be verified.
+- [ui-components.md](references/ui-components.md): product UI motion (whether to animate, easing and duration by component, press, popover, tooltip, toast and drawer rules, clip-path patterns, drag gestures), the frame budget and the traps that cause jank. Adapted from Emil Kowalski's MIT-licensed skills.
 - [story.md](references/story.md): explainer structure, a beat-sheet template, caption rules and game trailer structure.
 - [ui-loops.md](references/ui-loops.md): one story per visual for UI cards, dashboards and mockups, accents, intro choreography, the loop cycle, and live-page rules.
 - [web-engine.md](references/web-engine.md): a deterministic `frame(t)` engine with keyframed particle tracks, staggered morphs, phosphor trails, bloom, captions and a transport, plus gotchas measured in practice.

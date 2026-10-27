@@ -1,6 +1,6 @@
 ---
 name: ui-quality
-description: "Everyday UI quality floor (forms, dashboards, settings): build every state; audit by measuring rendered page (axe-core, focus, reflow, contrast). Use: /ui-quality, 'audit accessibility', 'is this UI production-ready', 'check this page on mobile'. Ambitious look → showpiece; conversion → conversion-ux."
+description: "Everyday UI quality floor (forms, dashboards, settings): build every state; audit by measuring rendered page (axe-core, focus, reflow, contrast). Use: /ui-quality, 'audit accessibility', 'is this UI production-ready', 'check this page on mobile', 'feels wrong on my phone', 'break this UI' with worst-case data. Ambitious look → showpiece; conversion → conversion-ux."
 ---
 
 # UI quality
@@ -19,6 +19,8 @@ Use the accompanying request as the target, including Claude's `$ARGUMENTS` when
 | Build or change a UI | [build.md](references/build.md), in order | Implemented states, saved design decisions, then a quick audit |
 | Audit, accessibility review, mobile check, production readiness | [audit.md](references/audit.md), in order | Verified findings and explicit coverage gaps |
 | Check after a build or a narrow fix | [audit.md](references/audit.md), quick depth | Evidence for the changed screen and states |
+| Make a web app behave on a phone: sticky hover, tap flash, input zoom, notch, `100vh`, carousel or sheet gestures | [mobile.md](references/mobile.md) | Fixes applied, a quick audit of the changed screen per [audit.md](references/audit.md), and which fixes need a real phone to confirm |
+| Break a component with worst-case data, stress-test, edge cases | [worst-case.md](references/worst-case.md), in order | A dev-only data toggle and a break report; fixes only when the owner names them or the request asked for them |
 
 [rules.md](references/rules.md) is a lookup table. During a build, read the groups relevant to the components. During an audit, use the rule IDs in the audit guide to look up the source for each finding. You do not need to read the probe's implementation to run it.
 
