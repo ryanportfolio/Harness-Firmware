@@ -1307,7 +1307,17 @@ async function integrity(url) {
     const late = await page.screenshot();
     const settled = await pixels({ op: 'light', a: late.toString('base64') });
     const backdrop = await page.evaluate(() => {
-      const near = (c) => { const m = c.match(/rgba?\(([^)]*)\)/); if (!m) return null; const [r, g, b, a = 1] = m[1].split(/[\s,/]+/).filter(Boolean).map(Number); return a < 0.9 ? null : { light: r >= 235 && g >= 235 && b >= 235, color: c }; };
+      // any colour syntax the browser understands (rgb, oklch, color(), color-mix): paint it and read it back
+      const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+      const near = (c) => {
+        if (!c || c === 'transparent') return null;
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = '#0000';
+        ctx.fillStyle = c;
+        ctx.fillRect(0, 0, 1, 1);
+        const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+        return a < 230 ? null : { light: r >= 235 && g >= 235 && b >= 235, color: c };
+      };
       for (let el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); el; el = el.parentElement) {
         const cs = getComputedStyle(el);
         const solid = near(cs.backgroundColor);
@@ -1443,11 +1453,14 @@ async function headingFont(page, context, f, url, base) {
     const used = drawn.length ? drawn.map((d) => d.familyName).join(', ') : null;
     // a family no font answers to falls back to the browser's default font
     const fallback = async (text) => draws('"uq-no-such-font-7f3a"', text);
-    // installed (or answered by an @font-face): the family draws differently from a generic family it is put in front of
+    // installed (or answered by an @font-face): the family draws differently from a generic family it is put in
+    // front of, for Latin sample text or for the heading's own text (a font for another script has no Latin)
     const installed = async (name) => {
-      for (const generic of ['monospace', 'serif']) {
-        const withIt = await draws(`${css(name)}, ${generic}`, SAMPLE);
-        if (withIt && !same(withIt, await draws(generic, SAMPLE))) return withIt;
+      for (const text of [SAMPLE, f.text]) {
+        for (const generic of ['monospace', 'serif']) {
+          const withIt = await draws(`${css(name)}, ${generic}`, text);
+          if (withIt && !same(withIt, await draws(generic, text))) return withIt;
+        }
       }
       return null;
     };
@@ -1458,15 +1471,15 @@ async function headingFont(page, context, f, url, base) {
       if (!f.faces.includes('loaded')) {
         problem = `"${first}" is a web font on this page (status ${[...new Set(f.faces)].join(', ')})${f.faces.includes('loading') ? ' and still loading after load and settle' : ''}; drawn with ${used}`;
       } else {
-        // usable: the family draws sample text differently from the default font. Then, when it also draws the
-        // heading's own text, the heading must use it; when it does not (a Latin font over Japanese text), a later
-        // family draws those glyphs by design
-        const sample = await draws(css(first), SAMPLE);
-        if (!sample || same(sample, await fallback(SAMPLE))) {
-          problem = `"${first}" is a web font on this page (status ${[...new Set(f.faces)].join(", ")}) but draws no text of its own, so the page cannot use it (font-display: optional past its window, or no face covers this text); drawn with ${used}`;
+        // when the family draws the heading's own text differently from the default font, the heading must use
+        // it. When it does not, it may be a font for another script (a Latin font over Japanese text, a later family
+        // draws those glyphs by design): it passes if it draws Latin sample text, else the page cannot use it
+        const wanted = await draws(css(first), f.text);
+        if (wanted && !same(wanted, await fallback(f.text))) {
+          if (!drawn.some((d) => same(d, wanted))) problem = `"${first}" is a web font on this page (status ${[...new Set(f.faces)].join(', ')}); drawn with ${used} instead of ${wanted.familyName}, which "${first}" draws now`;
         } else {
-          const wanted = await draws(css(first), f.text);
-          if (same(wanted, sample) && !drawn.some((d) => same(d, wanted))) problem = `"${first}" is a web font on this page (status ${[...new Set(f.faces)].join(", ")}); drawn with ${used} instead of ${wanted.familyName}, which "${first}" draws now`;
+          const sample = await draws(css(first), SAMPLE);
+          if (!sample || same(sample, await fallback(SAMPLE))) problem = `"${first}" is a web font on this page (status ${[...new Set(f.faces)].join(', ')}) but draws no text of its own, so the page cannot use it (font-display: optional past its window, or no face covers this text); drawn with ${used}`;
         }
       }
     } else if (!(await installed(first))) {
