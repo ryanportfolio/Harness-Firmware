@@ -469,7 +469,12 @@ async function open(url, ctxOpts = {}, hooks = {}) {
       await until;
     };
     if (hooks.paint) await sample(page.waitForLoadState('load', { timeout: 60000 }));
-    if (opts.waitFor) await page.waitForSelector(opts.waitFor, { timeout: 30000 });
+    // frames keep coming while --wait-for waits, so a flash while an app renders is seen
+    if (opts.waitFor) {
+      const ready = page.waitForSelector(opts.waitFor, { timeout: 30000 });
+      if (hooks.paint) await sample(ready);
+      else await ready;
+    }
     if (hooks.paint) await sample(page.waitForTimeout(opts.settle));
     else await page.waitForTimeout(opts.settle);
     return { context, page };
@@ -1320,9 +1325,11 @@ async function integrity(url) {
       };
       for (let el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); el; el = el.parentElement) {
         const cs = getComputedStyle(el);
+        // a gradient paints above the element's background colour, and at once even when layered with an image,
+        // so it is read first; the 50-point drop the flash also needs keeps a light gradient from counting
+        if (/gradient\(/.test(cs.backgroundImage)) return { light: false, color: 'a CSS gradient' };
         const solid = near(cs.backgroundColor);
         if (solid) return solid;
-        if (/gradient\(/.test(cs.backgroundImage) && !/url\(/.test(cs.backgroundImage)) return { light: false, color: 'a CSS gradient' };
       }
       return { light: true, color: 'the browser default white' };
     });
