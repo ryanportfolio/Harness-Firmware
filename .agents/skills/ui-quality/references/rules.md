@@ -26,6 +26,7 @@ The probe uses `fail` for candidates associated with WCAG A or AA. Confirm the c
 | RE4 | Body text at least 16 px on phones; lines about 45 to 75 characters on wide screens | Craft | Probe `phone:no-mobile-layout` when a phone shrinks a desktop-width layout; sizes and line length are manual |
 | RE5 | Fixed heights with hidden overflow around text are a bug waiting for a longer name or language | Craft | Probe `reflow`, `spacing`, `textscale` (clipped text) |
 | RE6 | The screen works in portrait and landscape unless one orientation is essential | WCAG 1.3.4 AA | Manual |
+| RE7 | Text inputs, textareas and selects are at least 16 px on phones; iOS Safari zooms into smaller ones on focus and does not zoom back out | Craft (iOS Safari behaviour) | Probe `phone:input-zoom`; the zoom itself needs an iPhone |
 
 ## Reach
 
@@ -42,6 +43,8 @@ The probe uses `fail` for candidates associated with WCAG A or AA. Confirm the c
 | RC9 | Content shown on hover or focus can be dismissed with Escape, hovered itself, and stays until dismissed | WCAG 1.4.13 AA | Manual |
 | RC10 | Nothing essential depends on hover; touch screens have none | Craft | Manual |
 | RC11 | A skip link or landmarks let keyboard users pass repeated navigation | WCAG 2.4.1 A | Probe `axe` (landmarks, best practice); manual |
+| RC12 | Hover styles sit inside `@media (hover: hover) and (pointer: fine)`; on touch a tap applies `:hover` and it stays until the next tap elsewhere | Craft | Probe `phone:ungated-hover` (same-origin stylesheets only; it accepts `(hover)`, `(hover: hover)` or `(pointer: fine)` alone, so whether both conditions are present is manual); fixes in [mobile.md](mobile.md) |
+| RC13 | A tap shows the control's own press feedback at once: an `:active` style or `pointerdown` handler, no browser tap highlight over it, `touch-action: manipulation` on controls | Craft | Probe `phone:tap-highlight` for the highlight; feedback timing is manual on a phone |
 
 ## Operate and understand
 
@@ -87,7 +90,7 @@ Common ways a stack breaks the rules above. Check the ones that match the detect
 - CSS resets with `*:focus { outline: none }` fail RC4 everywhere at once.
 - `hidden md:block` and similar hide content on phones; check that nothing a phone user needs is behind it.
 - `overflow-x: hidden` on `html`, `body` or a wrapper turns a reflow failure into silently cut-off content; the probe reports it as `reflow:cut-off`.
-- `height: 100vh` on phones sits under the browser bars; use `100dvh` or `min-height`.
+- `height: 100vh` on phones sits under the browser bars; use `100dvh` for app shells and `min-height: 100svh` for heroes ([mobile.md](mobile.md)).
 - `user-scalable=no` or `maximum-scale=1` in the viewport tag fails RE3.
 - Emoji or icon fonts alone can leave a control's name ambiguous and render differently per platform. Inspect the accessible name; give the control a name that describes its action. An SVG alone does not supply one.
 - `title` as the only name is unreliable; touch and many screen readers ignore it.

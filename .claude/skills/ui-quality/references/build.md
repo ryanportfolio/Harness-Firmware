@@ -42,7 +42,7 @@ For each affected component or screen, record the applicable states below. For e
 | Disabled or read-only | Why an action is unavailable and how to make it available |
 | Offline or slow | What still works and what will retry |
 | Identity and roles | Signed out and supported permission levels |
-| Content extremes | Long names, unbroken strings, large numbers, one or many rows, supported translations and right-to-left text |
+| Content extremes | Long names, unbroken strings, large numbers, one or many rows, supported translations and right-to-left text; build the worst-case fixture and toggle in [worst-case.md](worst-case.md) |
 
 Keep the inventory with the task or page decisions. An inaccessible fixture or missing account is a verification gap, not a tested state.
 
@@ -51,7 +51,8 @@ Keep the inventory with the task or page decisions. An inaccessible fixture or m
 - Use native elements and existing components. Read Reach and Operate in [rules.md](rules.md) for keyboard behavior, names and state. Custom controls need equivalent semantics and keyboard operation.
 - Forms need visible associated labels, hints, suitable `autocomplete`, usable validation and input preserved after failure. Keep paste and password managers available. Read OP1 through OP6 and OP14.
 - Read Read and Stability for responsive content, text resizing and space reserved for late data. Choose pagination or virtualization only when the actual content and performance need it; preserve keyboard and screen reader access.
-- Read Motion when anything animates. Implement the reduced-motion behavior and keep the resulting content available.
+- Read Motion when anything animates. Implement the reduced-motion behavior and keep the resulting content available. For the motion itself (easing, duration, press feedback, popovers, gestures, jank), read the `motion-design` skill's `references/ui-components.md` when that skill is installed.
+- When the screen targets phones, start from the baseline in [mobile.md](mobile.md) and gate every hover style behind `(hover: hover) and (pointer: fine)`.
 
 Update saved decisions when implementation changes them. Use audience-appropriate prose for labels, errors and empty states; use the Writing skill if available.
 

@@ -25,7 +25,7 @@ Compiled 2026-09-29. Flashing content can trigger seizures in people with photos
 
 ## Reduced motion
 
-Off by default: the owner wants full motion. Use this section only when the owner asks for a reduced version.
+Off by default for films and animated pieces: the owner wants full motion. Use this section only when the owner asks for a reduced version. Product UI motion always honours reduced motion; see [ui-components.md](ui-components.md#reduced-motion).
 
 - **Triggers.** Scaling and zooming ("the illusion that the viewer is moving forward or backward"), spinning, multi-speed or multi-directional movement such as parallax, 2D planes moving in 3D space, and "horizontal movement in the peripheral field of vision" (James Craig, [WebKit](https://webkit.org/blog/7551/responsive-design-for-motion/)). Remove only the animations "you *know* to be vestibular triggers"; removing everything can leave an interface "confusing or unusable".
 - **Scale is relative to the screen.** Val Head: "Exaggerated parallax and scrolljacking animations are highly likely to be triggering", a full-screen wipe "likely would" be, and animation of "non-moving properties, like opacity, color, and blurs, are unlikely to be problematic" ([A List Apart](https://alistapart.com/article/designing-safer-web-animation-for-motion-sensitivity/)).

@@ -1,6 +1,6 @@
 # Web effects: landing-page video, scroll and glass
 
-Recipes for the effects that carry a marketing or portfolio page: background video, seamless and scrubbed loops, glass over footage, entrance choreography and scroll-driven stages. Each one keeps its reduced-motion branch, its touch fallback and a cost rating. Product components (buttons, popovers, toasts, drawers) are in [ui-components.md](ui-components.md) when that file exists; films and loops rendered by a `frame(t)` engine are in [web-engine.md](web-engine.md).
+Recipes for the effects that carry a marketing or portfolio page: background video, seamless and scrubbed loops, glass over footage, entrance choreography and scroll-driven stages. Each one keeps its reduced-motion branch, its touch fallback and a cost rating. Product components (buttons, popovers, toasts, drawers) are in [ui-components.md](ui-components.md); films and loops rendered by a `frame(t)` engine are in [web-engine.md](web-engine.md).
 
 Adapted from the technique library in [Motionsites-AI/claude-skill](https://github.com/Motionsites-AI/claude-skill) (`plugins/motionsites-web-builder/skills/motionsites-web-builder/references/techniques/`, commit `faa30d5`, read 2026-10-26), MIT licence in [web-effects.LICENSE](web-effects.LICENSE). Only the MIT-licensed references were used. Its taste rules (which effects to pair, how many per page) were left out: direction comes from the brief, `design-brief` and `showpiece`. Values marked as source values are that library's practice, not standards; tune them by eye. Several recipes were rewritten here to cost less; those changes are called out. The decision rules in [SKILL.md](../SKILL.md) still apply; where this file and SKILL.md disagree, SKILL.md wins.
 
@@ -651,7 +651,7 @@ function stage(section, apply) {                         // apply(s) writes styl
 
 Rewritten here to cost less than the source, which wrote about 25 custom properties on the stage every frame and animated `filter: blur() brightness()` on full-viewport image layers:
 
-- **Write each value on the element that uses it** (`el.style.transform`, or a variable set on that layer), and skip the write when the rounded value hasn't changed. Variables on the stage restyle every descendant on each change.
+- **Write each value on the element that uses it** (`el.style.transform`, or a variable set on that layer), and skip the write when the rounded value hasn't changed. Variables on the stage restyle every descendant on each change (see [ui-components.md](ui-components.md#performance)).
 - **Never animate `filter` on the big layers.** Export a pre-blurred copy of the background (source value 14 px) and crossfade its `opacity`; do brightness and tint with overlay layers whose `opacity` changes. Everything that moves is then `transform` or `opacity`.
 - **Size the planes to their use.** Each decoded layer costs width × height × 4 bytes. Export each plane at its largest rendered width times a device pixel ratio capped at 2 (a 118vw foreground on a 1440 px screen is about 3400 px), crop it tight to its opaque pixels, serve smaller files to phones with `srcset`, and cut the foreground into a left and a right file.
 - **Hide what is off stage:** controls that slide out get `visibility:hidden` and `pointer-events:auto` only once their enter value passes 0.98.
@@ -746,4 +746,4 @@ Light. Fixed UI (wordmark, nav, captions) in white with `mix-blend-mode: exclusi
 
 ## Not ported
 
-From the same library: buttons and card hovers, type effects (scramble, typewriter, rotating word, giant display type, wordmark assembly, count-ups), depth carousels, cursor spotlight, image trails, orbit rings, sand-dissolve transitions, menus and navigation, product mockups, sliders and marquees, and the 3D model and shader backdrops. For product components see [ui-components.md](ui-components.md) when it exists; for WebGL see [web-engine.md](web-engine.md). The library's craft, spec-template and review files, its example prompts and its media were not used.
+From the same library: buttons and card hovers, type effects (scramble, typewriter, rotating word, giant display type, wordmark assembly, count-ups), depth carousels, cursor spotlight, image trails, orbit rings, sand-dissolve transitions, menus and navigation, product mockups, sliders and marquees, and the 3D model and shader backdrops. For product components see [ui-components.md](ui-components.md); for WebGL see [web-engine.md](web-engine.md). The library's craft, spec-template and review files, its example prompts and its media were not used.
