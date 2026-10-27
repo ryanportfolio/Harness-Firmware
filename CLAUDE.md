@@ -37,9 +37,12 @@ Defaults until configured:
 - Scope discipline: No unrequested refactors, features, abstractions, or extra coding. Minimum complexity for the task at hand; don't regress performance.
 - Reuse before writing: code already in this repo first, then the standard library or a platform feature, then an installed dependency, and only then new code. Never add a dependency to save a few lines.
 - Bug fixes: find every caller of the function before editing, then fix the root cause once in the shared code instead of patching each caller.
+- Two fixes that rest on the same assumption failed the same check: stop. Write that assumption down in one sentence and test it directly before a third attempt. If it is false, the next fix starts from what is true.
 - Code you move or merge keeps its error handling and validation.
 - Never make a change smaller by cutting validation at trust boundaries, error handling that prevents data loss, security, or accessibility.
 - No unit tests or type tests unless the user asks.
+- A test or check that would still pass if the code returned nothing, or ran on an empty file, proves nothing. Before trusting a pass, confirm the check fails when its input or output is missing or empty.
+- Don't silence the compiler, type checker or linter (`@ts-ignore`, `as any`, `eslint-disable`, `#[allow(...)]`, `# type: ignore`) to make an error go away. Fix the cause. When a suppression is right, scope it to one line and say why in a comment.
 - Solve generally. Never hard-code to pass specific tests. If a test or requirement is wrong, say so rather than work around it. Never fake success: no placeholder results, and no fallback added only to silence an error. Fallbacks the product needs (older browsers, offline, missing media) are fine.
 - Scratch work → `.tmp/` (gitignored). Promote to `scripts/` if reusable; otherwise delete.
 - Durable project knowledge → `.claude/reference/` via `/recall save` (committed, travels to every machine and sandbox). Standing truths only: moments (PR numbers, branch names, task status, tool-version snapshots) rot and don't get saved. `/recall` and `.claude/reference/` replace Claude Code's built-in auto memory, which stays off (`"autoMemoryEnabled": false` in `.claude/settings.json`).
