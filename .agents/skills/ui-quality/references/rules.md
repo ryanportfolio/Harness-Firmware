@@ -86,12 +86,12 @@ The probe uses `fail` for candidates associated with WCAG A or AA. Confirm the c
 
 | ID | Rule | Source | Checked by |
 |---|---|---|---|
-| IN1 | Every script, stylesheet, font, image and media file the page requests loads; none fails or answers HTTP 400 or higher | Craft | Probe `page:failed-request` (load and settle only) |
+| IN1 | Every script, stylesheet, font, image, media file, data request (fetch, XHR) and frame document the page needs loads; none fails, is blocked by the page's own Content-Security-Policy, or answers HTTP 400 or higher | Craft | Probe `page:failed-request` (load and settle only) |
 | IN2 | The page throws no uncaught errors or unhandled promise rejections | Craft | Probe `page:error` (load and settle only) |
 | IN3 | Every image loads; a broken one leaves its alt text or an empty box in the layout | Craft; the alt text itself is SE4 | Probe `page:broken-image` |
-| IN4 | Headings draw in the font the design names; a web font that fails, or a named font that is not installed, falls back to another font with different widths and line breaks | Craft | Probe `page:font-fallback` (h1 only) |
+| IN4 | Headings draw in the font the design names; a web font that fails or cannot be used, or a named font that is not installed and has no installed fallback named after it, falls back to another font with different widths and line breaks | Craft | Probe `page:font-fallback` (first visible h1 only) |
 | IN5 | Videos load and show a frame or a poster; an autoplay video has `muted` and `playsinline`, because browsers block autoplay with sound and iPhone Safari plays a video in the page only with `playsinline` | Craft (browser autoplay policies) | Probe `page:video-stuck` |
-| IN6 | The first paint already uses the page's background: a dark page never flashes white while its styles, theme or script arrive | Craft | Probe `page:white-flash` (one frame 350 ms after DOMContentLoaded) |
+| IN6 | The first paint already uses the page's background: a dark page never flashes white while its styles, theme or script arrive | Craft | Probe `page:white-flash` (frames about every 100 ms from navigation to the end of the settle time) |
 
 ## Stack traps
 
