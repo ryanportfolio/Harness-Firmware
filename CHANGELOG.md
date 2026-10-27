@@ -13,6 +13,13 @@ condensed.
 
 ### Added
 
+- Three kernel rules adapted from unclebob/ub-mode (`CLAUDE.md` under Core
+  principles, `AGENTS.md` under Defaults). After two fixes in a row fail to
+  clear the same failure, stop and test the assumption they share before a
+  third attempt. A test or check proves nothing until it has been seen to fail
+  on a case it must reject. Compiler, type checker and linter suppressions are
+  allowed only where the tool is wrong about the code, scoped to the smallest
+  unit, with the reason stated.
 - `seo-loop` for Claude and Codex: measured rounds that make a site easier to
   index and to quote in AI answers. Two deterministic checks gate each round:
   `scripts/seo-check.mjs`, a zero-dependency crawler for status codes,

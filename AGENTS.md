@@ -11,9 +11,9 @@ This is the Codex boundary for repositories using the Harness Firmware starter. 
 - Read only `CLAUDE.md`'s `What this project is`, `CRITICAL: Verification`, and `Environment & deploy target` sections for configured project facts. Use `.claude/reference/` for architecture, commands, deployment, and pitfalls. Other `CLAUDE.md` workflow rules are not Codex instructions.
 - Never execute `.claude/hooks/session-start.sh` in Codex.
 - No unit tests or type tests unless the user asks.
-- Two fixes that rest on the same assumption failed the same check: stop. Write that assumption down in one sentence and test it directly before a third attempt. If it is false, the next fix starts from what is true.
-- A test or check that would still pass if the code returned nothing, or ran on an empty file, proves nothing. Before trusting a pass, confirm the check fails when its input or output is missing or empty.
-- Don't silence the compiler, type checker or linter (`@ts-ignore`, `as any`, `eslint-disable`, `#[allow(...)]`, `# type: ignore`) to make an error go away. Fix the cause. When a suppression is right, scope it to one line and say why in a comment.
+- When two fixes in a row fail to clear the same failure (same test, same error), stop. Write down in one sentence the assumption both fixes share and test it directly before a third attempt. Never switch to a weaker check to get a pass. If the assumption is false, start the next fix from what is true. Loop skills with their own rule for repeated failures follow theirs.
+- A test or check that would still pass if the code returned nothing proves nothing. Before trusting one you wrote or have never seen fail, run it once on a case it must reject and watch it fail: missing or empty output, or, for a check that looks for something absent (a linter, secret scan or brand gate), a planted bad case.
+- Don't silence the compiler, type checker or linter to make an error or warning go away: no `@ts-ignore`, `@ts-nocheck`, `as any`, `eslint-disable`, `#[allow(...)]`, `# type: ignore` or `# noqa`, and no turning a rule or strict mode off in config. Fix the cause. A suppression is right only when the tool is wrong about this code (a false positive, or a gap in third-party types); then scope it to the smallest unit the tool allows and name the tool's mistake in its comment or `reason`.
 
 ## Capabilities
 
