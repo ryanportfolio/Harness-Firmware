@@ -35,17 +35,19 @@ Allow at most one heavy effect per page. Measure frame time with the page's real
   ```html
   <button class="motion-toggle" type="button" aria-pressed="false">Pause motion</button>
   <script>
+    let pausedByButton = [];   // resume only what was playing, never scrub footage, stills or off-screen clips
     document.querySelector('.motion-toggle').addEventListener('click', (e) => {
       const paused = e.currentTarget.getAttribute('aria-pressed') !== 'true';
       e.currentTarget.setAttribute('aria-pressed', String(paused));
       document.documentElement.classList.toggle('motion-paused', paused);
-      document.querySelectorAll('video').forEach((v) => (paused ? v.pause() : v.play().catch(() => {})));
+      if (paused) { pausedByButton = [...document.querySelectorAll('video')].filter((v) => !v.paused); pausedByButton.forEach((v) => v.pause()); }
+      else { pausedByButton.forEach((v) => v.play().catch(() => {})); pausedByButton = []; }
     });
   </script>
   <style>.motion-paused *{animation-play-state:paused!important}</style>
   ```
 
-  Recipes that call `play()` themselves (off-screen observers, loop restarts) should check `document.documentElement.classList.contains('motion-paused')` first.
+  Every recipe that calls `play()` itself (off-screen observers, loop restarts, touch fallbacks) checks `document.documentElement.classList.contains('motion-paused')` first; the ones below do.
 - **Touch.** Pointer effects check `(hover: hover) and (pointer: fine)` and fall back to autoplay or a still.
 - **Media encoding.** Background clips: H.264 MP4 with `-movflags +faststart`, 6 to 12 s, 5 to 8 MB at most, plus a 720p or smaller encode for phones chosen with `matchMedia('(max-width: 768px)')`. Clips that will be seeked (scrubbed) need short keyframe intervals; see the scrub recipes.
 - Where `@supports (animation-timeline: view())` passes, CSS scroll-driven animations can replace the JS for reveals and simple parallax and run off the main thread. Keep the JS path as the fallback.
@@ -122,7 +124,10 @@ function mountVideo(video, src, { revealDelay = 0 } = {}) {
     });
     io.observe(video);
   }
-  return () => { clearTimeout(timer); io?.disconnect(); hls?.destroy(); };
+  return () => {
+    clearTimeout(timer); io?.disconnect(); video.removeEventListener('loadeddata', reveal);
+    video.pause(); hls?.destroy();
+  };
 }
 document.querySelectorAll('video[data-src]').forEach((v) => mountVideo(v, v.dataset.src));
 ```
@@ -181,7 +186,7 @@ function fadeLoopVideo(video, { fadeMs = 500, fadeOutLead = 0.8, gapMs = 100, pl
   video.addEventListener('ended', onEnded);
   if (video.readyState >= 2) start();
   return () => {
-    cancelAnimationFrame(raf); clearTimeout(timer); io.disconnect();
+    cancelAnimationFrame(raf); clearTimeout(timer); io.disconnect(); video.pause();
     video.removeEventListener('error', onError); video.removeEventListener('loadeddata', start);
     video.removeEventListener('timeupdate', onTime); video.removeEventListener('ended', onEnded);
   };
@@ -270,7 +275,10 @@ function mouseScrubVideo(video, { sensitivity = 0.8, query = '(min-width: 1024px
   const applyMode = () => {
     if (reduce.matches) video.pause();
     else if (mq.matches) { video.loop = false; video.pause(); target = video.currentTime; }
-    else { video.loop = true; visible ? video.play().catch(() => {}) : video.pause(); }
+    else {
+      video.loop = true;
+      visible && !document.documentElement.classList.contains('motion-paused') ? video.play().catch(() => {}) : video.pause();
+    }
   };
   new IntersectionObserver(([e]) => { visible = e.isIntersecting; applyMode(); }).observe(video);
   mq.addEventListener('change', applyMode); reduce.addEventListener('change', applyMode);
@@ -573,16 +581,20 @@ Light. Blocks below the fold fade and rise once as they enter, with per-element 
 - Trigger: `threshold .15`, `rootMargin: 0px 0px -10% 0px`. `threshold` is a fraction of the element, so with that margin a block taller than about 6 viewports never reaches 0.15: give blocks taller than the viewport `threshold 0`. The margin also means the bottom 10 % of the viewport never counts, so once the page is scrolled to its end, everything left on screen is revealed.
 - Stagger `base + i × step`: lists `150 + i·120 ms`, grid cards `i·100 ms`, stat columns `i·150 ms`.
 - Corner decor around a centred heading: four objects sliding in from `x ±80px`, 0.9 s, delays .10, .15, .25, .30 s.
+- The `.js` class hides content before the controller runs, so the head script also sets a 3 s fallback: if the controller never reports ready (it failed to load or threw), everything is shown.
 
 ```html
-<script>document.documentElement.classList.add('js')</script>   <!-- in <head> -->
+<script>   /* in <head> */
+  document.documentElement.classList.add('js');
+  setTimeout(() => window.revealReady || document.documentElement.classList.add('reveal-failed'), 3000);
+</script>
 <ul data-stagger="120" data-stagger-base="150"><li data-reveal>…</li><li data-reveal>…</li></ul>
 ```
 ```css
 .js [data-reveal]{opacity:0;transform:translate3d(var(--x,0px),var(--y,30px),0);
   transition:opacity var(--dur,.7s) var(--ease,var(--ease-reveal)) var(--d,0s),transform var(--dur,.7s) var(--ease,var(--ease-reveal)) var(--d,0s)}
 .js [data-reveal="scale"]{transform:scale(.95);--ease:var(--ease-out-quint)}
-.js [data-reveal].is-in{opacity:1;transform:none}
+.js [data-reveal].is-in,.reveal-failed [data-reveal]{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.js [data-reveal]{opacity:1;transform:none;transition:none}}
 ```
 ```js
@@ -600,6 +612,7 @@ addEventListener('scroll', () => {                         // the last lines may
     if (el.getBoundingClientRect().top < innerHeight) { el.classList.add('is-in'); revealIO.unobserve(el); }
   });
 }, { passive: true });
+window.revealReady = true;                                 // last line: the head fallback stands down
 ```
 
 ### Scroll-linked word reveal
@@ -802,6 +815,7 @@ Light. Fixed UI (wordmark, nav, captions) in white with `mix-blend-mode: exclusi
 
 - `position:fixed; color:#fff; mix-blend-mode:exclusion; pointer-events:none`, with `pointer-events:auto` back on real links.
 - Blending happens against what is painted in the same stacking context. A parent with `transform`, `filter`, `opacity < 1`, `isolation` or `will-change` traps the blend, so keep blended elements as direct children of `body` and animate the blended element itself, not a wrapper.
+- Exclusion fails over mid-grey: white over `rgb(128,128,128)` gives `rgb(127,127,127)`, a contrast of about 1:1. Navigation that people need to use gets a backing surface (a small glass or dark pill) wherever the footage passes through mid-tones; check frames across the whole clip, not only the brightest.
 - Keep a visible focus style for keyboard users.
 
 ## Not ported
