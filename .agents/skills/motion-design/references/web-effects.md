@@ -71,16 +71,17 @@ Medium. A muted clip fills the hero and all UI floats over it.
 - Section background `#000` or the clip's edge colour, so nothing flashes before the first frame. `100svh` with a `100vh` fallback.
 - Settle-in: `opacity 0, scale(1.05)` to rest over 1.8 s `--ease-out-expo`, or fade the video in at about 2.8 s and let a type intro own the first seconds.
 - HLS (`.m3u8`): Safari plays it natively; elsewhere use a pinned hls.js release with `capLevelToPlayerSize: true` so phones never stream 4K, and call `hls.destroy()` on unmount.
-- Reduced motion: no autoplay, the poster or first frame stays as a still. Autoplay can be refused (low-power mode), so the poster must work as the design.
+- Reduced motion: no autoplay, the poster or first frame stays as a still. Autoplay can be refused (low-power mode) and the clip can fail to load, so the poster sits on the section background, independent of the video, and must work as the design. Match its position to the video's `object-position`.
 
 ```html
-<section class="vhero">
+<section class="vhero" style="--poster:url(poster.jpg)">
   <video class="vhero__media" data-src="clip.mp4" poster="poster.jpg" muted playsinline preload="auto" aria-hidden="true"></video>
   <div class="vhero__content">…</div>
 </section>
 ```
 ```css
-.vhero{position:relative;min-height:100vh;min-height:100svh;overflow:hidden;background:#000;isolation:isolate;color:#fff}
+.vhero{position:relative;min-height:100vh;min-height:100svh;overflow:hidden;isolation:isolate;color:#fff;
+  background:#000 var(--poster) center/cover no-repeat}   /* the poster shows even if the video never loads */
 .vhero__media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;pointer-events:none;
   opacity:0;transform:scale(1.05);transition:opacity 1.8s var(--ease-out-expo),transform 1.8s var(--ease-out-expo)}
 .vhero__media.is-ready{opacity:1;transform:none}
@@ -337,14 +338,15 @@ Rewritten here to cost less. The source cached up to 90 frames at 960 px wide (a
   addEventListener('resize', request);
   video.addEventListener('seeked', request);
   video.play().then(() => video.pause()).catch(() => {});   // prime decoding on iOS
-  video.addEventListener('loadeddata', async () => {
+  const init = async () => {
     root.classList.add('has-video');
     request();
     if (!USE_CACHE) return;
     await new Promise((r) => setTimeout(r, 300));           // let the first paint finish
     try { frames = await buildFrameCache(); drawn = -1; root.classList.add('has-frames'); request(); }
     catch { /* keep the seek path */ }
-  }, { once: true });
+  };
+  video.readyState >= 2 ? init() : video.addEventListener('loadeddata', init, { once: true });   // cached media may load before this runs
 })();
 ```
 
@@ -456,14 +458,18 @@ Light. Each hero element rises a few pixels out of a blur in reading order while
 .in-fade{animation:fadeRise var(--dur,1s) var(--ease-out-expo) var(--d,0ms) both}
 .in-down{animation:fadeDown .8s var(--ease-out-expo) var(--d,0ms) both}
 .in-zoom{animation:settleZoom 1.8s var(--ease-out-expo) both}
-/* wait for fonts so lines don't re-wrap mid-animation */
-.in-blur,.in-fade{animation-play-state:paused}
-.fonts-ready .in-blur,.fonts-ready .in-fade{animation-play-state:running}
+/* wait for fonts so lines don't re-wrap mid-animation; only when the head script ran, or a paused
+   first keyframe would hide the text for good */
+.js .in-blur,.js .in-fade{animation-play-state:paused}
+.js.fonts-ready .in-blur,.js.fonts-ready .in-fade{animation-play-state:running}
 @media (prefers-reduced-motion:reduce){.in-blur,.in-fade,.in-down,.in-zoom{animation:none}}
 ```
-```js
-document.fonts.ready.then(() => document.documentElement.classList.add('fonts-ready'));
-setTimeout(() => document.documentElement.classList.add('fonts-ready'), 1500);   // never wait forever
+```html
+<script>   /* inline in <head>, so the gate and its release can't fail separately */
+  document.documentElement.classList.add('js');
+  document.fonts.ready.then(() => document.documentElement.classList.add('fonts-ready'));
+  setTimeout(() => document.documentElement.classList.add('fonts-ready'), 1500);   // never wait forever
+</script>
 ```
 
 `both` hides an element only during its delay; if animations never run, everything stays visible.
