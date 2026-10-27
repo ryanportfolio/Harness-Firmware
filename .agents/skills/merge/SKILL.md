@@ -38,7 +38,7 @@ Review skills' "review ≠ fix authority" rule lifted for in-scope fixes only. S
 - Rerun reviewer: `opus-review` (repo `.agents/skills/` first, then `~/.codex/skills/`). Not installed → `$claude-review` with `--model opus --effort high`, the repo's standing Opus review; say which ran. Fallback extra check: `ANTHROPIC_DEFAULT_OPUS_MODEL` absent from child env (presence only, never print value), since `claude-review`'s preflight checks only the Fable override; present → stop, say so. Fallback's resolved model stays unverified: report it that way. Neither reviewer → stop, say so.
 - Named review skills are invoked from this skill, not typed by user: open each one's `SKILL.md` and follow it in full; don't rely on the `$name` mention loading it.
 - Each review skill's own fail-closed preflight passes (subscription routing proven, no provider overrides, no billing prompt). Fails → stop before merge, report. Never substitute self-review + call gate passed.
-- Multi-agent tools for Step 2: inspect current tools; `multi_agent = true` alone ≠ proof. None exposed → say so, skip to Step 3; Opus loop still runs in full. Never replace the 3 reviewers with main-thread self-review and call Step 2 done.
+- Multi-agent tools for Step 2: inspect current tools; `multi_agent = true` alone ≠ proof. None exposed, or no fresh-context spawn option → say so, skip to Step 3; Opus loop still runs in full. Never replace the 3 reviewers with main-thread self-review and call Step 2 done.
 
 ## Step 1: Integrate
 
@@ -71,7 +71,7 @@ Goal: find + fix what Opus would find, so Opus rounds come back clean more often
 
 More files or concerns than 3 → group them. Fewer distinct areas than 3 (tiny PR) → split whole diff by lens instead: false success; common real inputs + error paths; docs vs code.
 
-**Launch.** Spawn 3 agents concurrently with the exposed multi-agent tools, then wait for all 3 results. Fresh context each: never fork this conversation; any spawn option that copies or inherits session history stays off (inherited history → reviewer shares author's reasoning, no longer fresh). Each brief standalone, reviewer has no session context:
+**Launch.** Spawn 3 agents concurrently with the exposed multi-agent tools, then wait for all 3 results. Fresh context each: spawn with `fork_turns: "none"` or the runtime's fresh-context equivalent. Omitting `fork_turns`, or `"all"`, forks full history → reviewer shares author's reasoning, no longer fresh. Each brief standalone, reviewer has no session context:
 
 - scope: repo path, base = `git merge-base origin/<target> <head>` SHA (not `origin/<target>` tip: once target moves, two-dot diff from tip shows target's new commits as PR reverts), head SHA, `git diff <base>..<head>` as the diff;
 - files to read + area to cover; other 2 areas named, running in parallel, so it stays in its own;
@@ -81,7 +81,7 @@ More files or concerns than 3 → group them. Fewer distinct areas than 3 (tiny 
 - rules: reproduce every bug before reporting it; fixtures + scratch only under `.tmp/selfreview/<area>/`; never edit repo files, never commit, never push, no nested agents or reviews;
 - return: confirmed findings, each w/ severity (BLOCKING / SHOULD-FIX / NITPICK), file:line, reproduction (command + observed vs expected), suggested fix; then separate list of unconfirmed suspicions.
 
-**While running.** No edits, commits, or pushes: reviewers read working tree. Wait for all 3. Reviewer errors, returns nothing, or report cut off → relaunch that area once; fails again → area uncovered: say so in report, never count it as clean.
+**While running.** No edits, commits, or pushes: reviewers read working tree. Wait for all 3. Reviewer errors, returns nothing, or report cut off → relaunch that area once, same Launch settings; fails again → area uncovered: say so in report, never count it as clean.
 
 **Triage.** Session verifies each reported finding itself (rerun reproduction or read code); reviewer's word ≠ proof. Then:
 
