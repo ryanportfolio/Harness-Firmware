@@ -1494,7 +1494,9 @@ async function headingFont(page, context, f, url, base) {
         if (own.length) {
           const missing = own.filter((d) => !has(drawn, d));
           if (missing.length) problem = `"${first}" is a web font on this page (status ${statuses}); drawn with ${used} instead of ${missing.map((d) => d.familyName).join(', ')}, which "${first}" draws now`;
-        } else if (!beyond(await draws(css(first), SAMPLE), await fallback(SAMPLE)).length) {
+        } else if (f.facesCover && !beyond(await draws(css(first), SAMPLE), await fallback(SAMPLE)).length) {
+          // a face whose unicode-range covers none of the heading text (a Cyrillic subset over an English heading)
+          // is meant for other characters, loaded or not; only a face that should draw this text can fail it
           problem = `"${first}" is a web font on this page (status ${statuses}) but draws no text of its own, so the page cannot use it (font-display: optional past its window, or no face covers this text); drawn with ${used}`;
         }
       }
