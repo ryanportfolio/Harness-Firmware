@@ -1348,7 +1348,8 @@ async function integrity(url) {
           selector: sel(v), src: v.currentSrc || v.src || v.querySelector('source')?.src || '',
           hasSource: !!(v.getAttribute('src') || v.querySelector('source[src]')),
           // Chrome pauses muted autoplay video outside the viewport and resumes it in view, so playback is judged only in view
-          inView: shown(v) && r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth,
+          // r.framed: every iframe around it shows it, not only the top viewport
+          inView: shown(v) && r.framed && r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth,
           error: v.error?.code ?? null, network: v.networkState, ready: v.readyState, paused: v.paused, ended: v.ended,
           autoplay: v.autoplay, muted: v.muted, inline: v.playsInline, poster: !!v.poster,
         };
@@ -1369,10 +1370,20 @@ async function integrity(url) {
           const stack = style(el).fontFamily;
           const families = stack.split(',').map(unquote).filter(Boolean);
           const isGeneric = (f) => /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-[a-z-]+|math|emoji|fangsong|-apple-system|BlinkMacSystemFont)$/i.test(f);
-          const faces = [...document.fonts].filter((f) => unquote(f.family).toLowerCase() === families[0].toLowerCase()).map((f) => f.status);
+          const ownFaces = [...document.fonts].filter((f) => unquote(f.family).toLowerCase() === families[0].toLowerCase());
+          const faces = ownFaces.map((f) => f.status);
+          // whether any face's unicode-range covers a character of the heading text; a face for other characters
+          // (a latin-ext subset over Japanese text) is never loaded for it, by design
+          const inRange = (range, cp) => range.split(',').some((part) => {
+            const [a, b] = part.trim().replace(/^u\+/i, '').split('-');
+            const lo = parseInt(a.replace(/\?/g, '0'), 16), hi = parseInt((b ?? a).replace(/\?/g, 'F'), 16);
+            return cp >= lo && cp <= hi;
+          });
+          const chars = [...text].filter((c) => c.trim()).map((c) => c.codePointAt(0));
+          const facesCover = ownFaces.some((f) => chars.some((cp) => inRange(f.unicodeRange || 'U+0-10FFFF', cp)));
           // kept for the DevTools reads below, which take the element itself rather than a selector
           window.__uq.fontTarget = el;
-          font = { selector: sel(el), stack, families, generic: isGeneric(families[0]), named: families.filter((f) => !isGeneric(f)), faces, text: text.slice(0, 200) };
+          font = { selector: sel(el), stack, families, generic: isGeneric(families[0]), named: families.filter((f) => !isGeneric(f)), faces, facesCover, text: text.slice(0, 200) };
         }
       }
       return { broken, videos, font, h1Note };
@@ -1440,9 +1451,10 @@ async function headingFont(page, context, f, url, base) {
       const top = (await fontsOf(`(() => { const el = window.__uq.fontTarget, cs = getComputedStyle(el), s = document.createElement('span');
         s.textContent = ${JSON.stringify(text)};
         s.lang = el.closest('[lang]')?.lang || '';
-        s.style.cssText = 'position:absolute;left:-9999px;top:0;white-space:nowrap';
-        s.style.fontFamily = ${JSON.stringify(family)};
-        for (const p of ['font-weight', 'font-style', 'font-stretch', 'font-size', 'font-variant', 'font-feature-settings', 'font-variation-settings', 'text-transform']) s.style.setProperty(p, cs.getPropertyValue(p));
+        // !important on the inline style outranks a page rule such as * { font-family: X !important }
+        s.style.cssText = 'position:absolute!important;left:-9999px!important;top:0!important;white-space:nowrap!important';
+        s.style.setProperty('font-family', ${JSON.stringify(family)}, 'important');
+        for (const p of ['font-weight', 'font-style', 'font-stretch', 'font-size', 'font-variant', 'font-feature-settings', 'font-variation-settings', 'text-transform']) s.style.setProperty(p, cs.getPropertyValue(p), 'important');
         document.body.appendChild(s); void s.offsetWidth; window.__uq.fontRef?.remove(); window.__uq.fontRef = s; return s; })()`))[0] || null;
       return top;
     };
@@ -1469,6 +1481,8 @@ async function headingFont(page, context, f, url, base) {
     if (!drawn.length) notes.push(`${url}: could not read which font drew the h1; heading font not checked`);
     else if (f.faces.length) {
       if (!f.faces.includes('loaded')) {
+        // faces left unloaded because none covers this text are not a failure
+        if (!f.facesCover && f.faces.every((s) => s === 'unloaded')) return;
         problem = `"${first}" is a web font on this page (status ${[...new Set(f.faces)].join(', ')})${f.faces.includes('loading') ? ' and still loading after load and settle' : ''}; drawn with ${used}`;
       } else {
         // when the family draws the heading's own text differently from the default font, the heading must use
