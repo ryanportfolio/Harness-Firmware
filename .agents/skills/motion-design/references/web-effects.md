@@ -142,7 +142,7 @@ Light. Native `loop` shows a hard cut when the first and last frames differ. Ins
 ```js
 /** Manual loop with rAF fades. Returns a cleanup function. */
 function fadeLoopVideo(video, { fadeMs = 500, fadeOutLead = 0.8, gapMs = 100, playlist = null } = {}) {
-  let raf = 0, timer = 0, fadingOut = false, idx = 0, visible = true, failures = 0;
+  let raf = 0, timer = 0, fadingOut = false, gap = false, idx = 0, visible = true, failures = 0;
   const fadeTo = (target, ms = fadeMs) => {
     cancelAnimationFrame(raf);
     const from = parseFloat(video.style.opacity) || 0, t0 = performance.now();
@@ -154,7 +154,7 @@ function fadeLoopVideo(video, { fadeMs = 500, fadeOutLead = 0.8, gapMs = 100, pl
     raf = requestAnimationFrame(tick);
   };
   const canPlay = () => visible && !document.documentElement.classList.contains('motion-paused');
-  const start = () => { fadingOut = false; failures = 0; if (canPlay()) video.play().catch(() => {}); fadeTo(1); };
+  const start = () => { fadingOut = gap = false; failures = 0; if (canPlay()) video.play().catch(() => {}); fadeTo(1); };
   const onTime = () => {
     const left = video.duration - video.currentTime;
     if (!fadingOut && left > 0 && left <= fadeOutLead) {
@@ -167,7 +167,7 @@ function fadeLoopVideo(video, { fadeMs = 500, fadeOutLead = 0.8, gapMs = 100, pl
     idx = (idx + 1) % playlist.length; video.src = playlist[idx];
   };
   const onEnded = () => {
-    cancelAnimationFrame(raf); video.style.opacity = '0';
+    gap = true; cancelAnimationFrame(raf); video.style.opacity = '0';
     timer = setTimeout(() => {
       if (playlist?.length > 1) { idx = (idx + 1) % playlist.length; video.src = playlist[idx]; }  // loadeddata -> start
       else { video.currentTime = 0; start(); }
@@ -176,7 +176,13 @@ function fadeLoopVideo(video, { fadeMs = 500, fadeOutLead = 0.8, gapMs = 100, pl
   if (playlist?.length) video.src = playlist[0];
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { video.pause(); video.style.opacity = '1'; return () => {}; }
   video.loop = false; video.muted = true; video.playsInline = true; video.style.opacity = '0';
-  const apply = () => (canPlay() ? video.play().catch(() => {}) : video.pause());
+  const apply = () => {                                    // visibility or the pause button changed
+    if (!canPlay()) { video.pause(); cancelAnimationFrame(raf); return; }   // a running fade freezes with the video
+    video.play().catch(() => {});
+    if (gap || video.readyState < 2) return;                // start() fades in after loading or the restart
+    const left = video.duration - video.currentTime;
+    fadingOut ? fadeTo(0, Math.max(50, Math.min(fadeMs, (left - 0.05) * 1000))) : fadeTo(1);
+  };
   const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; apply(); });
   io.observe(video);
   document.addEventListener('motionchange', apply);
@@ -262,12 +268,12 @@ function mouseScrubVideo(video, { sensitivity = 0.8, query = '(min-width: 1024px
   let prevX = null, target = 0, busy = false, visible = true;
   video.muted = true; video.playsInline = true;
   const flush = () => {
-    if (!mq.matches || reduce.matches || Math.abs(video.currentTime - target) < 1 / 60) { busy = false; return; }
+    if (!mq.matches || reduce.matches || !visible || Math.abs(video.currentTime - target) < 1 / 60) { busy = false; return; }
     busy = true; video.currentTime = target;            // 'seeked' calls flush again
   };
   video.addEventListener('seeked', flush);
   addEventListener('mousemove', (e) => {
-    if (!mq.matches || reduce.matches || !video.duration) return;
+    if (!mq.matches || reduce.matches || !visible || !video.duration) { prevX = null; return; }   // no decoding off screen
     if (prevX === null) { prevX = e.clientX; return; }
     target = Math.max(0, Math.min(video.duration, target + ((e.clientX - prevX) / innerWidth) * sensitivity * video.duration));
     prevX = e.clientX;
@@ -288,7 +294,7 @@ function mouseScrubVideo(video, { sensitivity = 0.8, query = '(min-width: 1024px
 }
 ```
 
-Split variant: two clips, left of centre scrubs clip A by distance from centre, right scrubs clip B, and a dead zone of `max(30px, width × 0.05)` either side of centre holds frame 0 of the last active clip. The source drives it from a permanent rAF loop; drive it from `pointermove` plus `seeked` with the same seek queue instead. On touch, the two clips alternate on `ended`.
+Split variant: two clips, left of centre scrubs clip A by distance from centre, right scrubs clip B, and a dead zone of `max(30px, width × 0.05)` either side of centre holds frame 0 of the last active clip. The source drives it from a permanent rAF loop; drive it from `pointermove` plus `seeked` with the same seek queue instead, and skip seeks while the clips are off screen. On touch, the two clips alternate on `ended`.
 
 ### Scroll-scrubbed video
 
