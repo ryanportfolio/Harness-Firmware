@@ -36,7 +36,7 @@ Review skills' "review ≠ fix authority" rule lifted for in-scope fixes only. S
 
 - `codex-review` + `codex-fullreview` skills, in repo `.claude/skills/` or `~/.claude/skills/`. Either missing → stop, say so.
 - Codex reachable via route review skills accept: `codex login status` = ChatGPT login, or `config.toml` in `$CODEX_HOME` (default `~/.codex`) sets `model_provider` to gateway. Neither → stop before merge, report. Never substitute self-review + call gate passed.
-- Claude Code `Agent` tool for Step 2. Missing → say so, skip to Step 3; Codex loop still runs in full.
+- Claude Code `Agent` tool with `general-purpose` type for Step 2. Either missing → say so, skip to Step 3; Codex loop still runs in full.
 
 ## Step 1: Integrate
 
@@ -69,7 +69,7 @@ Goal: find + fix what Codex would find, so Codex rounds come back clean more oft
 
 More files or concerns than 4 → group them. Fewer distinct areas than 4 (tiny PR) → split whole diff by lens instead: false success; common real inputs; error + edge paths; docs vs code.
 
-**Launch.** 4 `Agent` calls, 1 message, run in parallel. `model` omitted, no `isolation` (worktree isolation breaks rtk git calls). Each brief standalone, reviewer has no session context:
+**Launch.** 4 `Agent` calls, 1 message, run in parallel. `subagent_type: "general-purpose"` on every call, never `"fork"` (fork inherits this conversation → reviewer shares author's reasoning, no longer fresh). `model` omitted, no `isolation` (worktree isolation breaks rtk git calls). Each brief standalone, reviewer has no session context:
 
 - scope: repo path, base = `git merge-base origin/<target> <head>` SHA (not `origin/<target>` tip: once target moves, two-dot diff from tip shows target's new commits as PR reverts), head SHA, `git diff <base>..<head>` as the diff;
 - files to read + area to cover; other 3 areas named, running in parallel, so it stays in its own;
@@ -79,7 +79,7 @@ More files or concerns than 4 → group them. Fewer distinct areas than 4 (tiny 
 - rules: reproduce every bug before reporting it; fixtures + scratch only under `.tmp/selfreview/<area>/`; never edit repo files, never commit, never push;
 - return: confirmed findings, each w/ severity (🔴/🟡/🟢), file:line, reproduction (command + observed vs expected), suggested fix; then separate list of unconfirmed suspicions.
 
-**While running.** No edits, commits, or pushes: reviewers read working tree. Wait for all 4. Reviewer errors, returns nothing, or report cut off → relaunch that area once; fails again → area uncovered: say so in report, never count it as clean.
+**While running.** No edits, commits, or pushes: reviewers read working tree. Wait for all 4. Reviewer errors, returns nothing, or report cut off → relaunch that area once, same Launch settings; fails again → area uncovered: say so in report, never count it as clean.
 
 **Triage.** Session verifies each reported finding itself (rerun reproduction or read code); reviewer's word ≠ proof. Then:
 
