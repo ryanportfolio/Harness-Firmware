@@ -35,19 +35,18 @@ Allow at most one heavy effect per page. Measure frame time with the page's real
   ```html
   <button class="motion-toggle" type="button" aria-pressed="false">Pause motion</button>
   <script>
-    let pausedByButton = [];   // resume only what was playing, never scrub footage, stills or off-screen clips
     document.querySelector('.motion-toggle').addEventListener('click', (e) => {
       const paused = e.currentTarget.getAttribute('aria-pressed') !== 'true';
       e.currentTarget.setAttribute('aria-pressed', String(paused));
       document.documentElement.classList.toggle('motion-paused', paused);
-      if (paused) { pausedByButton = [...document.querySelectorAll('video')].filter((v) => !v.paused); pausedByButton.forEach((v) => v.pause()); }
-      else { pausedByButton.forEach((v) => v.play().catch(() => {})); pausedByButton = []; }
+      if (paused) document.querySelectorAll('video').forEach((v) => v.pause());
+      document.dispatchEvent(new Event('motionchange'));   // each video's controller resumes by its own rules
     });
   </script>
   <style>.motion-paused *{animation-play-state:paused!important}</style>
   ```
 
-  Every recipe that calls `play()` itself (off-screen observers, loop restarts, touch fallbacks) checks `document.documentElement.classList.contains('motion-paused')` first; the ones below do.
+  Resuming is left to each video's controller, which knows whether its clip is on screen, scrubbed or a reduced-motion still. Every recipe below that calls `play()` checks `document.documentElement.classList.contains('motion-paused')` first and re-applies its state on `motionchange`. Mount plain autoplaying loops through `mountVideo` so they resume too.
 - **Touch.** Pointer effects check `(hover: hover) and (pointer: fine)` and fall back to autoplay or a still.
 - **Media encoding.** Background clips: H.264 MP4 with `-movflags +faststart`, 6 to 12 s, 5 to 8 MB at most, plus a 720p or smaller encode for phones chosen with `matchMedia('(max-width: 768px)')`. Clips that will be seeked (scrubbed) need short keyframe intervals; see the scrub recipes.
 - Where `@supports (animation-timeline: view())` passes, CSS scroll-driven animations can replace the JS for reveals and simple parallax and run off the main thread. Keep the JS path as the fallback.
@@ -108,7 +107,8 @@ Medium. A muted clip fills the hero and all UI floats over it.
 ```js
 /** Returns a cleanup function. */
 function mountVideo(video, src, { revealDelay = 0 } = {}) {
-  let hls = null, io = null, timer = 0;
+  let hls = null, io = null, timer = 0, visible = false;
+  const apply = () => (visible && !document.documentElement.classList.contains('motion-paused') ? video.play().catch(() => {}) : video.pause());
   video.muted = true; video.playsInline = true;
   if (/\.m3u8($|\?)/i.test(src) && !video.canPlayType('application/vnd.apple.mpegurl') && window.Hls?.isSupported()) {
     hls = new Hls({ capLevelToPlayerSize: true }); hls.loadSource(src); hls.attachMedia(video);
@@ -118,15 +118,13 @@ function mountVideo(video, src, { revealDelay = 0 } = {}) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) video.pause();
   else {
     video.loop = true;
-    io = new IntersectionObserver(([e]) => {
-      const paused = document.documentElement.classList.contains('motion-paused');
-      e.isIntersecting && !paused ? video.play().catch(() => {}) : video.pause();
-    });
+    io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; apply(); });
     io.observe(video);
+    document.addEventListener('motionchange', apply);
   }
   return () => {
     clearTimeout(timer); io?.disconnect(); video.removeEventListener('loadeddata', reveal);
-    video.pause(); hls?.destroy();
+    document.removeEventListener('motionchange', apply); video.pause(); hls?.destroy();
   };
 }
 document.querySelectorAll('video[data-src]').forEach((v) => mountVideo(v, v.dataset.src));
@@ -178,8 +176,10 @@ function fadeLoopVideo(video, { fadeMs = 500, fadeOutLead = 0.8, gapMs = 100, pl
   if (playlist?.length) video.src = playlist[0];
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { video.pause(); video.style.opacity = '1'; return () => {}; }
   video.loop = false; video.muted = true; video.playsInline = true; video.style.opacity = '0';
-  const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; canPlay() ? video.play().catch(() => {}) : video.pause(); });
+  const apply = () => (canPlay() ? video.play().catch(() => {}) : video.pause());
+  const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; apply(); });
   io.observe(video);
+  document.addEventListener('motionchange', apply);
   video.addEventListener('error', onError);
   video.addEventListener('loadeddata', start);
   video.addEventListener('timeupdate', onTime);
@@ -187,6 +187,7 @@ function fadeLoopVideo(video, { fadeMs = 500, fadeOutLead = 0.8, gapMs = 100, pl
   if (video.readyState >= 2) start();
   return () => {
     cancelAnimationFrame(raf); clearTimeout(timer); io.disconnect(); video.pause();
+    document.removeEventListener('motionchange', apply);
     video.removeEventListener('error', onError); video.removeEventListener('loadeddata', start);
     video.removeEventListener('timeupdate', onTime); video.removeEventListener('ended', onEnded);
   };
@@ -282,6 +283,7 @@ function mouseScrubVideo(video, { sensitivity = 0.8, query = '(min-width: 1024px
   };
   new IntersectionObserver(([e]) => { visible = e.isIntersecting; applyMode(); }).observe(video);
   mq.addEventListener('change', applyMode); reduce.addEventListener('change', applyMode);
+  document.addEventListener('motionchange', applyMode);
   applyMode();
 }
 ```
@@ -578,7 +580,7 @@ requestAnimationFrame(() => requestAnimationFrame(() => {  // fallback: nothing 
 Light. Blocks below the fold fade and rise once as they enter, with per-element delays so a group cascades.
 
 - Source values: `opacity 0, y 30px` to rest, 0.7 s `--ease-reveal`, once. Large headings y 40; media y 60 over 0.9 s; two-column splits from `x ±40px`; card grids `scale(.95)` with `--ease-out-quint`.
-- Trigger: `threshold .15`, `rootMargin: 0px 0px -10% 0px`. `threshold` is a fraction of the element, so with that margin a block taller than about 6 viewports never reaches 0.15: give blocks taller than the viewport `threshold 0`. The margin also means the bottom 10 % of the viewport never counts, so once the page is scrolled to its end, everything left on screen is revealed.
+- Trigger: `threshold .15`, `rootMargin: 0px 0px -10% 0px`. `threshold` is a fraction of the element, so with that margin a block taller than about 6 viewports never reaches 0.15: give blocks taller than the viewport `threshold 0`. The margin also means the bottom 10 % of the viewport never counts, so whenever the page is at its end (scrolled there, or too short to scroll), everything left on screen is revealed.
 - Stagger `base + i × step`: lists `150 + i·120 ms`, grid cards `i·100 ms`, stat columns `i·150 ms`.
 - Corner decor around a centred heading: four objects sliding in from `x ±80px`, 0.9 s, delays .10, .15, .25, .30 s.
 - The `.js` class hides content before the controller runs, so the head script also sets a 3 s fallback: if the controller never reports ready (it failed to load or threw), everything is shown.
@@ -606,12 +608,16 @@ const revealIO = new IntersectionObserver((entries) => entries.forEach((e) => {
   if (e.isIntersecting) { e.target.classList.add('is-in'); revealIO.unobserve(e.target); }
 }), { threshold: 0.15, rootMargin: '0px 0px -10% 0px' });
 document.querySelectorAll('[data-reveal]').forEach((el) => revealIO.observe(el));
-addEventListener('scroll', () => {                         // the last lines may sit in the excluded bottom band
-  if (innerHeight + scrollY < document.documentElement.scrollHeight - 2) return;
+const revealAtEnd = () => {                                // the last lines may sit in the excluded bottom band
+  const SLACK = 80;                                        // more than the largest hide offset (60 px), which itself adds scroll
+  if (innerHeight + scrollY < document.documentElement.scrollHeight - SLACK) return;   // also true when the page doesn't scroll
   document.querySelectorAll('[data-reveal]:not(.is-in)').forEach((el) => {
-    if (el.getBoundingClientRect().top < innerHeight) { el.classList.add('is-in'); revealIO.unobserve(el); }
+    if (el.getBoundingClientRect().top < innerHeight + SLACK) { el.classList.add('is-in'); revealIO.unobserve(el); }
   });
-}, { passive: true });
+};
+addEventListener('scroll', revealAtEnd, { passive: true });
+addEventListener('resize', revealAtEnd);
+revealAtEnd();
 window.revealReady = true;                                 // last line: the head fallback stands down
 ```
 
