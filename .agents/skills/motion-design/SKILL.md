@@ -1,6 +1,6 @@
 ---
 name: motion-design
-description: "Animation that must read + feel right: explainers, promos, trailers, hero/UI motion, UI card loops, kinetic type, WebGL particles. Not static layout."
+description: "Animation that must read + feel right: explainers, promos, trailers, hero/UI motion, landing-page video/scroll/glass, UI card loops, kinetic type, WebGL particles. Not static layout."
 ---
 
 # Motion design
@@ -34,6 +34,7 @@ These are defaults. Tune them by eye.
 | Color | One hue per actor, the same everywhere. For example, builder green and reviewer amber. |
 | Text | Browser-only piece: set real DOM text over the canvas and let particles draw pictures. Piece that must export to video: draw text into a 2D canvas layer composited into the frame, because DOM text never reaches the MP4. Either way, keep a statement to about ten words, with no orphan word on its own line, and set it in a face with character (the brand display or editorial face), not the UI body font. |
 | UI cards, dashboard or mockup | Write one sentence per visual saying what it acts out (a list receives an item, a chart is read), and build that story after the intro. Each story starts and ends on the exact design; cards act offset, in reading order. See [ui-loops.md](references/ui-loops.md). |
+| Landing-page effect | Background video, seamless or scrubbed loops, glass over footage, entrances, scroll reveals and pinned scroll stages start from the recipe in [web-effects.md](references/web-effects.md). Keep its reduced-motion branch and touch fallback, and allow one heavy effect per page. |
 | Anything that loops | Run the seam, empty-hold and rest checks before export, and export frames 0 to `CYCLE * fps - 1`. See [verify-export.md](references/verify-export.md#loop-checks-seam-empty-hold-and-rest). |
 | Game trailer | Gameplay by 2 s, hook by 15 s, logo only on the end slate, 90 s or less, cuts on the music's hits. Every system shot shows risk, reward and power spike to someone who never played. See [story.md](references/story.md#game-trailer). |
 | Impact | Hitstop plus shake on the victim, not only the camera; hold frames for weight; few, fast smears. Sources in [principles.md](references/principles.md#impact). |
@@ -70,6 +71,7 @@ These are defaults. Tune them by eye.
 - [story.md](references/story.md): explainer structure, a beat-sheet template, caption rules and game trailer structure.
 - [ui-loops.md](references/ui-loops.md): one story per visual for UI cards, dashboards and mockups, accents, intro choreography, the loop cycle, and live-page rules.
 - [web-engine.md](references/web-engine.md): a deterministic `frame(t)` engine with keyframed particle tracks, staggered morphs, phosphor trails, bloom, captions and a transport, plus gotchas measured in practice.
+- [web-effects.md](references/web-effects.md): landing-page recipes with cost ratings, reduced-motion and touch fallbacks: background video, fade and boomerang loops, framing and scrims, cursor- and scroll-scrubbed video, glass and grain, fail-safe entrances, scroll reveals, a sticky cinematic stage, stacking cards and a text crawl. Adapted from the MIT-licensed MotionSites technique library.
 - [verify-export.md](references/verify-export.md): headed offscreen Chrome, stills, an fps probe, seek and colour checks, loop checks, delivery specs, encoding checks and frame-stepped video export.
 - [accessibility.md](references/accessibility.md): flash limits, photosensitivity testing, and reduced-motion replacements for when the owner asks for one.
 - [camera-cut.md](references/camera-cut.md): cutting rules, shot-length data, lenses, camera damping, handheld noise and gameplay capture.
