@@ -1237,7 +1237,19 @@ async function integrity(url) {
         else errors.set(key, { where, count: 1 });
       });
     },
-    early: async (p) => { early = await shot(p, `${slug(url)}-early`, false); },
+    // Playwright's screenshot first waits for document.fonts.ready, which can be seconds past this moment;
+    // DevTools captures the frame as it is
+    early: async (p) => {
+      const cdp = await p.context().newCDPSession(p);
+      try {
+        early = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64');
+      } finally {
+        await cdp.detach().catch(() => { /* already gone */ });
+      }
+      const file = join(opts.out, `${slug(url)}-early.png`);
+      writeFileSync(file, early);
+      shots.push(file);
+    },
   });
   try {
     const pct = (x) => `${(x * 100).toFixed(1)}%`;
@@ -1255,7 +1267,7 @@ async function integrity(url) {
 
     // a page that is white anyway has nothing to flash; a dark page that first paints white does
     const late = await page.screenshot();
-    const first = await pixels({ op: 'light', a: readFileSync(early).toString('base64') });
+    const first = await pixels({ op: 'light', a: early.toString('base64') });
     const settled = await pixels({ op: 'light', a: late.toString('base64') });
     if (first >= 0.9 && settled <= 0.5) {
       add({ ...base, check: 'page:white-flash', selector: 'document', measured: `${pct(first)} of the viewport near-white 350 ms after DOMContentLoaded, ${pct(settled)} once loaded and settled; the page paints white before its own background`, threshold: 'the first paint already uses the page background' });
@@ -1269,7 +1281,7 @@ async function integrity(url) {
         .map((i) => ({ selector: sel(i), src: i.currentSrc || i.src }));
       const videos = all('video').map((v) => ({
         selector: sel(v), src: v.currentSrc || v.src || v.querySelector('source')?.src || '',
-        error: v.error?.code ?? null, ready: v.readyState, paused: v.paused, autoplay: v.autoplay, muted: v.muted, inline: v.playsInline, poster: !!v.poster,
+        error: v.error?.code ?? null, ready: v.readyState, paused: v.paused, ended: v.ended, autoplay: v.autoplay, muted: v.muted, inline: v.playsInline, poster: !!v.poster,
       }));
       // the font of the h1's first visible text, which can sit in a span with a font of its own
       const h1 = document.querySelector('h1');
@@ -1297,7 +1309,8 @@ async function integrity(url) {
       const problems = [];
       if (v.error) problems.push(`error ${v.error} (${mediaError[v.error] || 'unknown'})${v.error === 4 && launchedVia.startsWith('bundled') ? '; bundled Chromium cannot play H.264, check in Chrome' : ''}`);
       else {
-        if (v.autoplay && v.paused) problems.push('has autoplay but is paused after load');
+        // a short video that played to its end is paused too
+        if (v.autoplay && v.paused && !v.ended) problems.push('has autoplay but is paused after load');
         if (v.ready < 2 && (v.autoplay || !v.poster)) problems.push(`no frame loaded (readyState ${v.ready})${v.poster ? '' : ' and no poster, so it shows an empty box'}`);
       }
       // browsers block autoplay with sound for a new visitor, and iPhone Safari autoplays inline only with playsinline
@@ -1310,15 +1323,33 @@ async function integrity(url) {
     const f = state.font;
     if (!f) notes.push(`${url}: no h1, so the heading font was not checked`);
     else if (!f.generic) {
-      // the font Chrome actually drew the text with: the authoritative answer when DevTools can give it
-      let drawn = null;
+      // the font Chrome actually drew the text with: the authoritative answer when DevTools can give it.
+      // For a web font, the same text in the named family alone, drawn now that it has loaded, gives the
+      // font's own name to compare with: another downloaded font in the stack is not the one asked for
+      let drawn = null, wanted = null, compared = false;
       try {
         const cdp = await context.newCDPSession(page);
         await cdp.send('DOM.enable');
         await cdp.send('CSS.enable');
-        const { root } = await cdp.send('DOM.getDocument', { depth: 0 });
-        const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: f.selector });
-        if (nodeId) drawn = (await cdp.send('CSS.getPlatformFontsForNode', { nodeId })).fonts.sort((a, b) => b.glyphCount - a.glyphCount);
+        const fontsOf = async (selector) => {
+          const { root } = await cdp.send('DOM.getDocument', { depth: 0 });
+          const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector });
+          return nodeId ? (await cdp.send('CSS.getPlatformFontsForNode', { nodeId })).fonts.sort((a, b) => b.glyphCount - a.glyphCount) : null;
+        };
+        drawn = await fontsOf(f.selector);
+        if (f.faces.includes('loaded')) {
+          await page.evaluate((s) => {
+            const el = window.__uq.find(s), cs = getComputedStyle(el), ref = document.createElement('span');
+            ref.setAttribute('data-uq-font-ref', '');
+            ref.textContent = el.textContent.trim().slice(0, 200);
+            ref.style.cssText = `position:absolute;left:-9999px;top:0;white-space:nowrap;font-family:${cs.fontFamily.split(',')[0]};font-weight:${cs.fontWeight};font-style:${cs.fontStyle};font-stretch:${cs.fontStretch};font-size:${cs.fontSize}`;
+            document.body.appendChild(ref);
+          }, f.selector);
+          const ref = await fontsOf('[data-uq-font-ref]');
+          compared = !!ref?.length;
+          wanted = ref?.find((d) => d.isCustomFont) ?? null;
+          await page.evaluate(() => document.querySelector('[data-uq-font-ref]')?.remove());
+        }
         await cdp.detach();
       } catch (err) {
         notes.push(`${url}: could not read which font drew the h1 (${err.message.split('\n')[0]}); judged from document.fonts only`);
@@ -1326,9 +1357,13 @@ async function integrity(url) {
       const used = drawn?.length ? drawn.map((d) => d.familyName).join(', ') : null;
       let problem = null;
       if (f.faces.length) {
-        // a web font: it loaded, and the text was drawn with a downloaded font
-        const ok = f.faces.includes('loaded') && (!drawn?.length || drawn.some((d) => d.isCustomFont));
-        if (!ok) problem = `"${f.family}" is a web font on this page (status ${[...new Set(f.faces)].join(', ')})${f.faces.includes('loading') ? ' and still loading after load and settle' : ''}${used ? `; drawn with ${used}` : ''}`;
+        // a web font: it loaded, and the text was drawn with it. A family that draws no downloaded font even on its
+        // own reports loaded but cannot be used (font-display: optional past its window, or no face for this text,
+        // weight or style). Without the comparison: drawn with some downloaded font
+        const match = compared ? wanted && drawn?.some((d) => d.isCustomFont && d.familyName === wanted.familyName) : drawn?.some((d) => d.isCustomFont);
+        const ok = f.faces.includes('loaded') && (!drawn?.length || match);
+        const why = !compared ? '' : wanted ? ` instead of ${wanted.familyName}, the font "${f.family}" draws now` : `; "${f.family}" draws no downloaded font even on its own, so the page cannot use it (font-display: optional past its window, or no face for this text, weight or style)`;
+        if (!ok) problem = `"${f.family}" is a web font on this page (status ${[...new Set(f.faces)].join(', ')})${f.faces.includes('loading') ? ' and still loading after load and settle' : ''}${used ? `; drawn with ${used}` : ''}${why}`;
       } else if (drawn?.length && !drawn.some((d) => d.familyName.toLowerCase() === f.family.toLowerCase())) {
         problem = `"${f.family}" has no @font-face on this page and is not installed on this machine; drawn with ${used}`;
       } else if (!drawn?.length) {
