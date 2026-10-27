@@ -1444,66 +1444,65 @@ async function headingFont(page, context, f, url, base) {
       const { nodeId } = await cdp.send('DOM.requestNode', { objectId: result.objectId });
       return nodeId ? (await cdp.send('CSS.getPlatformFontsForNode', { nodeId })).fonts.sort((a, b) => b.glyphCount - a.glyphCount) : [];
     };
-    // the top font a span draws text with in the given font-family, styled like the h1's text; the span is held
+    // every font a span draws text with in the given font-family, styled like the h1's text; the span is held
     // by reference, so nothing on the page can be mistaken for it. Reading offsetWidth lays it out: DevTools
     // reports no fonts for a node that has not been laid out yet
-    const draws = async (family, text) => {
-      const top = (await fontsOf(`(() => { const el = window.__uq.fontTarget, cs = getComputedStyle(el), s = document.createElement('span');
+    const draws = async (family, text) => fontsOf(`(() => { const el = window.__uq.fontTarget, cs = getComputedStyle(el), s = document.createElement('span');
         s.textContent = ${JSON.stringify(text)};
         s.lang = el.closest('[lang]')?.lang || '';
         // !important on the inline style outranks a page rule such as * { font-family: X !important }
         s.style.cssText = 'position:absolute!important;left:-9999px!important;top:0!important;white-space:nowrap!important';
         s.style.setProperty('font-family', ${JSON.stringify(family)}, 'important');
         for (const p of ['font-weight', 'font-style', 'font-stretch', 'font-size', 'font-variant', 'font-feature-settings', 'font-variation-settings', 'text-transform']) s.style.setProperty(p, cs.getPropertyValue(p), 'important');
-        document.body.appendChild(s); void s.offsetWidth; window.__uq.fontRef?.remove(); window.__uq.fontRef = s; return s; })()`))[0] || null;
-      return top;
-    };
-    const same = (a, b) => !!a && !!b && a.familyName === b.familyName && a.isCustomFont === b.isCustomFont;
+        document.body.appendChild(s); void s.offsetWidth; window.__uq.fontRef?.remove(); window.__uq.fontRef = s; return s; })()`);
+    const key = (d) => `${d.familyName}|${d.isCustomFont}`;
+    // the fonts in `list` that `base` does not draw: what a family contributes beyond the fallback, for any share
+    // of the glyphs (a Japanese font may draw two characters of a mostly Latin heading)
+    const beyond = (list, base) => { const b = new Set(base.map(key)); return list.filter((d) => !b.has(key(d))); };
+    const has = (list, d) => list.some((x) => key(x) === key(d));
     const css = (name) => `"${name.replace(/["\\]/g, '\\$&')}"`;
     const SAMPLE = 'Hamburgefonstiv';
     const drawn = await fontsOf('window.__uq.fontTarget');
     const used = drawn.length ? drawn.map((d) => d.familyName).join(', ') : null;
     // a family no font answers to falls back to the browser's default font
     const fallback = async (text) => draws('"uq-no-such-font-7f3a"', text);
-    // installed (or answered by an @font-face): the family draws differently from a generic family it is put in
+    // installed (or answered by an @font-face): the fonts the family draws beyond a generic family it is put in
     // front of, for Latin sample text or for the heading's own text (a font for another script has no Latin)
     const installed = async (name) => {
       for (const text of [SAMPLE, f.text]) {
         for (const generic of ['monospace', 'serif']) {
-          const withIt = await draws(`${css(name)}, ${generic}`, text);
-          if (withIt && !same(withIt, await draws(generic, text))) return withIt;
+          const own = beyond(await draws(`${css(name)}, ${generic}`, text), await draws(generic, text));
+          if (own.length) return own;
         }
       }
-      return null;
+      return [];
     };
     const first = f.families[0];
+    const statuses = [...new Set(f.faces)].join(', ');
     let problem = null;
     if (!drawn.length) notes.push(`${url}: could not read which font drew the h1; heading font not checked`);
     else if (f.faces.length) {
       if (!f.faces.includes('loaded')) {
         // faces left unloaded because none covers this text are not a failure
         if (!f.facesCover && f.faces.every((s) => s === 'unloaded')) return;
-        problem = `"${first}" is a web font on this page (status ${[...new Set(f.faces)].join(', ')})${f.faces.includes('loading') ? ' and still loading after load and settle' : ''}; drawn with ${used}`;
+        problem = `"${first}" is a web font on this page (status ${statuses})${f.faces.includes('loading') ? ' and still loading after load and settle' : ''}; drawn with ${used}`;
       } else {
-        // when the family draws the heading's own text differently from the default font, the heading must use
-        // it. When it does not, it may be a font for another script (a Latin font over Japanese text, a later family
-        // draws those glyphs by design): it passes if it draws Latin sample text, else the page cannot use it
-        const wanted = await draws(css(first), f.text);
-        if (wanted && !same(wanted, await fallback(f.text))) {
-          if (!drawn.some((d) => same(d, wanted))) problem = `"${first}" is a web font on this page (status ${[...new Set(f.faces)].join(', ')}); drawn with ${used} instead of ${wanted.familyName}, which "${first}" draws now`;
-        } else {
-          const sample = await draws(css(first), SAMPLE);
-          if (!sample || same(sample, await fallback(SAMPLE))) problem = `"${first}" is a web font on this page (status ${[...new Set(f.faces)].join(', ')}) but draws no text of its own, so the page cannot use it (font-display: optional past its window, or no face covers this text); drawn with ${used}`;
+        // the fonts the family draws for the heading's own text beyond the default font must all be in the heading.
+        // When it draws none of that text, it may be a font for another script (a Latin font over Japanese text, a
+        // later family draws those glyphs by design): it passes if it draws Latin sample text, else the page cannot use it
+        const own = beyond(await draws(css(first), f.text), await fallback(f.text));
+        if (own.length) {
+          const missing = own.filter((d) => !has(drawn, d));
+          if (missing.length) problem = `"${first}" is a web font on this page (status ${statuses}); drawn with ${used} instead of ${missing.map((d) => d.familyName).join(', ')}, which "${first}" draws now`;
+        } else if (!beyond(await draws(css(first), SAMPLE), await fallback(SAMPLE)).length) {
+          problem = `"${first}" is a web font on this page (status ${statuses}) but draws no text of its own, so the page cannot use it (font-display: optional past its window, or no face covers this text); drawn with ${used}`;
         }
       }
-    } else if (!(await installed(first))) {
+    } else if (!(await installed(first)).length) {
       // not installed here: fine when a later named family in the stack drew the text, as the stack intends
       const later = [];
-      for (const name of f.named.filter((n) => n !== first).slice(0, 5)) {
-        const font = await installed(name);
-        if (font) later.push(font);
-      }
-      if (later.some((l) => drawn.some((d) => same(d, l)))) notes.push(`${url}: the h1's first font "${first}" is not installed on this machine; drawn with ${used} from later in its font stack`);
+      for (const name of f.named.filter((n) => n !== first).slice(0, 5)) later.push(...(await installed(name)));
+      if (later.some((l) => has(drawn, l))) notes.push(`${url}: the h1's first font "${first}" is not installed on this machine; drawn with ${used} from later in its font stack`);
       else problem = `"${first}" has no @font-face on this page and is not installed on this machine, and no later named font in the stack drew the text; drawn with ${used}`;
     }
     if (problem) add({ ...base, check: 'page:font-fallback', selector: f.selector, measured: `${problem}; font-family is ${f.stack}` });
