@@ -71,7 +71,7 @@ Goal: find + fix what Opus would find, so Opus rounds come back clean more often
 
 More files or concerns than 3 → group them. Fewer distinct areas than 3 (tiny PR) → split whole diff by lens instead: false success; common real inputs + error paths; docs vs code.
 
-**Launch.** Spawn 3 agents concurrently with the exposed multi-agent tools, then wait for all 3 results. Fresh context each: no fork of this conversation. Each brief standalone, reviewer has no session context:
+**Launch.** Spawn 3 agents concurrently with the exposed multi-agent tools, then wait for all 3 results. Fresh context each: never fork this conversation; any spawn option that copies or inherits session history stays off (inherited history → reviewer shares author's reasoning, no longer fresh). Each brief standalone, reviewer has no session context:
 
 - scope: repo path, base = `git merge-base origin/<target> <head>` SHA (not `origin/<target>` tip: once target moves, two-dot diff from tip shows target's new commits as PR reverts), head SHA, `git diff <base>..<head>` as the diff;
 - files to read + area to cover; other 2 areas named, running in parallel, so it stays in its own;
