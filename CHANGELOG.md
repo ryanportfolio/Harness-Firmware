@@ -61,6 +61,9 @@ condensed.
   leaves pixels that move on their own out of the focus comparison, counts the
   opacity of the boxes around text, and reports focus that loads another page,
   a page with no mobile viewport tag, and focusable elements Tab never reaches.
+  It also checks that the page loaded whole: failed requests, uncaught errors,
+  broken images, a heading drawn in a fallback font, videos that fail or stall,
+  and a white first paint under a dark page.
   Each rule cites its WCAG 2.2 criterion, platform guideline or craft basis.
   Ideas taken from ui-ux-pro-max-skill (MIT); its style, palette and font tables
   were left out.

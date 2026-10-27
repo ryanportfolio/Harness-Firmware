@@ -1,6 +1,6 @@
 # Rules
 
-Use this as a lookup table after the audit guide maps a candidate to a rule, or when building the relevant component. Groups: See (contrast and images), Read (reflow and text), Reach (keyboard and targets), Operate (semantics and forms), Motion, Stability. Stack traps at the end apply only to the detected stack.
+Use this as a lookup table after the audit guide maps a candidate to a rule, or when building the relevant component. Groups: See (contrast and images), Read (reflow and text), Reach (keyboard and targets), Operate (semantics and forms), Motion, Stability, Integrity (the page loaded whole). Stack traps at the end apply only to the detected stack.
 
 Each rule names its source and how it is checked. Sources: a WCAG 2.2 success criterion with its level, a platform guideline (Apple Human Interface Guidelines, Material Design), Core Web Vitals, or Craft (practice without a standard behind it; say so when citing it). "Probe" names an automated check; "Manual" needs observation or code inspection. When a row combines a requirement and craft advice, cite only the requirement the evidence demonstrates. A code inspection cannot establish runtime behavior by itself.
 
@@ -81,6 +81,17 @@ The probe uses `fail` for candidates associated with WCAG A or AA. Confirm the c
 |---|---|---|---|
 | ST1 | Layout shift under 0.1; reserve space for images, ads, banners and late data | Core Web Vitals | Probe `shift` covers load and settle only, a lower bound; shifts after that are manual |
 | ST2 | Hover, press and focus styles never change an element's size or move its neighbours | Craft | Manual |
+
+## Integrity
+
+| ID | Rule | Source | Checked by |
+|---|---|---|---|
+| IN1 | Every script, stylesheet, font, image, media file, data request (fetch, XHR) and frame document the page needs loads; none fails, is blocked by the page's own Content-Security-Policy, or answers HTTP 400 or higher | Craft | Probe `page:failed-request` (load and settle only) |
+| IN2 | The page throws no uncaught errors or unhandled promise rejections | Craft | Probe `page:error` (load and settle only) |
+| IN3 | Every image loads; a broken one leaves its alt text or an empty box in the layout | Craft; the alt text itself is SE4 | Probe `page:broken-image` |
+| IN4 | Headings draw in the font the design names; a web font that fails or cannot be used, or a named font that is not installed and has no installed fallback named after it, falls back to another font with different widths and line breaks | Craft | Probe `page:font-fallback` (first visible h1 only) |
+| IN5 | Videos load and show a frame or a poster; an autoplay video has `muted` and `playsinline`, because browsers block autoplay with sound and iPhone Safari plays a video in the page only with `playsinline` | Craft (browser autoplay policies) | Probe `page:video-stuck` |
+| IN6 | The first paint already uses the page's background: a dark page never flashes white while its styles, theme or script arrive | Craft | Probe `page:white-flash` (frames about every 100 ms from navigation to the end of the settle time) |
 
 ## Stack traps
 

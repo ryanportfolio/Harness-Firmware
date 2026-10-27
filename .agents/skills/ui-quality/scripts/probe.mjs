@@ -7,7 +7,11 @@
    CSS px, text spacing, text-only enlargement, reduced motion, layout shift
    during load, dark mode contrast, and at phone width touch targets, hover
    rules a tap leaves stuck, inputs iOS zooms into and the browser's tap
-   flash. What axe could not decide is listed, not
+   flash. It also checks that the page loaded whole: requests that failed,
+   uncaught script errors, broken images, the h1's font, videos that fail,
+   stall or lack muted or playsinline, and a white first paint under a page
+   whose own background is not white. What axe could
+   not decide is listed, not
    dropped. axe runs inside every iframe; the probe's own checks of names,
    focus, contrast and targets also reach open shadow roots and same-origin
    iframes.
@@ -38,7 +42,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // Run from the audited repository root. This also works when the skill is a
 // scratch copy or a personal install rather than four levels below it.
 const REPO = existsSync(join(process.cwd(), '.git')) ? process.cwd() : resolve(HERE, '../../../..');
-const CHECKS = ['axe', 'contrast', 'focus', 'reflow', 'spacing', 'textscale', 'motion', 'shift', 'dark', 'phone'];
+const CHECKS = ['axe', 'contrast', 'focus', 'reflow', 'spacing', 'textscale', 'motion', 'shift', 'dark', 'phone', 'page'];
 
 function parseArgs(argv) {
   const opts = { urls: [], out: null, storageState: null, waitFor: null, settle: 1500, maxTabs: 80, skip: new Set(), strict: false, allowErrorStatus: false };
@@ -328,6 +332,14 @@ const PIXELS = async ({ op, a, a2, b, b2, rect, rects, color, threshold }) => {
     }
     return { changed, total: n, moving };
   }
+  if (op === 'light') {
+    // share of the shot that is near-white: every channel 235 or more
+    const ctx = await load(a);
+    const d = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height).data;
+    let light = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] >= 235 && d[i + 1] >= 235 && d[i + 2] >= 235) light++;
+    return d.length ? light / (d.length / 4) : 0;
+  }
   // op === 'contrast': text colour (with alpha) against every background pixel under the text's own line boxes.
   // Optional b: the same view with the text's faded boxes at full opacity. With their opacities multiplied into
   // color.a, a text pixel is the a pixel plus color.a times (text colour minus the b pixel); without b that is
@@ -426,7 +438,9 @@ if (launchedVia.startsWith('bundled')) notes.push(`ran in ${browserInfo}, not th
 const blank = await (await browser.newContext()).newPage();
 const pixels = (args) => blank.evaluate(PIXELS, args);
 
-async function open(url, ctxOpts = {}) {
+// hooks.before(page) runs before the page loads, to attach listeners; hooks.paint(page) runs about every
+// 100 ms from the first response until the settle time ends, to see the page while it first paints
+async function open(url, ctxOpts = {}, hooks = {}) {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 1,
@@ -438,13 +452,31 @@ async function open(url, ctxOpts = {}) {
   try {
     await context.addInitScript(INIT);
     const page = await context.newPage();
-    const response = await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await hooks.before?.(page);
+    const response = await page.goto(url, { waitUntil: hooks.paint ? 'commit' : 'load', timeout: 60000 });
     // a 404 or 500 page, or a sign-in page served with an error code, is not the page that was asked for
     if (response && response.status() >= 400 && !opts.allowErrorStatus) {
       throw new Error(`HTTP ${response.status()}: not audited (pass --allow-error-status to audit an error page on purpose)`);
     }
-    if (opts.waitFor) await page.waitForSelector(opts.waitFor, { timeout: 30000 });
-    await page.waitForTimeout(opts.settle);
+    // call hooks.paint until `until` settles; a rejection (a load timeout) ends the run like any other failure
+    const sample = async (until) => {
+      let done = false;
+      until.then(() => { done = true; }, () => { /* raced below */ });
+      while (!done) {
+        await hooks.paint(page);
+        await Promise.race([until, page.waitForTimeout(100)]);
+      }
+      await until;
+    };
+    if (hooks.paint) await sample(page.waitForLoadState('load', { timeout: 60000 }));
+    // frames keep coming while --wait-for waits, so a flash while an app renders is seen
+    if (opts.waitFor) {
+      const ready = page.waitForSelector(opts.waitFor, { timeout: 30000 });
+      if (hooks.paint) await sample(ready);
+      else await ready;
+    }
+    if (hooks.paint) await sample(page.waitForTimeout(opts.settle));
+    else await page.waitForTimeout(opts.settle);
     return { context, page };
   } catch (err) {
     await context.close().catch(() => { /* already gone */ });
@@ -1191,6 +1223,306 @@ async function phone(url) {
   }
 }
 
+// whether the page loaded whole: requests that failed, uncaught script errors, broken images, the h1's font,
+// videos that fail or stall, and a white first paint under a page whose own background is not white
+async function integrity(url) {
+  const failed = new Map(), errors = new Map();
+  let lightest = null, docAnswered = false, cdpPaint = null, paintErrors = 0;
+  const started = Date.now();
+  // the page's own Content-Security-Policy applies here, as it does for a visitor: what it blocks fails
+  const { context, page } = await open(url, { bypassCSP: false }, {
+    before: (p) => {
+      p.on('requestfailed', (r) => {
+        const why = r.failure()?.errorText || 'failed';
+        // cancelled by the page or the browser (a navigation, a media range request), not a broken resource
+        if (why.includes('ERR_ABORTED')) return;
+        failed.set(r.url(), { type: r.resourceType(), measured: why });
+      });
+      p.on('response', (r) => {
+        // the first answer for the document itself is checked when it opens (--allow-error-status lets an error
+        // page through on purpose); a later navigation of the page, such as a script redirect, is not
+        if (r.request().isNavigationRequest() && r.frame() === p.mainFrame() && !(r.status() >= 300 && r.status() < 400)) {
+          const first = !docAnswered;
+          docAnswered = true;
+          if (first) return;
+        }
+        if (r.status() < 400) return;
+        failed.set(r.url(), { type: r.request().resourceType(), measured: `HTTP ${r.status()}` });
+      });
+      p.on('pageerror', (e) => {
+        const key = `${e.name || 'Error'}: ${e.message}`.replace(/\s+/g, ' ').slice(0, 200);
+        const where = (e.stack || '').split('\n').map((l) => l.trim()).find((l) => l.startsWith('at '))?.slice(3) || null;
+        const seen = errors.get(key);
+        if (seen) seen.count++;
+        else errors.set(key, { where, count: 1 });
+      });
+    },
+    // the lightest frame from navigation to the end of the settle time. Playwright's screenshot first waits for
+    // document.fonts.ready, which can be seconds late; DevTools captures each frame as it is
+    paint: async (p) => {
+      try {
+        cdpPaint ??= await p.context().newCDPSession(p);
+        const buf = Buffer.from((await cdpPaint.send('Page.captureScreenshot', { format: 'png' })).data, 'base64');
+        const share = await pixels({ op: 'light', a: buf.toString('base64') });
+        if (!lightest || share > lightest.share) lightest = { buf, share, t: Date.now() - started };
+      } catch {
+        // nothing painted yet, or a frame the browser could not capture; the next sample tries again
+        paintErrors++;
+      }
+    },
+  });
+  try {
+    await cdpPaint?.detach().catch(() => { /* already gone */ });
+    const pct = (x) => `${(x * 100).toFixed(1)}%`;
+    const short = (u) => (u.length > 120 ? `${u.slice(0, 117)}...` : u);
+    const base = { url, viewport: '1280', wcag: [], level: 'craft', severity: 'review' };
+
+    // lazy images below the fold are never requested during load; load them now so a broken one is seen
+    const lazy = await page.evaluate(() => {
+      const waiting = window.__uq.all('img[loading="lazy"]').filter((i) => !i.complete);
+      const done = Promise.all(waiting.map((i) => new Promise((r) => {
+        i.addEventListener('load', r, { once: true });
+        i.addEventListener('error', r, { once: true });
+        i.loading = 'eager';
+      })));
+      return Promise.race([done.then(() => ({ count: waiting.length, timedOut: false })), new Promise((r) => setTimeout(() => r({ count: waiting.length, timedOut: true }), 5000))]);
+    });
+    if (lazy.timedOut) notes.push(`${url}: ${lazy.count} lazy images were loaded for page:broken-image and some had not finished after 5 s`);
+
+    // same-site failures first, so third-party trackers an ad blocker stops cannot push them out of the list
+    const site = (u) => { try { return new URL(u).hostname.split('.').slice(-2).join('.'); } catch { return ''; } };
+    const own = site(page.url());
+    const failures = [...failed].sort(([a], [b]) => (site(a) === own ? 0 : 1) - (site(b) === own ? 0 : 1));
+    for (const [res, f] of failures.slice(0, 15)) {
+      add({ ...base, check: 'page:failed-request', selector: res, measured: `${f.type} request ${f.measured}` });
+    }
+    if (failures.length > 15) {
+      const hosts = [...new Set(failures.slice(15).map(([u]) => { try { return new URL(u).hostname; } catch { return u.slice(0, 40); } }))];
+      notes.push(`${url}: page:failed-request has ${failures.length - 15} more failed requests, to ${hosts.slice(0, 8).join(', ')}${hosts.length > 8 ? ` and ${hosts.length - 8} more hosts` : ''}`);
+    }
+    for (const [message, e] of [...errors].slice(0, 15)) {
+      // an error with no stack frame (a thrown string or object) is told apart by its message
+      add({ ...base, check: 'page:error', selector: e.where || `window: ${message.slice(0, 80)}`, measured: `uncaught ${message}${e.count > 1 ? ` (${e.count} times)` : ''}` });
+    }
+    if (errors.size > 15) notes.push(`${url}: page:error has ${errors.size - 15} more distinct errors`);
+
+    // a white first paint matters only under a page whose own colour is not white. The backdrop is the first
+    // background colour (or CSS gradient) found from the middle of the viewport up to the root; an image that
+    // arrives late over a white page is content, not the page's colour
+    const late = await page.screenshot();
+    const settled = await pixels({ op: 'light', a: late.toString('base64') });
+    const backdrop = await page.evaluate(() => {
+      // any colour syntax the browser understands (rgb, oklch, color(), color-mix): paint it and read it back
+      const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+      const near = (c) => {
+        if (!c || c === 'transparent') return null;
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = '#0000';
+        ctx.fillStyle = c;
+        ctx.fillRect(0, 0, 1, 1);
+        const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+        return a < 230 ? null : { light: r >= 235 && g >= 235 && b >= 235, color: c };
+      };
+      for (let el = document.elementFromPoint(innerWidth / 2, innerHeight / 2); el; el = el.parentElement) {
+        const cs = getComputedStyle(el);
+        // a gradient paints above the element's background colour, and at once even when layered with an image,
+        // so it is read first; the 50-point drop the flash also needs keeps a light gradient from counting
+        if (/gradient\(/.test(cs.backgroundImage)) return { light: false, color: 'a CSS gradient' };
+        const solid = near(cs.backgroundColor);
+        if (solid) return solid;
+      }
+      return { light: true, color: 'the browser default white' };
+    });
+    if (lightest) {
+      const file = join(opts.out, `${slug(url)}-early.png`);
+      writeFileSync(file, lightest.buf);
+      shots.push(file);
+      if (lightest.share - settled >= 0.5 && !backdrop.light) {
+        add({ ...base, check: 'page:white-flash', selector: 'document', measured: `${pct(lightest.share)} of the viewport near-white ${lightest.t} ms after navigation started, ${pct(settled)} once loaded and settled; the page's background is ${backdrop.color}, but it first paints white`, threshold: 'the first paint already uses the page background' });
+      }
+    } else notes.push(`${url}: no frame could be captured while the page loaded (${paintErrors} attempts); page:white-flash not checked`);
+
+    const state = await page.evaluate(() => {
+      const { all, sel, style, topRect, framesShow } = window.__uq;
+      const unquote = (s) => s.trim().replace(/^["']|["']$/g, '').replace(/\\(.)/g, '$1');
+      const shown = (el) => (el.checkVisibility?.({ visibilityProperty: true }) ?? el.getClientRects().length > 0) && framesShow(el);
+      // an empty or missing src is a placeholder a script fills in, not a broken file
+      const broken = all('img').filter((i) => i.complete && i.naturalWidth === 0 && (i.currentSrc || i.getAttribute('src')))
+        .map((i) => ({ selector: sel(i), src: i.currentSrc || i.src }));
+      const videos = all('video').map((v) => {
+        const r = topRect(v);
+        return {
+          selector: sel(v), src: v.currentSrc || v.src || v.querySelector('source')?.src || '',
+          hasSource: !!(v.getAttribute('src') || v.querySelector('source[src]')),
+          // Chrome pauses muted autoplay video outside the viewport and resumes it in view, so playback is judged only in view
+          // r.framed: every iframe around it shows it, not only the top viewport
+          inView: shown(v) && r.framed && r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth,
+          error: v.error?.code ?? null, network: v.networkState, ready: v.readyState, paused: v.paused, ended: v.ended,
+          autoplay: v.autoplay, muted: v.muted, inline: v.playsInline, poster: !!v.poster,
+        };
+      });
+      // the first visible h1 in the page, and in it the first text with a letter (an emoji or an icon has none)
+      // outside SVG; that text can sit in a span with a font of its own
+      let font = null, h1Note = null;
+      const h1 = [...document.querySelectorAll('h1')].find((h) => shown(h) && h.getClientRects().length);
+      if (!h1) h1Note = document.querySelector('h1') ? 'no visible h1' : 'no h1';
+      else {
+        const walker = document.createTreeWalker(h1, NodeFilter.SHOW_TEXT);
+        let el = null, text = '';
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+          if (/\p{L}/u.test(n.textContent) && !n.parentElement.closest('svg') && shown(n.parentElement)) { el = n.parentElement; text = n.textContent.trim(); break; }
+        }
+        if (!el) h1Note = 'the visible h1 has no text with letters';
+        else {
+          const stack = style(el).fontFamily;
+          const families = stack.split(',').map(unquote).filter(Boolean);
+          const isGeneric = (f) => /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-[a-z-]+|math|emoji|fangsong|-apple-system|BlinkMacSystemFont)$/i.test(f);
+          const ownFaces = [...document.fonts].filter((f) => unquote(f.family).toLowerCase() === families[0].toLowerCase());
+          const faces = ownFaces.map((f) => f.status);
+          // whether any face's unicode-range covers a character of the heading text; a face for other characters
+          // (a latin-ext subset over Japanese text) is never loaded for it, by design
+          const inRange = (range, cp) => range.split(',').some((part) => {
+            const [a, b] = part.trim().replace(/^u\+/i, '').split('-');
+            const lo = parseInt(a.replace(/\?/g, '0'), 16), hi = parseInt((b ?? a).replace(/\?/g, 'F'), 16);
+            return cp >= lo && cp <= hi;
+          });
+          const chars = [...text].filter((c) => c.trim()).map((c) => c.codePointAt(0));
+          const facesCover = ownFaces.some((f) => chars.some((cp) => inRange(f.unicodeRange || 'U+0-10FFFF', cp)));
+          // kept for the DevTools reads below, which take the element itself rather than a selector
+          window.__uq.fontTarget = el;
+          font = { selector: sel(el), stack, families, generic: isGeneric(families[0]), named: families.filter((f) => !isGeneric(f)), faces, facesCover, text: text.slice(0, 200) };
+        }
+      }
+      return { broken, videos, font, h1Note };
+    });
+
+    for (const img of state.broken.slice(0, 15)) {
+      add({ ...base, check: 'page:broken-image', selector: img.selector, measured: `image finished loading with no picture (naturalWidth 0): ${short(img.src)}` });
+    }
+    if (state.broken.length > 15) notes.push(`${url}: page:broken-image has ${state.broken.length - 15} more broken images`);
+
+    const mediaError = { 1: 'loading aborted', 2: 'network error', 3: 'could not decode', 4: 'format or address not supported' };
+    let outOfView = 0;
+    for (const v of state.videos.slice(0, 15)) {
+      // no source at all and nothing requested: a placeholder a script fills in, like an img without src
+      if (!v.hasSource && v.network === 0 && !v.error) continue;
+      const problems = [];
+      if (v.error) problems.push(`error ${v.error} (${mediaError[v.error] || 'unknown'})`);
+      // every <source> failed or has a type the browser cannot play: Chrome sets no error, only NETWORK_NO_SOURCE
+      else if (v.network === 3) problems.push('no playable source (every source failed or has a type this browser cannot play)');
+      else if (v.inView) {
+        if (v.ready < 2 && v.network === 2) problems.push(`still loading after load and settle (readyState ${v.ready})`);
+        else {
+          // a short video that played to its end is paused too
+          if (v.autoplay && v.paused && !v.ended) problems.push('has autoplay but is paused after load');
+          if (v.ready < 2 && (v.autoplay || !v.poster)) problems.push(`no frame loaded (readyState ${v.ready})${v.poster ? '' : ' and no poster, so it shows an empty box'}`);
+        }
+      } else outOfView++;
+      // browsers block autoplay with sound for a new visitor, and iPhone Safari autoplays inline only with playsinline
+      if (v.autoplay && !v.muted) problems.push('autoplay without muted, which browsers block for visitors who have not interacted with the site');
+      if (v.autoplay && !v.inline) problems.push('autoplay without playsinline, which iPhone Safari needs to play it in the page');
+      if (problems.length) add({ ...base, check: 'page:video-stuck', selector: v.selector, measured: `${problems.join('; ')}; source ${short(v.src) || 'none'}` });
+    }
+    if (outOfView) notes.push(`${url}: ${outOfView} videos outside the first viewport or hidden were checked for errors and missing muted or playsinline only; Chrome pauses muted autoplay video out of view, so whether they play was not judged`);
+    if (state.videos.length > 15) notes.push(`${url}: page:video-stuck checked the first 15 of ${state.videos.length} videos`);
+
+    const f = state.font;
+    if (!f) notes.push(`${url}: ${state.h1Note}, so the heading font was not checked`);
+    else if (!f.generic) await headingFont(page, context, f, url, base);
+  } finally {
+    await context.close();
+  }
+}
+
+// whether the h1's text is drawn in the font it names. Each answer comes from the font Chrome actually drew with
+// (DevTools CSS.getPlatformFontsForNode), compared by name with what the same text draws in a test span, so a
+// local() source, a localized family name or a font for another script is judged by what it draws
+async function headingFont(page, context, f, url, base) {
+  let cdp;
+  try {
+    cdp = await context.newCDPSession(page);
+    await cdp.send('DOM.enable');
+    await cdp.send('CSS.enable');
+    await cdp.send('DOM.getDocument', { depth: 0 });
+    // fonts of an element an expression returns, the most-used first
+    const fontsOf = async (expression) => {
+      const { result } = await cdp.send('Runtime.evaluate', { expression });
+      if (!result.objectId) return [];
+      const { nodeId } = await cdp.send('DOM.requestNode', { objectId: result.objectId });
+      return nodeId ? (await cdp.send('CSS.getPlatformFontsForNode', { nodeId })).fonts.sort((a, b) => b.glyphCount - a.glyphCount) : [];
+    };
+    // every font a span draws text with in the given font-family, styled like the h1's text; the span is held
+    // by reference, so nothing on the page can be mistaken for it. Reading offsetWidth lays it out: DevTools
+    // reports no fonts for a node that has not been laid out yet
+    const draws = async (family, text) => fontsOf(`(() => { const el = window.__uq.fontTarget, cs = getComputedStyle(el), s = document.createElement('span');
+        s.textContent = ${JSON.stringify(text)};
+        s.lang = el.closest('[lang]')?.lang || '';
+        // !important on the inline style outranks a page rule such as * { font-family: X !important }
+        s.style.cssText = 'position:absolute!important;left:-9999px!important;top:0!important;white-space:nowrap!important';
+        s.style.setProperty('font-family', ${JSON.stringify(family)}, 'important');
+        for (const p of ['font-weight', 'font-style', 'font-stretch', 'font-size', 'font-variant', 'font-feature-settings', 'font-variation-settings', 'text-transform']) s.style.setProperty(p, cs.getPropertyValue(p), 'important');
+        document.body.appendChild(s); void s.offsetWidth; window.__uq.fontRef?.remove(); window.__uq.fontRef = s; return s; })()`);
+    const key = (d) => `${d.familyName}|${d.isCustomFont}`;
+    // the fonts in `list` that `base` does not draw: what a family contributes beyond the fallback, for any share
+    // of the glyphs (a Japanese font may draw two characters of a mostly Latin heading)
+    const beyond = (list, base) => { const b = new Set(base.map(key)); return list.filter((d) => !b.has(key(d))); };
+    const has = (list, d) => list.some((x) => key(x) === key(d));
+    const css = (name) => `"${name.replace(/["\\]/g, '\\$&')}"`;
+    const SAMPLE = 'Hamburgefonstiv';
+    const drawn = await fontsOf('window.__uq.fontTarget');
+    const used = drawn.length ? drawn.map((d) => d.familyName).join(', ') : null;
+    // a family no font answers to falls back to the browser's default font
+    const fallback = async (text) => draws('"uq-no-such-font-7f3a"', text);
+    // installed (or answered by an @font-face): the fonts the family draws beyond a generic family it is put in
+    // front of, for Latin sample text or for the heading's own text (a font for another script has no Latin)
+    const installed = async (name) => {
+      for (const text of [SAMPLE, f.text]) {
+        for (const generic of ['monospace', 'serif']) {
+          const own = beyond(await draws(`${css(name)}, ${generic}`, text), await draws(generic, text));
+          if (own.length) return own;
+        }
+      }
+      return [];
+    };
+    const first = f.families[0];
+    const statuses = [...new Set(f.faces)].join(', ');
+    let problem = null;
+    if (!drawn.length) notes.push(`${url}: could not read which font drew the h1; heading font not checked`);
+    else if (f.faces.length) {
+      if (!f.faces.includes('loaded')) {
+        // faces left unloaded because none covers this text are not a failure
+        if (!f.facesCover && f.faces.every((s) => s === 'unloaded')) return;
+        problem = `"${first}" is a web font on this page (status ${statuses})${f.faces.includes('loading') ? ' and still loading after load and settle' : ''}; drawn with ${used}`;
+      } else {
+        // the fonts the family draws for the heading's own text beyond the default font must all be in the heading.
+        // When it draws none of that text, it may be a font for another script (a Latin font over Japanese text, a
+        // later family draws those glyphs by design): it passes if it draws Latin sample text, else the page cannot use it
+        const own = beyond(await draws(css(first), f.text), await fallback(f.text));
+        if (own.length) {
+          const missing = own.filter((d) => !has(drawn, d));
+          if (missing.length) problem = `"${first}" is a web font on this page (status ${statuses}); drawn with ${used} instead of ${missing.map((d) => d.familyName).join(', ')}, which "${first}" draws now`;
+        } else if (f.facesCover && !beyond(await draws(css(first), SAMPLE), await fallback(SAMPLE)).length) {
+          // a face whose unicode-range covers none of the heading text (a Cyrillic subset over an English heading)
+          // is meant for other characters, loaded or not; only a face that should draw this text can fail it
+          problem = `"${first}" is a web font on this page (status ${statuses}) but draws no text of its own, so the page cannot use it (font-display: optional past its window, or no face covers this text); drawn with ${used}`;
+        }
+      }
+    } else if (!(await installed(first)).length) {
+      // not installed here: fine when a later named family in the stack drew the text, as the stack intends
+      const later = [];
+      for (const name of f.named.filter((n) => n !== first).slice(0, 5)) later.push(...(await installed(name)));
+      if (later.some((l) => has(drawn, l))) notes.push(`${url}: the h1's first font "${first}" is not installed on this machine; drawn with ${used} from later in its font stack`);
+      else problem = `"${first}" has no @font-face on this page and is not installed on this machine, and no later named font in the stack drew the text; drawn with ${used}`;
+    }
+    if (problem) add({ ...base, check: 'page:font-fallback', selector: f.selector, measured: `${problem}; font-family is ${f.stack}` });
+  } catch (err) {
+    notes.push(`${url}: could not compare the h1's fonts (${err.message.split('\n')[0]}); heading font not checked`);
+  } finally {
+    await page.evaluate(() => window.__uq.fontRef?.remove()).catch(() => { /* page gone */ });
+    await cdp?.detach().catch(() => { /* already gone */ });
+  }
+}
+
 if (!on('axe')) notes.push('axe skipped: contrast over images and dark-mode contrast depend on it and were not measured either; axe rules at 320 and 375 px were not run');
 const pages = [];
 try {
@@ -1252,6 +1584,7 @@ try {
       await step('motion', () => motion(url));
       await step('dark', () => dark(url));
       await step('phone', () => phone(url));
+      await step('page', () => integrity(url));
     } catch (err) {
       entry.ok = false;
       entry.error = err.message.split('\n')[0];
@@ -1277,9 +1610,10 @@ const notMeasured = [
   'Dark themes switched by a class or data attribute, and styles in cross-origin stylesheets. Dark-mode axe incompletes are not collected.',
   'Layout shift after the settle time; the figure above covers load only.',
   'Under text spacing and enlarged text: text that overlaps its neighbours in a box that does not hide overflow; only cut-off text is measured, at 1280 px only.',
-  'Canvas, WebGL and media content. Inside cross-origin iframes only axe runs; focus markers, names, contrast over images and targets there are not measured. Reflow, text stress, motion and layout shift look at the top page only. Closed shadow roots are not reached.',
+  'Canvas, WebGL, and what media shows (captions, the picture itself); page:video-stuck checks only that videos load and play. Inside cross-origin iframes only axe runs; focus markers, names, contrast over images and targets there are not measured. Reflow, text stress, motion and layout shift look at the top page only. Closed shadow roots are not reached.',
   'Text whose colour comes from `filter`, `mix-blend-mode` or `background-clip: text`; contrast over images accounts for colour and opacity only.',
   'Phone behaviour only hardware shows: the input zoom, tap delay and tap flash themselves, hover left behind after a tap, safe areas, the software keyboard and overscroll. The phone checks report the CSS behind three of them; hover rules in cross-origin stylesheets are not read.',
+  'Page integrity covers one desktop load until the settle time ends, plus lazy images loaded on purpose: requests that fail and errors thrown later, after an interaction, or only at phone width are not seen; requests a service worker makes for itself are not seen; console.error calls that are not uncaught errors are not collected. White-flash frames are sampled about every 100 ms, so a shorter flash can be missed, and a locally served page loads faster than it does for a visitor. Only the first visible h1, and in it the first text with letters, is checked for its font; a heading drawn partly in a fallback because one unicode-range subset failed shows only as a failed request. Whether videos outside the first viewport play is not judged.',
 ];
 const report = { generated: new Date().toISOString(), browser: browserInfo, urls: opts.urls, skipped: [...opts.skip], counts, pages, findings, axeUndecided: undecided, notes, notMeasured, screenshots: shots };
 writeFileSync(join(opts.out, 'report.json'), JSON.stringify(report, null, 2));
@@ -1301,7 +1635,7 @@ const md = [
   '', '## Notes', '', ...(notes.length ? notes.map((n) => `- ${n}`) : ['- none']),
   '', '## Focus order', '', ...pages.flatMap((p) => [`${p.url}:`, ...p.focusOrder.map((s, i) => `${i + 1}. ${s}`), '']),
   '## Screenshots', '',
-  'Names start with the URL position (01, 02, etc.). Suffixes identify width, dark theme or text stress. Baseline screenshots show context, not the transient focus or motion measurements; reproduce those checks when verifying.', '',
+  'Names start with the URL position (01, 02, etc.). Suffixes identify width, dark theme, text stress, or the lightest frame captured while the page loaded (early). Baseline screenshots show context, not the transient focus or motion measurements; reproduce those checks when verifying.', '',
   ...shots.map((file) => `- ${file}`), '',
   '## Not measured', '',
   ...notMeasured.map((gap) => `- ${gap}`),
