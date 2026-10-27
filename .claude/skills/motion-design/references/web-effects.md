@@ -2,7 +2,7 @@
 
 Recipes for the effects that carry a marketing or portfolio page: background video, seamless and scrubbed loops, glass over footage, entrance choreography and scroll-driven stages. Each one keeps its reduced-motion branch, its touch fallback and a cost rating. Product components (buttons, popovers, toasts, drawers) are in [ui-components.md](ui-components.md); films and loops rendered by a `frame(t)` engine are in [web-engine.md](web-engine.md).
 
-Adapted from the technique library in [Motionsites-AI/claude-skill](https://github.com/Motionsites-AI/claude-skill) (`plugins/motionsites-web-builder/skills/motionsites-web-builder/references/techniques/`, commit `faa30d5`, read 2026-10-26), MIT licence in [web-effects.LICENSE](web-effects.LICENSE). Only the MIT-licensed references were used. Its taste rules (which effects to pair, how many per page) were left out: direction comes from the brief, `design-brief` and `showpiece`. Values marked as source values are that library's practice, not standards; tune them by eye. Several recipes were rewritten here to cost less; those changes are called out. The decision rules in [SKILL.md](../SKILL.md) still apply; where this file and SKILL.md disagree, SKILL.md wins.
+Adapted from the technique library in [Motionsites-AI/claude-skill](https://github.com/Motionsites-AI/claude-skill) (`plugins/motionsites-web-builder/skills/motionsites-web-builder/references/techniques/`, commit `faa30d5`, read 2026-10-26), MIT licence in [web-effects.LICENSE](web-effects.LICENSE). Only its techniques folder was used; the `examples/` and `media/` folders, which are not MIT-licensed, and its craft, spec and review files were not. Its taste rules (which effects to pair, one signature per page) were left out: direction comes from the brief, `design-brief` and `showpiece`. Its limit of one heavy effect per page is kept, as a performance budget. Values marked as source values are that library's practice, not standards; tune them by eye. Several recipes were rewritten here to cost less; those changes are called out. The decision rules in [SKILL.md](../SKILL.md) still apply; where this file and SKILL.md disagree, SKILL.md wins.
 
 ## Cost and budget
 
@@ -29,7 +29,23 @@ Allow at most one heavy effect per page. Measure frame time with the page's real
 - **Read all rects, then write all styles** in one frame, never interleaved.
 - **Sticky needs unclipped ancestors.** `overflow:hidden` on any ancestor kills `position:sticky`; use `overflow-x:clip` on wrappers.
 - **Pause what is off screen.** Every autoplaying video gets an IntersectionObserver that pauses it outside the viewport.
-- **Reduced motion.** These effects run on live pages, so the reduced-motion branches stay in, unlike films where motion is the content. The source keeps scroll-linked mappings under reduced motion and only drops smoothing and autonomous movement. When the project runs `ui-quality`, its rule MO1 is stricter: large scroll-driven movement (the cinematic stage, parallax columns, the text crawl) should stop or become an opacity fade between key states.
+- **Reduced motion.** These effects run on live pages, so they honour reduced motion, unlike films where motion is the content. The default is `ui-quality`'s rule MO1: decorative and scroll-driven movement stops or becomes an opacity fade, and the final state still shows. The source kept scroll-linked mappings (scrubbed video, the cinematic stage, the crawl) under reduced motion and only dropped smoothing; each recipe below says what it does instead.
+- **Pause control.** Autoplaying motion that runs longer than 5 s beside other content (background video, loops, animated grain) gets a visible pause button (MO2, WCAG 2.2.2; the Control row in [SKILL.md](../SKILL.md)). One button can stop everything on the page:
+
+  ```html
+  <button class="motion-toggle" type="button" aria-pressed="false">Pause motion</button>
+  <script>
+    document.querySelector('.motion-toggle').addEventListener('click', (e) => {
+      const paused = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+      e.currentTarget.setAttribute('aria-pressed', String(paused));
+      document.documentElement.classList.toggle('motion-paused', paused);
+      document.querySelectorAll('video').forEach((v) => (paused ? v.pause() : v.play().catch(() => {})));
+    });
+  </script>
+  <style>.motion-paused *{animation-play-state:paused!important}</style>
+  ```
+
+  Recipes that call `play()` themselves (off-screen observers, loop restarts) should check `document.documentElement.classList.contains('motion-paused')` first.
 - **Touch.** Pointer effects check `(hover: hover) and (pointer: fine)` and fall back to autoplay or a still.
 - **Media encoding.** Background clips: H.264 MP4 with `-movflags +faststart`, 6 to 12 s, 5 to 8 MB at most, plus a 720p or smaller encode for phones chosen with `matchMedia('(max-width: 768px)')`. Clips that will be seeked (scrubbed) need short keyframe intervals; see the scrub recipes.
 - Where `@supports (animation-timeline: view())` passes, CSS scroll-driven animations can replace the JS for reveals and simple parallax and run off the main thread. Keep the JS path as the fallback.
@@ -69,8 +85,8 @@ Medium. A muted clip fills the hero and all UI floats over it.
 
 - `muted autoplay loop playsinline` are all required for iOS autoplay; also set `video.muted = true` as a property.
 - Section background `#000` or the clip's edge colour, so nothing flashes before the first frame. `100svh` with a `100vh` fallback.
-- Settle-in: `opacity 0, scale(1.05)` to rest over 1.8 s `--ease-out-expo`, or fade the video in at about 2.8 s and let a type intro own the first seconds.
-- HLS (`.m3u8`): Safari plays it natively; elsewhere use a pinned hls.js release with `capLevelToPlayerSize: true` so phones never stream 4K, and call `hls.destroy()` on unmount.
+- Settle-in: `opacity 0, scale 1.05` to rest over 1.8 s `--ease-out-expo`, on the individual `scale` property so `transform` stays free for the framing rules below, or fade the video in at about 2.8 s and let a type intro own the first seconds.
+- HLS (`.m3u8`): Safari plays it natively; elsewhere use a pinned hls.js release with `capLevelToPlayerSize: true` so phones never stream 4K, and call the returned cleanup on unmount (it destroys the hls.js instance).
 - Reduced motion: no autoplay, the poster or first frame stays as a still. Autoplay can be refused (low-power mode) and the clip can fail to load, so the poster sits on the section background, independent of the video, and must work as the design. Match its position to the video's `object-position`.
 
 ```html
@@ -83,21 +99,30 @@ Medium. A muted clip fills the hero and all UI floats over it.
 .vhero{position:relative;min-height:100vh;min-height:100svh;overflow:hidden;isolation:isolate;color:#fff;
   background:#000 var(--poster) center/cover no-repeat}   /* the poster shows even if the video never loads */
 .vhero__media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;pointer-events:none;
-  opacity:0;transform:scale(1.05);transition:opacity 1.8s var(--ease-out-expo),transform 1.8s var(--ease-out-expo)}
-.vhero__media.is-ready{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){.vhero__media{opacity:1;transform:none;transition:none}}
+  opacity:0;scale:1.05;transition:opacity 1.8s var(--ease-out-expo),scale 1.8s var(--ease-out-expo)}
+.vhero__media.is-ready{opacity:1;scale:1}
+@media (prefers-reduced-motion:reduce){.vhero__media{opacity:1;scale:1;transition:none}}
 ```
 ```js
+/** Returns a cleanup function. */
 function mountVideo(video, src, { revealDelay = 0 } = {}) {
+  let hls = null, io = null, timer = 0;
   video.muted = true; video.playsInline = true;
   if (/\.m3u8($|\?)/i.test(src) && !video.canPlayType('application/vnd.apple.mpegurl') && window.Hls?.isSupported()) {
-    const hls = new Hls({ capLevelToPlayerSize: true }); hls.loadSource(src); hls.attachMedia(video);
+    hls = new Hls({ capLevelToPlayerSize: true }); hls.loadSource(src); hls.attachMedia(video);
   } else video.src = src;
-  const reveal = () => setTimeout(() => video.classList.add('is-ready'), revealDelay);
+  const reveal = () => { timer = setTimeout(() => video.classList.add('is-ready'), revealDelay); };
   video.readyState >= 2 ? reveal() : video.addEventListener('loadeddata', reveal, { once: true });
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { video.pause(); return; }
-  video.loop = true;
-  new IntersectionObserver(([e]) => (e.isIntersecting ? video.play().catch(() => {}) : video.pause())).observe(video);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) video.pause();
+  else {
+    video.loop = true;
+    io = new IntersectionObserver(([e]) => {
+      const paused = document.documentElement.classList.contains('motion-paused');
+      e.isIntersecting && !paused ? video.play().catch(() => {}) : video.pause();
+    });
+    io.observe(video);
+  }
+  return () => { clearTimeout(timer); io?.disconnect(); hls?.destroy(); };
 }
 document.querySelectorAll('video[data-src]').forEach((v) => mountVideo(v, v.dataset.src));
 ```
@@ -106,29 +131,37 @@ document.querySelectorAll('video[data-src]').forEach((v) => mountVideo(v, v.data
 
 Light. Native `loop` shows a hard cut when the first and last frames differ. Instead: fade in from black, fade out just before the end, hold black briefly, restart. The same mechanism cycles a playlist.
 
-- Source values: fade 500 ms; fade-out starts when `duration - currentTime <= 0.55 s`; 100 ms of black between plays.
+- Fade 500 ms; 100 ms of black between plays. The source started the fade-out when `duration - currentTime <= 0.55 s`, but `timeupdate` fires only about every 250 ms, so the fade often began with 0.33 s left and snapped to black at `ended`. Here the lead is 0.8 s and the fade-out is shortened to the time actually left.
 - Fades run on rAF, never a CSS transition on the video. Each new fade cancels the previous one and starts from the current opacity, so fades never snap. A flag stops `timeupdate` from re-triggering the fade-out.
 - `loop` off; the section behind is pure `#000` so the dip reads as intentional.
-- Reduced motion: paused still at full opacity.
+- Reduced motion: paused still at full opacity. A playlist item that fails to load is skipped; if every item fails, the loop stops on black, so put a poster or colour behind it.
 
 ```js
 /** Manual loop with rAF fades. Returns a cleanup function. */
-function fadeLoopVideo(video, { fadeMs = 500, fadeOutLead = 0.55, gapMs = 100, playlist = null } = {}) {
-  let raf = 0, timer = 0, fadingOut = false, idx = 0, visible = true;
-  const fadeTo = (target) => {
+function fadeLoopVideo(video, { fadeMs = 500, fadeOutLead = 0.8, gapMs = 100, playlist = null } = {}) {
+  let raf = 0, timer = 0, fadingOut = false, idx = 0, visible = true, failures = 0;
+  const fadeTo = (target, ms = fadeMs) => {
     cancelAnimationFrame(raf);
     const from = parseFloat(video.style.opacity) || 0, t0 = performance.now();
     const tick = (now) => {
-      const p = Math.min((now - t0) / fadeMs, 1);
+      const p = Math.min((now - t0) / ms, 1);
       video.style.opacity = String(from + (target - from) * p);
       if (p < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
   };
-  const start = () => { fadingOut = false; if (visible) video.play().catch(() => {}); fadeTo(1); };
+  const canPlay = () => visible && !document.documentElement.classList.contains('motion-paused');
+  const start = () => { fadingOut = false; failures = 0; if (canPlay()) video.play().catch(() => {}); fadeTo(1); };
   const onTime = () => {
     const left = video.duration - video.currentTime;
-    if (!fadingOut && left > 0 && left <= fadeOutLead) { fadingOut = true; fadeTo(0); }
+    if (!fadingOut && left > 0 && left <= fadeOutLead) {
+      fadingOut = true;
+      fadeTo(0, Math.max(50, Math.min(fadeMs, (left - 0.05) * 1000)));   // finish before the last frame
+    }
+  };
+  const onError = () => {                                   // skip a playlist item that fails to load
+    if (!playlist || playlist.length < 2 || ++failures >= playlist.length) return;
+    idx = (idx + 1) % playlist.length; video.src = playlist[idx];
   };
   const onEnded = () => {
     cancelAnimationFrame(raf); video.style.opacity = '0';
@@ -137,18 +170,20 @@ function fadeLoopVideo(video, { fadeMs = 500, fadeOutLead = 0.55, gapMs = 100, p
       else { video.currentTime = 0; start(); }
     }, gapMs);
   };
+  if (playlist?.length) video.src = playlist[0];
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { video.pause(); video.style.opacity = '1'; return () => {}; }
   video.loop = false; video.muted = true; video.playsInline = true; video.style.opacity = '0';
-  if (playlist?.length) video.src = playlist[0];
-  const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; visible ? video.play().catch(() => {}) : video.pause(); });
+  const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; canPlay() ? video.play().catch(() => {}) : video.pause(); });
   io.observe(video);
+  video.addEventListener('error', onError);
   video.addEventListener('loadeddata', start);
   video.addEventListener('timeupdate', onTime);
   video.addEventListener('ended', onEnded);
   if (video.readyState >= 2) start();
   return () => {
     cancelAnimationFrame(raf); clearTimeout(timer); io.disconnect();
-    video.removeEventListener('loadeddata', start); video.removeEventListener('timeupdate', onTime); video.removeEventListener('ended', onEnded);
+    video.removeEventListener('error', onError); video.removeEventListener('loadeddata', start);
+    video.removeEventListener('timeupdate', onTime); video.removeEventListener('ended', onEnded);
   };
 }
 ```
@@ -157,11 +192,13 @@ The video's CSS sets `opacity:0` with no transition. In React, put that in the c
 
 ### Boomerang loop
 
-Light. The clip plays forward then backward with no seam, which reads like slow breathing. Pre-render it and loop the file natively:
+Light. The clip plays forward then backward with no seam, which reads like slow breathing. Pre-render it and loop the file natively. Each half drops its first frame, so no frame repeats at the turn or where the loop wraps (the source's command showed both twice):
 
 ```
-ffmpeg -i in.mp4 -filter_complex "[0:v]split[a][b];[b]reverse[r];[a][r]concat=n=2:v=1:a=0[out]" -map "[out]" -an -c:v libx264 -crf 20 -movflags +faststart boomerang.mp4
+ffmpeg -i in.mp4 -filter_complex "[0:v]split[a][b];[a]trim=start_frame=1,setpts=PTS-STARTPTS[f];[b]reverse,trim=start_frame=1,setpts=PTS-STARTPTS[r];[f][r]concat=n=2:v=1:a=0[out]" -map "[out]" -an -c:v libx264 -crf 20 -pix_fmt yuv420p -movflags +faststart boomerang.mp4
 ```
+
+`reverse` holds the whole clip in memory while encoding (about 3 MB per 1080p frame), so keep the source short.
 
 The source also captures frames at runtime and plays them back from a canvas; that costs about 2 MB per 960×540 frame (about 300 MB for 5 s at 30 fps), so it is not ported. When pre-rendering is impossible, use the fade loop instead.
 
@@ -211,12 +248,12 @@ Medium, desktop only. A paused clip whose playhead follows horizontal mouse move
 - **Seek queue:** never set `currentTime` while a seek is in flight. Store the target; on `seeked`, seek again only if the target moved. Without this the decoder floods and the image freezes.
 - Encode with tiny keyframe intervals so seeks land at once: `ffmpeg -i in.mp4 -an -c:v libx264 -crf 20 -g 6 -keyint_min 6 -pix_fmt yuv420p -movflags +faststart scrub.mp4` (`-g 1`, all keyframes, is the smoothest and largest).
 - Clips under about 15 MB: load the whole file as a blob first (`fetch(url).then(r => r.blob())`, then `URL.createObjectURL`) so every seek is local.
-- Below 1024 px or without a fine pointer: autoplay loop. Reduced motion: still frame.
+- Below 1024 px or without a fine pointer: autoplay loop, paused while off screen. Reduced motion: still frame.
 
 ```js
-function mouseScrubVideo(video, { sensitivity = 0.8, query = '(min-width: 1024px) and (hover: hover)' } = {}) {
+function mouseScrubVideo(video, { sensitivity = 0.8, query = '(min-width: 1024px) and (hover: hover) and (pointer: fine)' } = {}) {
   const mq = matchMedia(query), reduce = matchMedia('(prefers-reduced-motion: reduce)');
-  let prevX = null, target = 0, busy = false;
+  let prevX = null, target = 0, busy = false, visible = true;
   video.muted = true; video.playsInline = true;
   const flush = () => {
     if (!mq.matches || reduce.matches || Math.abs(video.currentTime - target) < 1 / 60) { busy = false; return; }
@@ -233,8 +270,9 @@ function mouseScrubVideo(video, { sensitivity = 0.8, query = '(min-width: 1024px
   const applyMode = () => {
     if (reduce.matches) video.pause();
     else if (mq.matches) { video.loop = false; video.pause(); target = video.currentTime; }
-    else { video.loop = true; video.play().catch(() => {}); }
+    else { video.loop = true; visible ? video.play().catch(() => {}) : video.pause(); }
   };
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; applyMode(); }).observe(video);
   mq.addEventListener('change', applyMode); reduce.addEventListener('change', applyMode);
   applyMode();
 }
@@ -252,6 +290,8 @@ Rewritten here to cost less. The source cached up to 90 frames at 960 px wide (a
 - **Cache with a budget:** frames are limited by pixel area (960×540 at most) and by a memory budget (64 MB desktop, 24 MB phones), between 12 and `duration × 12` frames. Neighbouring frames crossfade, so fewer frames still scrub smoothly.
 - **The canvas is the size of one frame** and CSS `object-fit:cover` scales it on the compositor, so there is no full-viewport backing store and no cover math.
 - **rAF runs only while the smoothed value settles** or a seek is pending.
+- **A seek that doesn't land within 3 s abandons the cache** and keeps the seek path. The source resolved its 1 s timeout as if the seek had landed, so on a slow connection (about 2 Mbps in a test) more than half the cached frames were the wrong ones. For clips under about 15 MB, downloading the file as a blob first (see the cursor recipe) makes every seek local.
+- **Reduced motion:** no scrub; the poster stays. The source kept the scrub and only dropped smoothing.
 
 ```html
 <div class="scrubbg" aria-hidden="true">
@@ -301,7 +341,7 @@ Rewritten here to cost less. The source cached up to 90 frames at 960 px wide (a
   const update = () => {
     pending = false;
     target = progress();
-    smooth = reduce ? target : smooth + (target - smooth) * 0.12;
+    smooth += (target - smooth) * 0.12;
     if (Math.abs(target - smooth) < 0.0005) smooth = target;
     render();
     if (smooth !== target) request();
@@ -309,9 +349,9 @@ Rewritten here to cost less. The source cached up to 90 frames at 960 px wide (a
   const request = () => { if (!pending) { pending = true; requestAnimationFrame(update); } };
 
   const once = (el, ev) => new Promise((r) => el.addEventListener(ev, r, { once: true }));
-  const seekTo = (v, t) => new Promise((r) => {
-    const timer = setTimeout(r, 1000);                      // safety net
-    v.addEventListener('seeked', () => { clearTimeout(timer); r(); }, { once: true });
+  const seekTo = (v, t) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('seek timed out')), 3000);   // a wrong frame is worse than no cache
+    v.addEventListener('seeked', () => { clearTimeout(timer); resolve(); }, { once: true });
     v.currentTime = t;
   });
   async function buildFrameCache() {
@@ -334,6 +374,7 @@ Rewritten here to cost less. The source cached up to 90 frames at 960 px wide (a
     return out;
   }
 
+  if (reduce) return;                                      // reduced motion: the poster stays, no scrub
   addEventListener('scroll', request, { passive: true });
   addEventListener('resize', request);
   video.addEventListener('seeked', request);
@@ -350,7 +391,7 @@ Rewritten here to cost less. The source cached up to 90 frames at 960 px wide (a
 })();
 ```
 
-Drawing a cross-origin video into a canvas only taints it (pixels can't be read back); drawing still works, so don't set `crossOrigin` unless the host sends CORS headers, or the video fails to load. Reduced motion skips smoothing; the scrub is user-driven, so it stays unless the project's MO1 rule applies.
+Drawing a cross-origin video into a canvas only taints it (pixels can't be read back); drawing still works, so don't set `crossOrigin` unless the host sends CORS headers, or the video fails to load.
 
 ### Scene switcher
 
@@ -393,7 +434,7 @@ Light. An almost invisible frosted surface whose edge is a gradient hairline, br
 .liquid-glass--strong::before{--rim-a:.5;--rim-b:.2}
 .liquid-glass--dark{background:rgba(0,0,0,.4)}
 .liquid-glass--dark::before{--rim-a:.3;--rim-b:.1}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.liquid-glass{background:rgba(255,255,255,.08)}}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.liquid-glass:not(.liquid-glass--dark){background:rgba(255,255,255,.08)}}
 ```
 
 Keep the three-line mask form: it is the one that works across browsers. The mask removes the content box, so only the ring paints and clicks pass through.
@@ -422,7 +463,7 @@ Light. A faint texture removes banding in video, gradients and flat colour.
 
 ```css
 :root{--noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-/* page-wide grain, about 3 % effective */
+/* page-wide grain: about 1.5 % effective (noise alpha averages about .5, times .08, times .4) */
 .page-grain{position:fixed;inset:0;z-index:100;pointer-events:none;opacity:.4;background-size:200px 200px;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E")}
 /* over a video, last child of a position:relative; overflow:hidden box: shows in mid-tones, where banding lives */
@@ -447,13 +488,14 @@ Light. Each hero element rises a few pixels out of a blur in reading order while
 - `filter: blur()` on large text is costly: blur only headline lines and a few chips; paragraphs get a plain rise (y 20 to 24 px, 0.8 to 1 s).
 - Media settle: `scale(1.12 → 1)` for images, `scale(1.05 → 1)` plus fade for video, 1.8 s.
 - Spacing: 80 to 200 ms between siblings, everything landed by about 1.5 s, the headline gets the longest duration, logos and fine print only fade.
-- Source timelines (start delays): minimal centred, headline 0, sub .2, call to action .4 (0.8 s, y 24). Glass hero over video: badge .4, headline words with .1 stagger, sub .8, calls to action 1.1, stat cards 1.3, partner strip 1.4. Two-line headline: line 1 .25, line 2 .42, bottom copy .70 and .85.
+- Source timelines (start delays): minimal centred, headline 0, sub .2, call to action .4 (0.8 s, y 24). Glass hero over video: badge .4, headline words with .08 stagger (the source used .1; SKILL.md's word stagger is 60 to 80 ms), sub .8, calls to action 1.1, stat cards 1.3, partner strip 1.4. Two-line headline: line 1 .25, line 2 .42, bottom copy .70 and .85.
 
 ```css
-@keyframes blurRise{from{opacity:0;transform:translateY(var(--rise,28px));filter:blur(var(--blur,12px))}to{opacity:1;transform:none;filter:blur(0)}}
-@keyframes fadeRise{from{opacity:0;transform:translateY(var(--rise,20px))}to{opacity:1;transform:none}}
-@keyframes fadeDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
-@keyframes settleZoom{from{transform:scale(var(--zoom-from,1.12))}to{transform:scale(1)}}
+/* from-only keyframes end on the element's own values, so hover transforms and fixed children work afterwards */
+@keyframes blurRise{from{opacity:0;transform:translateY(var(--rise,28px));filter:blur(var(--blur,12px))}}
+@keyframes fadeRise{from{opacity:0;transform:translateY(var(--rise,20px))}}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-16px)}}
+@keyframes settleZoom{from{transform:scale(var(--zoom-from,1.12))}}
 .in-blur{animation:blurRise var(--dur,1.1s) var(--ease-out-expo) var(--d,0ms) both}
 .in-fade{animation:fadeRise var(--dur,1s) var(--ease-out-expo) var(--d,0ms) both}
 .in-down{animation:fadeDown .8s var(--ease-out-expo) var(--d,0ms) both}
@@ -466,20 +508,22 @@ Light. Each hero element rises a few pixels out of a blur in reading order while
 ```
 ```html
 <script>   /* inline in <head>, so the gate and its release can't fail separately */
-  document.documentElement.classList.add('js');
-  document.fonts.ready.then(() => document.documentElement.classList.add('fonts-ready'));
-  setTimeout(() => document.documentElement.classList.add('fonts-ready'), 1500);   // never wait forever
+  const root = document.documentElement, release = () => root.classList.add('fonts-ready');
+  setTimeout(release, 1500);                                // first, so nothing below can block it
+  root.classList.add('js');
+  // fonts.ready resolves at once in <head>, before any font is requested; wait for the parsed DOM
+  document.addEventListener('DOMContentLoaded', () => document.fonts?.ready.then(release) ?? release());
 </script>
 ```
 
-`both` hides an element only during its delay; if animations never run, everything stays visible.
+`both` hides an element only during its delay; if animations never run, everything stays visible. A filled animation holds the element's transform while it runs, so hover transforms apply only once it ends.
 
 ### Fail-safe entrance system
 
 Light. The production version of the blur-rise: each element picks a verb and a delay, the page can never be stuck blank, and once an animation ends its `transform` is released so `:hover` transforms work.
 
 - Duration 1.05 s, `--ease-out-expo`, delay from `--d`.
-- Verbs: `scale` (from `scale(.84)`) for the logo, `soft` (`translateY(14px)`), `mask` (`translateY(40%)` inside an overflow-hidden line), `pop` (`scale(.9)`, `1.03` at 70 %, then 1) for badges, `btn` (`translateY(18px) scale(.94)`), `side` (`translateX(22px)`) for secondary calls to action, `stat` (`translateY(20px)`).
+- Verbs: `scale` (from `scale(.9)`; the source used .84, below SKILL.md's 0.9 floor) for the logo, `soft` (`translateY(14px)`), `mask` (`translateY(40%)` inside an overflow-hidden line), `pop` (`scale(.9)`, `1.03` at 70 %, then 1) for badges, `btn` (`translateY(18px) scale(.94)`), `side` (`translateX(22px)`) for secondary calls to action, `stat` (`translateY(20px)`).
 - Accent words in a headline: `opacity .35, blur(4px)` to sharp, 1.2 s at .72 s.
 - Example timeline: logo .08; nav items .16 to .52; badge .22; headline lines .42 and .62; lede .82 (1.25 s); primary .96; secondary 1.10; stats 1.12, 1.28, 1.44.
 
@@ -487,8 +531,8 @@ Light. The production version of the blur-rise: each element picks a verb and a 
 .appear{animation-duration:1.05s;animation-fill-mode:both;animation-timing-function:var(--ease-out-expo);animation-delay:var(--d,.08s)}
 .appear--scale{animation-name:in-scale} .appear--soft{animation-name:in-soft} .appear--mask{animation-name:in-mask}
 .appear--pop{animation-name:in-pop} .appear--btn{animation-name:in-btn} .appear--side{animation-name:in-side} .appear--stat{animation-name:in-stat}
-.appear.is-in{animation:none;opacity:1;transform:none;filter:none}
-@keyframes in-scale{from{opacity:0;transform:scale(.84)}}
+.appear.is-in{animation:none}   /* release: the element's own opacity, transform and filter return */
+@keyframes in-scale{from{opacity:0;transform:scale(.9)}}
 @keyframes in-soft {from{opacity:0;transform:translateY(14px)}}
 @keyframes in-mask {from{opacity:0;transform:translateY(40%)}}
 @keyframes in-pop  {0%{opacity:0;transform:scale(.9)}70%{opacity:1;transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}
@@ -496,11 +540,13 @@ Light. The production version of the blur-rise: each element picks a verb and a 
 @keyframes in-side {from{opacity:0;transform:translateX(22px)}}
 @keyframes in-stat {from{opacity:0;transform:translateY(20px)}}
 @keyframes in-em   {from{opacity:.35;filter:blur(4px)}}
-.headline-line{display:block;overflow:hidden;padding:.06em .15em .14em}   /* room for descenders and italics */
+.headline-line{display:block;overflow:hidden;padding:.06em .15em .14em}   /* the clip; room for descenders and italics */
+.headline-line>.appear{display:block}                                      /* the moving line inside it */
 h1 em{animation:in-em 1.2s var(--ease-out-expo) .72s both}
-@media (prefers-reduced-motion:reduce){.appear,h1 em{animation:none!important;opacity:1;transform:none;filter:none}}
+@media (prefers-reduced-motion:reduce){.appear,h1 em{animation:none!important}}
 ```
 ```js
+// at the end of <body>, or with defer, so the elements exist
 const appearEls = document.querySelectorAll('.appear');
 appearEls.forEach((el) => el.addEventListener('animationend', (e) => {
   if (e.target === el) el.classList.add('is-in');      // ignore animations bubbling from children such as <em>
@@ -512,8 +558,8 @@ requestAnimationFrame(() => requestAnimationFrame(() => {  // fallback: nothing 
 ```
 ```html
 <h1>
-  <span class="headline-line appear appear--mask" style="--d:.42s">First line with <em>accent</em></span>
-  <span class="headline-line appear appear--mask" style="--d:.62s">second line.</span>
+  <span class="headline-line"><span class="appear appear--mask" style="--d:.42s">First line with <em>accent</em></span></span>
+  <span class="headline-line"><span class="appear appear--mask" style="--d:.62s">second line.</span></span>
 </h1>
 ```
 
@@ -524,7 +570,7 @@ requestAnimationFrame(() => requestAnimationFrame(() => {  // fallback: nothing 
 Light. Blocks below the fold fade and rise once as they enter, with per-element delays so a group cascades.
 
 - Source values: `opacity 0, y 30px` to rest, 0.7 s `--ease-reveal`, once. Large headings y 40; media y 60 over 0.9 s; two-column splits from `x ±40px`; card grids `scale(.95)` with `--ease-out-quint`.
-- Trigger: `threshold .15`, `rootMargin: 0px 0px -10% 0px`. `threshold` is a fraction of the element, so a block taller than about 6.6 viewports never reaches 0.15: use `threshold 0` for tall blocks.
+- Trigger: `threshold .15`, `rootMargin: 0px 0px -10% 0px`. `threshold` is a fraction of the element, so with that margin a block taller than about 6 viewports never reaches 0.15: give blocks taller than the viewport `threshold 0`. The margin also means the bottom 10 % of the viewport never counts, so once the page is scrolled to its end, everything left on screen is revealed.
 - Stagger `base + i × step`: lists `150 + i·120 ms`, grid cards `i·100 ms`, stat columns `i·150 ms`.
 - Corner decor around a centred heading: four objects sliding in from `x ±80px`, 0.9 s, delays .10, .15, .25, .30 s.
 
@@ -548,6 +594,12 @@ const revealIO = new IntersectionObserver((entries) => entries.forEach((e) => {
   if (e.isIntersecting) { e.target.classList.add('is-in'); revealIO.unobserve(e.target); }
 }), { threshold: 0.15, rootMargin: '0px 0px -10% 0px' });
 document.querySelectorAll('[data-reveal]').forEach((el) => revealIO.observe(el));
+addEventListener('scroll', () => {                         // the last lines may sit in the excluded bottom band
+  if (innerHeight + scrollY < document.documentElement.scrollHeight - 2) return;
+  document.querySelectorAll('[data-reveal]:not(.is-in)').forEach((el) => {
+    if (el.getBoundingClientRect().top < innerHeight) { el.classList.add('is-in'); revealIO.unobserve(el); }
+  });
+}, { passive: true });
 ```
 
 ### Scroll-linked word reveal
@@ -555,7 +607,7 @@ document.querySelectorAll('[data-reveal]').forEach((el) => revealIO.observe(el))
 Medium. A paragraph in large type starts at 15 % opacity and lights up word by word as the reader scrolls through it. One or two per page; highlighted key words end in full foreground, the rest on a softer tone.
 
 - Progress 0 when the block's top reaches 80 % of the viewport, 1 when its bottom reaches 20 %.
-- Each word's window is `[i/N - 0.1, i/N + 0.05]` for a soft overlap, or `[i/N, (i+1)/N]` for a crisper sweep.
+- Each word's window is 0.15 of the progress wide and overlaps its neighbours; the windows are spread so the first starts at 0 and the last ends at 1. The source's `[i/N - 0.1, i/N + 0.05]` started the first words already lit and left the last ones short of full opacity. For a crisper sweep use `before: 0, after: 1 / N`.
 - Opacity only, inline spans: no layout shift, natural line breaks, and the text stays real for screen readers.
 
 ```js
@@ -581,7 +633,7 @@ function scrollReveal(el, { from = 0.15, start = 0.8, end = 0.2, before = 0.1, a
     if (Math.abs(p - last) < 0.0005) return;
     last = p;
     pieces.forEach((s, i) => {
-      const a = i / N - before, b = i / N + after;
+      const c = before + (N > 1 ? i / (N - 1) : 0) * (1 - before - after), a = c - before, b = c + after;
       s.style.opacity = (from + (1 - from) * Math.min(1, Math.max(0, (p - a) / (b - a)))).toFixed(3);
     });
   };
@@ -662,14 +714,14 @@ Rewritten here to cost less than the source, which wrote about 25 custom propert
 - **Size the planes to their use.** Each decoded layer costs width × height × 4 bytes. Export each plane at its largest rendered width times a device pixel ratio capped at 2 (a 118vw foreground on a 1440 px screen is about 3400 px), crop it tight to its opaque pixels, serve smaller files to phones with `srcset`, and cut the foreground into a left and a right file.
 - **Hide what is off stage:** controls that slide out get `visibility:hidden` and `pointer-events:auto` only once their enter value passes 0.98.
 
-Mobile widens the subject and close-up (source: 138vw, then 190vw on phones) so the planes still cover, and shrinks the title in steps. Reduced motion snaps values without smoothing and drops pointer parallax; under MO1, replace the parting and launches with crossfades between the key states.
+Mobile widens the subject and close-up (source: 138vw, then 190vw on phones) so the planes still cover, and shrinks the title in steps. Reduced motion: replace the parting, launches and drift with opacity crossfades between the key states (`apply` can branch on `matchMedia('(prefers-reduced-motion: reduce)')`), and drop pointer parallax. The helper already snaps without smoothing. The source kept the full movement and only dropped smoothing.
 
 ### Stacking cards
 
 Medium. Cards pin near the top one after another; each new card slides over the last while those underneath shrink a little with a sliver of their top edge showing.
 
 - Each card in its own slot: `position:sticky; top:0; height:85vh`, card offset `top: i × 28px`, `transform-origin: top center`.
-- Target scale `1 - (n - 1 - i) × 0.03`, interpolated from 1 at section progress `i/n` to the target at progress 1.
+- Target scale `1 - (n - 1 - i) × 0.03`, interpolated from 1 at section progress `i/n` to the target at progress 1. Progress ends when the last slot pins, not when the section's bottom reaches the viewport's.
 - Reduced motion: keep the sticky stacking, skip the scaling.
 
 ```js
@@ -680,7 +732,8 @@ function stackCards(section) {
   const update = () => {
     pending = false;
     const r = section.getBoundingClientRect();
-    const p = Math.min(1, Math.max(0, -r.top / Math.max(1, r.height - innerHeight)));
+    const end = Math.max(1, r.height - cards[n - 1].parentElement.offsetHeight);   // when the last slot pins
+    const p = Math.min(1, Math.max(0, -r.top / end));
     cards.forEach((card, i) => {
       const t = Math.min(1, Math.max(0, (p - i / n) / (1 - i / n)));
       card.style.transform = `scale(${1 - (n - 1 - i) * 0.03 * t})`;
@@ -706,7 +759,7 @@ Medium. A heading stays pinned in the centre while two columns of tilted images 
 
 Medium. Two rows of work thumbnails slide sideways as the page scrolls down, the top row right and the bottom row left.
 
-- `offset = (innerHeight - section.top) × 0.3`; row A `translateX(-33.333% + offset)`, row B `translateX(-33.333% - offset)`.
+- `offset = (innerHeight - section.top) × 0.3`; row A `translateX(calc(-33.333% + offset))`, row B `translateX(calc(-33.333% - offset))`. Each set must be wider than the viewport plus the largest offset, or an empty edge shows; repeat tiles within a set if needed.
 - Each row's content is tripled and starts one set to the left, so neither direction shows an empty edge. Mark the duplicate sets `aria-hidden="true"`.
 - Tiles 420×270 px (260×168 on phones), radius 16 px, 12 px gaps.
 - Changed from the source: when tiles are videos, only the middle set plays video; the duplicate sets use the poster image, so the page decodes one copy of each clip instead of three. Pause them all when the section leaves the viewport.
@@ -718,22 +771,23 @@ Medium. A large centred paragraph tilted back in perspective drifts upward as th
 
 - Container `perspective:400px`; text `rotateX(24deg) translateY(y) translateZ(15px)`; `y` maps progress 0 to 1 onto 60 to -120 px; opacity 0 to 1 between progress 0.3 and 0.5.
 - Spring (source values): stiffness 15, damping 32, mass 1.8, an overdamped float.
-- Changed from the source, which ran rAF forever: the loop starts on scroll and stops once the spring settles.
-- Reduced motion: the text tracks scroll without the spring; under MO1, fade it in without the tilt movement.
+- Changed from the source, which ran rAF forever: the loop starts on scroll and stops once the spring settles (about 10 s after the last scroll, since the spring is heavily damped). The first frame snaps to the scroll position, so a page loaded mid-section shows the text at once.
+- Reduced motion: the text holds its resting tilt and only fades in with scroll.
 
 ```js
 function crawl(sec, txt, { K = 15, C = 32, M = 1.8 } = {}) {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let x = 0, v = 0, last = 0, raf = 0;
+  let x = 0, v = 0, last = 0, raf = 0, init = false;
   const targetOf = () => { const r = sec.getBoundingClientRect(); return Math.min(1, Math.max(0, (innerHeight - r.top) / (innerHeight + r.height))); };
   const frame = (now) => {
     const dt = last ? Math.min(0.032, (now - last) / 1000) : 1 / 60; last = now;
     const target = targetOf();
-    if (reduce) { x = target; v = 0; }
+    if (!init || reduce) { x = target; v = 0; init = true; }
     else { v += ((-K * (x - target) - C * v) / M) * dt; x += v * dt; }        // semi-implicit Euler
-    txt.style.transform = `rotateX(24deg) translateY(${(60 - 180 * x).toFixed(2)}px) translateZ(15px)`;
+    const y = reduce ? -30 : 60 - 180 * x;                                    // reduced motion: no drift
+    txt.style.transform = `rotateX(24deg) translateY(${y.toFixed(2)}px) translateZ(15px)`;
     txt.style.opacity = Math.min(1, Math.max(0, (x - 0.3) / 0.2)).toFixed(3);
-    raf = Math.abs(x - target) > 3e-4 || Math.abs(v) > 3e-4 ? requestAnimationFrame(frame) : (last = 0);   // 3e-4 ≈ 0.05 px
+    raf = Math.abs(x - target) > 2e-3 || Math.abs(v) > 2e-3 ? requestAnimationFrame(frame) : (last = 0);   // 2e-3 ≈ 0.36 px
   };
   const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
   addEventListener('scroll', kick, { passive: true });
