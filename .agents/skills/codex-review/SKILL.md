@@ -1,6 +1,6 @@
 ---
 name: "codex-review"
-description: "Second opinion: Codex CLI (codex exec review, gpt-6.1-sol, high) over PR, branch, commit, or uncommitted diff, then each finding verified. Use: $codex-review, 'have Codex/Sol review this'."
+description: "Second opinion: Codex CLI (gpt-6.1-sol, high) reviews PR, branch, commit, or uncommitted diff; each finding verified. Use: 'have Codex/Sol review this'."
 ---
 
 # Codex review

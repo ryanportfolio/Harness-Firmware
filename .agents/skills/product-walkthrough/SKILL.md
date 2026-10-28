@@ -1,6 +1,6 @@
 ---
 name: product-walkthrough
-description: "Product tour replaying real screens (product CSS + markup), guide cursor acts; embed or MP4. Use: $product-walkthrough, onboarding tours."
+description: "Product tour or onboarding tour replaying real screens (product CSS + markup), guide cursor acts; embed or MP4."
 ---
 
 # Product walkthrough

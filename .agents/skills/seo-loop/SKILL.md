@@ -1,6 +1,6 @@
 ---
 name: seo-loop
-description: "SEO/AEO/GEO fix rounds, measured. Use: $seo-loop [local|live], 'improve SEO'."
+description: "SEO/AEO/GEO fix rounds, measured, local or live. Use: 'improve SEO'."
 ---
 
 # SEO loop

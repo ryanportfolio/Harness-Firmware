@@ -184,6 +184,13 @@ condensed.
 
 ### Changed
 
+- 25 Codex skill descriptions are shorter, taking the Codex skill catalog from
+  7,716 to 7,242 characters. Most of the cut removes `$name` from a skill's own
+  description: Codex loads a skill by name when the user types `$name`, so
+  repeating it adds nothing. `$name` stays where it marks an explicit-only
+  skill (`advocate`, `why`, `merge`, `external-review`) or is the skill's only
+  trigger (`deep-plan`, `design-prototypes`, `redesign-concepts`). Claude
+  descriptions are unchanged.
 - The 7,500-character cap on the Codex skill catalog (every skill name plus
   description) is gone. `test-codex-contract.mjs` still prints the total but no
   longer warns, and `addskill` and `docs/codex-skills.md` no longer ask to stay
