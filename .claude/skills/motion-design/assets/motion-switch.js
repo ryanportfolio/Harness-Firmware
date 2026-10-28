@@ -3,14 +3,15 @@
 
    Mode, first match wins: ?motion=on|off|xray in the URL, the visitor's saved choice, prefers-reduced-motion
    (off), else on. <html data-motion="..."> mirrors it for CSS.
-     off   every <video> pauses, CSS animations pause; each piece shows its finished still (it subscribes, below)
+     off   every <video> pauses, CSS animations are removed (rest state shows); each piece shows its finished
+           still (it subscribes, below)
      on    everything plays
      xray  everything plays, and each [data-xray] element is outlined and labelled with its data-xray text
            and data-xray-tool, e.g. data-xray="Scroll film, 3 chained clips" data-xray-tool="generated video"
    Every change also sets <html class="motion-paused"> (off only) and fires a motionchange event on document,
    the pause contract of web-effects.md (Shared conventions), so those recipes stop and resume with it.
    Reduced motion is a floor: on or xray lifts the switch's own pause, but under prefers-reduced-motion the
-   switch starts no video and recipes keep their reduced-motion fallbacks.
+   switch pauses native autoplay video and recipes keep their reduced-motion fallbacks.
    API: Motion.mode, Motion.set(mode), Motion.on(fn) runs fn(mode) now and on every change, returns an unsubscribe.
    Control: put <div data-motion-switch></div> where the buttons belong. Key M cycles the modes, except while
    typing in a field. */
@@ -59,7 +60,9 @@
     root.dataset.motion = mode;
     root.classList.toggle('motion-paused', mode === 'off');
     if (mode === 'off') for (const v of document.querySelectorAll('video')) v.pause();
-    else if (!reduce.matches) for (const v of document.querySelectorAll('video[autoplay]')) v.play().catch(() => {});
+    // Reduced motion floor: whatever the mode, native autoplay is stopped, since the browser starts it on its own.
+    else if (reduce.matches) for (const v of document.querySelectorAll('video[autoplay]')) v.pause();
+    else for (const v of document.querySelectorAll('video[autoplay]')) v.play().catch(() => {});
     for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
     xray(mode === 'xray');
     // Recipe controllers re-apply their own state (on screen? scrubbed?) after the plain videos above.
@@ -100,7 +103,9 @@
       '.motion-switch button:focus-visible{outline:2px solid #fff;outline-offset:2px}',
       '.xray-label{position:fixed;left:0;top:0;z-index:2147483646;pointer-events:none;max-width:280px;padding:4px 7px;border-radius:6px;background:#111;color:#fff;font:500 11px/1.35 ui-monospace,Consolas,monospace;box-shadow:0 0 0 1px rgba(255,255,255,.3)}',
       '[data-motion="xray"] [data-xray]{outline:1px dashed #ff4fa3;outline-offset:2px}',
-      '.motion-paused *{animation-play-state:paused!important}',   // CSS animations (grain, loops) stop with Off
+      // Off removes CSS animations instead of pausing them: a paused entrance (fill-mode both) would freeze on its
+      // hidden first frame, while removal shows every element's visible rest state. On replays entrances once.
+      '.motion-paused *{animation:none!important}',
     ].join('');
     document.head.appendChild(style);
     document.querySelectorAll('[data-motion-switch]').forEach(mount);
@@ -111,8 +116,8 @@
       if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
       set(MODES[(MODES.indexOf(mode) + 1) % MODES.length]);
     });
-    // Follow the OS setting while the visitor has made no choice of their own.
-    reduce.addEventListener('change', () => { if (!chosen) set(reduce.matches ? 'off' : 'on', false); });
+    // Follow the OS setting while the visitor has made no choice of their own; after a choice, re-apply the floor.
+    reduce.addEventListener('change', () => { if (!chosen) set(reduce.matches ? 'off' : 'on', false); else apply(false); });
     apply(false); // subscribers already got the mode from Motion.on
   }
 

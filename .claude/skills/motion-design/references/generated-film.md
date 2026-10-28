@@ -107,7 +107,7 @@ Limits:
 - **Living still** for cards: a clip with start = end image and calm motion that can come home ("locked-off camera, leaf shadows drift across the wall and back"), then forward + reversed for a loop with no seam:
 
 ```bash
-ffmpeg -i in.mp4 -filter_complex "[0:v]scale=960:-2,split[a][b];[b]reverse,trim=start_frame=1,setpts=PTS-STARTPTS[r];[a][r]concat=n=2:v=1[v]" -map "[v]" -an -c:v libx264 -crf 25 -pix_fmt yuv420p -movflags +faststart loop.mp4
+ffmpeg -i in.mp4 -filter_complex "[0:v]scale=960:-2,split[a][b];[a]trim=start_frame=1,setpts=PTS-STARTPTS[f];[b]reverse,trim=start_frame=1,setpts=PTS-STARTPTS[r];[f][r]concat=n=2:v=1[v]" -map "[v]" -an -c:v libx264 -crf 25 -pix_fmt yuv420p -movflags +faststart loop.mp4
 ```
 
-  `reverse` buffers whole clip in memory: fine for 5 s at 960 px. Play `<video muted playsinline loop autoplay poster="still.jpg">`. Model outputs 16:9 from portrait still → crop in card with `object-fit: cover`.
+  Same as the [boomerang loop](web-effects.md#boomerang-loop) at web size: each half drops its first frame, so no frame repeats at the turn or the wrap (4-frame test: `1,2,3,2,1,0`). `reverse` buffers whole clip in memory: fine for 5 s at 960 px. Play `<video muted playsinline loop autoplay poster="still.jpg">`. Model outputs 16:9 from portrait still → crop in card with `object-fit: cover`.
