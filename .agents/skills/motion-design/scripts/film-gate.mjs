@@ -43,7 +43,7 @@ function pairs(file, lag = 1) {
   const r = run('ffmpeg', ['-v', 'error', '-nostdin', '-i', file, '-i', file, '-lavfi', graph, '-f', 'null', '-']);
   const out = [];
   for (const line of r.stdout.split(/\r?\n/)) {
-    const m = /All:([0-9.]+)/.exec(line);
+    const m = /All:(-?[0-9.]+)/.exec(line);   // SSIM goes negative for inverted contrast, often at a cut
     if (m) out.push(Number(m[1]));
   }
   if (!out.length && r.status !== 0) throw new Error(r.stderr.trim().split(/\r?\n/).slice(-2).join(' '));

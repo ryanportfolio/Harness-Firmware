@@ -38,7 +38,7 @@ node .agents/skills/motion-design/scripts/film-chain.mjs film.json --run    # af
 What it does:
 - Clip i starts on clip i-1's exact last frame (read back with ffmpeg, never keyframe) and ends on keyframe i+1 → seams match by construction.
 - Strictly in order. Clip on disk (`film/c<i>.mp4`) reused, never repaid.
-- Each clip gated before next starts. Fail → renamed `c<i>.cut.mp4` (kept as evidence, never reused), run stops.
+- Each clip gated before next starts. Fail → `c<i>.mp4` renamed `c<i>.cut.mp4` and `c<i>.job-id` renamed `c<i>.cut.job-id` (kept as evidence, never reused, so the rerun makes a new job), run stops.
 - Join drops first frame of clip 2+ (repeats previous last frame), H.264 CRF 16, no audio, then gates whole film.
 - Needs `ffmpeg` + `ffprobe` on PATH. Plain Node, no shell: runs same on Windows, macOS, Linux.
 
@@ -48,7 +48,7 @@ Fix for a cut clip: remake keyframe i+1 from `film/c<i-1>-last.png` (or k1), sam
 
 `adapter.mjs` exports `async generate({ index, start, end, prompt, out, dir })`. Must write `out` (mp4) or throw.
 
-- Persist provider job id next to `out` (`c<i>.job-id`) the moment it exists; on rerun, wait on that job instead of creating a new one. Chain only logs credits after `out` exists, so a crash mid-job leaves billing to the adapter's record.
+- Persist provider job id next to `out` as exactly `c<i>.job-id` (the name the chain retires on a failed gate) the moment it exists; on rerun, wait on that job instead of creating a new one. Chain only logs credits after `out` exists, so a crash mid-job leaves billing to the adapter's record.
 - Use `execFile` with an argv array, no shell: prompts carry quotes and commas.
 - Windows: npm-installed CLIs are `.cmd` shims; Node 24 `execFile` refuses them (`EINVAL`) without `shell: true`. Call the CLI's `.exe`, or `node <its JS entry>`. Never switch to `shell: true` with a prompt in argv.
 
@@ -91,7 +91,7 @@ Exit 0 pass, 1 fail, 2 could not measure (missing file, not a video, under 8 fra
 - **Cut**: SSIM of adjacent frames at 480 px, as dissimilarity d = 1 - SSIM. Cut when d > 3x median d of the 8 neighbouring pairs (pair itself excluded) and > that median + 0.15. Fixed threshold fails: smooth fast pan scored median 0.49 per step; hard cut between similar frames scores high.
 - **Freeze**: frame n vs frame n + `--max-freeze` s scores above `--freeze-ssim` → nothing visible changed that long = dead scroll zone. Adjacent pairs can't judge this: slow 4 s dissolve scored 0.998 per step, same as a stopped camera.
 
-Measured 2026-10-28 on synthetic clips (ffmpeg 8.0.1): smooth zoom PASS (median 0.989); hard cut caught (0.504 vs local 0.986); zoom jump mid-push caught (0.482 vs 0.984); 1.5 s hold caught as 1.54 s freeze; textured pan 40 px/frame PASS (median 0.488).
+Measured 2026-10-28 on synthetic clips (ffmpeg 8.0.1): smooth zoom PASS (median 0.989); hard cut caught (0.504 vs local 0.986); cut to the inverted frame caught (SSIM goes negative; parsed signed); zoom jump mid-push caught (0.482 vs 0.984); 1.5 s hold caught as 1.54 s freeze; textured pan 40 px/frame PASS (median 0.488).
 
 Limits:
 - Median SSIM under 0.6 (fast motion over fine texture) → gate prints WARN: a 300 px skip inside the 40 px/frame pan passed. Watch those files at 1x.

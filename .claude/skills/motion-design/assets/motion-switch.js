@@ -61,9 +61,11 @@
   }
 
   function set(next, persist = true) {
-    if (!MODES.includes(next) || next === mode) return;
+    if (!MODES.includes(next)) return;
+    // Save first: clicking the mode already showing is still an explicit choice that the OS setting must not undo.
+    if (persist) { chosen = true; try { localStorage.setItem('motion', next); } catch {} }
+    if (next === mode) return;
     mode = next;
-    if (persist) { chosen = true; try { localStorage.setItem('motion', mode); } catch {} }
     apply();
   }
 

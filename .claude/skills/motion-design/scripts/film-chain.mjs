@@ -5,7 +5,8 @@
 // film.json (paths relative to the file):
 //   { "keyframes": ["kf/k1.png", "kf/k2.png", "kf/k3.png"],     N keyframes, each made from the one before
 //     "prompts": ["One continuous single shot, no cuts. ...", ...], N-1 prompts, one camera move per clip
-//     "adapter": "adapter.mjs",                                    exports async generate({ index, start, end, prompt, out, dir })
+//     "adapter": "adapter.mjs",                                    exports async generate({ index, start, end, prompt, out, dir });
+//                                                                  job id in c<i>.job-id next to out (retired on a failed gate)
 //     "creditsPerClip": 60, "ledger": "ledger.tsv", "out": "film/film.mp4" }
 //
 // Clip i starts on the exact last frame of clip i-1 (pixels read back with ffmpeg, never the keyframe) and
@@ -74,6 +75,9 @@ async function main() {
     if (g.status !== 0) {
       const kept = c.replace(/\.mp4$/, '.cut.mp4');
       renameSync(c, kept);
+      // Retire the provider job too, or a resuming adapter would download the rejected clip again.
+      const job = c.replace(/\.mp4$/, '.job-id');
+      if (existsSync(job)) renameSync(job, c.replace(/\.mp4$/, '.cut.job-id'));
       console.error(g.status === 2
         ? `clip ${i} could not be measured (not a video?); kept as ${kept}. Check the adapter's output, then rerun.`
         : `clip ${i} failed the gate; kept as ${kept}. Remake keyframe ${i + 1} from ${start} with the same camera angle and a smaller step, then rerun.`);
