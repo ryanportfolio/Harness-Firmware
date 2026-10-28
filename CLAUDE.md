@@ -16,7 +16,7 @@ Invoke the `caveman` skill at **ultra** at session start. Applies to all prose r
 
 ## Always-on cleanup
 
-Caveman covers chat replies only. Anything written to a file or for another reader (docs, READMEs, UI copy, emails, commit messages, PR text) uses the `writing` skill in normal prose. Preserve facts, caveats, exact quotations, code and identifiers. No jargon, in chat or in files: say what a thing does in plain words instead of coining labels, internal codes or shorthand the reader hasn't seen. If a new term is unavoidable, define it the first time.
+Caveman covers chat replies and files that only agents read: skill bodies and their references, `.claude/reference/` entries, and subagent or Codex briefs. Write those in caveman ultra, but keep safety, authorization and gating lines ("never", "only when", "unless the user asks") as full sentences with every qualifier. Anything written for a human reader (docs, READMEs, UI copy, emails, commit messages, PR text) uses the `writing` skill in normal prose. Preserve facts, caveats, exact quotations, code and identifiers. No jargon, in chat or in files: say what a thing does in plain words instead of coining labels, internal codes or shorthand the reader hasn't seen. If a new term is unavoidable, define it the first time.
 
 ## CRITICAL: Verification
 
