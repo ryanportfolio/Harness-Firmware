@@ -308,6 +308,7 @@ Rewritten here to cost less. The source cached up to 90 frames at 960 px wide (a
 - **rAF runs only while the smoothed value settles** or a seek is pending.
 - **A seek that doesn't land within 3 s abandons the cache** and keeps the seek path. The source resolved its 1 s timeout as if the seek had landed, so on a slow connection (about 2 Mbps in a test) more than half the cached frames were the wrong ones. For clips under about 15 MB, downloading the file as a blob first (see the cursor recipe) makes every seek local.
 - **Reduced motion:** no scrub; the poster stays. The source kept the scrub and only dropped smoothing.
+- **Pause control** (`.motion-paused` + `motionchange`, Shared conventions): the poster shows and scrolling stops redrawing; resuming jumps to the current scroll position.
 
 ```html
 <div class="scrubbg" aria-hidden="true">
@@ -324,6 +325,8 @@ Rewritten here to cost less. The source cached up to 90 frames at 960 px wide (a
 .scrubbg.has-video .scrubbg__video{opacity:1}
 .scrubbg.has-video .scrubbg__poster,.scrubbg.has-frames .scrubbg__video{opacity:0}
 .scrubbg.has-frames .scrubbg__canvas{opacity:1}
+.scrubbg.is-paused .scrubbg__poster{opacity:1}
+.scrubbg.is-paused .scrubbg__video,.scrubbg.is-paused .scrubbg__canvas{opacity:0}
 .page{position:relative;z-index:1}
 ```
 ```js
@@ -362,7 +365,9 @@ Rewritten here to cost less. The source cached up to 90 frames at 960 px wide (a
     render();
     if (smooth !== target) request();
   };
-  const request = () => { if (!pending) { pending = true; requestAnimationFrame(update); } };
+  const paused = () => document.documentElement.classList.contains('motion-paused');
+  const request = () => { if (!pending && !paused()) { pending = true; requestAnimationFrame(update); } };
+  const applyPause = () => { root.classList.toggle('is-paused', paused()); request(); };   // paused: the poster shows
 
   const once = (el, ev) => new Promise((r) => el.addEventListener(ev, r, { once: true }));
   const seekTo = (v, t) => new Promise((resolve, reject) => {
@@ -394,6 +399,8 @@ Rewritten here to cost less. The source cached up to 90 frames at 960 px wide (a
   addEventListener('scroll', request, { passive: true });
   addEventListener('resize', request);
   video.addEventListener('seeked', request);
+  document.addEventListener('motionchange', applyPause);
+  applyPause();
   video.play().then(() => video.pause()).catch(() => {});   // prime decoding on iOS
   const init = async () => {
     root.classList.add('has-video');

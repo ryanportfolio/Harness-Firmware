@@ -3,7 +3,9 @@
 
    Mode, first match wins: ?motion=on|off|xray in the URL, the visitor's saved choice, prefers-reduced-motion
    (off), else on. <html data-motion="..."> mirrors it for CSS.
-     off   every <video autoplay> pauses; each piece shows its finished still (it subscribes, below)
+     off   every <video> pauses; each piece shows its finished still (it subscribes, below)
+   Every change also sets <html class="motion-paused"> (off only) and fires a motionchange event on document,
+   the pause contract of web-effects.md (Shared conventions), so those recipes stop and resume with it.
      on    everything plays
      xray  everything plays, and each [data-xray] element is outlined and labelled with its data-xray text
            and data-xray-tool, e.g. data-xray="Scroll film, 3 chained clips" data-xray-tool="generated video"
@@ -25,6 +27,7 @@
   let labels = [], raf = 0;
 
   root.dataset.motion = mode;
+  root.classList.toggle('motion-paused', mode === 'off');   // set early: recipes read it when they start
 
   function place() {
     for (const [el, label] of labels) {
@@ -52,11 +55,13 @@
 
   function apply(notify = true) {
     root.dataset.motion = mode;
-    for (const v of document.querySelectorAll('video[autoplay]')) {
-      if (mode === 'off') v.pause(); else v.play().catch(() => {});
-    }
+    root.classList.toggle('motion-paused', mode === 'off');
+    if (mode === 'off') for (const v of document.querySelectorAll('video')) v.pause();
+    else for (const v of document.querySelectorAll('video[autoplay]')) v.play().catch(() => {});
     for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
     xray(mode === 'xray');
+    // Recipe controllers re-apply their own state (on screen? scrubbed?) after the plain videos above.
+    document.dispatchEvent(new Event('motionchange'));
     if (notify) for (const fn of listeners) fn(mode);
   }
 

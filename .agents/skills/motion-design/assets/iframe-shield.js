@@ -11,7 +11,7 @@
    Iframes added later: IframeShield.attach(iframe). */
 (() => {
   const style = document.createElement('style');
-  style.textContent = '.iframe-shield{position:absolute;inset:0;z-index:1;background:transparent}';
+  style.textContent = '.iframe-shield{position:absolute;z-index:1;background:transparent}';
   document.head.appendChild(style);
 
   const EVENTS = [['pointermove', 'move'], ['pointerdown', 'down'], ['pointerup', 'up'], ['pointerleave', 'leave'], ['click', 'click']];
@@ -25,6 +25,15 @@
     shield.className = 'iframe-shield';
     shield.setAttribute('aria-hidden', 'true');
     frame.after(shield);
+    // Cover the iframe's own box, not the whole parent, so sibling links, controls and iframes stay reachable.
+    // offsetLeft/Top and absolute positioning both measure from the parent's padding edge.
+    const fit = () => {
+      Object.assign(shield.style, { left: frame.offsetLeft + 'px', top: frame.offsetTop + 'px', width: frame.offsetWidth + 'px', height: frame.offsetHeight + 'px' });
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(frame);
+    ro.observe(host);
     if (frame.dataset.shield !== 'forward') return;
 
     const send = (type, e) => {
