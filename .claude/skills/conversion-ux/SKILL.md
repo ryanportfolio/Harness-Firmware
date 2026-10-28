@@ -5,7 +5,7 @@ description: "Audit, design conversion flows stage by stage (arrive to exit): ea
 
 # Conversion UX
 
-Every element on a screen puts a question in the user's head: is this worth $19 a month, how many steps is this, what if my plans change. People act when those questions are easy to answer, and they stay when the easy answer was true. This skill finds the hard questions and replaces them with easier, honest ones.
+Every element on a screen puts a question in the user's head: is this worth 19 dollars a month, how many steps is this, what if my plans change. People act when those questions are easy to answer, and they stay when the easy answer was true. This skill finds the hard questions and replaces them with easier, honest ones.
 
 Users decide across a run of screens, and many are lost between them: a plan forgotten at sign-in, a total that grows at payment, a "Not now" that drops them on the home page. So both modes work through the same seven stages, and check at each hand-off that the user's choices and attention carry over.
 
