@@ -267,12 +267,17 @@ condensed.
 - The `SessionStart` and `SubagentStart` hook commands in `.claude/settings.json`
   quote `$CLAUDE_PROJECT_DIR`. Unquoted, a project path containing a space split
   into several arguments and both hooks failed with `No such file or directory`.
+  `/apply-firmware`'s `detect.mjs` marks a template hook that differs from a
+  project hook only in quoting as `replaces <old command>`, and `apply-firmware`
+  and `sync-starter` swap the old hook out instead of adding a second copy, so
+  existing projects pick up the quoted commands without running each hook twice.
 - `conversion-ux` says "19 dollars a month" where it said "$19 a month". Claude
-  Code replaces `$` followed by a digit in a skill body with an argument, so the
-  example price could be mangled when the skill loaded. The wording works in
-  both runtimes; `\$19` would show its backslash in Codex.
+  Code replaces `$` plus digits in a skill body with the argument at that index,
+  so a `/conversion-ux` request of 20 or more words turned the price into its
+  20th word. The wording works in both runtimes; `\$19` would show its backslash
+  in Codex.
 - `writing-plans/plan-document-reviewer-prompt.md` is removed from both runtimes.
-  Nothing referenced it, so no agent ever loaded it.
+  Nothing referenced it, so no skill directed an agent to it.
 
 - README diagrams paint an opaque background matching GitHub's canvas. A
   `<picture>` follows the operating system's colour scheme, not GitHub's theme
