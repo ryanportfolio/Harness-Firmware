@@ -224,6 +224,11 @@ Do not produce them.
 🔴 BLOCKING — Real bug, regression, schema drift, security/privacy issue, data correctness
 🟡 SHOULD-FIX — Edge case that will bite, observability gap, inconsistency, parity issue
 🟢 NITPICK — Style, future polish, deferable
+Grade against the change's goal: another code path, a rare input, a small
+performance cost, or extra compatibility is 🟢 unless it breaks the goal
+(security, auth, and data loss keep their impact severity). Flag code, tests,
+guards, or options the goal does not need as 🟢, with the smaller version as
+the fix.
 
 ## Confidence (tag every finding, separate from severity)
 HIGH — verified: I read the file / grepped the call sites.
@@ -393,6 +398,8 @@ This rule is repeated inside each subagent prompt, but it also applies to the si
 🟡 **SHOULD-FIX** — Edge case that will eventually bite, observability gap, inconsistency, minor parity issue between code paths. Should be fixed but not blocking.
 
 🟢 **NITPICK** — Style preference, future polish, deferable consideration. Mention it but make clear it can be skipped.
+
+**Grade against the change's goal.** A finding limited to another code path, a rare input, a small performance cost, or extra compatibility is 🟢 unless it breaks what the change sets out to do; security, auth, and data-loss findings keep their impact severity. Code, tests, guards, or options the goal does not need are a 🟢 finding whose fix is the smaller version. Apply this when you re-rank in Step 6, whatever label the reviewer gave; review loops otherwise grow a change one cheap-looking fix at a time.
 
 ## Step 6: Merge subagent findings and present
 
