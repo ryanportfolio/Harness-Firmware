@@ -78,11 +78,13 @@ Evidence goes only to the agent's scratch, named as `agents/<agent id>/artifacts
 
 ## Verdicts
 
-Each checking agent writes one JSON object per candidate, in the Step 4 verifier form: `{"decision": "confirmed|needs_validation|rejected", "record": { ... }}`. The step adds no verdict, field, schema change, or validator change.
+Each checking agent writes exactly one JSON object to `result.json`, under the result contract in SKILL.md (Briefs). The object holds a `candidates` array with one entry per assigned candidate. Each entry carries the candidate's fingerprint and is otherwise in the Step 4 verifier form: `{"candidates": [{"fingerprint": "...", "decision": "confirmed|needs_validation|rejected", "record": { ... }}]}`, where `record` matches the decision's schema branch exactly. This envelope exists only in `result.json`: `findings.json`, `report-schema.json`, and the validators do not change. The step adds no verdict, field, schema change, or validator change.
 
 - **Demonstrated** through the app's interface: proposed `confirmed`. `execution` describes only the bounded local check performed: the attacker's dummy account, the minimal input in `payloads`, the steps in `instructions`, and in `observed_result` only what the app returned, rendered, stored, or sent.
 - **Refuted by the running app**: proposed `rejected`, with the control that refused the request named in `reason` (a middleware, a template escape, an ownership check the source reading missed). A failed reproduction with no identified control is not a disproof; that candidate stays `needs_validation`.
 - **Still blocked** by something loopback cannot show (a proxy rule, a provider policy, a deployment setting): stays `needs_validation`, with `blockers` narrowed to what remains and the local part of the plan removed when this step settled it.
+
+The parent reads each result as in hunting.md (Parent consolidation). It validates each entry and maps it to exactly one assigned fingerprint. It rejects an entry that is malformed or whose fingerprint is duplicated or was not assigned to that agent, and it treats an assigned candidate with no entry the same way. A candidate whose entry is rejected keeps its Step 4 verdict, or goes to a fresh checking agent if the budget allows. The parent never repairs or fills in an entry.
 
 Every proposed change is a material replacement under verification.md Step 6. Each goes to a fresh verifier that did not hunt, validate, or check that candidate, before the record enters `findings.json`. Without budget for that verifier, the candidate keeps its Step 4 verdict and the report says so. The same holds when no agent tools are exposed: the re-verification is skipped, the candidate keeps its Step 4 verdict, and the report says so; it is never done in the main thread.
 
