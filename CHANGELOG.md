@@ -264,6 +264,16 @@ condensed.
 
 ### Fixed
 
+- The `SessionStart` and `SubagentStart` hook commands in `.claude/settings.json`
+  quote `$CLAUDE_PROJECT_DIR`. Unquoted, a project path containing a space split
+  into several arguments and both hooks failed with `No such file or directory`.
+- `conversion-ux` says "19 dollars a month" where it said "$19 a month". Claude
+  Code replaces `$` followed by a digit in a skill body with an argument, so the
+  example price could be mangled when the skill loaded. The wording works in
+  both runtimes; `\$19` would show its backslash in Codex.
+- `writing-plans/plan-document-reviewer-prompt.md` is removed from both runtimes.
+  Nothing referenced it, so no agent ever loaded it.
+
 - README diagrams paint an opaque background matching GitHub's canvas. A
   `<picture>` follows the operating system's colour scheme, not GitHub's theme
   setting, so a reader with GitHub in dark mode and a light OS got the light
