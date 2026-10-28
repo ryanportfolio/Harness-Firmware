@@ -46,7 +46,7 @@ The times above fit the 12 s cycle in ui-loops.md; take yours from the piece's o
 
 ## In-page WebCodecs export (always; run end to end 2026-09-28 and 2026-10-19)
 
-Every MP4 of a canvas animation is encoded in the page with WebCodecs. Never read back a PNG or screenshot per frame for ffmpeg to re-encode: the user called that "insanely inefficient" (user instruction, 2026-10-19). Draw every layer, text included, into the canvas so the encoder sees it. The CoreWise promo rendered 94 s at 1920x1080, 60 fps (5,640 frames) in 33 s; the file was H.264 High at about 15 Mbit/s, 178 MB.
+Every MP4 of a canvas animation is encoded in the page with WebCodecs. Never read back a PNG or screenshot per frame for ffmpeg to re-encode: the user called that "insanely inefficient" (user instruction, 2026-10-19). Draw every layer, text included, into the canvas so the encoder sees it. A piece built from DOM, CSS and several canvases goes through tab capture instead (next section). The CoreWise promo rendered 94 s at 1920x1080, 60 fps (5,640 frames) in 33 s; the file was H.264 High at about 15 Mbit/s, 178 MB.
 
 **Driven from a script (Playwright), no muxer in the page.** Configure `avc: { format: 'annexb' }`, render and encode frames in batches of about 60 per `page.evaluate`, and return each batch's chunk bytes as a `Uint8Array`. Pipe them into `ffmpeg -f h264 -framerate 60 -i - -c:v copy -bsf:v h264_metadata=colour_primaries=1:transfer_characteristics=13:matrix_coefficients=1:video_full_range_flag=0 -movflags +faststart out.mp4`: a stream copy, with the colour tags written into the stream. Add audio in a second ffmpeg pass that copies the video. fullbuild.ai showreel 2 (2026-10-19, `scripts/export-showreel.mjs --encoder webcodecs`): `avc1.64002A` (High 4.2) at 40 Mbit/s variable, hardware encoder, 1080p60 at about 46 fps, colour patches within 0.6 levels of a lossless 4:2:0 conversion of the canvas.
 
@@ -57,6 +57,43 @@ Every MP4 of a canvas animation is encoded in the page with WebCodecs. Never rea
 5. Download through an anchor with `download`. From Playwright, capture it with `page.waitForEvent('download')` and `saveAs`; returning the bytes through `evaluate` is too large.
 6. Browsers without WebCodecs need a clear error, not a silent failure. Wrap the export in `try/finally` so a thrown error still restores the live render loop.
 7. Verify with `ffprobe`: codec, profile, dimensions, frame rate, frame count and duration.
+
+## DOM + WebGL page export: tab capture into WebCodecs (run end to end 2026-10-27)
+
+For a piece that is not one canvas (DOM text, CSS 3D, several WebGL canvases), capture the tab itself and feed its frames to `VideoEncoder`. The CORE+ free week piece went out this way at 1920x1080 and 1080x1920, 60 fps, 3,360 frames each, H.264 High 4.2 at about 38 Mbit/s, with every frame tied to its exact T. The scripts from that run are not shipped with this skill; the steps and commands below are the spec.
+
+The piece must provide:
+
+- `window.__anim = { seek, pause }` like stills.mjs, with `seek` taking seconds.
+- Every frame a pure function of T. This route seeks once per frame, and a seek resets feedback such as the engine skeleton's phosphor trails. A piece with trail feedback draws its captions into the canvas and takes the in-page route above.
+- Canvas backing stores at the full `devicePixelRatio`. A cap (the engine skeleton caps it at 1.5) renders below the capture scale, and the capture upscales it.
+
+1. **Wrapper in a popup.** Launch headed Chrome offscreen with `--mute-audio --auto-accept-this-tab-capture` and open a page in `browser.newContext({ viewport: null })`, so Playwright emulates no viewport or DPR. From it, `window.open(url, 'cap', 'popup,width=..,height=..')` a wrapper page: an iframe holding the piece at OW x OH CSS px, and a marker strip to its right, outside the crop. Make the strip 16 to 20 CSS px wide so that its device width is an even integer (16 at 1.25 gives 20; 20 at 2 gives 40). It holds 16 stacked blocks, white for 1, carrying the index of the frame now shown. Size the window with CDP `Browser.setWindowBounds` until `innerWidth` is exactly OW plus the strip and `innerHeight` is exactly OH.
+2. **HiDPI capture.** Bring the popup to the front and press one key (user activation), then call `getDisplayMedia({ video: { width: { max: W + S }, height: { max: H }, frameRate: 60 }, audio: false, preferCurrentTab: true, selfBrowserSurface: 'include' })`, with W x H the output size and S the strip width, all in device px. Max constraints larger than the CSS size make Chrome render the tab at a higher device scale, so the pixels are native, not upscaled: 1536x864 CSS at 1.25 gives 1920x1080; 540x960 at 2 gives 1080x1920. Re-fit the window (the sharing bar has appeared), check that `devicePixelRatio` equals the scale, and only then load the piece into the iframe so it boots at its final size.
+3. **Frame-exact T.** Once the piece is ready, await `document.fonts.ready` and call `pause()`; then seek to the start, half a second in, and back to the start before frame 0, as the reference run did. Read frames with `MediaStreamTrackProcessor`. For frame i: seek to `i / fps` seconds (the CORE+ engine took milliseconds, `i * 1000 / fps`), wait three rAFs, set the marker to i, and take the first captured frame of coded size W + S by H whose marker reads i. Frames arrived as I420, so read the marker from plane 0 luma at the middle of each block (128 or more is 1; anything between 64 and 192 is ambiguous, so drop the frame). Close every other frame. If nothing arrives within 1.5 s, flip the marker away and back to force new damage, and retry.
+4. **Encode.** Copy the output rect out of the captured frame with `copyTo`, close the captured frame, build a new `VideoFrame` from the buffer (same `format`, `layout` and `colorSpace`) with `timestamp: i * 1e6 / fps`, encode it, and close it: `avc: { format: 'annexb' }`, `prefer-hardware`, variable bitrate (40 Mbit/s here), keyframe every 2 s. Wait on `dequeue` while `encodeQueueSize > 4`. Every 60 frames, return the chunk bytes to Node as base64 and append them to an `.h264` file. After the last frame, `await encoder.flush()` and append what is left.
+
+Capture pitfalls found on that run:
+
+- **Window height clamp and sharing bar.** On a 1080-tall display Chrome clamps window height near 1100 physical px, and the tab strip, toolbar and the 56 px "sharing this tab" bar take 143 of it, so 960 CSS px never fit in a normal window. A popup window has no tab strip.
+- **2x cap.** HiDPI capture scale tops out at 2x, so the CSS size must be at least half the output size.
+- **Capture oracle ignores damage outside the animating region.** After about 20 seeks Chrome's capture locks onto the region that animates (the iframe) and stops delivering frames for damage elsewhere, so a marker-only change is never captured. Fix: every marker change also flips the iframe's opacity between 0.9999 and 0.9998. That damages the whole iframe without changing an 8-bit pixel. Never set it to 1, so the iframe keeps one compositing path.
+- **Release capture buffers.** Copy the frame out of the capture buffer and close it at once. The encoder holds its input frames for a while, and capture stops delivering when its buffer pool runs dry.
+
+**Mux**: a stream copy with exact 1/fps timestamps and colour tags in both the SPS and the container.
+
+```bash
+ffmpeg -v error -y -framerate 60 -i in.h264 -c:v copy -bsf:v "h264_metadata=video_full_range_flag=0:colour_primaries=1:transfer_characteristics=13:matrix_coefficients=1:tick_rate=120,setts=ts=N*1000:duration=1000:time_base=1/60000" -video_track_timescale 60000 -color_primaries bt709 -color_trc iec61966-2-1 -colorspace bt709 -color_range tv -movflags +faststart out.mp4
+```
+
+Do not add `fixed_frame_rate_flag=1` to `h264_metadata`. On a stream whose SPS carries it as 0 (libx264, Media Foundation) ffmpeg stops with `low_delay_hrd_flag does not match inferred value`; `setts` and the track timescale already fix the timing. The transfer tag follows the colour-tag rule below (sRGB, 13). The CORE+ files shipped tagged BT.709 (1), the transfer Chrome's encoder reported; the patch check compares code values, so it cannot tell the two tags apart.
+
+**Verify**:
+
+- `ffprobe -count_frames`: codec, profile, level, `yuv420p`, colour tags, no B-frames, frame count equal to duration x fps.
+- **Neighbour-T stills.** During the export, at a set of frame indices spread across every beat, screenshot the wrapper's crop at device scale for T, T minus one frame and T plus one frame. Decode the same frame from the MP4 (BT.709 limited to full-range RGB) and compare 8x8 patch means. Each frame must match its own T and beat both neighbours wherever the picture moves; an off-by-one frame matches a neighbour better. CORE+: 21 stills per layout, patch mean 0.55 to 1.14 levels, own T won in all 42.
+- **Flash check.** Split each decoded frame into a 6x4 grid of relative luminance and fail any cell with more than 3 flashes in a 1 s window (a flash is a pair of opposing changes of 0.1 or more, the darker state below 0.8). Prove the detector first: it must fail a synthetic 5 Hz flash. It is a smoke test; the Harding note below still applies.
+- Count black frames, capture retries and page errors (all 0 here), and cut a 1 fps contact sheet for a pacing review.
 
 ## Delivery and encoding checks
 
@@ -94,9 +131,9 @@ ffmpeg -v error -ss 30.5 -t 4 -i out.mp4 -vf "fps=6,scale=480:-1,tile=4x6" -fram
 
 Cut one strip per transition and one strip of the whole piece at 1 fps for pacing. Tile long runs of stills into contact sheets (a page of `<img>` tags screenshotted by the same headed browser), so a full-timeline review costs a few images instead of dozens.
 
-## Frame-stepped PNG export (fallback, only with the user's OK)
+## Frame-stepped PNG export (last resort, owner's OK required)
 
-Ask the user before using this. Move DOM captions into the canvas first, so WebCodecs can carry them; reach for this only when that is impossible.
+Do not use this without the owner's explicit OK for that piece. A canvas piece goes through in-page WebCodecs; a DOM or multi-canvas piece goes through tab capture (both above). Ask only when neither can carry the piece, and say why.
 
 1. Add `renderAt(t, dtFrames)` next to `frame(t)`, which draws without the rAF loop.
 2. Reset the trail buffer, then step `t` from 0 to TOTAL in increments of 1/60 s, calling `renderAt(t, 1)`. The trails need every frame in order, so never skip ahead.
