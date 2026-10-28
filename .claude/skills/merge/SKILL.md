@@ -41,7 +41,7 @@ Review skills' "review ≠ fix authority" rule lifted for in-scope fixes only. S
 ## Step 1: Integrate
 
 1. Inspect repo, remote, branch, working changes, existing PR. Target = task's or repo default. Keep unrelated work. Detached HEAD / on target → task branch before commit; respect user-chosen branch. Don't touch other checkouts w/o authorization.
-2. Run relevant local checks. Stage explicit paths, inspect staged diff, commit, push. Never bypass hooks. Reuse branch's open PR (`gh pr list --head <branch>`); else create one, description = final behavior + validation. PR changes flows, boundaries, data model or state → description adds short Mermaid diagram of changed structure (GitHub renders it), so owner reads diagram instead of diff; repo keeps `.claude/reference/architecture.md` → same diagram there, same PR. No structural change (copy, styling, docs, config) → no diagram. Multiline bodies via file. Verify PR base, head, remote.
+2. Run relevant local checks. Stage explicit paths, inspect staged diff, commit, push. Never bypass hooks. Reuse branch's open PR (`gh pr list --head <branch>`); else create one. Title + description per `writing` skill's pull request form: title = effect, description opens w/ problem as user saw it, then fix, then validation; never a changed-file inventory. PR changes flows, boundaries, data model or state → description adds short Mermaid diagram of changed structure (GitHub renders it), so owner reads diagram instead of diff; repo keeps `.claude/reference/architecture.md` → same diagram there, same PR. No structural change (copy, styling, docs, config) → no diagram. Multiline bodies via file. Verify PR base, head, remote.
 3. Fetch target, check mergeability. Resolve unambiguous conflicts, keep both sides' intent. Semantic conflicts → investigate; ask only if resolution needs user decision not yet made. Reverify affected behavior, push.
 
 **Destination trust**, before session's first push to this repo. Print no credentials:
@@ -75,6 +75,7 @@ More files or concerns than 4 → group them. Fewer distinct areas than 4 (tiny 
 - files to read + area to cover; other 3 areas named, running in parallel, so it stays in its own;
 - browser work (if any): own Chrome via repo's `launchPlacedChrome()` or `--window-position=-2400,-2400`, `--mute-audio`; never shared `mcp__playwright-iso__*` tools (one browser per session, other reviewers run at same time);
 - bug classes in priority order: false success (reports pass/clean/done when it isn't), then wrong results on common real inputs, then crashes;
+- PR's goal in 1-2 sentences + scope rule: finding only on another path, a rare input, a small perf cost, or extra compatibility = 🟢 unless it breaks the goal (security, auth, data loss keep impact severity); code, tests, guards or options the goal doesn't need = 🟢 finding, fix = smaller version;
 - what earlier rounds already fixed (this session's fix commits + findings), so it hunts new bugs;
 - rules: reproduce every bug before reporting it; fixtures + scratch only under `.tmp/selfreview/<area>/`; never edit repo files, never commit, never push;
 - return: confirmed findings, each w/ severity (🔴/🟡/🟢), file:line, reproduction (command + observed vs expected), suggested fix; then separate list of unconfirmed suspicions.
@@ -83,7 +84,7 @@ More files or concerns than 4 → group them. Fewer distinct areas than 4 (tiny 
 
 **Triage.** Session verifies each reported finding itself (rerun reproduction or read code); reviewer's word ≠ proof. Then:
 
-- Confirmed, in scope → fix at cause, any severity.
+- Confirmed, in scope → re-grade by scope rule (Step 3 **Scope**), fix at cause, any severity; declined 🟢 → follow-up list.
 - Unconfirmed suspicion → quick check; confirmed → fix, else note in report.
 - Refuted → drop, list under "checked and fine".
 - Fix needs user decision (behavior change, tradeoff, scope growth) → ask.
@@ -108,6 +109,8 @@ Each round: `git fetch origin <target>`, scope = full PR branch diff from `git m
 - Refuted → drop, list under "checked and fine".
 - Fix needs user decision (behavior change, tradeoff, scope growth) → ask. User may waive; record waiver.
 
+**Scope.** Re-grade each confirmed finding by Step 2's scope rule, whatever label reviewer gave. Prefer fix that deletes or narrows code over new guard, option, cache or helper. Declined 🟢 → report's follow-up list, 1 line each. Before each push: `git diff --shortstat <merge-base> HEAD` vs before the round; diff grew more than its 🔴/🟡 fixes need → cut first.
+
 Fix at cause, run relevant local checks, round's fixes = 1 commit naming findings, push. Leave unrelated work alone.
 
 **Self-check before each rerun.** Codex round found something → after fixing, before push: session itself checks for related cases of same bug kind (same input class, same pattern in sibling code paths, same missing guard elsewhere). Reproduce each one found, fix in same commit. Goal: rerun doesn't find the sibling of a bug just fixed. Full 4-reviewer self-review (Step 2) only before round 1, plus again before a rerun when fixes are large (new module or code path, rewrite of a core function, or fix delta bigger than the original change in that area). Then: commit round's fixes locally, no push; run Step 2 on that head so reviewers see the fixes; its fixes = 2nd commit; push both together. Rerun budget unchanged.
@@ -125,8 +128,9 @@ Inspect **all PR checks**: `gh pr checks <number> --json name,bucket,state,workf
 ## Step 5: Merge
 
 1. Re-read PR head. ≠ head where loop + CI both passed → back to Step 3; verdict covers only head it saw.
-2. Squash unless user/repo says otherwise: `gh pr merge <number> --squash --match-head-commit <verified-head>`. No head guard available → say so, use guarded API or hold; never merge unreviewed commits.
-3. Confirm PR merged, fetch target, see merge commit. Keep branch unless user asked cleanup. Next change → new task branch from updated target, keep uncommitted work.
+2. Base drift: `git fetch origin <target>`; `gh pr view <number> --json mergeStateStatus`. `DIRTY` → Step 1.3. Files target changed since branch point (`git diff --name-only <merge-base> origin/<target>`, merge-base = `git merge-base origin/<target> <head>`) overlap PR's files (`git diff --name-only <merge-base> <head>`) → review + CI never saw that combination: `git merge origin/<target>` into branch (never rebase: force-push not authorized), local checks, push → back to Step 3 (`/codex-review` rerun, same budget) + Step 4. No overlap → continue.
+3. Squash unless user/repo says otherwise: `gh pr merge <number> --squash --match-head-commit <verified-head>`. No head guard available → say so, use guarded API or hold; never merge unreviewed commits.
+4. Confirm PR merged, fetch target, see merge commit. Keep branch unless user asked cleanup. Next change → new task branch from updated target, keep uncommitted work.
 
 Never reset unrelated work, force-push, or push direct to target. Interrupted → inspect real Git + PR state before retry; lost response ≠ failed write. Pause only blocked action, finish independent authorized work, report exact blocker.
 
