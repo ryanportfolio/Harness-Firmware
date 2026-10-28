@@ -46,7 +46,8 @@ function pairs(file, lag = 1) {
     const m = /All:(-?[0-9.]+)/.exec(line);   // SSIM goes negative for inverted contrast, often at a cut
     if (m) out.push(Number(m[1]));
   }
-  if (!out.length && r.status !== 0) throw new Error(r.stderr.trim().split(/\r?\n/).slice(-2).join(' '));
+  // Any nonzero exit fails, even after some rows: partial statistics would certify a clip never fully decoded.
+  if (r.status !== 0) throw new Error(r.stderr.trim().split(/\r?\n/).slice(-2).join(' '));
   return out;
 }
 

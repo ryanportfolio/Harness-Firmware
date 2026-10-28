@@ -38,7 +38,7 @@ node .agents/skills/motion-design/scripts/film-chain.mjs film.json --run    # af
 What it does:
 - Clip i starts on clip i-1's exact last frame (read back with ffmpeg, never keyframe) and ends on keyframe i+1 → seams match by construction.
 - Strictly in order. Clip on disk (`film/c<i>.mp4`) reused, never repaid.
-- Each clip gated before next starts. Fail → `c<i>.mp4` renamed `c<i>.cut.mp4` and `c<i>.job-id` renamed `c<i>.cut.job-id` (kept as evidence, never reused, so the rerun makes a new job), run stops.
+- Each clip gated before next starts. Fail → `c<i>.mp4` renamed `c<i>.cut.mp4` and `c<i>.job-id` renamed `c<i>.cut.job-id` (kept as evidence, never reused, so the rerun makes a new job), run stops. Gate could not measure (exit 2: ffmpeg missing, unreadable file) → clip and job left in place, run stops; no verdict, nothing retired.
 - Join drops first frame of clip 2+ (repeats previous last frame), H.264 CRF 16, no audio, then gates whole film.
 - Needs `ffmpeg` + `ffprobe` on PATH. Plain Node, no shell: runs same on Windows, macOS, Linux.
 

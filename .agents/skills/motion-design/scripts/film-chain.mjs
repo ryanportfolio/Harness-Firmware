@@ -72,15 +72,19 @@ async function main() {
     } else console.log(`clip ${i}: on disk, reused`);
     const g = spawnSync(process.execPath, [gate, c], { encoding: 'utf8' });
     process.stdout.write(g.stdout);
-    if (g.status !== 0) {
+    if (g.status !== 1 && g.status !== 0) {
+      // Not measured (ffmpeg missing, unreadable file): no verdict, so the paid clip and its job stay in place.
+      process.stderr.write(g.stderr || '');
+      console.error(`clip ${i} could not be measured; ${c} left in place. Fix the cause (ffmpeg on PATH? a real video?), then rerun.`);
+      return 1;
+    }
+    if (g.status === 1) {
       const kept = c.replace(/\.mp4$/, '.cut.mp4');
       renameSync(c, kept);
       // Retire the provider job too, or a resuming adapter would download the rejected clip again.
       const job = c.replace(/\.mp4$/, '.job-id');
       if (existsSync(job)) renameSync(job, c.replace(/\.mp4$/, '.cut.job-id'));
-      console.error(g.status === 2
-        ? `clip ${i} could not be measured (not a video?); kept as ${kept}. Check the adapter's output, then rerun.`
-        : `clip ${i} failed the gate; kept as ${kept}. Remake keyframe ${i + 1} from ${start} with the same camera angle and a smaller step, then rerun.`);
+      console.error(`clip ${i} failed the gate; kept as ${kept}. Remake keyframe ${i + 1} from ${start} with the same camera angle and a smaller step, then rerun.`);
       return 1;
     }
     // -update 1 overwrites one image per decoded frame of the last second, leaving the true last frame.
