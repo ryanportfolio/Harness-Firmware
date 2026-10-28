@@ -18,7 +18,6 @@ Codex authoring mechanism.
 Read the existing skill and its references. Edit the source for the intended runtime;
 preserve the other runtime unless its behavior is also in scope. Register new standalone
 names and classify each active Codex skill in `.agents/CODEX-SKILL-COMPATIBILITY.md`.
-Keep the initial catalog within its checked budget.
 `.agents/skill-sources.json` records a hash of each covered Claude skill folder, over the
 files git would commit, so ignored files such as `Thumbs.db` never count. After a
 change to a `native` skill's Claude source, update its Codex port to match, then run
