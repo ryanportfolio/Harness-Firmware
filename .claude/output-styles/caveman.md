@@ -8,7 +8,7 @@ keep-coding-instructions: true
 - Fragments, short synonyms, abbrevs, arrows for causality (X → Y).
 - Full technical accuracy.
 - Plain prose only for security warnings, irreversible-action confirms, ambiguous multi-step sequences. That reply only; next reply ultra.
-- Never compress code, commands, identifiers, quoted errors, commit msgs, PR text, file contents.
+- Never compress code, commands, identifiers, quoted errors, commit msgs, PR text, quoted file contents.
 - Answer or action first.
 - Shortest reply that keeps every fact. Result, not route.
 - Process/evidence: one line, keeping required facts (scope, model, findings, gaps). Full trail → file, not chat.
@@ -18,4 +18,4 @@ keep-coding-instructions: true
 - Cut praise, filler, stock openers/closers, invented jargon, repeat summaries.
 - No em dashes. No "not X, but Y" pivots.
 - Keep facts, uncertainty, precision. Never invent detail.
-- Session replies only. Docs, UI copy, guides, emails, READMEs, release notes → `writing` skill, normal prose. Commits, PRs → normal prose, repo conventions.
+- Session replies + files only agents read (skill bodies, references, `.claude/reference/`, subagent/Codex briefs). Safety/authorization/gating lines there stay full sentences, every qualifier kept. Docs, UI copy, guides, emails, READMEs, release notes → `writing` skill, normal prose. Commits, PRs → normal prose, repo conventions.

@@ -19,7 +19,6 @@ const failures = [];
 const warnings = [];
 // Skills deleted on purpose and listed in .agents/removed-skills.json.
 const removed = new Set(readRemovedSkills(root));
-const maxCatalogChars = 7500;
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -114,9 +113,6 @@ const duplicateNames = skills
   .map((skill) => skill.name)
   .filter((name, index, names) => names.indexOf(name) !== index);
 for (const name of new Set(duplicateNames)) warnings.push(`${name}: duplicate active skill name`);
-if (catalogChars > maxCatalogChars) {
-  warnings.push(`Codex skill catalog is ${catalogChars} chars (max ${maxCatalogChars})`);
-}
 
 const compatibility = read(".agents/CODEX-SKILL-COMPATIBILITY.md");
 const classifications = new Map();

@@ -4,7 +4,7 @@ This is the Codex boundary for repositories using the Harness Firmware starter. 
 
 ## Defaults
 
-- Use Caveman Ultra for prose from the first reply, without asking or requiring `$caveman`. Keep code, commands, identifiers, errors, commits, PR text, and files normal.
+- Use Caveman Ultra for prose from the first reply, without asking or requiring `$caveman`. Keep code, commands, identifiers, errors, commits, PR text, and files written for human readers normal. Files that only agents read (skill bodies and their references, `.claude/reference/` entries, subagent briefs) use Caveman Ultra too, with safety, authorization and gating lines kept as full sentences with every qualifier.
 - Caveman includes Unslop for all session replies. Use the Writing skill for user-facing deliverables such as website copy, product UI, onboarding, guides, and release notes; keep those artifacts in normal audience-appropriate prose.
 - No jargon, in chat or in files: say what a thing does in plain words instead of coining labels, internal codes or shorthand the reader hasn't seen. If a new term is unavoidable, define it the first time.
 - Use plain prose for security warnings, irreversible confirmations, and ambiguous multi-step decisions, then resume Ultra. A new session restores Ultra after the user temporarily disables it.

@@ -184,6 +184,20 @@ condensed.
 
 ### Changed
 
+- The 7,500-character cap on the Codex skill catalog (every skill name plus
+  description) is gone. `test-codex-contract.mjs` still prints the total but no
+  longer warns, and `addskill` and `docs/codex-skills.md` no longer ask to stay
+  under it. The cap was a margin under Codex's own fallback of 8,000
+  characters, which Codex applies only when it doesn't know the model's context
+  window; otherwise Codex allows 2% of the window in tokens.
+- Files that only agents read (skill bodies and their references,
+  `.claude/reference/` entries, subagent and Codex briefs) are now written in
+  caveman ultra, the same as chat replies. Safety, authorization and gating
+  lines in them stay full sentences with every qualifier. Files for human
+  readers still use the `writing` skill in normal prose. `CLAUDE.md`,
+  `AGENTS.md`, the `caveman` skill and output style, and `addskill` carry the
+  rule; `addskill` applies it to the lines an edit touches, and a whole-skill
+  rewrite counts as a behavior change that needs an evaluation record.
 - Every skill description in both runtimes is rewritten in caveman-ultra style,
   keeping each trigger command, quoted user phrase, and gating limit word for
   word. The Codex skill catalog drops from 7,625 to 6,510 characters, back
