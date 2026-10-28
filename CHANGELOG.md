@@ -13,6 +13,16 @@ condensed.
 
 ### Added
 
+- `.claude/scripts/check-skill-size.mjs` and a `validate-template` step that
+  fail when any `SKILL.md` in `.claude/skills/` or `.agents/skills/` is 20,000
+  bytes or more. After compaction, Claude Code re-attaches an invoked skill cut
+  at about 20,000 characters, which dropped the finding-verification steps of
+  `codex-review` and `codex-fullreview`, the guardrails of `long-horizon`, the
+  accept-and-report step of `wow-loop` and the output format of
+  `impartial-review`. Those five skills and `long-horizon-workflows` now keep
+  their stop rules, caps, gates and verification steps in the body and move
+  rarely needed sections, word for word, into `references/`. `addskill`
+  authoring notes the limit.
 - Three kernel rules adapted from unclebob/ub-mode (`CLAUDE.md` under Core
   principles, `AGENTS.md` under Defaults). After two fixes in a row fail to
   clear the same failure, stop and test the assumption they share before a
