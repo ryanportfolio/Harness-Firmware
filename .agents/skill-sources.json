@@ -4,7 +4,7 @@
     "addskill": "24c0cd85c752e919c1e2b0321ff2f6bf158a7c64760d3e9a2c5dbe560aad1389",
     "adopt-repo": "245434df66e8093cf9e1366015e52289ebee51eb7cef5ddd68fe179d2415421d",
     "advocate": "c9eb6c83cd84ca55f718c2979c4aad242dee41fc82d269f4218bff9098ee4f1e",
-    "apply-firmware": "98dd0d2681457a70896b0614f40bd1d9a1cd61da70498535ab3ba0ebc512c480",
+    "apply-firmware": "c4b8112eb2bef6c7e42fcbf44529ad5f4e2ee4eadad93a38b691d58d9d47bad3",
     "arena": "04931566603c847b9f35141ef6cf161d18df2de932dfdb1738274e5723c7a3cc",
     "astra-review": "5ef99bdc4b48632900ad038a05c54c3046baa5844fc68de0b13e4a10c7c0f8e9",
     "babysit-ci": "bfcde3a84ce10a9999df1b6995ea0477133e46092bfe9079c2f5f3f785771c7d",
@@ -14,7 +14,7 @@
     "caveman": "7f998c96107c6875cfa696c5318ab69345bd312ddba0cc04f4b725379b1a3e67",
     "claude-review": "9bc6dba1fd084a0277cdc02b9dbce30964751e6621c73a9011c8d65e5adcd625",
     "codex-review": "d54ef4f26e11b28382c264a552ecede1eb9a0ff0dd580ae7a6dc7b68f93ead92",
-    "conversion-ux": "d2cf849fa606bf767245680c19912020dbb6edafaf8129b52045dd561368262c",
+    "conversion-ux": "b2172d03e39e7e9704289bca76cdaf8ae4a4ee07fc691efcb96da3500894ee46",
     "dare": "1237a9ca0cc2b0a8cfba2c88b0e560655f312f22c8c50744089dba450740567b",
     "deep-plan": "d578b1430d894348d4ea5fe316dfe425d9f3f43ae389b12723510fdd0d47546b",
     "design-prototypes": "67f7951f74ab82326782f9f0cc2c5225ce59d64138e844c519b11eb13ebfd9be",
@@ -39,12 +39,12 @@
     "servers": "86579b71d519b7fa69893e633f0f4ac2f08faa6fed7a4a4dde6ad905b025314c",
     "session-hub": "4820e268280d21d9d25ed6828553c38a7694272adb9b23f95a152bf740350ba8",
     "showpiece": "f3bded1ae1a71c25ef86e83d46e100f09ed9671e306482fc2d44db78c2140f56",
-    "sync-starter": "a9285d70d04b4edccc23840bb8c6c9ce61bacedcf5b1345064749718ad06b3af",
+    "sync-starter": "d34fb361d5ebe0d143f4c62fe69f138accb2ceaee25af2571b394eec1a219cf0",
     "ui-quality": "6bdbe468a1e1648550185031e87fe1eefd3bd2e85fdfc3f3ed7a829d9b4fd0d4",
     "why": "2831308991094c8c3707f0159ee69b41dada2e8589a1b1fd4b454724cd7cf429",
     "wow-loop": "a52e10ae4afd7485822ab002804f311a48fc5ccf48f0fff0eda13d5e83965a03",
     "wrapup": "34e27f3234a0e2317bd08212e1d5251f3027ff37f08bb850d472e3482252cb1e",
     "writing": "599df603f9d3e94f1952c4f1eee49ba3e41d25730bdc6e886daa1fdc53f605d5",
-    "writing-plans": "5415a9b40c2e1adfb245fc141d3f078352361e1976ee79f31ca18f8e5ee5573a"
+    "writing-plans": "bc819763c9529c8218ee3502ac4c16d2dd5d1f28d9bc9dc54207405d8cbfa7db"
   }
 }
