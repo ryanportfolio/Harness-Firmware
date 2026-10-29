@@ -72,6 +72,10 @@ jobs:
       - name: Codex skills registered and in sync with their Claude source
         run: node .claude/scripts/sync-codex-skills.mjs --check
 
+      # Compaction re-attaches an invoked skill cut at about 20,000 characters.
+      - name: Every SKILL.md is under 20,000 bytes
+        run: node .claude/scripts/check-skill-size.mjs
+
       - name: Codex starter contract is valid
         run: node .claude/scripts/test-codex-contract.mjs
 
