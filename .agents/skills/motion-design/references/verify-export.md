@@ -110,11 +110,11 @@ A page with no `seek` (a live site, React state, a tour that advances on wall ti
 3. **Step, then capture.** For frame i, `step(i ? 1000 / fps : 0)`, wait three real rAFs (keep a reference to the native rAF), then capture with the marker as above. Each step returns the page state (here: welcome inert or live, tour shown or hidden, chapter title), and the exporter drives the flow from it: hold 2 s once the welcome goes live, click the tour button, follow the chapters, stop 2.5 s after the welcome returns.
 4. **Limits.** `setTimeout`, `setInterval`, `Date.now` and media elements still run on real time. Anything the shot depends on that uses them needs its own override, or it plays at the export's speed (about 50 to 70 ms per frame) and differs between runs.
 
-**Resume a stalled run.** The virtual clock makes a run repeatable, so a stall costs only the frames after the last keyframe. Restart with `--from N`, N a multiple of the keyframe interval (120 frames at 60 fps). Frames before N only step the clock, with one real rAF each and no capture (about 11 ms per frame); frame N is encoded as a keyframe. Then cut the first segment at N and join the Annex B streams before one mux:
+**Resume a stalled run.** The virtual clock makes a run repeatable, so a stall costs only the frames after the last keyframe. Restart with `--from N`, N a multiple of the keyframe interval (120 frames at 60 fps). Frames before N only step the clock, with one real rAF each and no capture (about 11 ms per frame); frame N is encoded as a keyframe. Then cut the first segment at N and join the Annex B streams before one mux. Join with ffmpeg's `concat:` protocol, which copies bytes in any shell; PowerShell's `cat` is `Get-Content`, which rejects the second file and reads binary as text:
 
 ```bash
 ffmpeg -v error -y -f h264 -framerate 60 -i seg0.h264 -c copy -frames:v N -f h264 seg0cut.h264
-cat seg0cut.h264 seg1.h264 > full.h264
+ffmpeg -v error -y -i "concat:seg0cut.h264|seg1.h264" -c copy -f h264 full.h264
 ```
 
 Both segments need the same encoder config. Check the join twice: a still both runs took at the same frame (here frame 2800: 88 pixels differed, all in a 17x12 px sparkle beside the mascot), and the mean frame-to-frame difference across N, which should match its neighbours (here 0.42 levels at the join, 0.1 to 0.3 around it).
