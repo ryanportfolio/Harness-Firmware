@@ -52,7 +52,7 @@ workspaces, never more agents in one.
 
 `.tmp/long-horizon/<task-slug>/state.md` (gitignored scratch), created before round one:
 
-Template: [state-file-template.md](references/state-file-template.md).
+Template: [state-file-template.md](references/state-file-template.md); read it before creating or rebuilding the file or writing a Current batch or Current round block.
 
 Only audit-passed results enter **Verified progress**. Resume from existing state file;
 reconcile w/ real workspace + latest user instructions. Before resuming run this session
@@ -92,7 +92,9 @@ attribution impossible; auditor reports integrity `suspect`, no guessing whose c
 
 ## Round loop
 
-1. **Plan**: read state file; split Remaining to the finest safe grain (Parallel rounds);
+1. **Plan**: read state file. Both engines: pin the batch base (never HEAD), take main's
+   manifest and size the batch per [batch-workspaces.md](references/batch-workspaces.md),
+   read first. Split Remaining to the finest safe grain (Parallel rounds);
    pick batch (every ready step the rules allow; each round works ONE step); set each
    round's candidate count, judge count and serial-candidates flag; write the Current batch block
    and each Current round block to state file, phase `planned`, before spawning anything.
@@ -190,7 +192,7 @@ Count both triggers from Audit log, never memory; recovery round = attempt. The 
 stage is the arena for a stuck step; a standalone `arena` run is unnecessary and would start
 its worktrees from HEAD, losing earlier rounds' uncommitted edits.
 
-Either trigger may escalate to a cross-vendor supervisor: [supervisor-consult.md](references/supervisor-consult.md).
+Either trigger may escalate to a cross-vendor supervisor: read [supervisor-consult.md](references/supervisor-consult.md) first. Its answer = opinion: check vs current contract version + acceptance checks before it rewrites Remaining.
 
 One consult per trigger. Each run bills user's Codex subscription → stagnation-triggered
 only, not every round.
@@ -234,7 +236,7 @@ Each round keeps whole contract: own Current round block, workspaces, Baselines,
 executors, audit. Workspaces never shared: one writer's edits land in another's manifest
 diff → both audits `suspect`.
 
-Batch base, candidate workspaces, capacity: read [batch-workspaces.md](references/batch-workspaces.md) at Plan before building workspaces.
+Batch base, candidate workspaces, capacity: read [batch-workspaces.md](references/batch-workspaces.md) at Plan before pinning the batch base, sizing a batch or building workspaces (both engines), and again before integrating.
 
 Workflow engine: one call per batch, `args.rounds` holding every round; the script runs the
 rounds side by side and each round's stages in order. Agent engine: all executors in one msg;

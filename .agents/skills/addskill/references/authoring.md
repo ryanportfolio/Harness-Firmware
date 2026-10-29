@@ -16,10 +16,10 @@ executable mechanics in scripts, and output templates in assets. Package needed 
 inside the skill for standalone installs. One strong example beats several near-duplicates;
 use a small flowchart only for a decision that prose cannot express clearly. Read references
 only when the task needs them. Do not duplicate other skills or impose a universal workflow.
-Keep each SKILL.md under 20,000 bytes (`.claude/scripts/check-skill-size.mjs` fails CI at or
-above it): after compaction Claude Code re-attaches an invoked skill cut at about 20,000
-characters and drops the rest. Put stop rules, caps, gates and verification steps early in
-the body; move rarely needed sections to references.
+Keep each SKILL.md under 20,000 bytes (run `node .claude/scripts/check-skill-size.mjs`; the
+template's own CI runs it): after compaction Claude Code re-attaches an invoked skill cut at
+about 20,000 characters and drops the rest. Put stop rules, caps, gates and verification
+steps early in the body; move rarely needed sections to references.
 
 Match specificity to risk. Give open-ended tasks room for judgment; prescribe exact steps
 for fragile mechanics and authorization boundaries. Preserve explicit user choices and

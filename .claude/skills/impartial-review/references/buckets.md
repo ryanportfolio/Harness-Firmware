@@ -1,6 +1,6 @@
 # Review buckets A–G
 
-Loaded from `SKILL.md` Step 3. Moved verbatim; each reviewer prompt pastes its bucket's bullets from here.
+Loaded from `SKILL.md` Step 2 and used again when writing reviewer prompts in Step 3. Moved verbatim; each reviewer prompt pastes its bucket's bullets from here.
 
 ### The five buckets
 

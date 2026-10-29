@@ -1,7 +1,7 @@
 {
   "version": 1,
   "skills": {
-    "addskill": "ad1507e8f32178d725563a412b28e02f9ca92caddf3e9f7634a127063240e601",
+    "addskill": "dc2c40e4b8e1606d98c40b10439586dab7cb43d3b22dd8068b32cc433f215a24",
     "adopt-repo": "245434df66e8093cf9e1366015e52289ebee51eb7cef5ddd68fe179d2415421d",
     "advocate": "c9eb6c83cd84ca55f718c2979c4aad242dee41fc82d269f4218bff9098ee4f1e",
     "apply-firmware": "c4b8112eb2bef6c7e42fcbf44529ad5f4e2ee4eadad93a38b691d58d9d47bad3",
@@ -13,7 +13,7 @@
     "cache-loop": "dd1e3b13c7ef54d564d93616dd55f682914739fd5abb5124e11d608552477338",
     "caveman": "7f998c96107c6875cfa696c5318ab69345bd312ddba0cc04f4b725379b1a3e67",
     "claude-review": "9bc6dba1fd084a0277cdc02b9dbce30964751e6621c73a9011c8d65e5adcd625",
-    "codex-review": "2381bb273887938c8bbea6426047de00f4fa981baf53aa85c1a59c96c79ce0cc",
+    "codex-review": "ba68c91db6f179ec1d14c09c4ed6f67371922dbb4c8c13f69af9efa2da8f60a2",
     "conversion-ux": "b2172d03e39e7e9704289bca76cdaf8ae4a4ee07fc691efcb96da3500894ee46",
     "dare": "1237a9ca0cc2b0a8cfba2c88b0e560655f312f22c8c50744089dba450740567b",
     "deep-plan": "d578b1430d894348d4ea5fe316dfe425d9f3f43ae389b12723510fdd0d47546b",
@@ -22,7 +22,7 @@
     "fable-mode": "496073eb58c06846e4ba99e70e346296755db1533135721c01ad5353e1324a6a",
     "forge-repo-ui-skill": "bba787bd033db215ece690d572c8318f3caaf06d8465908382971f165a9227cd",
     "handoff-audit": "d1d186505ff45607361dcfd50eb3eecbc37031a7007eed7f3821f3161cc1d2ae",
-    "impartial-review": "5e74dee2ef905335686f49346048745b8cac14e3ce9af80843c6b6b08dcda285",
+    "impartial-review": "83b1b316149507eb29eeb03d47cbe770f748f102d86ee6bcf48111ad300ac797",
     "init-project": "058b8f3da654424e807a8dcf2a77f73ed2fbb4fbe1cfaeeceef7ca734a8d10b2",
     "lab": "cb23f0c5665d0e7b20756d91216a9de4ebba78cee140cfc26738fc1b8b7c7c06",
     "long-horizon": "ba5fc6faac8156ff651f18d864c43db18b11b5c3be2a03151950284e0aae50c9",
