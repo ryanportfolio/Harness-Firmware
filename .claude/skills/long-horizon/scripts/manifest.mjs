@@ -195,6 +195,11 @@ try {
       console.error(usage);
       process.exit(2);
     }
+    // update-ref on HEAD or a branch moves the checkout to the stash commit; only a pin ref is safe.
+    if (ref && !/^refs\/(?!heads\/|tags\/|remotes\/)[^/]+\//.test(ref)) {
+      console.error(`manifest.mjs: --ref must be a pin ref such as refs/long-horizon/<task>/round-<N>, not ${ref}\n${usage}`);
+      process.exit(2);
+    }
     const extras = i >= 0 ? rest.filter((_, j) => j !== i && j !== i + 1) : rest;
     const m = build(root, out, { ref, extras });
     console.log(`files ${Object.keys(m.files).length}, snapshot ${m.snapshot ?? "none"}${m.uncovered.length ? `, uncovered: ${m.uncovered.join("; ")}` : ""}`);
