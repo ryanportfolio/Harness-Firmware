@@ -161,3 +161,16 @@ test("bad arguments exit 2", () => {
   assert.equal(spawnSync(process.execPath, [script], { encoding: "utf8" }).status, 2);
   assert.equal(spawnSync(process.execPath, [script, ".", "x.json", "--ref"], { encoding: "utf8" }).status, 2);
 });
+
+test("--ref refuses HEAD, branches and tags, leaving the checkout alone", (t) => {
+  const { dir, root, git, write } = repo(t);
+  write("a.txt", "a.txt dirty\n");
+  const head = git("rev-parse", "HEAD").trim();
+  const branch = git("symbolic-ref", "HEAD").trim();
+  for (const ref of ["HEAD", branch, "refs/tags/x", "refs/remotes/origin/main", "refs/x"]) {
+    const r = spawnSync(process.execPath, [script, root, path.join(dir, "m.json"), "--ref", ref], { encoding: "utf8" });
+    assert.equal(r.status, 2, ref);
+  }
+  assert.equal(git("rev-parse", "HEAD").trim(), head);
+  assert.equal(git("symbolic-ref", "HEAD").trim(), branch);
+});

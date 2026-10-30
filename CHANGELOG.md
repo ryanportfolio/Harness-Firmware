@@ -274,6 +274,11 @@ condensed.
 
 ### Fixed
 
+- `long-horizon`'s `manifest.mjs` refuses a `--ref` that is `HEAD`, a branch,
+  a tag or a remote ref, and exits 2 before touching Git. It pins the snapshot
+  with `git update-ref`, so `--ref HEAD` moved the checked-out branch to the
+  stash commit and the worktree had to be repaired by hand. Pin refs such as
+  `refs/long-horizon/<task>/round-<N>` work as before.
 - The `SessionStart` and `SubagentStart` hook commands in `.claude/settings.json`
   quote `$CLAUDE_PROJECT_DIR`. Unquoted, a project path containing a space split
   into several arguments and both hooks failed with `No such file or directory`.
