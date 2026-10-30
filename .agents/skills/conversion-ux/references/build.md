@@ -8,7 +8,7 @@ One sentence each: the action this screen or flow exists to get; who arrives, fr
 
 ## 2. Map the journey before any screen
 
-List the stages this journey has (most have fewer than seven), the screens in each, and every gate: sign-in, sign-up, verification, consent, payment. For each hand-off, write what must carry over (JO1) and what the next screen opens on (JO3). Count taps and fields from arrival to goal; cut any step that asks for something the product already knows (JO2, GA1). Design the exits now too: the decline on each upsell and the cancel route (EX1, EX3).
+List the stages this journey has (most have fewer than seven), the screens in each, and every gate: sign-in, sign-up, verification, consent, payment. For each hand-off, write what must carry over (JO1) and what the next screen opens on (JO3). Mark each step that going back cannot undo (payment, sign-up, a submitted form) and say where back lands from its result (JO4). Count taps and fields from arrival to goal; cut any step that asks for something the product already knows (JO2, GA1). Design the exits now too: the decline on each upsell and the cancel route (EX1, EX3).
 
 ## 3. Put the user's questions on the map
 

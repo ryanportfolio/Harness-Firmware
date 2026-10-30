@@ -7,6 +7,7 @@ Every rule and honesty item, with the file that holds it. Prefixes name the stag
 | JO1 | Choices carry over | [journey.md](journey.md) |
 | JO2 | Count the path | [journey.md](journey.md) |
 | JO3 | Attention carries over | [journey.md](journey.md) |
+| JO4 | Back never re-enters a finished step | [journey.md](journey.md) |
 | SC1 | Nothing covers the action or the decision facts | [every-screen.md](every-screen.md) |
 | SC2 | Every width and language shows the facts needed to decide | [every-screen.md](every-screen.md) |
 | SC3 | Everyone can reach the action | [every-screen.md](every-screen.md) |

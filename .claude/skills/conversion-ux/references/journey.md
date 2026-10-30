@@ -35,6 +35,8 @@ Checked at every hand-off, in both modes.
 
 **JO3. Attention carries over.** Each new screen opens on the result of the last action: the item just added, the plan just picked, the step now pending, in its first read. A screen pushed between two stages (a promo, a survey, a cross-sell) breaks the user's line of thought; when one is needed, it names what the user was doing, returns them to it, and has a decline per EX1. Fix: the confirmation or pending step leads the next screen ("Pro · Yearly selected. Create your account to start."). Convention.
 
+**JO4. Back never re-enters a finished step.** After a step that going back cannot undo (a payment, a finished sign-up or sign-in, a submitted order or form, completed onboarding), the browser back button, a back link and the Android back gesture must not show that step's form again, re-open a paywall already paid for, or offer to submit a second time. A back press that can submit or charge twice is Blocks. Back must not trap the user either: hold it only while an irreversible request is in flight (seconds, with visible progress) or when leaving would lose unsaved input, and then ask first ("Discard this draft?"). A funnel, exit prompt or rating prompt that blocks back is a defect (EX1). Fix: replace the finished step's history entry with its result (a redirect after the form post, `history.replaceState`, or the router's `replace`), so back from the result goes to the screen before the flow; a paywall opened from a feature closes onto that feature, unlocked (GA1). Test it: finish the step, press back once and twice, and refresh the result page; nothing submits or charges again. Convention.
+
 ## Severity follows the journey
 
 Grade each finding by what it does to the walk:
