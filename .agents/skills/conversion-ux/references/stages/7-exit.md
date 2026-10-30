@@ -30,7 +30,7 @@ HO1 (confirmshaming dismiss copy), HO3 (cancel or downgrade harder than sign-up)
 - Give every upsell and prompt a decline of equal weight that returns to the task (EX1).
 - Write loss copy from real facts: date, items, size, and a way out that is not "Upgrade" (EX2).
 - Build cancel and downgrade alongside sign-up, with a step count no longer than sign-up's (EX3).
-- Make back and close restore the previous step with its choices (JO1).
+- Make back and close restore the previous unfinished step with its choices (JO1); a finished step stays finished (JO4).
 
 ## At limited depth
 
