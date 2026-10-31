@@ -56,7 +56,7 @@ Stop: owner approves plan + drafts + fact list + build target. One approval may 
 
 ## 5. Build
 
-Target none → stop at plan. Before each batch: seo-check on site + willaicite on key pages + every page the batch changes, at the last accepted state (batch 1: pre-change commit) → before-state. Local: on the local build (diffs across origins can't compare). Live: on prod just before deploy.
+Target none → stop at plan. Before each batch: seo-check on site + willaicite on key pages + every existing page the batch changes, at the last accepted state (batch 1: pre-change commit) → before-state. New pages have none: their first valid run (HTTP 200, report complete) after the change = their baseline, and the site crawl diff shows their findings as `NEW`. Local: on the local build (diffs across origins can't compare). Live: on prod just before deploy.
 
 Approved plan, in batches (one page or one template per batch):
 
@@ -74,7 +74,7 @@ Local: PR → repo's review gate → merge + deploy only on owner's go.
 
 ## 6. Re-check
 
-Before deploy: seo-check + willaicite (key + changed pages) on prod = before-state (live mode: the last batch's). After deploy (owner's go): same on prod, diff vs that before-state; repeat step 3 spot checks w/ same queries + questions → before/after as samples. Search Console connected → [technical](references/technical.md) Search Console. Effects lag weeks → offer a one-time reminder at deploy + 4 weeks to rerun this step. Never claim ranking or citation gains from samples.
+Before deploy: seo-check + willaicite (key + changed existing pages) on prod = before-state (live mode: the last batch's); new pages get their first prod run as baseline. After deploy (owner's go): same on prod, diff vs that before-state; repeat step 3 spot checks w/ same queries + questions → before/after as samples. Search Console connected → [technical](references/technical.md) Search Console. Effects lag weeks → offer a one-time reminder at deploy + 4 weeks to rerun this step. Never claim ranking or citation gains from samples.
 
 ## Owner decisions
 

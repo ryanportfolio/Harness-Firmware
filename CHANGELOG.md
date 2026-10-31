@@ -209,7 +209,7 @@ condensed.
   now sit in `references/technical.md` as one part of the study. Each batch
   passes only when every diff against the last accepted state exits 0, or
   exits 1 with every regression line expected; exit 2 fails. `SKILL.md`
-  drops from 17,716 to 10,067 bytes. The integrity rules add copying from the
+  drops from 17,716 to 10,294 bytes. The integrity rules add copying from the
   field, padding to a length, stacking query variants and build-time dates to
   the banned list, and `checks.md` notes that willaicite v1.4.0 scores FAQ
   headings and FAQPage markup without evidence that they affect citations.

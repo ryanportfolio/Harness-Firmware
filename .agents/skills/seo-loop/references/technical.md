@@ -37,7 +37,7 @@ Each batch deployed, then measured on prod. Fits: small site, deploy + rollback 
 
 - Before first deploy, record deploy cmd (or merge → auto-deploy) + rollback cmd to the previous build. Rollback unknown → no deploy.
 - Deploy from a clean checkout at the merge SHA (CLI deploys can upload another folder: `railway up` from a worktree uploaded the main checkout).
-- Before-state = seo-check + willaicite (key + changed pages) on prod just before deploy. After deploy: confirm the change is on prod (a changed string), hit each changed route once, then crawl + diff vs that before-state.
+- Before-state = seo-check + willaicite (key + changed existing pages) on prod just before deploy; new pages: first valid prod run = baseline. After deploy: confirm the change is on prod (a changed string), hit each changed route once, then crawl + diff vs that before-state.
 - Regression or target finding still there → roll back unless owner says keep; done when a recrawl diffs exit 0 vs before-state; then revert the PR so source = prod.
 - Owner's go per deploy, or a standing go the owner states for this site this session. Robots, noindex, canonical, redirect changes always need their own yes: rollback restores the site, not what Googlebot already fetched.
 
@@ -45,7 +45,7 @@ Each batch deployed, then measured on prod. Fits: small site, deploy + rollback 
 
 Exit 0 nothing new. Exit 1 regression: new fail/warn, warn → fail, duplicate group grew, indexable page `LOST` (now noindex, blocked, broken, canonical/redirect to non-indexable, or no longer found), lower willaicite dimension score. Exit 2 not comparable: incomplete run, different origins (new baseline), budget hit on one side only, earlier page not rechecked, finding gone w/o its URL rechecked. Info ignored.
 
-Pass = exit 0, or exit 1 w/ every regression line expected. Exit 2 prints nothing to stdout (reason on stderr): never read it as clean; restore comparability (Tools), rerun, still 2 → fail.
+Pass = exit 0, or exit 1 w/ every regression line expected. Exit 2 may print nothing or only a partial summary to stdout (reason on stderr): judge by exit code, never read it as clean; restore comparability (Tools), rerun, still 2 → fail.
 
 - Before a batch, write expected regression lines: each `NEW`/`WORSE`/`LOST`/`GREW` = rule + URL pattern (rule alone lets a real regression elsewhere pass); each falling `SCORE` = dimension + willaicite file. A script matches those stdout lines to the list; `FIXED`, `CHANGED`, rising `SCORE` and the summary line are not regressions. Exit 1 passes only if every regression line matches and stderr holds no not-comparable note.
 - Consolidated page (301 or canonical) → not `LOST` while its target is indexable.
