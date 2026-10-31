@@ -2,7 +2,7 @@
 
 Input: `study/brief.md` + audience + offer reports. Main thread, or one subagent per persona on large sites; judgment work.
 
-Real evidence first, labeled w/ source + date: Search Console queries if connected ([technical](technical.md) Search Console), site search logs if owner gives them, autocomplete + "People also ask" seen in a headed browser for a few top terms (sample, never a scraper). Then fill the gaps by reasoning, labeled as guesses.
+Real evidence first, labeled w/ source + date: Search Console queries if connected ([technical](technical.md) Search Console), site search logs if owner gives them, autocomplete + "People also ask" for a few top terms, only if owner OK'd it, in a headed browser by hand-like use (sample, never a scraper). Then fill the gaps by reasoning, labeled as guesses.
 
 ## Personas (3-6)
 

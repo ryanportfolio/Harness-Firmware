@@ -4,7 +4,7 @@ Goal: learn the words, coverage and page types people in this space meet, then p
 
 ## Pick the field (5-10 sites)
 
-Sources: web-search the top clusters from `searcher.md` and note sites that show up repeatedly; sites the owner names; alternatives the study found (README "similar projects", comparison mentions). Prefer sites serving the same people over big generic sites. Record why each was picked.
+Sources (no web search tool → owner names + study only, say so): web-search the top clusters from `searcher.md` and note sites that show up repeatedly; sites the owner names; alternatives the study found (README "similar projects", comparison mentions). Prefer sites serving the same people over big generic sites. Record why each was picked.
 
 ## Read each site (subagents)
 
@@ -31,6 +31,6 @@ Pick rules: field consensus + matches audience → use it. Our site's term is cl
 
 ## Spot checks (samples)
 
-- Web search (Codex: its web search tool if exposed; none → say so, skip, and pick the field from owner names + study) top ~10 queries: record date, exact query, top results' page types, whether our site appears + where. One sample; web-search tool ≠ Google, results vary by location and person.
-- AI questions: ~5 top questions to engines reachable here (web-search tool; headed browser to an engine only if owner is signed in and OK'd it). Record date, engine, exact question, whether our site named or linked, which sources were. Answers change per try → sample.
+- Web search (Codex: its web search tool if exposed; none → say so, skip) top ~10 queries: record date, exact query, top results' page types, whether our site appears + where. One sample; web-search tool ≠ Google, results vary by location and person.
+- AI questions: ~5 top questions, only in an AI engine the owner OK'd (headed browser, owner signed in). Record date, engine, exact question, whether our site named or linked, which sources were. Answers change per try → sample. No approved engine → record "AI spot check: not run"; never substitute search results or the agent's own answer.
 - Same queries + questions rerun at re-check (step 6). Compare as samples; never report as measured gain.
