@@ -159,7 +159,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`bro`](.claude/skills/bro/SKILL.md) · Plain-language restatement. Use: /bro anywhere in msg, 'plain english', 'plain language', 'dumb it down', 'I don't understand', 'what does that mean'.
 - [`session-hub`](.claude/skills/session-hub/SKILL.md) · Coordinate parallel Claude Code sessions via shared append-only HTML hub. Use: /session-hub, 'run parallel sessions on this', joining a hub, or proactively when the checkout shows edits or commits this session didn't make.
 - [`cache-loop`](.claude/skills/cache-loop/SKILL.md) · Caching or stale content.
-- [`seo-loop`](.claude/skills/seo-loop/SKILL.md) · SEO/AEO/GEO fix rounds, measured. Use: /seo-loop [local|live], 'improve SEO'.
+- [`seo-loop`](.claude/skills/seo-loop/SKILL.md) · SEO/AEO/GEO: study the site, map how people search for it, compare with its field, improve pages. Use: /seo-loop, 'improve SEO', keywords.
 - [`coordinate`](.claude/skills/coordinate/SKILL.md) · Coordinate with another named Claude Code session: read its work + recs, critique, send own rec, let it answer, once agreed have it finish; ping user only when a step needs them. Use: /coordinate <session>, 'coordinate / review / go back and forth with another session'.
 - [`servers`](.claude/skills/servers/SKILL.md) · /servers, after starting a dev server, or user asks what's running, which port is which, why browsers are open, or to close old servers and browsers.
 - [`wrapup`](.claude/skills/wrapup/SKILL.md) · /wrapup, or user asks if session is done, OK to archive, or what's left: one verdict from git, the PR, scratch files, running servers or browsers.
