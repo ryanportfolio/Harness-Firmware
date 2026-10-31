@@ -194,6 +194,25 @@ condensed.
 
 ### Changed
 
+- `seo-loop` now works the way people think about SEO: keywords, the pages
+  that answer them, and whether AI answers mention the site. Parallel subagents
+  study the site (offer, audience, what sets it apart, every page, the facts it
+  states, where it is mentioned elsewhere, visitor paths, technical health).
+  The skill then works out how each kind of visitor would search for it, at
+  each stage from first noticing a problem to using the site, and compares
+  that wording and coverage with 5 to 10 sites in the same field. The result
+  is a query-to-page plan with draft copy and a list of facts the owner
+  confirms one by one, built in reviewed batches and rechecked after deploy.
+  It uses no paid keyword or rank data: chosen wording is reported as a
+  reasoned pick, and spot-check searches and AI answers as single samples.
+  The crawler, the willaicite audit and the `diff` tool are unchanged and
+  now sit in `references/technical.md` as one part of the study. Each batch
+  passes only when every diff against the last accepted state exits 0, or
+  exits 1 with every regression line expected; exit 2 fails. `SKILL.md`
+  drops from 17,716 to 10,294 bytes. The integrity rules add copying from the
+  field, padding to a length, stacking query variants and build-time dates to
+  the banned list, and `checks.md` notes that willaicite v1.4.0 scores FAQ
+  headings and FAQPage markup without evidence that they affect citations.
 - 25 Codex skill descriptions are shorter, taking the Codex skill catalog from
   7,716 to 7,242 characters. Most of the cut removes `$name` from a skill's own
   description: Codex loads a skill by name when the user types `$name`, so

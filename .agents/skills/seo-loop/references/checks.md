@@ -39,7 +39,7 @@ Sources = Google Search Central. Re-read page before quoting a rule to owner in 
 
 Noindex = a standalone `noindex` or `none` in meta robots (anywhere in the page) or X-Robots-Tag, or a past `unavailable_after` (a full date with its year); a directive prefixed for another crawler (`bingbot: noindex`) does not count. `title-long` = 70-char display heuristic, not a Google limit. `h1-missing`, `img-alt-missing` help people + image search; Google requires neither. A11y → `ui-quality`.
 
-Not covered: JS-added tags (compare rendered DOM in headed Chrome when framework injects head tags), rich-result eligibility ([Rich Results Test](https://search.google.com/test/rich-results)), Core Web Vitals (`perf-loop`), Search Console data.
+Not covered: JS-added tags (compare rendered DOM in headed Chrome when framework injects head tags), rich-result eligibility ([Rich Results Test](https://search.google.com/test/rich-results)), Core Web Vitals (`perf-loop`), Search Console data ([technical](technical.md) Search Console).
 
 ## willaicite dimensions
 
@@ -49,10 +49,10 @@ Not covered: JS-added tags (compare rendered DOM in headed Chrome when framework
 |---|---|---|
 | `crawlerAccess` | robots.txt groups for retrieval crawlers; CDN/firewall bot rules (outside repo → report exact setting) | changing training-crawler rules w/o owner's licensing call |
 | `renderability` | server rendering or prerender of main content | bots get different page than people (cloaking) |
-| `answerReadiness` | plain answer near top, headings matching real questions | FAQ blocks/question headings added only to score; cited replication: formatting-only edits ~useless |
+| `answerReadiness` | plain answer near top, headings matching real questions | FAQ blocks/question headings added only to score; cited replication: formatting-only edits ~useless. v1.4.0 gives +15 for any FAQ heading or FAQPage markup, no cited evidence; controlled vendor tests found no citation effect; Google dropped FAQ rich results May 2026 → never add an FAQ to move this |
 | `topicalFocus` | title, H1, description naming page's one topic | keyword stuffing |
 | `evidenceDensity` | real figures, quotes, source links owner stands behind | invented stats, quotes, citations |
-| `structuredData` | JSON-LD of what page visibly shows | markup for absent content; self-serving reviews |
+| `structuredData` | JSON-LD of what page visibly shows | markup for absent content; self-serving reviews; FAQPage scores +15 again here (same caveat as answerReadiness) |
 | `freshness` | visible + machine-readable dates changing only w/ real edits | date bumps w/o content change |
 | `entityEeat` | real author, org, about page | invented people, credentials, affiliations |
 | `seoFoundation` | self-referencing canonicals, unique titles + descriptions | none beyond seo-check rules |
