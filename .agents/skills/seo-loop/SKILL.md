@@ -1,6 +1,6 @@
 ---
 name: seo-loop
-description: "SEO/AEO/GEO: study the site, map how people search for it, compare with its field, improve pages. Use: /seo-loop, 'improve SEO', keywords."
+description: "SEO/AEO/GEO: study the site, map how people search for it, compare with its field, improve pages. Use: 'improve SEO', keywords."
 ---
 
 # SEO loop
@@ -54,13 +54,13 @@ Stop: owner approves plan + drafts. One approval may cover a batch of existing-p
 
 ## 5. Build
 
-Before batch 1: local target → fresh local round-0 at the pre-change commit (diffs across origins can't compare). No local target → [technical](references/technical.md) Live mode if owner opts in, else stop at plan. Live: per batch, step 4 runs on the diff before merge; steps 2-3 run on prod after deploy; regression → Live mode rollback.
+Before batch 1: local target → fresh local round-0 at the pre-change commit (diffs across origins can't compare). No local target → [technical](references/technical.md) Live mode if owner opts in, else stop at plan. Live: per batch, step 4 runs before merge on the diff plus the changed templates' HTML from the production build (no prod data needed for head tags + copy; can't build → diff only); rendered + 3-UA checks marked "deferred to prod" and run after deploy w/ steps 2-3; any miss → Live mode rollback.
 
 Approved plan, in batches (one page or one template per batch):
 
 1. Edit source. Copy = approved draft, word for word. Changed copy or markup → grep repo tests + checks for old strings, update them.
 2. Build + serve (production build locally per [technical](references/technical.md) Measuring; live → after deploy). Check served page shows new title, H1, description, JSON-LD.
-3. seo-check diff vs that round-0 (live: vs prod crawl just before deploy): no new fail/warn except ones the plan expects ([technical](references/technical.md) Diff gate). Project build + tests pass.
+3. seo-check on site + willaicite on key pages + every changed page; diff each vs last accepted state (batch 1: round-0; live: prod crawl just before deploy). Gate: no new fail/warn, no lower willaicite dimension, except what the plan expects ([technical](references/technical.md) Diff gate). Project build + tests pass. Round-0 stays the reference for the report.
 4. Independent review, fresh agent per lens, standalone brief (request, approved plan rows, diff, served URL, integrity.md): integrity (every changed string traced to proof sheet or owner approval; markup = visible content; no stuffing, no padding) + regression (changed + same-template pages render + work; canonical, sitemap, hreflang agree; headed Chrome via `launchPlacedChrome()` if repo has it, else `--window-position=-2400,-2400`, always `--mute-audio`, never headless; screenshots where user's instructions say, else run folder). Codex: exposed multi-agent tools, fresh context; `multi_agent = true` alone ≠ proof they exist. Unavailable → report gap; self-review ≠ independent.
 5. Confirmed issue → fix + recheck, or drop that batch. Commit per batch.
 
