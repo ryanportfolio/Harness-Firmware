@@ -57,24 +57,31 @@ const DISABLE_FEATURES = '--disable-features=';
 // Playwright does not export its disabled-feature list, so read it from the installed bundle.
 // Without it, the merged switch would turn Playwright's entries (request interception fixes,
 // HttpsUpgrades, PaintHolding, ...) back on.
+function playwrightBundle() {
+  const req = createRequire(import.meta.url);
+  const errors = [];
+  // same order as loadChromium(): the playwright-core that playwright itself runs comes first
+  for (const from of [() => createRequire(req.resolve('playwright')), () => req]) {
+    try {
+      return from().resolve('playwright-core/lib/coreBundle');
+    } catch (err) {
+      errors.push(err.message.split('\n')[0]);
+    }
+  }
+  throw new Error(`playwright-core/lib/coreBundle not found (needs Playwright 1.60 or later): ${errors.join('; ')}`);
+}
+
 let playwrightDisabled;
 function playwrightDisabledFeatures() {
   if (playwrightDisabled) return playwrightDisabled;
   try {
-    const req = createRequire(import.meta.url);
-    let bundle;
-    try {
-      bundle = req.resolve('playwright-core/lib/coreBundle');
-    } catch {
-      // only playwright installed and its playwright-core not hoisted: resolve from inside it
-      bundle = createRequire(req.resolve('playwright')).resolve('playwright-core/lib/coreBundle');
-    }
-    const list = readFileSync(bundle, 'utf8').match(/disabledFeatures = \[([\s\S]*?)\]/)?.[1];
-    const names = list ? [...list.replace(/\/\/.*$/gm, '').matchAll(/"(\w+)"/g)].map((m) => m[1]) : [];
+    // the list's closing bracket sits on its own line; a ] inside a comment or entry does not end it
+    const list = readFileSync(playwrightBundle(), 'utf8').match(/disabledFeatures = \[([\s\S]*?)\n\s*\]/)?.[1];
+    const names = list ? [...list.replace(/\/\/.*$/gm, '').matchAll(/"([^"]+)"/g)].map((m) => m[1]) : [];
     if (!names.length) throw new Error('list not found in playwright-core/lib/coreBundle.js');
     playwrightDisabled = names;
   } catch (err) {
-    console.warn(`[launch-chrome] Playwright's own --disable-features list is off for this launch: ${err.message}`);
+    console.warn(`[launch-chrome] Playwright's own --disable-features list is off for every launch in this process: ${err.message}`);
     playwrightDisabled = [];
   }
   return playwrightDisabled;
@@ -119,8 +126,8 @@ function plan(mode) {
 }
 
 /* Launch headed Chrome, placed. Returns what chromium.launch() returns.
-   Extra opts: place ('other-monitor' | 'offscreen' | 'here'), args (appended),
-   purpose (label recorded by the servers skill). */
+   Extra opts: place ('other-monitor' | 'offscreen' | 'here'), args (appended; any
+   --disable-features in them joins the one merged switch), purpose (label recorded by the servers skill). */
 export async function launchPlacedChrome({ place, args = [], purpose, ...opts } = {}) {
   const chromium = await loadChromium();
   const mode = place || process.env.CHROME_PLACE || 'other-monitor';
