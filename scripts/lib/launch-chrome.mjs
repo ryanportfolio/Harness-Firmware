@@ -19,11 +19,24 @@
    full refresh rate (measured 100.5 fps on a 100 Hz panel).
 
    Placement is Windows-only; elsewhere this is a plain headed launch.
+
+   Windows password probe: Chrome 156 asks, for every tab, whether the device can
+   re-authenticate when AutofillAiWalletPrivatePasses or AutofillAmbientAutofill is
+   on. On a profile with no cached answer that check calls LogonUser(<user>, ".", "")
+   to test for a blank password, and Windows logs a failed logon (Security event 4625).
+   Playwright gives every launch a fresh profile, so every verification Chrome added
+   one, enough to trip an account lockout policy. Both features stay disabled here.
+
+   Chrome keeps only the last --disable-features switch, and Playwright passes its own
+   list before any args added here. So the launcher sends one merged switch, last:
+   Playwright's list, the two features above, and any --disable-features in args.
 */
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 
 const PS1 = join(dirname(fileURLToPath(import.meta.url)), 'window-place.ps1');
 const OFFSCREEN = { x: -2400, y: -2400, width: 1600, height: 1000 };
@@ -36,6 +49,42 @@ const BACKGROUNDING_ARGS = [
   // verification windows stay silent: pages with music or effects would play to the operator
   '--mute-audio',
 ];
+
+// stop the blank-password LogonUser probe (see the header)
+const DISABLED_FEATURES = ['AutofillAiWalletPrivatePasses', 'AutofillAmbientAutofill'];
+const DISABLE_FEATURES = '--disable-features=';
+
+// Playwright does not export its disabled-feature list, so read it from the installed bundle.
+// Without it, the merged switch would turn Playwright's entries (request interception fixes,
+// HttpsUpgrades, PaintHolding, ...) back on.
+let playwrightDisabled;
+function playwrightDisabledFeatures() {
+  if (playwrightDisabled) return playwrightDisabled;
+  try {
+    const req = createRequire(import.meta.url);
+    let bundle;
+    try {
+      bundle = req.resolve('playwright-core/lib/coreBundle');
+    } catch {
+      // only playwright installed and its playwright-core not hoisted: resolve from inside it
+      bundle = createRequire(req.resolve('playwright')).resolve('playwright-core/lib/coreBundle');
+    }
+    const list = readFileSync(bundle, 'utf8').match(/disabledFeatures = \[([\s\S]*?)\]/)?.[1];
+    const names = list ? [...list.replace(/\/\/.*$/gm, '').matchAll(/"(\w+)"/g)].map((m) => m[1]) : [];
+    if (!names.length) throw new Error('list not found in playwright-core/lib/coreBundle.js');
+    playwrightDisabled = names;
+  } catch (err) {
+    console.warn(`[launch-chrome] Playwright's own --disable-features list is off for this launch: ${err.message}`);
+    playwrightDisabled = [];
+  }
+  return playwrightDisabled;
+}
+
+function mergeDisableFeatures(args) {
+  const own = args.filter((a) => a.startsWith(DISABLE_FEATURES)).flatMap((a) => a.slice(DISABLE_FEATURES.length).split(','));
+  const names = new Set([...playwrightDisabledFeatures(), ...DISABLED_FEATURES, ...own].filter(Boolean));
+  return [...args.filter((a) => !a.startsWith(DISABLE_FEATURES)), DISABLE_FEATURES + [...names].join(',')];
+}
 
 async function loadChromium() {
   for (const pkg of ['playwright', 'playwright-core']) {
@@ -80,12 +129,12 @@ export async function launchPlacedChrome({ place, args = [], purpose, ...opts } 
   // a Playwright Browser from launch() exposes no pid
   const marker = `--harness-launch=${randomUUID()}`;
 
-  const launchArgs = [
+  const launchArgs = mergeDisableFeatures([
     marker,
     ...BACKGROUNDING_ARGS,
     ...(spot ? [`--window-position=${spot.x},${spot.y}`, `--window-size=${spot.width},${spot.height}`] : []),
     ...args,
-  ];
+  ]);
 
   let browser;
   try {
