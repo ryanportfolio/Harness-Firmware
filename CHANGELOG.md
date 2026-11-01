@@ -293,6 +293,16 @@ condensed.
 
 ### Fixed
 
+- `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`) disables the Chrome
+  features `AutofillAiWalletPrivatePasses` and `AutofillAmbientAutofill`. With
+  either on, Chrome 156 checks for a blank Windows password by calling
+  `LogonUser` with an empty password on every fresh profile, and Windows logs a
+  failed logon (Security event 4625) for each verification Chrome; one morning
+  of verification runs logged 370+ and locked the account. Chrome honors only
+  the last `--disable-features` switch, so the launcher sends one merged switch
+  with Playwright's own list (read from the installed `playwright-core`), these
+  two features, and any `--disable-features` a caller passes. Before this, a
+  caller's `--disable-features` silently replaced Playwright's list.
 - The `SessionStart` and `SubagentStart` hook commands in `.claude/settings.json`
   quote `$CLAUDE_PROJECT_DIR`. Unquoted, a project path containing a space split
   into several arguments and both hooks failed with `No such file or directory`.
