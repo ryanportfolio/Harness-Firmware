@@ -160,6 +160,11 @@
       "group": "specialist"
     },
     {
+      "name": "wow-animation",
+      "label": "Wow animation",
+      "group": "specialist"
+    },
+    {
       "name": "product-walkthrough",
       "label": "Product walkthrough",
       "group": "specialist"
