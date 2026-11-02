@@ -13,6 +13,14 @@ condensed.
 
 ### Added
 
+- `wow-animation` for Claude and Codex, moved in from a personal install. It
+  starts a shareable promo, explainer or game trailer animation about a real
+  subject: parallel recon agents write `facts.md` (every on-screen string and
+  number with its source), directors pitch beat sheets, the user approves one
+  animatic, and `wow-loop` judges the build before any export. Defaults are 16:9,
+  silent and no periods in display text; `references/score.md` covers sound
+  only when the user asks for it. The craft stays in `motion-design`.
+
 - `.claude/scripts/check-skill-size.mjs` and a `validate-template` step that
   fail when any `SKILL.md` in `.claude/skills/` or `.agents/skills/` is 20,000
   bytes or more. After compaction, Claude Code re-attaches an invoked skill cut

@@ -46,7 +46,8 @@ LICENSE/NOTICE files in the skill folder.
 `cache-loop`, `claude-review`, `codex-fullreview`, `codex-review`, `coordinate`, `dare`, `enhance-prompt`,
 `external-review`, `fable-mode`, `forge-repo-ui-skill`, `gauntlet`, `handoff-audit`,
 `impartial-review`, `init-project`, `lab`, `merge`, `motion-design`, `optimize-context`, `perf-loop`,
-`product-walkthrough`, `recall`, `session-hub`, `showpiece`, `sync-starter`, `why`, `wow-loop`.
+`product-walkthrough`, `recall`, `session-hub`, `showpiece`, `sync-starter`, `why`, `wow-animation`,
+`wow-loop`.
 
 Homegrown skills are MIT, same as the template (see its [`LICENSE`](https://github.com/ryanportfolio/Harness-Firmware/blob/main/LICENSE)).
 
