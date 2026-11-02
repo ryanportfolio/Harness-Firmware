@@ -38,6 +38,6 @@ Turn these into named checks in `bar.md`. Keep the IDs so repeated runs compare.
 | WA-SEEK | `seek(t)` then render equals fresh load at `t` for sampled times | scripted |
 | WA-RM (only when reduced motion was asked for) | Reduced-motion version exists and keeps every caption | scripted |
 | WA-FLASH | Flash limits from motion-design hold across the full timeline | scripted |
-| WA-SILENT (sound off, the default) | No `AudioContext` or media element with audio in the page; the export has no audio stream | scripted |
+| WA-SILENT (sound off, the default) | No `AudioContext` or media element with audio in the page (the export's audio stream is checked at export, after the loop) | scripted |
 | WA-SOUND-* (sound on) | Every check in [score.md](score.md#checks), plus one full listen by the user before export | scripted and user |
 | WA-GAME-CAST (games) | Named real enemies and bosses appear, each restyled from its sprite and showing its real tell | judged |

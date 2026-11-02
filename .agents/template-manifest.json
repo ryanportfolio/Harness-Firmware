@@ -75,7 +75,7 @@
       "product-walkthrough": ["motion-design"],
       "security-loop": ["claude-review", "codex-review"],
       "seo-loop": ["writing"],
-      "wow-animation": ["motion-design", "wow-loop"],
+      "wow-animation": ["motion-design", "wow-loop", "writing", "codex-fullreview", "codex-review", "opus-fullreview", "claude-review"],
       "wrapup": ["servers"]
     },
     "presets": {
