@@ -40,6 +40,11 @@
    regression exits 1 even when other findings can't be compared. Info findings
    are left out of the comparison.
 
+   A production run also requests the other forms of the landing origin (http or
+   https, with or without www) and reports any that serve the site instead of
+   redirecting to it. Pages served over https are checked for scripts,
+   stylesheets, images, frames and media loaded over plain http.
+
    Finding ids are stable across runs (rule plus URL or duplicate key), so diff
    can say which findings a round fixed and which it introduced. */
 
@@ -492,11 +497,14 @@ const NAME_CODE = new Map(CODED.map((n, i) => [n, i + 1]));
 const OTHER = CODED.length + 1;
 const HEAD = NAME_CODE.get('head'), BODY = NAME_CODE.get('body'), H1 = NAME_CODE.get('h1');
 // Elements whose attributes parseHtml reads.
-const KEEP_ATTRS = new Set(['base', 'title', 'meta', 'link', 'a', 'img']);
+const KEEP_ATTRS = new Set(['base', 'title', 'meta', 'link', 'a', 'img', 'iframe', 'source', 'video', 'audio']);
+// <link> types the browser fetches as part of the page; an http one on an https page is mixed content.
+const SUBRESOURCE_RELS = new Set(['stylesheet', 'icon', 'preload', 'modulepreload']);
 
 function parseHtml(html, pageUrl) {
   const jsonld = [];
   const titleTexts = [];
+  const scriptSrcs = [];
   let doc = '';
   // Every tag is matched whole, so "<script>" or "<!--" inside a quoted attribute stays attribute text.
   // DOCTYPE and bogus comments (<!x>, <?x>, </ x>, </>) end at the first '>' and are dropped.
@@ -521,7 +529,11 @@ function parseHtml(html, pageUrl) {
     const c = close.exec(html);
     const inner = html.slice(m.index + m[0].length, c ? c.index : html.length);
     pos = c ? c.index + c[0].length : html.length;
-    if (name === 'script' && (attrs(m[3]).type ?? '').trim().toLowerCase() === 'application/ld+json') jsonld.push(inner);
+    if (name === 'script') {
+      const a = attrs(m[3]);
+      if ((a.type ?? '').trim().toLowerCase() === 'application/ld+json') jsonld.push(inner);
+      if (a.src) scriptSrcs.push(a.src);
+    }
     // Kept as an empty element so the head scan sees where it was; the text is looked up by index.
     if (name === 'title') { doc += `<title data-seo-title="${titleTexts.length}"></title>`; titleTexts.push(decodeEntities(inner).replace(/\s+/g, ' ').trim()); }
     else doc += `<${name}></${name}>`;
@@ -605,6 +617,21 @@ function parseHtml(html, pageUrl) {
     } catch { /* unparseable href */ }
   }
 
+  // Files the page loads over plain http: mixed content when the page itself is https.
+  const httpSubresources = [];
+  const sub = (kind, raw) => {
+    try { const u = new URL(raw.trim(), base); if (u.protocol === 'http:') httpSubresources.push({ kind, url: u.href }); } catch { /* unparseable URL */ }
+  };
+  scriptSrcs.forEach((s) => sub('script', s));
+  for (const l of tags('link')) if (l.href && (l.rel ?? '').toLowerCase().split(/\s+/).some((t) => SUBRESOURCE_RELS.has(t))) sub('link', l.href);
+  for (const name of ['img', 'iframe', 'source', 'video', 'audio']) {
+    for (const t of tags(name)) {
+      if (t.src) sub(name, t.src);
+      if (t.poster) sub(name, t.poster);
+      for (const c of (t.srcset ?? '').split(',')) { const s = c.trim().split(/\s+/)[0]; if (s) sub(name, s); }
+    }
+  }
+
   return {
     base, // document base URL: <base href>, else the page URL; relative metadata URLs resolve against it
     headBreaker, // what ended <head> before its </head>, or null
@@ -620,6 +647,7 @@ function parseHtml(html, pageUrl) {
     imgsNoAlt: tags('img', (t) => !inHead(t)).filter((i) => !('alt' in i)).length,
     jsonld,
     links: [...new Set(links)],
+    httpSubresources,
   };
 }
 
@@ -754,6 +782,43 @@ async function check(opts) {
   else if (robotsRes.error && !/redirect/.test(robotsRes.error)) add('robots-unreachable', 'fail', origin + '/robots.txt', `robots.txt fetch failed (${robotsRes.error}); Google treats that like a server error and stops crawling for the first 12 hours`);
   else add('robots-missing', 'info', origin + '/robots.txt', `no robots.txt (${robotsRes.error ?? `HTTP ${robotsRes.status}`}); crawlers treat that as "allow everything"`);
   if (robots && !googlebotAllowed(robots, origin + '/')) add('robots-blocks-root', 'fail', origin + '/robots.txt', 'robots.txt disallows / for Googlebot');
+
+  // Host variants: the other forms of the landing origin (http or https, with or without www)
+  // must redirect to it, or the site is served, and can be indexed, at two addresses.
+  const hostVariants = [];
+  if (local) limits.push('Host variants (http/https, www/non-www) are not checked on a local run; check them on production.');
+  else if (start.port) limits.push(`Host variants are not checked: the landing origin ${origin} names a port.`);
+  else {
+    if (start.protocol === 'http:') add('https-missing', 'warn', start.href, `the site lands on plain HTTP (${start.href}); browsers mark it "Not secure" and Google prefers HTTPS pages`);
+    const altHost = start.hostname.startsWith('www.') ? start.hostname.slice(4) : `www.${start.hostname}`;
+    for (const v of [`http://${start.hostname}/`, `https://${start.hostname}/`, `https://${altHost}/`, `http://${altHost}/`]) {
+      if (new URL(v).origin === origin) continue;
+      hostVariants.push(v);
+      const res = await timed(v, () => null);
+      // A host with no DNS record or nothing listening serves nothing: not a variant.
+      if (res.error && /ENOTFOUND|EAI_AGAIN|ECONNREFUSED/.test(res.error)) continue;
+      const hops = res.chain.map((c) => `${c.status ?? 'error'} ${c.url}`).join(' -> ');
+      if (res.error || res.status === null || res.status >= 400) {
+        add('host-variant-error', 'info', v, `${v} answers ${res.error ?? `HTTP ${res.status}`} instead of redirecting to ${origin}; visitors and links that use it get an error (${hops})`);
+        continue;
+      }
+      if (new URL(res.finalUrl).origin === origin) {
+        // Reached through a temporary redirect, Google may keep showing the variant's URL.
+        const temp = res.chain.slice(0, -1).find((c) => [302, 303, 307].includes(c.status));
+        if (temp) add('host-variant-temporary-redirect', 'warn', v, `${v} reaches ${origin} through a temporary ${temp.status} redirect; use 301 or 308 (${hops})`);
+        continue;
+      }
+      if (res.status < 200 || res.status >= 300) continue;
+      // Served without a redirect. A canonical pointing at the landing origin softens it.
+      let canonOrigin = null;
+      try {
+        const h = res.body !== null && /html/i.test(res.headers['content-type'] ?? '') ? parseHtml(res.body, res.finalUrl) : null;
+        if (h?.canonicals.length === 1 && h.canonicals[0]) canonOrigin = new URL(h.canonicals[0], h.base).origin;
+      } catch { /* unreadable page or canonical: treated as none */ }
+      if (canonOrigin === origin) add('host-variant-duplicate', 'warn', v, `${res.finalUrl} serves the site (HTTP ${res.status}) instead of redirecting to ${origin}; its canonical points there, but a 301 is the stronger signal (${hops})`);
+      else add('host-variant-duplicate', 'fail', v, `${res.finalUrl} serves the site (HTTP ${res.status}) instead of redirecting to ${origin}, so the site can be indexed at two addresses (${hops})`);
+    }
+  }
 
   // sitemaps
   const sitemapUrls = new Set();
@@ -1032,6 +1097,15 @@ async function check(opts) {
     if (!h.descriptions.length || !h.descriptions[0].trim()) add('description-missing', 'warn', url, 'no meta description; Google writes its own snippet');
     if (!h.h1.length) add('h1-missing', 'info', url, 'no <h1>');
     if (h.imgsNoAlt) add('img-alt-missing', 'info', url, `${h.imgsNoAlt} <img> without an alt attribute`);
+    // An https page, or a local preview of an https production site. On a preview, http URLs on this
+    // machine are the preview's own files and become https in production.
+    if (rec.finalUrl.startsWith('https:') || (local && publicOrigin?.startsWith('https:'))) {
+      const mixed = h.httpSubresources.filter((r) => !(local && isLocal(new URL(r.url).hostname)));
+      if (mixed.length) {
+        const kinds = [...new Set(mixed.map((r) => r.kind))].join(', ');
+        add('mixed-content', 'warn', url, `${mixed.length} file(s) load over plain http on an https page (${kinds}); browsers block or upgrade them and may mark the page "Not secure": ${mixed.slice(0, 3).map((r) => r.url).join(', ')}${mixed.length > 3 ? ` and ${mixed.length - 3} more` : ''}`);
+      }
+    }
 
     // canonical
     if (h.bodyCanonicals.length && !h.canonicals.length) add('canonical-in-body', 'warn', url, 'rel=canonical sits in <body>, where Google ignores it');
@@ -1155,7 +1229,7 @@ async function check(opts) {
 
   return {
     tool: 'seo-check',
-    version: 2,
+    version: 3,
     mode: list ? 'urls' : 'crawl',
     url: start.href,
     requestedUrl: requested.href,
@@ -1166,6 +1240,8 @@ async function check(opts) {
     fetches,
     publicOrigin,
     robots: { status: robotsRes.status, sitemaps: robots?.sitemaps ?? [] },
+    hostVariants, // other forms of the landing origin that were requested
+
     sitemap: { files: sitemapFiles, read: sitemapsRead, complete: sitemapComplete, urls: sitemapUrls.size, list: [...sitemapUrls] },
     // Same-origin URLs some crawled page links to: diff uses it to tell a removed link from an unchecked page.
     linked: [...linkedFrom.keys()],
@@ -1211,7 +1287,7 @@ function normalize(report, label) {
     // Every URL the run fetched and got an answer from. A finding counts as fixed
     // only if the later run fetched its URL again (a robots.txt block is not a fetch).
     const origin = new URL(report.url).origin;
-    const covered = new Set([report.url, origin, origin + '/robots.txt', ...(report.sitemap?.files ?? [])]);
+    const covered = new Set([report.url, origin, origin + '/robots.txt', ...(report.sitemap?.files ?? []), ...(report.hostVariants ?? [])]);
     const coveredHtml = new Set(); // pages whose whole HTML was read, so HTML findings were rechecked
     for (const p of report.pages ?? []) {
       if (p.blocked || p.status === null) continue;
@@ -1310,7 +1386,7 @@ function diff(beforePath, afterPath) {
   if (b.kind === 'seo-check') {
     // Findings read from a page's HTML need that page's HTML read again; status and
     // redirect findings only need it fetched.
-    const statusRule = /^(http-error|http-no-content|fetch-error|redirect-chain|sitemap-|robots-|start-unreadable|needs-public-origin|linked-url-|listed-url-)/;
+    const statusRule = /^(http-error|http-no-content|fetch-error|redirect-chain|sitemap-|robots-|start-unreadable|needs-public-origin|linked-url-|listed-url-|host-variant-|https-missing)/;
     // Sitemap-membership findings need the later run to have read every sitemap file, in a full crawl.
     const membershipRule = /^(not-in-sitemap|orphan|sitemap-url-|sitemap-bad-url$|sitemap-foreign-url$)/;
     // Findings about one sitemap entry are settled once a complete later sitemap no longer lists it.

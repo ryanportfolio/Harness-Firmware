@@ -27,10 +27,11 @@ Output `field/<site>.md`.
 2. Coverage table: topic | field sites covering it | our page or "none" | fits our offer? (only topics our offer really serves).
 3. Page-type signal per cluster: what the field and search results answer it with.
 
-Pick rules: field consensus + matches audience → use it. Our site's term is clearer or more accurate → keep it, add the common term where natural (heading or first paragraph), never stuffed. Field misleads (hype term, wrong term) → don't follow; note why.
+Pick rules: field consensus + matches audience → use it. Two terms fit equally → Trends comparison (Spot checks) decides, noted as a dated sample. Our site's term is clearer or more accurate → keep it, add the common term where natural (heading or first paragraph), never stuffed. Field misleads (hype term, wrong term) → don't follow; note why.
 
 ## Spot checks (samples)
 
 - Web search (Codex: its web search tool if exposed; none → say so, skip) top ~10 queries: record date, exact query, top results' page types, whether our site appears + where. One sample; web-search tool ≠ Google, results vary by location and person.
 - AI questions: ~5 top questions, only in an AI engine the owner OK'd (headed browser, owner signed in). Record date, engine, exact question, whether our site named or linked, which sources were. Answers change per try → sample. No approved engine → record "AI spot check: not run"; never substitute search results or the agent's own answer.
+- Google Trends (tie-breaker only, when two terms both fit): [trends.google.com](https://trends.google.com/trends/explore) in headed Chrome, 2-5 terms compared in one view, region = where the audience is, timeframe past 12 months. Scripted requests get 429 → browser only, ≤1 comparison per ~10 s. Record date, exact terms, region, timeframe, each term's average. Values = interest relative to the top term in that view (0-100); never convert to searches, never compare across views. Term shows 0 or "not enough data" → too little to measure, not "nobody searches". Local business: also compare by city/region. Not opened → record "Trends: not run".
 - Same queries + questions rerun at re-check (step 6). Compare as samples; never report as measured gain.
