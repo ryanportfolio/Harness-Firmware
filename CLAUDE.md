@@ -57,6 +57,7 @@ Defaults until configured:
   - `sonnet`: scoped work that needs some reasoning and is easy to check. Web research and digests, triage of logs or test output, edits that repeat an existing pattern across files.
   - `haiku`: mechanical work with an exact spec. File and code searches, bulk renames and reformats, summaries of long output, extraction into a fixed format, counts and inventories. Haiku does what the prompt literally says, so spell out the scope.
   - A Sonnet or Haiku result that looks incomplete or wrong gets rerun with `model` omitted, not patched by hand.
+- A session you propose yourself (`start_session` `own_initiative`) gets a brief that opens with a `/why` step on its recommendation: rejected → report and stop for the user's OK; refined → apply it, proceed, and note the change in the first report. Plan-split cards and `user_asked` sessions skip it.
 
 ## Git: push on completion
 
