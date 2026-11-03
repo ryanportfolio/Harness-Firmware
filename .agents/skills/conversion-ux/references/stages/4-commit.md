@@ -19,7 +19,7 @@ Starts at the primary action and the line beside it; ends when the user presses 
 
 **CO3. Light verbs for first steps.** "Subscribe" signals a recurring commitment; "Start my free trial" a beginning. zr37ibqXl1U 3:23. Presenter. Guard: the CO2 line still states billing and its date.
 
-**CO4. Reachable when the user is ready.** People decide after reading further down. Fix: a sticky action on long pages, labelled with the plan and price, that does not cover content. On a long marketing or service page without one, repeat the same action right after the section that answers the main objection (the process, the price, the proof), with the same label; an action only in the footer, after the reader's interest has peaked, is a finding. GGg61sdEjeI 12:15. Craft.
+**CO4. Reachable when the user is ready.** People decide after reading further down. Fix: a sticky action on long pages, labelled with the plan and price, that does not cover content. GGg61sdEjeI 12:15. Craft. On a long marketing or service page without a sticky action, repeat the same action, with the same label, right after the section that answers the main objection (the process, the price, the proof); a long page whose only actions are at the top and in the footer is a finding. Craft.
 
 **CO5. Inputs beside the action they feed.** Quantity far from "Add to cart"; units outside the control. Fix: group them; put the unit inside the selector. GGg61sdEjeI 11:09. Craft.
 
@@ -27,7 +27,7 @@ Starts at the primary action and the line beside it; ends when the user presses 
 
 ### Applies when: the action submits a form (contact, quote, booking request, sign-up, lead)
 
-**CO7. Ask only what the next step needs.** Each required field is one more reason to stop. For every field, name the step it unlocks; a field that is merely useful later ("company size", "budget", "how did you hear about us") is a finding. Fix: required fields only for what the next step cannot happen without (for a first contact, usually a name and one way to reply); everything else optional, marked as optional, or asked later in conversation or after the account exists; order fields from easy (name, email) to sensitive (phone, budget, address). Convention; field order Craft. Guard: never drop a field the service, the law or a safety check really needs; say why it is needed beside it. The confirmation after submit: JO3.
+**CO7. Ask only what the next step needs.** Each required field is one more reason to stop. For every field, name the step it unlocks; a field that is merely useful later ("company size", "budget", "how did you hear about us") is a finding. Fix: required fields only for what the next step cannot happen without (for a first contact, usually a name and one way to reply); everything else optional, marked as optional, or asked later in conversation or after the account exists; order fields from easy (name, email) to sensitive (phone, budget, address). A short setup step before an account (GA3) is not a CO7 finding. Convention. Guard: never drop a field the service, the law or a safety check really needs; beside any such field whose need is not obvious (phone, date of birth, an ID number), say why. The confirmation after submit: JO3.
 
 Something covering the button or the CO2 line (a chat widget, a cookie bar): SC1. A button a keyboard cannot reach: SC3. Both in [every-screen.md](../every-screen.md).
 
