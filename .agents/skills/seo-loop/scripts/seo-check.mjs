@@ -811,25 +811,34 @@ async function check(opts) {
       // first request: a redirect into a dead endpoint is a broken variant.
       if (res.chain.length === 1 && res.error && /ENOTFOUND|ECONNREFUSED/.test(res.error)) { hostVariants.push(v); continue; }
       const hops = res.chain.map((c) => `${c.status ?? 'not fetched'} ${c.url}`).join(' -> ');
-      // Errors, server errors, rate limits, auth or bot walls and robots-stopped redirects may pass:
-      // reported, never counted as rechecked, so a diff can't read them as a fix.
-      if (res.error || res.status === null || res.stopped || res.status >= 500 || [401, 403, 429].includes(res.status)) {
-        const why = res.stopped ?? res.error ?? `HTTP ${res.status}`;
+      // The variant is judged up to its first hop on the landing origin; what the site does after
+      // that (locale redirects, its own errors) is the site's, not the variant's.
+      const reach = res.chain.findIndex((c) => new URL(c.url).origin === origin);
+      const own = reach > 0 ? res.chain.slice(0, reach) : res.chain;
+      // A robots.txt that answered 5xx/429 or failed leaves crawler access to that host unknown.
+      const robotsUnknown = [...new Set(own.map((c) => new URL(c.url).origin))].find((o) => {
+        const r = robotsCache.get(o);
+        return r && (r.status >= 500 || r.status === 429 || (r.status === null && !/ENOTFOUND|ECONNREFUSED|redirect/.test(r.error ?? '')));
+      });
+      if (reach > 0 && !robotsUnknown) {
+        hostVariants.push(v);
+        // Reached through a temporary redirect, Google may keep showing the variant's URL.
+        const temp = own.find((c) => [302, 303, 307].includes(c.status));
+        if (temp) add('host-variant-temporary-redirect', 'warn', v, `${v} reaches ${origin} through a temporary ${temp.status} redirect; use 301 or 308 (${hops})`);
+        continue;
+      }
+      // Errors, server errors, rate limits, auth or bot walls, robots-stopped redirects and unreadable
+      // robots.txt may pass: reported, never counted as rechecked, so a diff can't read them as a fix.
+      if (robotsUnknown || res.error || res.status === null || res.stopped || res.status >= 500 || [401, 403, 429].includes(res.status)) {
+        const why = robotsUnknown ? `an unreadable robots.txt on ${robotsUnknown}` : res.stopped ?? res.error ?? `HTTP ${res.status}`;
         variantsUnsettled.push(`${v} (${why})`);
         add('host-variant-error', 'info', v, `${v} answers ${why} instead of redirecting to ${origin}; visitors and links that use it may get an error (${hops})`);
         continue;
       }
       hostVariants.push(v);
-      // Redirects up to the first hop on the landing origin; what the site does after that is its own.
-      const reach = res.chain.findIndex((c) => new URL(c.url).origin === origin);
-      if (reach > 0) {
-        // Reached through a temporary redirect, Google may keep showing the variant's URL.
-        const temp = res.chain.slice(0, reach).find((c) => [302, 303, 307].includes(c.status));
-        if (temp) add('host-variant-temporary-redirect', 'warn', v, `${v} reaches ${origin} through a temporary ${temp.status} redirect; use 301 or 308 (${hops})`);
-        continue;
-      }
-      if (res.status >= 400) {
-        add('host-variant-error', 'warn', v, `${v} answers HTTP ${res.status} instead of redirecting to ${origin}; visitors and links that use it get an error (${hops})`);
+      // 204/205 carry no page: nothing indexable there, but nothing redirects either.
+      if (res.status >= 400 || res.status === 204 || res.status === 205) {
+        add('host-variant-error', 'warn', v, `${v} answers HTTP ${res.status} instead of redirecting to ${origin}; visitors and links that use it get ${res.status >= 400 ? 'an error' : 'an empty page'} (${hops})`);
         continue;
       }
       if (res.status < 200 || res.status >= 300) continue;
@@ -844,8 +853,10 @@ async function check(opts) {
         const h = res.body !== null && /html/i.test(res.headers['content-type'] ?? '') ? parseHtml(res.body, res.finalUrl) : null;
         if (h?.canonicals.length === 1 && h.canonicals[0]) canonOrigin = new URL(h.canonicals[0], h.base).origin;
       } catch { /* unreadable page or canonical: treated as none */ }
-      if (canonOrigin === origin) add('host-variant-duplicate', 'warn', v, `${res.finalUrl} serves the site (HTTP ${res.status}) instead of redirecting to ${origin}; its canonical points there, but a 301 is the stronger signal (${hops})`);
-      else add('host-variant-duplicate', 'fail', v, `${res.finalUrl} serves the site (HTTP ${res.status}) instead of redirecting to ${origin}, so the site can be indexed at two addresses (${hops})`);
+      // Once https on the same host works, every variant should end there, not on the http start URL.
+      const target = httpsServes ? new URL(httpsSameHost).origin : origin;
+      if (canonOrigin === origin) add('host-variant-duplicate', 'warn', v, `${res.finalUrl} serves the site (HTTP ${res.status}) instead of redirecting to ${target}; its canonical points to ${origin}, but a 301 is the stronger signal (${hops})`);
+      else add('host-variant-duplicate', 'fail', v, `${res.finalUrl} serves the site (HTTP ${res.status}) instead of redirecting to ${target}, so the site can be indexed at two addresses (${hops})`);
     }
     if (start.protocol === 'http:') {
       add('https-missing', 'warn', start.href, httpsServes
