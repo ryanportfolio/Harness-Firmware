@@ -619,8 +619,10 @@ function parseHtml(html, pageUrl) {
 
   // Files the page loads over plain http: mixed content when the page itself is https.
   const httpSubresources = [];
+  // `explicit`: written as http://. A relative or //host URL takes the page's scheme, so on an
+  // http preview of an https site it is http here and https in production.
   const sub = (kind, raw) => {
-    try { const u = new URL(raw.trim(), base); if (u.protocol === 'http:') httpSubresources.push({ kind, url: u.href }); } catch { /* unparseable URL */ }
+    try { const u = new URL(raw.trim(), base); if (u.protocol === 'http:') httpSubresources.push({ kind, url: u.href, explicit: /^\s*http:/i.test(raw) }); } catch { /* unparseable URL */ }
   };
   scriptSrcs.forEach((s) => sub('script', s));
   for (const l of tags('link')) if (l.href && (l.rel ?? '').toLowerCase().split(/\s+/).some((t) => SUBRESOURCE_RELS.has(t))) sub('link', l.href);
@@ -785,7 +787,8 @@ async function check(opts) {
 
   // Host variants: the other forms of the landing origin (http or https, with or without www)
   // must redirect to it, or the site is served, and can be indexed, at two addresses.
-  const hostVariants = [];
+  const hostVariants = []; // variants with a settled answer; diff counts only these as rechecked
+  const variantsUnsettled = [];
   if (local) limits.push('Host variants (http/https, www/non-www) are not checked on a local run; check them on production.');
   else if (start.port) limits.push(`Host variants are not checked: the landing origin ${origin} names a port.`);
   else {
@@ -793,19 +796,29 @@ async function check(opts) {
     const altHost = start.hostname.startsWith('www.') ? start.hostname.slice(4) : `www.${start.hostname}`;
     for (const v of [`http://${start.hostname}/`, `https://${start.hostname}/`, `https://${altHost}/`, `http://${altHost}/`]) {
       if (new URL(v).origin === origin) continue;
-      hostVariants.push(v);
-      const res = await timed(v, () => null);
+      // Like every other fetch: robots.txt is checked before the variant and before each redirect hop.
+      if (!googlebotAllowed(await robotsFor(new URL(v).origin), v)) { variantsUnsettled.push(`${v} (disallowed by its robots.txt)`); continue; }
+      const res = await timed(v, startGuard);
       // A host with no DNS record or nothing listening serves nothing: not a variant.
-      if (res.error && /ENOTFOUND|EAI_AGAIN|ECONNREFUSED/.test(res.error)) continue;
-      const hops = res.chain.map((c) => `${c.status ?? 'error'} ${c.url}`).join(' -> ');
-      if (res.error || res.status === null || res.status >= 400) {
-        add('host-variant-error', 'info', v, `${v} answers ${res.error ?? `HTTP ${res.status}`} instead of redirecting to ${origin}; visitors and links that use it get an error (${hops})`);
+      if (res.error && /ENOTFOUND|ECONNREFUSED/.test(res.error)) { hostVariants.push(v); continue; }
+      const hops = res.chain.map((c) => `${c.status ?? 'not fetched'} ${c.url}`).join(' -> ');
+      if (res.status !== null && !res.error && new URL(res.finalUrl).origin === origin) {
+        hostVariants.push(v);
+        // Reached through a temporary redirect, Google may keep showing the variant's URL.
+        const temp = res.chain.find((c) => [302, 303, 307].includes(c.status));
+        if (temp) add('host-variant-temporary-redirect', 'warn', v, `${v} reaches ${origin} through a temporary ${temp.status} redirect; use 301 or 308 (${hops})`);
         continue;
       }
-      if (new URL(res.finalUrl).origin === origin) {
-        // Reached through a temporary redirect, Google may keep showing the variant's URL.
-        const temp = res.chain.slice(0, -1).find((c) => [302, 303, 307].includes(c.status));
-        if (temp) add('host-variant-temporary-redirect', 'warn', v, `${v} reaches ${origin} through a temporary ${temp.status} redirect; use 301 or 308 (${hops})`);
+      // Timeouts, TLS and server errors, rate limits and robots-stopped redirects may pass: reported,
+      // but never counted as rechecked, so a diff can't read them as a fix.
+      if (res.error || res.status === null || res.stopped || res.status >= 500 || res.status === 429) {
+        variantsUnsettled.push(`${v} (${res.stopped ?? res.error ?? `HTTP ${res.status}`})`);
+        add('host-variant-error', 'info', v, `${v} answers ${res.stopped ?? res.error ?? `HTTP ${res.status}`} instead of redirecting to ${origin}; visitors and links that use it may get an error (${hops})`);
+        continue;
+      }
+      hostVariants.push(v);
+      if (res.status >= 400) {
+        add('host-variant-error', 'info', v, `${v} answers HTTP ${res.status} instead of redirecting to ${origin}; visitors and links that use it get an error (${hops})`);
         continue;
       }
       if (res.status < 200 || res.status >= 300) continue;
@@ -818,6 +831,7 @@ async function check(opts) {
       if (canonOrigin === origin) add('host-variant-duplicate', 'warn', v, `${res.finalUrl} serves the site (HTTP ${res.status}) instead of redirecting to ${origin}; its canonical points there, but a 301 is the stronger signal (${hops})`);
       else add('host-variant-duplicate', 'fail', v, `${res.finalUrl} serves the site (HTTP ${res.status}) instead of redirecting to ${origin}, so the site can be indexed at two addresses (${hops})`);
     }
+    if (variantsUnsettled.length) limits.push(`Host variants without a settled answer (not counted as rechecked): ${variantsUnsettled.join(', ')}`);
   }
 
   // sitemaps
@@ -1099,8 +1113,9 @@ async function check(opts) {
     if (h.imgsNoAlt) add('img-alt-missing', 'info', url, `${h.imgsNoAlt} <img> without an alt attribute`);
     // An https page, or a local preview of an https production site. On a preview, http URLs on this
     // machine are the preview's own files and become https in production.
-    if (rec.finalUrl.startsWith('https:') || (local && publicOrigin?.startsWith('https:'))) {
-      const mixed = h.httpSubresources.filter((r) => !(local && isLocal(new URL(r.url).hostname)));
+    const preview = !rec.finalUrl.startsWith('https:');
+    if (!preview || (local && publicOrigin?.startsWith('https:'))) {
+      const mixed = h.httpSubresources.filter((r) => !preview || (r.explicit && !isLocal(new URL(r.url).hostname)));
       if (mixed.length) {
         const kinds = [...new Set(mixed.map((r) => r.kind))].join(', ');
         add('mixed-content', 'warn', url, `${mixed.length} file(s) load over plain http on an https page (${kinds}); browsers block or upgrade them and may mark the page "Not secure": ${mixed.slice(0, 3).map((r) => r.url).join(', ')}${mixed.length > 3 ? ` and ${mixed.length - 3} more` : ''}`);
