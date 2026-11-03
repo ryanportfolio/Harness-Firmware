@@ -46,7 +46,7 @@ Spot checks (samples, labeled): web-search the top ~10 queries → what kind of 
 - One primary cluster per page; no two pages aimed at same cluster (merge or split instead).
 - Changes per page: title, H1, description, opening answer, missing sections, internal links in + out, JSON-LD for visible content only, URL only if owner decides.
 - Technical fixes from baseline: own rows, access/indexing fails first. Core Web Vitals metric rated poor or needs improvement in field data → own row, work handed to `perf-loop`.
-- Local business: rows for name/address/phone mismatches (site fixes in repo; Google Business Profile + directory fixes = owner's list w/ exact wording), `LocalBusiness` JSON-LD of what the page visibly shows, place names on real service pages only (integrity swap test).
+- Local business: rows for name/address/phone mismatches; which value is correct = owner's call, recorded on the owner-confirmed fact list before any site edit (site fixes in repo; Google Business Profile + directory fixes = owner's list w/ exact wording), `LocalBusiness` JSON-LD of what the page visibly shows, place names on real service pages only (integrity swap test).
 - Order: serves offer best × personas served × effort. Not search volume (unknown).
 - Draft all new/rewritten copy via `writing`, using only proof-sheet facts; each fact in a draft cites its proof-sheet row. Gaps → `owner input needed`.
 - `plan.md` lists every fact needing owner OK one by one (not on proof sheet, or only in code/data). Approving a draft ≠ confirming its facts; only that list records confirmation.
@@ -79,10 +79,10 @@ Before deploy: seo-check + willaicite (key + changed existing pages) on prod = b
 
 ## Owner decisions
 
-Never alone; list pending w/ exact proposed change: new pages; URL changes, redirects + redirect maps; canonical targets; noindex/robots; training-crawler rules (licensing call; see [checks](references/checks.md) Crawler claims); CDN/firewall bot settings; host redirects (www/non-www, http → https); Google Business Profile + directory edits; review replies; facts not on proof sheet; key-page copy; merge + deploy.
+Never alone; list pending w/ exact proposed change: new pages; URL changes, redirects + redirect maps; canonical targets; noindex/robots; training-crawler rules (licensing call; see [checks](references/checks.md) Crawler claims); CDN/firewall bot settings; host redirects (www/non-www, http → https); which name, address or phone is correct; Google Business Profile + directory edits; review replies; facts not on proof sheet; key-page copy; merge + deploy.
 
 ## Report
 
-`report.md` (kept at cleanup); chat gets verdict + next step + path. Order: verdict (what shipped / plan only), owner's next decision, site brief (5 lines), personas, query-to-page map w/ wording picks + reasons, what shipped (PRs, pages), technical before/after (finding counts, willaicite dimensions), spot checks before/after (samples, dated), pending owner decisions, what was not attempted + why, evidence paths. Plain words; gloss SEO terms once.
+`report.md` (kept at cleanup); chat gets verdict + next step + path. Order: verdict (what shipped / plan only), owner's next decision, site brief (5 lines), personas, query-to-page map w/ wording picks + reasons, what shipped (PRs, pages), technical before/after (finding counts, willaicite dimensions, Core Web Vitals field data w/ source + date), spot checks before/after (samples, dated), pending owner decisions, what was not attempted + why, evidence paths. Plain words; gloss SEO terms once.
 
 Cleanup: stop servers, close browsers, delete scratch except run folder evidence; report leftovers w/ path + size.
