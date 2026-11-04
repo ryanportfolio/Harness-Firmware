@@ -13,6 +13,16 @@ condensed.
 
 ### Added
 
+- `climb-loop` for Claude and Codex. It hill-climbs a target round after round.
+  For UI, Opus, the newest Sol and Astra each rank our screens blind against
+  frozen captures of reference apps the user names, per category, until every
+  judge puts ours alone in the top tier for two fresh rounds in a row. Judges
+  rank instead of scoring because absolute scores drifted in the source run,
+  and they never see the target. Sol judges alone until it passes, then Opus
+  joins, then Astra, to save usage. A scripted mode turns past agent mistakes
+  into an eval, climbs it to a perfect score, then cuts cost while staying
+  perfect. Adapted from Theo's "Agents Sucked At UI (Until Today)" video.
+
 - `wow-animation` for Claude and Codex, moved in from a personal install. It
   starts a shareable promo, explainer or game trailer animation about a real
   subject: parallel recon agents write `facts.md` (every on-screen string and

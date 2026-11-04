@@ -14,6 +14,7 @@
     "cache-loop": "native",
     "caveman": "native",
     "claude-review": "native",
+    "climb-loop": "native",
     "codex-fullreview": "disabled",
     "codex-image-gen": "disabled",
     "codex-review": "native",
