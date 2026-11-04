@@ -44,8 +44,7 @@ LICENSE/NOTICE files in the skill folder.
 
 `addskill`, `adopt-repo`, `advocate`, `apply-firmware`, `astra-fullreview`, `astra-review`,
 `cache-loop`, `claude-review`, `climb-loop`, `codex-fullreview`, `codex-review`, `coordinate`, `dare`,
-`enhance-prompt`,
-`external-review`, `fable-mode`, `forge-repo-ui-skill`, `gauntlet`, `handoff-audit`,
+`enhance-prompt`, `external-review`, `fable-mode`, `forge-repo-ui-skill`, `gauntlet`, `handoff-audit`,
 `impartial-review`, `init-project`, `lab`, `merge`, `motion-design`, `optimize-context`, `perf-loop`,
 `product-walkthrough`, `recall`, `session-hub`, `showpiece`, `sync-starter`, `why`, `wow-animation`,
 `wow-loop`.

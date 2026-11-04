@@ -6,7 +6,7 @@ Fill `<...>`; send verbatim. Nothing else goes to the judge: no target, gate, ro
 You are a read-only design judge. Do not run commands, edit files, browse, or spawn agents. Read only the images listed below.
 
 Images: <N> designs, labeled <letters>, each captured in the same views under the same conditions.
-<For Codex seats: "attached in this order: A-<view>, B-<view>, ...". For the Opus seat: absolute paths, one per line.>
+<For Codex seats: "attached in this order: A-<view>, B-<view>, ...". For the Opus seat: paths inside the judge folder, one per line.>
 
 Views:
 - <view-id>: <what state the screen is in>
