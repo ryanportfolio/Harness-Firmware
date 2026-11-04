@@ -26,7 +26,7 @@ Neighbors: `wow-loop` = written quality contract, binary checks, own critics, on
 
 ## Why rank, not score
 
-Absolute 1–10 scores drift. Observed in the source run: same screenshot, same model, three scores; in-thread judge called a change 6.5 → 9 while a fresh judge with rival screenshots called it 7 → 7.4; rival scores rose 8.3 → 9.1 with no change to their screenshots; judges who knew the target likely inflated. So: each judge ranks ours against frozen reference captures, per category, blind. References never change → any reference rank movement between rounds = judge noise, logged as drift.
+Absolute 1–10 scores drift. Observed in the source run: same screenshot, same model, three scores; in-thread judge called a change 6.5 → 9 while a fresh judge with rival screenshots called it 7 → 7.4; rival scores rose 8.3 → 9.1 with no change to their screenshots; judges who knew the target likely inflated. So: each judge ranks ours against frozen reference captures, per category, blind. References never change → drift = any change in the order of references among themselves (ours removed) between rounds; logged as judge noise. A reference dropping a tier because ours passed it is not drift.
 
 ## 1. Council
 
@@ -50,7 +50,7 @@ codex exec -m "$MODEL_ID" -c model_reasoning_effort=high -s read-only \
   < "$RUN/brief.md" > "$RUN/sol.log" 2>&1
 ```
 
-`$RUN` = unique dir per seat per round under `.tmp/climb-loop/<slug>/`. Exit 0 + `-o` file parses against the schema = success. Anything else → report once, ask before a retry; never swap model or effort silently. Opus subagent gets the same brief plus absolute image paths, returns the same JSON.
+`$RUN` = unique dir per seat per round under `.tmp/climb-loop/<slug>/`. Exit 0 + `-o` file parses against the schema = success. Then reject incomplete judgments: every contracted category present once, every expected letter exactly once in each ranking, `gaps` empty. Any miss → that seat result is invalid for the round, never counted as a pass. Anything else → report once, ask before a retry; never swap model or effort silently. Opus subagent gets the same brief plus absolute image paths, returns the same JSON.
 
 ## 2. Contract (once, then frozen)
 
@@ -85,7 +85,7 @@ Two rounds in a row with no tier gain in any category → stop, write one senten
 
 ## 5. Report
 
-- PR body (normal prose): history table rounds × seat × category, ours' tier; drift row with every reference tier change (expected zero).
+- PR body (normal prose): history table rounds × seat × category, ours' tier; drift row: changes in reference-only order, ours removed (expected none).
 - Per shipped change: annotated before/after (arrow + one line) so the user can see subtle diffs.
 - Attribution: seats that ran, observed model/effort per seat, rounds where a seat sat out and why (staged, quota, failure), blinding limits, total judge calls.
 

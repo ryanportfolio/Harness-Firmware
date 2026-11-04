@@ -25,6 +25,7 @@ Categories:
 For each category: rank every letter best first as tiers (letters in one tier are tied), give a one-line reason, and list up to 3 defects per letter. Each defect names the view, the element, the problem, and a measurable fix (size, color value, spacing, contrast ratio).
 
 Judge only what the images show. If an image is missing or unreadable, say so in gaps instead of guessing.
+<For the Opus seat only, add: "Return only JSON matching this schema, with no text before or after it:" followed by the full contents of rank.schema.json.>
 ```
 
-Return format: `rank.schema.json` (Codex: `--output-schema`; Opus: ask for exactly that JSON, validate it the same way).
+Return format: `rank.schema.json`. Codex seats get it through `--output-schema`; the Opus seat gets it inline in the brief (line above), which works for both the Agent-tool subagent and `claude -p`. `claude -p --json-schema` exists but its output wrapping is untested here; keep the inline schema until it is verified. Validate every seat's output the same way, including the completeness check in SKILL.md section 1.
