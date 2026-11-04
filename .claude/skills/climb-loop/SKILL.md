@@ -16,7 +16,7 @@ Neighbors: `wow-loop` = written quality contract, binary checks, own critics, on
 
 ## Stop rules (read first)
 
-- Agree a round cap and a usage budget with the user before round 1. When the round cap or the agreed usage budget is reached, stop, report, and ask the user before any further judge call. Never raise the cap or the budget yourself.
+- Agree a round cap and a usage budget with the user before the first judge call or eval run; baseline, confirmation and scripted eval runs all count against them. When the round cap or the agreed usage budget is reached, stop, report, and ask the user before any further judge call. Never raise the cap or the budget yourself.
 - Before starting, state seat count × planned rounds; every judge call bills the user's subscriptions.
 - Judges must not edit anything. Codex judges run with `-s read-only`. The Opus judge is an Agent-tool subagent whose tools are not restricted, so it is read-only only because its brief forbids edits and any tool use beyond reading the listed images; say so in the report.
 - Never tell a judge the target, gate, round number, prior ranks, builder notes or which letter is ours.
@@ -38,15 +38,15 @@ Absolute 1–10 scores drift. Observed in the source run: in-thread judge called
 
 Sol + Astra share a vendor (OpenAI) → their agreement is weaker evidence than Opus + either. Report says so. User names other models → honor, record.
 
-Preflight, no inference: `codex --version`, `codex login status`, `codex exec --help` shows `-i/--image`, `-s/--sandbox`, `-C/--cd`, `--skip-git-repo-check`, `--ephemeral`, `--output-schema`, `-o`. Do not probe models by spending usage.
+Preflight, no inference. Codex route: accept a ChatGPT login from `codex login status` or a gateway `model_provider` in `config.toml`, per `codex-review` Step 1; with neither, stop before inference and ask the user to log in. Then `codex --version`, `codex exec --help` shows `-i/--image`, `-s/--sandbox`, `-C/--cd`, `--skip-git-repo-check`, `--ephemeral`, `--output-schema`, `-o`. Do not probe models by spending usage.
 
 **Judge folder.** Per seat per round, make a new empty folder outside the repository (`JUDGE=$(mktemp -d "${TMPDIR:-/tmp}/judge-XXXXXXXX")`). Copy in the filled brief and that seat's captures renamed `<letter>-<view>.png` under that seat's shuffle. Judges see only this folder: no repo, no project name, no slug in any path. Results move to `$RUN` = `.tmp/climb-loop/<slug>/round-<n>/<seat>/` after the call.
 
-Codex judge call. Brief on stdin, so multi-value `-i` cannot swallow it (verified codex-cli 0.166.0). `$SKILL` = absolute path of this skill's folder. Launch in background and poll, per `codex-review` Step 3:
+Codex judge call. `$MODEL_ID` and `$EFFORT` come from the seat's row in the table. Brief on stdin, so multi-value `-i` cannot swallow it (verified codex-cli 0.166.0). `$SKILL` = absolute path of this skill's folder. Launch in background and poll, per `codex-review` Step 3:
 
 ```bash
 codex exec -C "$JUDGE" --skip-git-repo-check --ephemeral \
-  -m "$MODEL_ID" -c model_reasoning_effort=high -s read-only \
+  -m "$MODEL_ID" -c model_reasoning_effort="$EFFORT" -s read-only \
   --output-schema "$SKILL/references/rank.schema.json" \
   -o "$JUDGE/out.json" \
   -i "$JUDGE/A-sidebar-dark.png" -i "$JUDGE/B-sidebar-dark.png" -i "$JUDGE/C-sidebar-dark.png" \
@@ -81,7 +81,7 @@ Output: [references/rank.schema.json](references/rank.schema.json). Ranking as t
 
 1. **Round 0 (baseline)**: capture all, all three seats judge untouched UI. Record start tiers.
 2. **Staged admission** (cost): only Sol judges until Sol passes; then Opus joins; when Opus passes, Astra joins. Default order Sol, Opus, Astra (the source run's order, Astra in its third seat); user may reorder. A pass while a seat is still waiting only admits the next seat; it never meets the gate.
-3. **Build**: one writer, isolated worktree per project rules. Fix ours' defects ordered by seats citing them, then category where ours ranks lowest. Scripted floor after each edit.
+3. **Build**: one writer, isolated worktree per project rules. Commit each build before the next round; judges only ever see a clean tree at a recorded commit. Fix ours' defects ordered by seats citing them, then category where ours ranks lowest. Scripted floor after each edit.
 4. **Next round**: new captures of ours, new shuffle, new judge folders, fresh judge contexts. Never reuse a judge thread.
 5. **Confirmation round**: after a round where all three seats pass, run one more round on the same commit with no build in between: new shuffle, new judge folders, fresh judges. All pass → gate met. Any seat fails → back to step 3.
 6. **Ratchet**: gate met and change is mergeable → open PR per project rules (its review gate applies). Further climbing (stricter gate, more references, more views) goes on a stacked branch in a new worktree; the mergeable PR stays intact.

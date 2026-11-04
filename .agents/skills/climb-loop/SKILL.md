@@ -16,7 +16,7 @@ Invocation input: target (app, screens or eval) plus optional references and rou
 
 ## Stop rules (read first)
 
-- Agree a round cap and a usage budget with the user before round 1. When the round cap or the agreed usage budget is reached, stop, report, and ask the user before any further judge call. Never raise the cap or the budget yourself.
+- Agree a round cap and a usage budget with the user before the first judge call or eval run; baseline, confirmation and scripted eval runs all count against them. When the round cap or the agreed usage budget is reached, stop, report, and ask the user before any further judge call. Never raise the cap or the budget yourself.
 - Before starting, state seat count × planned rounds; every judge call bills the user's subscriptions.
 - Judges must not edit anything. Codex judges run with `-s read-only`. The Opus judge runs with `--tools "Read"`, `--restricted` and `--permission-mode plan`, and its brief forbids edits.
 - Never tell a judge the target, gate, round number, prior ranks, builder notes or which letter is ours.
@@ -40,7 +40,8 @@ From Codex, Sol and Astra share this session's vendor; each child is still a fre
 
 Preflight, no inference:
 
-- `codex --version`, `codex login status`, `codex exec --help` shows `-i/--image`, `-s/--sandbox`, `-C/--cd`, `--skip-git-repo-check`, `--ephemeral`, `--output-schema`, `-o`.
+- Codex route: accept a ChatGPT login from `codex login status` or a gateway `model_provider` in `config.toml`, per `$codex-review`; with neither, stop before inference and ask the user to log in.
+- `codex --version`, `codex exec --help` shows `-i/--image`, `-s/--sandbox`, `-C/--cd`, `--skip-git-repo-check`, `--ephemeral`, `--output-schema`, `-o`.
 - Opus seat: run the fail-closed preflight from `$claude-review` section 1 (subscription route proven, no API or provider variables), and also require `ANTHROPIC_DEFAULT_OPUS_MODEL` to be absent from the child environment (check presence only, never print the value). Stop the Opus seat if any check fails. Never accept or enable paid credits for the user.
 - Do not probe models by spending usage.
 
@@ -48,11 +49,11 @@ Preflight, no inference:
 
 Commands below are POSIX. PowerShell does not support `<` input redirection: on native Windows, launch each judge through a Node launcher that writes the brief to the spawned child's stdin (as `$opus-fullreview` does) and redirects its output to the judge folder. Launch every judge in the background and poll, per `$codex-review`. `$SKILL` = absolute path of this skill's folder.
 
-Codex judge call. Brief on stdin, so multi-value `-i` cannot swallow it (verified codex-cli 0.166.0):
+Codex judge call. `$MODEL_ID` and `$EFFORT` come from the seat's row in the table. Brief on stdin, so multi-value `-i` cannot swallow it (verified codex-cli 0.166.0):
 
 ```bash
 codex exec -C "$JUDGE" --skip-git-repo-check --ephemeral \
-  -m "$MODEL_ID" -c model_reasoning_effort=high -s read-only \
+  -m "$MODEL_ID" -c model_reasoning_effort="$EFFORT" -s read-only \
   --output-schema "$SKILL/references/rank.schema.json" \
   -o "$JUDGE/out.json" \
   -i "$JUDGE/A-sidebar-dark.png" -i "$JUDGE/B-sidebar-dark.png" -i "$JUDGE/C-sidebar-dark.png" \
@@ -97,7 +98,7 @@ Output: [references/rank.schema.json](references/rank.schema.json). Ranking as t
 
 1. **Round 0 (baseline)**: capture all, every council seat judges untouched UI. Record start tiers.
 2. **Staged admission** (cost): only Sol judges until Sol passes; then Opus joins; when Opus passes, Astra joins. Without Opus: Sol, then Astra. Default order is the source run's (Astra in its third seat); user may reorder. A pass while a seat is still waiting only admits the next seat; it never meets the gate.
-3. **Build**: one writer, isolated worktree per `AGENTS.md`. Fix ours' defects ordered by seats citing them, then category where ours ranks lowest. Scripted floor after each edit.
+3. **Build**: one writer, isolated worktree per `AGENTS.md`. Commit each build before the next round; judges only ever see a clean tree at a recorded commit. Fix ours' defects ordered by seats citing them, then category where ours ranks lowest. Scripted floor after each edit.
 4. **Next round**: new captures of ours, new shuffle, new judge folders, fresh judge processes. Never resume a judge session.
 5. **Confirmation round**: after a round where every council seat passes, run one more round on the same commit with no build in between: new shuffle, new judge folders, fresh judges. All pass → gate met. Any seat fails → back to step 3.
 6. **Ratchet**: gate met and change is mergeable → open PR per `AGENTS.md` (its review gate applies). Further climbing (stricter gate, more references, more views) goes on a stacked branch in a new worktree; the mergeable PR stays intact.
