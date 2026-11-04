@@ -24,7 +24,7 @@ for comparison, backup, reconciliation, and discovery checks.
 |---|---|
 | Native | `addskill`, `babysit-ci`, `brainstorming`, `bro`, `caveman`, `enhance-prompt`, `external-review`, `fable-mode`, `forge-repo-ui-skill`, `handoff-audit`, `recall`, `refine`, `servers`, `session-hub`, `showpiece`, `wrapup`, `writing`, `writing-plans` |
 | Adapted | `apply-firmware`, `astra-review`, `claude-review`, `codex-review`, `deep-plan`, `init-project`, `lab`, `optimize-context`, `opus-fullreview`, `sync-starter` |
-| Capability-gated | `advocate`, `arena`, `cache-loop`, `conversion-ux`, `dare`, `design-prototypes`, `impartial-review`, `long-horizon`, `motion-design`, `perf-loop`, `product-walkthrough`, `redesign-concepts`, `security-loop`, `seo-loop`, `ui-quality`, `why`, `wow-animation`, `wow-loop` |
+| Capability-gated | `advocate`, `arena`, `cache-loop`, `climb-loop`, `conversion-ux`, `dare`, `design-prototypes`, `impartial-review`, `long-horizon`, `motion-design`, `perf-loop`, `product-walkthrough`, `redesign-concepts`, `security-loop`, `seo-loop`, `ui-quality`, `why`, `wow-animation`, `wow-loop` |
 | Dangerous | `adopt-repo`, `merge` |
 | Claude-only | `astra-fullreview`, `codex-fullreview`, `codex-image-gen`, `coordinate`, `gauntlet`, `long-horizon-workflows` |
 
@@ -35,6 +35,8 @@ for comparison, backup, reconciliation, and discovery checks.
 `ui-quality` audits need headed Chrome and Node with `axe-core` and `playwright-core` installable for the probe; without them, audit from code and supplied screenshots, label each finding as not measured, and list what could not be checked.
 
 `motion-design` and `product-walkthrough` verify motion in headed Chrome on the real GPU with `playwright` or `playwright-core` installable, plus process and network approval for the local server and browser launches. Without a browser, say that motion, stills and exports were not checked rather than judging them from code. `wow-animation` runs recon, directors and critics as parallel fresh-context agents and inherits the browser needs of `motion-design` and `wow-loop`; without agent tools it says so and runs its steps in the main thread, and it never claims independent critics ran. `product-walkthrough` builds chapters with parallel agents when the session exposes agent tools; without them it builds one chapter after another in the main thread and says so.
+
+`climb-loop` judges through child processes, not agent tools: Sol and Astra run as read-only `codex exec` processes and Opus runs through Claude CLI behind the `claude-review` fail-closed subscription preflight. From Codex only the Opus seat is cross-vendor; without it the council is Sol and Astra only, and the result must say it shares this session's vendor. Its judged hill needs headed Chrome for captures, plus process and network approval for the local server and browser launches; without a browser it says the judged hill cannot run. Its scripted hill needs only the project's own test runner.
 
 `merge` is user-invoked only (`$merge`) and pushes, opens PRs and squash-merges, so it is classified Dangerous. Its Codex version swaps the Claude version's Codex loop for Claude Opus through Claude CLI: `opus-fullreview` for round one, then `opus-review` reruns (or `claude-review` with Opus when `opus-review` is not installed), each under its own fail-closed subscription preflight. Its self-review uses three fresh agents where the Claude version uses four; with no exposed agent tools it says so and skips to the Opus loop, which still runs in full.
 
