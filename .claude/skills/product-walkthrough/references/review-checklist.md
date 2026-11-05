@@ -76,6 +76,18 @@ Stills prove layout, not motion. Watch the whole tour at 1x in a headed browser 
 - [ ] Nothing plays before the host sends `start`, arrow keys included.
 - [ ] Tab stays inside the caption controls while the tour is open.
 
+## 9. Viewer questions
+
+A walkthrough is the `explainer` type in the motion-design skill's `references/critique.md`. Ask its questions of the finished tour, read as below; steps 1 to 8 already answer the rest.
+
+- Covered above: `pace` (step 6), `read` (steps 3, 6, 7), `land` (step 2's end frame, the CTA, `tour-done` in step 8). `sound` only when the tour has audio.
+- `loop` (decisive) is judged per chapter: one action carried to its result, which step 2 checks. A tour of separate chapters does not fail it for having several.
+- [ ] `shown`: while each caption is up, the action it claims is happening on the stage. Step 5 proves the claim is true; this proves it is on screen at that moment.
+- [ ] `own`: with the product's name and logo covered, every chapter still shows something this product does, not an action any app has.
+- [ ] `point`: a fresh subagent given only the player URL and the audience watches once and writes one sentence on what the product lets them do. A second fresh agent, given only that sentence and the storyboard's takeaways, returns same or different. The author never makes this call.
+- [ ] `open`: an embedded tour starts on the host's `start`, so only the second half applies: chapter 1 poses a question the tour answers. An MP4 exported for a feed gets the full `open`, muted too.
+- Not used: `q-read-time` (needs the motion-design engine's caption records; step 6 times these captions) and `q-best` (needs wow-loop rounds). A tour run through `wow-loop` adds `q-best` per critique.md.
+
 ## Reporting
 
 For each chapter: pass or the open issues, with the screenshot path. Then the product bug list, the "not in the real UI, so not shown" list from builders, and any visual doubt nobody resolved.
