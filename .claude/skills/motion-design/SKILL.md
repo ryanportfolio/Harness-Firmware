@@ -15,7 +15,7 @@ Motion inside a product (buttons, popovers, tooltips, toasts, drawers, drag gest
 2. **Write the story before any pixels.** For an explainer, open on a concrete moment instead of a definition, chain the beats with "but" and "therefore", and give each beat one idea. Write a beat sheet with timestamps. See [story.md](references/story.md).
 3. **Build an animatic with final timing and rough visuals.** It needs a scrubber, pause and chapter ticks. Get the pacing approved before any polish.
 4. **Block the key poses, then polish the in-betweens:** easing, stagger, overlap and secondary motion.
-5. **Verify in a real browser on the GPU.** Judge motion by watching it play. Stills only prove layout. See [verify-export.md](references/verify-export.md).
+5. **Verify in a real browser on the GPU.** Judge motion by watching it play. Stills only prove layout. See [verify-export.md](references/verify-export.md). Judge what the viewer gets with the questions for the piece's type in [critique.md](references/critique.md).
 6. **Export to video** when the piece has to travel to feeds that do not run JavaScript. Encode in the page with WebCodecs, never a PNG or screenshot per frame (user instruction, 2026-10-19); see [verify-export.md](references/verify-export.md).
 
 ## Decision rules
@@ -77,6 +77,7 @@ These are defaults. Tune them by eye.
 - [ui-loops.md](references/ui-loops.md): one story per visual for UI cards, dashboards and mockups, accents, intro choreography, the loop cycle, and live-page rules.
 - [web-engine.md](references/web-engine.md): a deterministic `frame(t)` engine with keyframed particle tracks, staggered morphs, phosphor trails, bloom, captions and a transport, plus gotchas measured in practice.
 - [web-effects.md](references/web-effects.md): landing-page recipes with cost ratings, reduced-motion and touch fallbacks: background video, fade and boomerang loops, framing and scrims, cursor- and scroll-scrubbed video, glass and grain, fail-safe entrances, scroll reveals, a sticky cinematic stage, stacking cards and a text crawl. Adapted from the MIT-licensed MotionSites technique library.
+- [critique.md](references/critique.md): viewer questions by piece type (pitch, explainer, story, game, tool), the decisive question per type, how each becomes a wow-loop check, and protecting the strongest moment during repairs.
 - [verify-export.md](references/verify-export.md): headed offscreen Chrome, stills, an fps probe, seek and colour checks, loop checks, delivery specs, encoding checks, WebCodecs export (from a canvas, or by tab capture for DOM pieces) and a last-resort frame-stepped export.
 - [generated-film.md](references/generated-film.md): AI video films: the cost gate, one camera move, chained keyframes, the clip adapter contract, the continuity gate and its measured limits, living-still loops.
 - [page-runtime.md](references/page-runtime.md): the 3D iframe shield with its pointer-forwarding receiver, Spline notes, and the Off / On / X-ray motion switch.
