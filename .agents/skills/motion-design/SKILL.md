@@ -11,7 +11,7 @@ Motion inside a product (buttons, popovers, tooltips, toasts, drawers, drag gest
 
 ## Workflow
 
-1. **Name the feeling and the job.** Write one sentence saying what the viewer should feel and understand when the piece ends. Choose techniques after that, never before (Jay Grandin).
+1. **Name the feeling and the job.** Write one sentence saying what the viewer should feel and understand when the piece ends. Choose techniques after that, never before (Jay Grandin). Record the piece's type next to it, per [critique.md](references/critique.md).
 2. **Write the story before any pixels.** For an explainer, open on a concrete moment instead of a definition, chain the beats with "but" and "therefore", and give each beat one idea. Write a beat sheet with timestamps. See [story.md](references/story.md).
 3. **Build an animatic with final timing and rough visuals.** It needs a scrubber, pause and chapter ticks. Get the pacing approved before any polish.
 4. **Block the key poses, then polish the in-betweens:** easing, stagger, overlap and secondary motion.
