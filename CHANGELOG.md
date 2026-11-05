@@ -21,7 +21,10 @@ condensed.
   and they never see the target. Sol judges alone until it passes, then Opus
   joins, then Astra, to save usage. A scripted mode turns past agent mistakes
   into an eval, climbs it to a perfect score, then cuts cost while staying
-  perfect. Adapted from Theo's "Agents Sucked At UI (Until Today)" video.
+  perfect. With no reference app named, it suggests `redesign-concepts` on the
+  current UI, builds the owner's pick, then climbs against its own earlier
+  versions and the frozen original. Adapted from Theo's "Agents Sucked At UI
+  (Until Today)" video.
 
 - `wow-animation` for Claude and Codex, moved in from a personal install. It
   starts a shareable promo, explainer or game trailer animation about a real
