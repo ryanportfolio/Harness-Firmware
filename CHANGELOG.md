@@ -314,6 +314,14 @@ condensed.
 
 ### Fixed
 
+- `sync-codex-skills.mjs --check` now notices a broken Codex copy of shared
+  files. It used to hash only the Claude source, so deleting a section from
+  `.agents/skills/product-walkthrough/references/review-checklist.md` still
+  passed as current. A new `.agents/skill-shared.json` lists the folders a
+  native port keeps identical to its Claude source (today `references/` and
+  `templates/` of `product-walkthrough`), and `--check` warns about each
+  missing, extra or changed file there, ignoring CRLF versus LF in text files.
+
 - `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`) disables the Chrome
   features `AutofillAiWalletPrivatePasses` and `AutofillAmbientAutofill`. With
   either on, Chrome 156 checks for a blank Windows password by calling

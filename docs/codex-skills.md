@@ -25,6 +25,12 @@ change to a `native` skill's Claude source, update its Codex port to match, then
 `--check` exits 1 only on broken input: unreadable or malformed JSON, a skill without
 frontmatter or a description, an invalid skill name or mode, or a deletion that would leave
 the repository. `disabled` skills have no port and no entry; run `--check` only.
+`.agents/skill-shared.json` lists, per `native` skill, the folders its Codex port keeps
+identical to the Claude source, for example `{"version": 1, "skills": {"product-walkthrough":
+["references", "templates"]}}`. `--check` compares each listed folder in both copies, folding
+CRLF to LF in text files, and warns about a missing, extra, or changed file with the fix:
+copy the Claude folder over the Codex one. `SKILL.md` is never listed, because Codex `SKILL.md`
+files differ on purpose. A skill whose port says it carries the same files belongs in this list.
 
 Run:
 

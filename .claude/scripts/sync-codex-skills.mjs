@@ -160,39 +160,64 @@ function walk(directory, base, files) {
   }
 }
 
-// Files git would commit under .claude/skills/, keyed by skill folder: tracked plus untracked
-// files that no .gitignore rule excludes. Null when git is unavailable or this checkout is not
-// the root of its own git repository; the hash then walks the folder on disk instead.
-let committable;
-function gitSkillFiles() {
-  if (committable !== undefined) return committable;
-  committable = null;
+// Files git would commit under a skills root (.claude/skills/ or .agents/skills/), keyed by skill
+// folder: tracked plus untracked files that no .gitignore rule excludes. Null when git is
+// unavailable or this checkout is not the root of its own git repository; callers then walk the
+// folder on disk instead.
+const committable = new Map();
+function gitSkillFiles(skillsRoot) {
+  if (committable.has(skillsRoot)) return committable.get(skillsRoot);
+  let listedByName = null;
   const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
+  const prefix = path.relative(root, skillsRoot).split(path.sep).join("/");
   try {
-    if (git("rev-parse", "--show-prefix").trim() !== "") return committable;
-    const listed = git("ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ".claude/skills");
-    committable = new Map();
-    for (const file of listed.split("\0")) {
-      // A skill folder committed as a link lists as the folder itself ("" below).
-      const match = file.match(/^\.claude\/skills\/([^/]+)(?:\/(.+))?$/);
-      if (!match) continue;
-      if (!committable.has(match[1])) committable.set(match[1], new Set());
-      committable.get(match[1]).add(match[2] ?? "");
+    if (git("rev-parse", "--show-prefix").trim() === "") {
+      const listed = git("ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", prefix);
+      listedByName = new Map();
+      for (const file of listed.split("\0")) {
+        if (!file.startsWith(`${prefix}/`)) continue;
+        // A skill folder committed as a link lists as the folder itself ("" below).
+        const match = file.slice(prefix.length + 1).match(/^([^/]+)(?:\/(.+))?$/);
+        if (!match) continue;
+        if (!listedByName.has(match[1])) listedByName.set(match[1], new Set());
+        listedByName.get(match[1]).add(match[2] ?? "");
+      }
     }
   } catch {
-    committable = null;
+    listedByName = null;
   }
-  return committable;
+  committable.set(skillsRoot, listedByName);
+  return listedByName;
+}
+
+// Files without a NUL byte are text and have CRLF folded to LF, so a line-ending-only change
+// never counts as a change.
+function normalizedContent(file) {
+  const content = fs.readFileSync(file);
+  return content.includes(0) ? content : Buffer.from(content.toString("latin1").replaceAll("\r\n", "\n"), "latin1");
 }
 
 // SHA-256 over the files git would commit under .claude/skills/<name>/ (every file on disk when
 // git cannot say), in sorted relative POSIX path order, so ignored files such as Thumbs.db or
-// .DS_Store never change it. Each file contributes "<path>\0<byte length>\0<content>". Files
-// without a NUL byte are text and have CRLF folded to LF, so a line-ending-only change keeps the hash.
+// .DS_Store never change it. Each file contributes "<path>\0<byte length>\0<content>", with
+// content normalized by normalizedContent.
 function sourceHash(name) {
   const base = path.join(sourceRoot, name);
+  const hash = crypto.createHash("sha256");
+  for (const relative of skillFiles(sourceRoot, name)) {
+    const content = normalizedContent(path.join(base, relative));
+    hash.update(`${relative}\0${content.length}\0`);
+    hash.update(content);
+  }
+  return hash.digest("hex");
+}
+
+// Sorted relative POSIX paths of the files git would commit under <skillsRoot>/<name>/, or every
+// file on disk when git cannot say.
+function skillFiles(skillsRoot, name) {
+  const base = path.join(skillsRoot, name);
   const files = [];
-  const listed = gitSkillFiles();
+  const listed = gitSkillFiles(skillsRoot);
   if (!listed) walk(base, base, files);
   for (const relative of listed?.get(name) ?? []) {
     const full = path.join(base, relative);
@@ -216,15 +241,8 @@ function sourceHash(name) {
     }
     files.push(relative);
   }
-  const hash = crypto.createHash("sha256");
   // Each path counts once, however git and the walk listed it.
-  for (const relative of [...new Set(files)].sort()) {
-    let content = fs.readFileSync(path.join(base, relative));
-    if (!content.includes(0)) content = Buffer.from(content.toString("latin1").replaceAll("\r\n", "\n"), "latin1");
-    hash.update(`${relative}\0${content.length}\0`);
-    hash.update(content);
-  }
-  return hash.digest("hex");
+  return [...new Set(files)].sort();
 }
 
 // Reviewed Claude source hash per native Codex port; a missing file records none.
@@ -361,6 +379,46 @@ for (const name of Object.keys(sources)) {
   if (covered.includes(name)) continue;
   if (!fs.existsSync(path.join(sourceRoot, name))) warnings.push(`.agents/skill-sources.json: ${name} has no .claude/skills/${name}/ folder; its entry can be removed`);
   else warnings.push(`.agents/skill-sources.json: ${name} is stale; it is not a native Codex skill with a Claude source, so remove its entry`);
+}
+
+// Folders a native port keeps identical to its Claude source (.agents/skill-shared.json). The
+// Claude copy is authoritative, so every difference warns with the fix in that direction. SKILL.md
+// is never listed: Codex SKILL.md files differ on purpose.
+const sharedPath = path.join(root, ".agents", "skill-shared.json");
+const shared = fs.existsSync(sharedPath) ? parseJson(fs.readFileSync(sharedPath, "utf8"), ".agents/skill-shared.json") : { version: 1, skills: {} };
+const sharedFolder = /^(?!\.\.?$)[^/\\:*?"<>|]+$/;
+if (shared?.version !== 1 || !shared.skills || typeof shared.skills !== "object" || Array.isArray(shared.skills)
+  || Object.values(shared.skills).some((folders) => !Array.isArray(folders) || folders.length === 0
+    || folders.some((folder) => typeof folder !== "string" || !sharedFolder.test(folder) || folder === "SKILL.md"))) {
+  throw new Error(`.agents/skill-shared.json: expected {"version": 1, "skills": {"<name>": ["<folder>", ...]}} with plain folder names other than SKILL.md`);
+}
+for (const [name, folders] of Object.entries(shared.skills)) {
+  if (!covered.includes(name) || disabled.has(name)) {
+    warnings.push(`.agents/skill-shared.json: ${name} is stale; it is not an enabled native Codex skill with a Claude source, so remove its entry`);
+    continue;
+  }
+  if (!fs.existsSync(path.join(targetRoot, name, "SKILL.md"))) continue; // reported above as a missing port
+  const copy = `copy .claude/skills/${name}/<folder>/ over .agents/skills/${name}/<folder>/`;
+  for (const folder of folders) {
+    const inFolder = (files) => files.filter((file) => file.startsWith(`${folder}/`));
+    const claude = inFolder(skillFiles(sourceRoot, name));
+    const codex = inFolder(skillFiles(targetRoot, name));
+    if (!claude.length && !codex.length) {
+      warnings.push(`.agents/skill-shared.json: ${name}/${folder} has no files in either copy; fix the folder name or remove it from the entry`);
+      continue;
+    }
+    const codexSet = new Set(codex);
+    const differences = [];
+    for (const file of claude) {
+      if (!codexSet.has(file)) differences.push(`missing ${file}`);
+      else if (!normalizedContent(path.join(sourceRoot, name, file)).equals(normalizedContent(path.join(targetRoot, name, file)))) differences.push(`differs ${file}`);
+    }
+    const claudeSet = new Set(claude);
+    for (const file of codex) if (!claudeSet.has(file)) differences.push(`extra ${file}`);
+    if (differences.length) {
+      warnings.push(`.agents/skills/${name}/${folder}: Codex copy drifted from the Claude source (${differences.join(", ")}); ${copy.replaceAll("<folder>", folder)}`);
+    }
+  }
 }
 
 // --write deletes generated adapters, except under an enabled native skill or a locked one,
