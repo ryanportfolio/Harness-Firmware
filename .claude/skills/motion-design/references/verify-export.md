@@ -157,6 +157,8 @@ ffmpeg -v error -ss 30.5 -t 4 -i out.mp4 -vf "fps=6,scale=480:-1,tile=4x6" -fram
 
 Cut one strip per transition and one strip of the whole piece at 1 fps for pacing. Tile long runs of stills into contact sheets (a page of `<img>` tags screenshotted by the same headed browser), so a full-timeline review costs a few images instead of dozens.
 
+To check every frame (a one-frame skip or cut that 6 fps sampling can miss), drop `fps=`: cut one 1 s strip per window, e.g. `-ss <t> -t 1 -vf "scale=320:-1,tile=6x5"` for 30 fps, and step `<t>` across the clip.
+
 ## Frame-stepped PNG export (last resort, owner's OK required)
 
 Do not use this without the owner's explicit OK for that piece. A canvas piece goes through in-page WebCodecs; a DOM or multi-canvas piece goes through tab capture (both above). Ask only when neither can carry the piece, and say why.

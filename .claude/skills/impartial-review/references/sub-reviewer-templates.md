@@ -104,7 +104,8 @@ is the findings report below.
 
 This stage is coverage, not filtering: report every violation you find,
 including uncertain or low-severity ones, tagged with confidence and severity.
-The main-session merge step verifies and ranks.
+The main-session merge step verifies and ranks. Do not invent violations;
+fabrication is the only thing to omit.
 
 ## Required reading (do this BEFORE looking at the diff)
 
