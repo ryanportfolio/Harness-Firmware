@@ -244,3 +244,29 @@ test('shared folder check lists files through git at a repository root and skips
   f.write('.claude/settings.json', JSON.stringify({ skillOverrides: { bro: 'off' } }));
   assert.doesNotMatch(f.run().stdout, /skill-shared|drifted/);
 });
+
+test('a directory link loop in either copy ends the walk instead of crashing the check', () => {
+  for (const useGit of [false, true]) {
+    const f = fixture(); f.modes({ bro: 'native' });
+    f.write('.agents/skills/bro/SKILL.md', body('bro'));
+    for (const side of ['.claude', '.agents']) {
+      f.write(`${side}/skills/bro/references/a.md`, 'same\n');
+      fs.mkdirSync(path.join(f.root, side, 'skills/bro/extras'));
+      // A link back to the skill folder, and in the walk case one back to its own folder too. Git
+      // for Windows lists untracked links itself and tries every path through two loop links, so
+      // the git case keeps one.
+      const loops = useGit ? [['skills/bro', 'up']] : [['skills/bro', 'up'], ['skills/bro/extras', 'self']];
+      for (const [target, name] of loops) fs.symlinkSync(path.join(f.root, side, target), path.join(f.root, side, 'skills/bro/extras', name), process.platform === 'win32' ? 'junction' : 'dir');
+    }
+    if (useGit) assert.equal(spawnSync('git', ['init', '-q'], { cwd: f.root }).status, 0);
+    f.baseline('bro');
+    f.write('.agents/skill-shared.json', JSON.stringify({ version: 1, skills: { bro: ['references'] } }));
+    let result = f.run();
+    assert.equal(result.status, 0, `${useGit ? 'git' : 'walk'}: ${result.stderr}`);
+    assert.doesNotMatch(result.stdout, /WARN/);
+    f.write('.agents/skills/bro/references/a.md', 'changed\n');
+    result = f.run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /differs references\/a\.md/);
+  }
+});

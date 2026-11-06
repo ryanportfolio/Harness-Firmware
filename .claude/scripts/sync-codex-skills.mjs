@@ -151,13 +151,30 @@ function generatedAdapter(filePath) {
   return fs.existsSync(filePath) && fs.readFileSync(filePath, "utf8").includes(MARKER);
 }
 
-// Every file on disk under directory, added to files as a POSIX path relative to base.
-function walk(directory, base, files) {
+// Every file on disk under directory, added to files as a POSIX path relative to base. A directory
+// link back to a folder already being walked (directory itself, or one between it and base) is
+// skipped, so a link loop ends instead of recursing until the path is too long. Other links,
+// including two links to the same folder, are walked as before.
+function walk(directory, base, files, open = linkAncestors(directory, base)) {
+  const real = fs.realpathSync(directory);
+  if (open.has(real)) return;
+  const inside = new Set(open).add(real);
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const full = path.join(directory, entry.name);
-    if (fs.statSync(full).isDirectory()) walk(full, base, files);
+    if (fs.statSync(full).isDirectory()) walk(full, base, files, inside);
     else files.push(path.relative(base, full).split(path.sep).join("/"));
   }
+}
+
+// Real paths of the folders from base down to the parent of directory, for a walk that starts
+// below base.
+function linkAncestors(directory, base) {
+  const open = new Set();
+  for (let folder = directory; path.relative(base, folder) !== "" && path.dirname(folder) !== folder;) {
+    folder = path.dirname(folder);
+    open.add(fs.realpathSync(folder));
+  }
+  return open;
 }
 
 // Files git would commit under a skills root (.claude/skills/ or .agents/skills/), keyed by skill
