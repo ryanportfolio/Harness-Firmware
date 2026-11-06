@@ -333,7 +333,8 @@ function analyze(snap, { oldHours = 12 } = {}) {
   // this session's own process: the first ancestor that is neither a launcher nor a dev runtime.
   // Ancestors above it (the desktop app, Explorer) are shared with every other session.
   let selfOwner = parentOf(byPid.get(process.pid), byPid);
-  while (selfOwner && (isLauncher(selfOwner) || DEV_RUNTIMES.test(selfOwner.name || ''))) selfOwner = parentOf(selfOwner, byPid);
+  // an agent CLI running on node (npm-installed Claude Code, Codex) is the session process itself
+  while (selfOwner && !AGENT_CLI.test(selfOwner.cmd || '') && (isLauncher(selfOwner) || DEV_RUNTIMES.test(selfOwner.name || ''))) selfOwner = parentOf(selfOwner, byPid);
   const recordFor = (pid) => {
     for (let p = byPid.get(pid), hops = 0; p && hops < 8; p = parentOf(p, byPid), hops++) if (reg.has(p.pid)) return reg.get(p.pid);
     return null;
