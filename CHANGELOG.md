@@ -314,6 +314,14 @@ condensed.
 
 ### Fixed
 
+- `sync-codex-skills.mjs` no longer crashes on a directory link that loops
+  back into the skill folder it sits in. When it walks a folder on disk (a
+  checkout that is not a git root, or a link git lists as one entry, as git
+  does on Linux), it skips a link to a folder it is already inside, where it
+  used to recurse until `stat` failed with `ELOOP` and exited 1. Links that do
+  not loop, including two links to the same folder, are walked and hashed as
+  before.
+
 - `sync-codex-skills.mjs --check` now notices a broken Codex copy of shared
   files. It used to hash only the Claude source, so deleting a section from
   `.agents/skills/product-walkthrough/references/review-checklist.md` still
