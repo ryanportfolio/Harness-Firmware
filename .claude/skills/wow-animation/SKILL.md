@@ -39,7 +39,7 @@ Ground every frame in the real thing: real assets restyled, real product strings
 
 ## Parallelize
 
-Speed comes from fan-out. Serial work that could run side by side is a defect in the run.
+Speed comes from fan-out.
 
 - Launch every independent agent of a step in one message, never one after another. Before each dispatch, ask what else could start now.
 - Subject research runs on Sonnet (`model: "sonnet"`): what the subject is, what it does, how it looks, its copy, assets, store or marketing pages, code facts. Split by source (live site, repo copy, design tokens and assets, feature code, store page, sprites, enemy and boss code) so each agent owns one slice with no overlap. Six or more recon agents is normal for a large subject.

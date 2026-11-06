@@ -4,7 +4,7 @@
 
 Run WebGL checks in headed Chrome on the real GPU. Headless Chromium renders WebGL through SwiftShader on the CPU, which burns the machine and makes frame timings meaningless.
 
-- **Launcher.** If the repository has `scripts/lib/launch-chrome.mjs`, use its `launchPlacedChrome({ place: 'offscreen', channel: 'chrome' })`. Otherwise launch with `--window-position=-2400,-2400` plus `--disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding`.
+- **Launcher.** If the repository has `scripts/lib/launch-chrome.mjs`, use its `launchPlacedChrome({ place: 'offscreen', channel: 'chrome' })`. Otherwise launch with `--window-position=-2400,-2400 --mute-audio` plus `--disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding`.
 - **Never minimize the window instead.** A minimized window drops `requestAnimationFrame` to 1 fps.
 - **Placement is in the environment.** Honor `CHROME_PLACE` when it is set, and pass the placement to any subagent or Codex brief that opens a browser, since they don't inherit it.
 - **Screenshots.** Save them where the machine's rules say (for example a screenshots drive), not in the repository.
@@ -17,7 +17,7 @@ Run WebGL checks in headed Chrome on the real GPU. Headless Chromium renders Web
 node .claude/skills/motion-design/scripts/stills.mjs <file-or-url> 2,10,17.5 <out-dir>
 ```
 
-Take stills at one point inside every chapter, including mid-transition times. Check them for overlaps, orphaned words, colour that has saturated to white, and labels colliding with shapes. Then watch the piece play at 1x to judge pacing and easing.
+Take stills at one point inside every chapter, including mid-transition times. Check them for overlaps, orphaned words, colour that has saturated to white, and labels colliding with shapes. Then judge pacing and easing from frame strips of a 1x capture (Reviewing motion from the export, below).
 
 ## Checks that caught real bugs (MAIMCOIL trailer, 2026-09-29)
 

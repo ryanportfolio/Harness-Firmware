@@ -39,7 +39,7 @@ Ground every frame in the real thing: real assets restyled, real product strings
 
 ## Parallelize
 
-Speed comes from fan-out. Serial work that could run side by side is a defect in the run.
+Speed comes from fan-out.
 
 - Check which agent tools this session exposes first; `multi_agent = true` alone does not prove they exist. No agent tools → say so, run steps in the main thread one after another, and never claim fresh-context critics or directors ran.
 - Spawn every independent agent of a step concurrently, then wait for the results each next step needs. Before each dispatch, ask what else could start now.
