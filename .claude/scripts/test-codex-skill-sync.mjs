@@ -224,3 +224,23 @@ test('shared folders listed in .agents/skill-shared.json warn when the Codex cop
     assert.match(result.stderr, /skill-shared\.json: expected/);
   }
 });
+
+test('shared folder check lists files through git at a repository root and skips off or locked skills', () => {
+  const f = fixture(); f.modes({ bro: 'native' });
+  f.write('.agents/skills/bro/SKILL.md', body('bro'));
+  for (const side of ['.claude', '.agents']) f.write(`${side}/skills/bro/references/a.md`, 'same\n');
+  f.write('.gitignore', 'Thumbs.db\n');
+  assert.equal(spawnSync('git', ['init', '-q'], { cwd: f.root }).status, 0);
+  f.baseline('bro');
+  f.write('.agents/skill-shared.json', JSON.stringify({ version: 1, skills: { bro: ['references'] } }));
+  // An ignored file is not part of either copy.
+  f.write('.agents/skills/bro/references/Thumbs.db', 'x');
+  assert.doesNotMatch(f.run().stdout, /WARN/);
+  f.write('.agents/skills/bro/references/new.md', 'untracked but not ignored');
+  assert.match(f.run().stdout, /bro\/references: Codex copy drifted .*extra references\/new\.md/);
+  f.write('.agents/skill-locks.json', JSON.stringify({ version: 1, locks: { bro: 'project copy' } }));
+  assert.doesNotMatch(f.run().stdout, /skill-shared|drifted/);
+  fs.unlinkSync(path.join(f.root, '.agents/skill-locks.json'));
+  f.write('.claude/settings.json', JSON.stringify({ skillOverrides: { bro: 'off' } }));
+  assert.doesNotMatch(f.run().stdout, /skill-shared|drifted/);
+});

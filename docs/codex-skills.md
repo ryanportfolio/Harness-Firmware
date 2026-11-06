@@ -31,6 +31,7 @@ identical to the Claude source, for example `{"version": 1, "skills": {"product-
 CRLF to LF in text files, and warns about a missing, extra, or changed file with the fix:
 copy the Claude folder over the Codex one. `SKILL.md` is never listed, because Codex `SKILL.md`
 files differ on purpose. A skill whose port says it carries the same files belongs in this list.
+A locked skill, or one turned off in `skillOverrides`, is not compared.
 
 Run:
 
@@ -125,7 +126,7 @@ A project keeps chosen skills exactly as they are by listing them in
 The file is optional; when it is missing, nothing is locked. Harness Console's skill sync and
 the `sync-starter` pull from the template never update, replace, or remove a locked skill's
 `.claude/skills/<name>/` or `.agents/skills/<name>/` folder or its entries in
-`.agents/skill-modes.json` and `.agents/skill-sources.json`, and they list each skipped skill
+`.agents/skill-modes.json`, `.agents/skill-sources.json` and `.agents/skill-shared.json`, and they list each skipped skill
 with its reason. `addskill` imports and updates, `init-project` profiles, and `adopt-repo`
 follow the same rule, and `sync-codex-skills.mjs --write` never deletes a locked skill's
 generated adapter. A lock file that exists but cannot be read or parsed stops those tools

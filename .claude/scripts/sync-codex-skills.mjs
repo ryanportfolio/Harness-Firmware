@@ -393,10 +393,13 @@ if (shared?.version !== 1 || !shared.skills || typeof shared.skills !== "object"
   throw new Error(`.agents/skill-shared.json: expected {"version": 1, "skills": {"<name>": ["<folder>", ...]}} with plain folder names other than SKILL.md`);
 }
 for (const [name, folders] of Object.entries(shared.skills)) {
-  if (!covered.includes(name) || disabled.has(name)) {
-    warnings.push(`.agents/skill-shared.json: ${name} is stale; it is not an enabled native Codex skill with a Claude source, so remove its entry`);
+  if (!covered.includes(name)) {
+    warnings.push(`.agents/skill-shared.json: ${name} is stale; it is not a native Codex skill with a Claude source, so remove its entry`);
     continue;
   }
+  // A skill turned off in skillOverrides keeps its entry, as in skill-sources.json. A locked skill
+  // stays as the project has it, so copying the Claude folder over it is never the fix.
+  if (disabled.has(name) || locked.has(name)) continue;
   if (!fs.existsSync(path.join(targetRoot, name, "SKILL.md"))) continue; // reported above as a missing port
   const copy = `copy .claude/skills/${name}/<folder>/ over .agents/skills/${name}/<folder>/`;
   for (const folder of folders) {
