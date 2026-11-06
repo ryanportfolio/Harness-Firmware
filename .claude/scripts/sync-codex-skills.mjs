@@ -153,10 +153,12 @@ function generatedAdapter(filePath) {
 
 // Every file on disk under directory, added to files as a POSIX path relative to base. A directory
 // link back to a folder already being walked (directory itself, or one between it and base) is
-// skipped, so a link loop ends instead of recursing until the path is too long. Other links,
-// including two links to the same folder, are walked as before.
+// skipped, so a link loop ends instead of recursing until stat fails with ELOOP. Other links,
+// including two links to the same folder, are walked as before. Real paths come from
+// realpathSync.native, which returns the on-disk case, so a link typed in another case still
+// matches on Windows.
 function walk(directory, base, files, open = linkAncestors(directory, base)) {
-  const real = fs.realpathSync(directory);
+  const real = fs.realpathSync.native(directory);
   if (open.has(real)) return;
   const inside = new Set(open).add(real);
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -172,7 +174,7 @@ function linkAncestors(directory, base) {
   const open = new Set();
   for (let folder = directory; path.relative(base, folder) !== "" && path.dirname(folder) !== folder;) {
     folder = path.dirname(folder);
-    open.add(fs.realpathSync(folder));
+    open.add(fs.realpathSync.native(folder));
   }
   return open;
 }

@@ -252,9 +252,10 @@ test('a directory link loop in either copy ends the walk instead of crashing the
     for (const side of ['.claude', '.agents']) {
       f.write(`${side}/skills/bro/references/a.md`, 'same\n');
       fs.mkdirSync(path.join(f.root, side, 'skills/bro/extras'));
-      // A link back to the skill folder, and in the walk case one back to its own folder too. Git
-      // for Windows lists untracked links itself and tries every path through two loop links, so
-      // the git case keeps one.
+      // A link back to the skill folder, and in the walk case one back to its own folder too. The
+      // git case reaches walk() only where git lists an untracked link as one entry (Linux CI).
+      // Git for Windows lists files through the link itself, and through two loop links it tries
+      // every path, so the git case keeps one.
       const loops = useGit ? [['skills/bro', 'up']] : [['skills/bro', 'up'], ['skills/bro/extras', 'self']];
       for (const [target, name] of loops) fs.symlinkSync(path.join(f.root, side, target), path.join(f.root, side, 'skills/bro/extras', name), process.platform === 'win32' ? 'junction' : 'dir');
     }
