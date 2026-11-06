@@ -330,6 +330,11 @@ function analyze(snap, { oldHours = 12 } = {}) {
   // this script and the processes that run it are never units
   const self = new Set();
   for (let p = byPid.get(process.pid); p; p = parentOf(p, byPid)) self.add(p.pid);
+  // this session's own process: the first ancestor that is neither a launcher nor a dev runtime.
+  // Ancestors above it (the desktop app, Explorer) are shared with every other session.
+  let selfOwner = parentOf(byPid.get(process.pid), byPid);
+  // an agent CLI running on node (npm-installed Claude Code, Codex) is the session process itself
+  while (selfOwner && !AGENT_CLI.test(selfOwner.cmd || '') && (isLauncher(selfOwner) || DEV_RUNTIMES.test(selfOwner.name || ''))) selfOwner = parentOf(selfOwner, byPid);
   const recordFor = (pid) => {
     for (let p = byPid.get(pid), hops = 0; p && hops < 8; p = parentOf(p, byPid), hops++) if (reg.has(p.pid)) return reg.get(p.pid);
     return null;
@@ -391,14 +396,16 @@ function analyze(snap, { oldHours = 12 } = {}) {
       : /@playwright[\\/]mcp|playwright-mcp/i.test(cmds) ? 'playwright-mcp'
       : /codex-runtimes|OpenAI[\\/]Codex[\\/]runtimes|cua_node/i.test(cmds) ? 'codex'
       : /[\\/]vercel[\\/]|\bvercel(\.cmd|\.js)?\b/i.test(cmds) ? 'vercel'
-      : isAutomationBrowser(rp) ? 'browser'
       : mp.some((p) => HELPER_RUNTIMES.test(p.name || '') && !/npm-cli\.js|npx-cli\.js/.test(p.cmd || '')) ? 'script'
+      // a browser stays a browser when a one-shot shell above it became the root
+      : browsers.length ? 'browser'
       : 'launcher';
     // owner: first live ancestor above the root that is not a launcher
     let owner = parentOf(rp, byPid);
     const chain = [];
     while (owner && isLauncher(owner) && !self.has(owner.pid) && chain.length < 12) { chain.push(owner); owner = parentOf(owner, byPid); }
-    const orphan = !parentOf(rp, byPid);
+    // orphaned when the walk ends at an exited process, even past a live launcher with other children
+    const orphan = !owner;
     // a record on a member counts too: launchPlacedChrome records the browser under its script
     const rec = recordFor(listen[0]?.pid ?? root) || recordFor(root) || reg.get(members.find((q) => reg.has(q))) || null;
     const fromCd = [...mp, ...chain].map((p) => cdTarget(p.cmd)).find(Boolean);
@@ -437,7 +444,8 @@ function analyze(snap, { oldHours = 12 } = {}) {
       ageH: ageH === null ? null : +ageH.toFixed(1),
       worktree: wt?.worktree || null, folderKind: wt?.gone ? null : folderKind(wt?.worktree), sessionProject,
       purpose: rec?.purpose || '', session: rec?.session || null, recorded: !!rec, recordPid: rec?.pid ?? null,
-      mine: !!(rec?.session && rec.session === session) || !!(owner && self.has(owner.pid)) || chain.some((p) => self.has(p.pid)),
+      // owned by this session's process, or by a launcher this script runs under; never by a shared ancestor
+      mine: !!(rec?.session && rec.session === session) || !!(owner && (owner.pid === selfOwner?.pid || (self.has(owner.pid) && isLauncher(owner)))),
       orphan, owner: owner ? { pid: owner.pid, name: owner.name, label: ownerText } : null, inUse, flags,
     };
   });
