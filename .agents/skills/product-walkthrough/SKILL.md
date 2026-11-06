@@ -85,7 +85,7 @@ Tell the owner: where the player runs (URL and the start command), what was veri
 
 ## Maintenance
 
-The Claude Code source at `.claude/skills/product-walkthrough/` is authoritative; this Codex port carries the same `references/` and `templates/`. After changing either, copy the shared folders across and re-apply the Codex-specific lines (invocation, agent-tool check, sandbox, server start, browser placement).
+The Claude Code source at `.claude/skills/product-walkthrough/` is authoritative; this Codex port carries the same `references/` and `templates/`, listed in `.agents/skill-shared.json` so `node .claude/scripts/sync-codex-skills.mjs --check` warns when they differ. After changing either, copy the shared folders across and re-apply the Codex-specific lines (invocation, agent-tool check, sandbox, server start, browser placement).
 
 ## Resources
 

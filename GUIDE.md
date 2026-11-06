@@ -66,12 +66,13 @@ The doctor checks hook wiring, skill frontmatter, that every Claude skill has a 
 
 ## add or remove skills
 
-Removing, adding, or changing a skill never fails a check. `node .claude/scripts/sync-codex-skills.mjs --check` warns until a Claude skill's Codex side is settled: a new skill needs a `native` or `disabled` entry in `.agents/skill-modes.json`, and a changed skill needs its Codex port updated and `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` run. The checks warn about what they notice and exit 0, locally, in the doctor, and in CI, where warnings show up as annotations on the run. Only a file the tools cannot read fails: invalid JSON in `.agents/skill-modes.json`, the removal record, or settings; a `SKILL.md` without frontmatter or a description; or a check script that crashes.
+Removing, adding, or changing a skill never fails a check. `node .claude/scripts/sync-codex-skills.mjs --check` warns until a Claude skill's Codex side is settled: a new skill needs a `native` or `disabled` entry in `.agents/skill-modes.json`, and a changed skill needs its Codex port updated and `node .claude/scripts/sync-codex-skills.mjs --baseline <name>` run. The checks warn about what they notice and exit 0, locally, in the doctor, and in CI, where warnings show up as annotations on the run. Only a file the tools cannot read fails: invalid JSON in `.agents/skill-modes.json`, `.agents/skill-shared.json`, the removal record, or settings, or a `.agents/skill-shared.json` entry that is not a list of plain folder names; a `SKILL.md` without frontmatter or a description; or a check script that crashes.
 
 What produces a warning:
 
 - A registered skill that is missing from a runtime. The warning suggests recording it or restoring it.
 - A Claude skill or a Codex-only skill with no entry in `.agents/skill-modes.json`, or a changed Claude skill whose Codex port has not been re-baselined. The warning gives the fix.
+- A file that differs between the Claude and Codex copies of a folder listed in `.agents/skill-shared.json`, or an entry there for a skill that is no longer native. The warning names each file; copy the Claude folder over the Codex one.
 - A skill the template marks required that is installed in neither runtime, even when its registration was deleted too.
 - A skill that needs another one that is not installed, for example `astra-review` without `codex-review`. The warning names both.
 - A retired skill that reappears, such as `verify-this`. The warning names the skill that replaced it; delete the folder unless you mean to bring it back.
@@ -79,7 +80,7 @@ What produces a warning:
 
 To remove a skill on purpose and keep the checks quiet about it:
 
-1. Delete `.claude/skills/<name>/` and `.agents/skills/<name>/`, whichever exist.
+1. Delete `.claude/skills/<name>/` and `.agents/skills/<name>/`, whichever exist, and the skill's entries in `.agents/skill-sources.json` and `.agents/skill-shared.json`.
 2. Add the name to `.agents/removed-skills.json`, sorted, each name once:
 
    ```json
