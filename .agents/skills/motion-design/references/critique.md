@@ -52,7 +52,7 @@ The decisive question is marked. A failure on it always fails the piece.
 - Severity uses wow-loop's anchors verbatim. For these questions "normal use" means one natural playback by the `BRIEF.md` audience. A failed decisive question, or a failed `q-point`, is a blocker.
 - `q-point` stays blind. Its pass condition never states the intended belief: write it as "a judge finds the critic's sentence states the same belief as the `BRIEF.md` feeling-and-job line". A separate fresh critic answers it with only the artifact, the capture instructions and the audience: no `BRIEF.md`, `spec.md`, `bar.md` or kickoff brief. Its sentence goes in the finding's measurement. A second fresh agent, given only that sentence and the feeling-and-job line, returns same or different, and that is the check's status. The orchestrator never makes this call.
 - `open` on a vertical or feed piece is judged twice, with sound and muted, at phone size. Feeds autoplay muted.
-- `own`: the critic watches with the subject's name and logo covered and names what else the piece could be for. A plausible rival or a whole category fails it.
+- `own`: the critic reviews frame strips with the subject's name and logo covered and names what else the piece could be for. A plausible rival or a whole category fails it.
 - No agent can hear audio. `sound`, and the with-sound half of `open`, are decided by the measured checks in [sound.md](sound.md) plus the owner's listen, never by a critic's verdict.
 
 ## Scripted reading time

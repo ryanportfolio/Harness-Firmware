@@ -140,9 +140,11 @@ const leftovers = ['.claude/skills', '.agents/skills'].flatMap((r) => {
     .map((d) => `${r}/${d.name}/`);
 });
 
+// Kernel headings the template renamed: an older copy's section counts as the new one (reported as differing).
+const RENAMED_HEADINGS = new Map([['CRITICAL: Verification', 'Verification']]);
 const sections = (text) =>
   new Map(text.replace(/\r\n/g, '\n').split(/^(?=## )/m).filter((s) => s.startsWith('## '))
-    .map((s) => [s.split('\n')[0].slice(3).trim(), s.trim()]));
+    .map((s) => { const h = s.split('\n')[0].slice(3).trim(); return [RENAMED_HEADINGS.get(h) ?? h, s.trim()]; }));
 
 // Hook commands in a hooks.<Event> array of matcher groups.
 const hookCommands = (groups) => groups.flatMap((g) => g?.hooks ?? []).map((h) => h?.command).filter(Boolean);

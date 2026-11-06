@@ -18,9 +18,9 @@ Invoke the `caveman` skill at **ultra** at session start. Applies to all prose r
 
 Caveman covers chat replies and files that only agents read: skill bodies and their references, `.claude/reference/` entries, and subagent or Codex briefs. Write those in caveman ultra, but keep safety, authorization and gating lines ("never", "only when", "unless the user asks") as full sentences with every qualifier. Anything written for a human reader (docs, READMEs, UI copy, emails, commit messages, PR text) uses the `writing` skill in normal prose. Preserve facts, caveats, exact quotations, code and identifiers. No jargon, in chat or in files: say what a thing does in plain words instead of coining labels, internal codes or shorthand the reader hasn't seen. If a new term is unavoidable, define it the first time.
 
-## CRITICAL: Verification
+## Verification
 
-<!-- FILL IN (via /init-project): what can this sandbox verify? Installs/builds/type-checks meaningful? Can the user reach a dev server you start? What is the AUTHORITATIVE signal (CI, deploy log, local tests)? -->
+<!-- FILL IN (via /init-project): what can this sandbox verify? Installs/builds/type-checks meaningful? Can the user reach a dev server you start? What is the authoritative signal (CI, deploy log, local tests)? -->
 
 Defaults until configured:
 
@@ -32,7 +32,7 @@ Defaults until configured:
 
 ## Core principles
 
-- Plan before acting. Break large refactors into atomic steps.
+- Break large refactors into atomic steps.
 - Reproduce bugs before fixing them.
 - Scope discipline: No unrequested refactors, features, abstractions, or extra coding. Minimum complexity for the task at hand; don't regress performance.
 - Reuse before writing: code already in this repo first, then the standard library or a platform feature, then an installed dependency, and only then new code. Never add a dependency to save a few lines.
@@ -47,7 +47,7 @@ Defaults until configured:
 - Scratch work → `.tmp/` (gitignored). Promote to `scripts/` if reusable; otherwise delete.
 - Durable project knowledge → `.claude/reference/` via `/recall save` (committed, travels to every machine and sandbox). Standing truths only: moments (PR numbers, branch names, task status, tool-version snapshots) rot and don't get saved. `/recall` and `.claude/reference/` replace Claude Code's built-in auto memory, which stays off (`"autoMemoryEnabled": false` in `.claude/settings.json`).
 - Welcome correction. Confident-sounding mistakes happen; don't defend wrong answers. Weighty recommendations get a `/why` pressure-test before they're presented (caveman skill); the user can also run `/why` on any recommendation.
-- Restraint is a feature. New kernel rules, skills, and reference entries must earn their place; prefer pruning stale content over accreting. More ≠ better; complex ≠ complicated. This file loads every turn: keep cross-cutting safety and process rules here, move area-specific detail to `.claude/reference/`, and never restate what the harness already injects (skills list, environment block, tool docs). See `/optimize-context`.
+- Restraint is a feature. New kernel rules, skills, and reference entries must earn their place; prefer pruning stale content over accreting. This file loads every turn: keep cross-cutting safety and process rules here, move area-specific detail to `.claude/reference/`, and never restate what the harness already injects (skills list, environment block, tool docs). See `/optimize-context`.
 
 ## Subagents
 
@@ -61,7 +61,7 @@ Defaults until configured:
 
 ## Git: push on completion
 
-- "Complete" = the requested change finished and verified to this environment's limits. On Complete: commit, push, and open or update the PR. Mid-task or exploratory work is NOT a commit trigger.
+- "Complete" = the requested change finished and verified to this environment's limits. On Complete: commit, push, and open or update the PR. Mid-task or exploratory work is not a commit trigger.
 - Stage intentionally. Never blanket-commit unrelated changes.
 - Before opening a PR, check for an existing one (`gh pr list --head <branch>`) and push to that instead. Before opening or updating one, re-check the reference entries the change may have made stale (`recall`: `memory-audit.mjs --diff`).
 - Merge PRs with **squash** by default (`gh pr merge --squash`); merge-commit or rebase only when the user explicitly asks.
@@ -71,7 +71,7 @@ Defaults until configured:
 
 ## Codex review on every PR
 
-Nothing merges until the PR has been through `/codex-review` and its surviving findings are fixed or explicitly waived by the user. This applies to every merge path: a manual merge, `/merge`, `gh pr merge`, and squash-merges done by agents.
+Nothing merges until the PR has been through `/codex-review` (in merge mode: the `/merge` loop's `/codex-fullreview` round and any `/codex-review` reruns) and its surviving findings are fixed or explicitly waived by the user. This applies to every merge path: a manual merge, `/merge`, `gh pr merge`, and squash-merges done by agents.
 
 - **Run it automatically.** Opening or updating a PR is itself the trigger: run `/codex-review` in the same turn, without asking and without waiting for a merge request. Naming it as a next step and stopping does not count. In merge mode the `/merge` loop replaces this trigger; don't run a separate `/codex-review` on top of it.
 - Sequence: open PR → `/codex-review` on the full PR diff against the default branch → verify each finding → fix confirmed BLOCKING and SHOULD-FIX findings → push → merge. Rerun only on the user's OK, because each run bills their Codex subscription. Typing `/merge` is that OK for every PR in the rest of the session.
@@ -80,13 +80,13 @@ Nothing merges until the PR has been through `/codex-review` and its surviving f
 
 ## Environment & deploy target
 
-<!-- FILL IN (via /init-project): where the app runs (host, DB, secrets); install policy (can sessions run npm/pip for app-runtime deps?); migration policy; anything that ALWAYS requires user action. -->
+<!-- FILL IN (via /init-project): where the app runs (host, DB, secrets); install policy (can sessions run npm/pip for app-runtime deps?); migration policy; anything that always requires user action. -->
 
 Defaults until configured: ask before installing app-runtime dependencies; provide migrations as copy/paste-ready artifacts rather than running them blind.
 
 ## Project reference library
 
-Topical reference lives in `.claude/reference/`. Consult BEFORE non-trivial work in an unfamiliar area: `/recall <topic>` or read directly.
+Topical reference lives in `.claude/reference/`. Consult it before non-trivial work in an unfamiliar area: `/recall <topic>` or read directly.
 
 | File | Covers |
 |---|---|

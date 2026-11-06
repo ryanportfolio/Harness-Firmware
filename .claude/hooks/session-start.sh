@@ -102,7 +102,7 @@ SKILLS
   cat <<'SKILLS'
   - recall                        → BEFORE work in unfamiliar areas; save confirmed gotchas to pitfalls.md
   - brainstorming                 → BEFORE designing new features or behavior changes
-  - codex-review                  → AFTER substantive changes, before merging (impartial-review without Codex)
+  - codex-review                  → AFTER substantive changes, before merging (no Codex: say so, stop before merging)
 SKILLS
 }
 
