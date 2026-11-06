@@ -272,7 +272,8 @@ function runsProtected(pid, { listeners, procs }, protect = protectedList()) {
   return treeOf(pid, childMap(procs)).some((q) => {
     const p = byPid.get(q);
     const ports = portsOf.get(q) || [];
-    return protect.some((x) => ports.includes(x) || (p?.name || '').includes(x) || (p?.cmd || '').includes(x));
+    // a number is a port: as a substring it would match digits in any long command line
+    return protect.some((x) => (/^\d+$/.test(x) ? ports.includes(x) : (p?.name || '').includes(x) || (p?.cmd || '').includes(x)));
   });
 }
 
@@ -280,8 +281,9 @@ function runsProtected(pid, { listeners, procs }, protect = protectedList()) {
 function isLauncher(p) {
   if (!SHELLS.test(p?.name || '')) return false;
   const c = ` ${p.cmd || ''} `;
-  if (/^cmd/i.test(p.name)) return /\s\/[cCkK]\s/.test(c);
-  if (/^(powershell|pwsh)/i.test(p.name)) return /\s-(c|command|file|encodedcommand)\s/i.test(c);
+  // cmd /k and powershell -NoExit stay open as the user's terminal after their command
+  if (/^cmd/i.test(p.name)) return /\s\/[cC]\s/.test(c) && !/\s\/[kK]\s/.test(c);
+  if (/^(powershell|pwsh)/i.test(p.name)) return /\s-(c|command|file|encodedcommand)\s/i.test(c) && !/\s-noexit\s/i.test(c);
   return /\s-[a-z]*c\s/.test(c);
 }
 
@@ -397,7 +399,8 @@ function analyze(snap, { oldHours = 12 } = {}) {
     const chain = [];
     while (owner && isLauncher(owner) && !self.has(owner.pid) && chain.length < 12) { chain.push(owner); owner = parentOf(owner, byPid); }
     const orphan = !parentOf(rp, byPid);
-    const rec = recordFor(listen[0]?.pid ?? root) || recordFor(root);
+    // a record on a member counts too: launchPlacedChrome records the browser under its script
+    const rec = recordFor(listen[0]?.pid ?? root) || recordFor(root) || reg.get(members.find((q) => reg.has(q))) || null;
     const fromCd = [...mp, ...chain].map((p) => cdTarget(p.cmd)).find(Boolean);
     const fromCmd = (listen.length ? listen : mp).map((p) => worktreeOf(p.cmd)).find(Boolean) || chain.map((p) => worktreeOf(p.cmd)).find(Boolean);
     const wt = rec ? { worktree: rec.worktree, gone: !fs.existsSync(rec.worktree) } : fromCd || fromCmd || null;
@@ -428,7 +431,7 @@ function analyze(snap, { oldHours = 12 } = {}) {
     const session = process.env.CLAUDE_CODE_SESSION_ID || process.env.CODEX_THREAD_ID || null;
     return {
       pid: root, kind, ports, addrs: Object.fromEntries(addrs), name: rp.name, cmd: rp.cmd || '', start: rp.start,
-      listenerPids: listen.map((p) => p.pid), members, procs: mp.length,
+      listenerPids: listen.map((p) => p.pid), members, memberStarts: Object.fromEntries(mp.map((p) => [p.pid, p.start])), procs: mp.length,
       nodeCount: mp.filter(isNode).length, memMB: Math.round(mp.reduce((s, p) => s + (p.mem || 0), 0) / 2 ** 20),
       browsers: browsers.length, script: scriptName(listen[0]?.cmd || rp.cmd) || scriptName(cmds),
       ageH: ageH === null ? null : +ageH.toFixed(1),
@@ -666,7 +669,8 @@ async function main(argv) {
           const host = t.units.find((u) => u.members.includes(pid));
           if (!host) return [];
           exact.add(pid);
-          return [{ ...host, pid, ports: [], why: `part of pid ${host.pid}; closes only this process and what runs under it`, start: snapshot().procs.find((p) => p.pid === pid)?.start }];
+          // identity from the triage snapshot, so a pid reused since then fails the check before the kill
+          return [{ ...host, pid, ports: [], why: `part of pid ${host.pid}; closes only this process and what runs under it`, start: host.memberStarts[pid] }];
         })()
         : /^\d+$/.test(w) ? t.units.filter((u) => u.ports.includes(+w))
         : null;
