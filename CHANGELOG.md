@@ -20,8 +20,8 @@ condensed.
   evidence, including `scripts/co-change.mjs`, which lists files that keep
   changing in the same commits. Problems are grouped under the fix that removes
   several, fresh critics try to refute each fix, and the run stops at a ranked
-  decision log. Only the fixes the owner picks go to `long-horizon`, with a
-  behavior baseline recorded first. Idea from caldoai/skills
+  decision log. Only the fixes the owner picks are made, through
+  `long-horizon`, with a behavior baseline recorded first. Idea from caldoai/skills
   `untangle-codebase`, which refactors the whole codebase with no
   approval step.
 
