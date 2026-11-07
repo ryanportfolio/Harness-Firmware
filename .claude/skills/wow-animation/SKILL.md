@@ -32,7 +32,7 @@ Ground every frame in the real thing: real assets restyled, real product strings
 | No periods in headings or large display text (statements, taglines, end slate); product UI copy keeps its own punctuation | none expected |
 | No MP4 or video export until every wow-loop round passes; export is the last step | "export a draft now" |
 | One approval checkpoint: beat sheet plus animatic, then run to the end | "autonomous" skips it; "check in after each scene" adds more |
-| Maximum parallel fan-out (see Parallelize); Sonnet for subject research, the session model for creative calls; never Haiku | "no subagents", "keep it small" |
+| Maximum parallel fan-out (see Parallelize); Sonnet for subject research, the default subagent model for creative calls (Sonnet if that would be Haiku); never Haiku | "no subagents", "keep it small" |
 | `/codex-fullreview` after each major step; Codex review before any merge | "skip codex" (the before-merge review stays: kernel rule) |
 | Games: trailer structure per motion-design (gameplay fast, hook early, logo on end slate), real enemies, bosses and systems | "teaser only", "no bosses" |
 | Commit and push on a feature branch, open a PR when done | "local only" |
@@ -43,7 +43,7 @@ Speed comes from fan-out.
 
 - Launch every independent agent of a step in one message, never one after another. Before each dispatch, ask what else could start now.
 - Subject research runs on Sonnet (`model: "sonnet"`): what the subject is, what it does, how it looks, its copy, assets, store or marketing pages, code facts. Split by source (live site, repo copy, design tokens and assets, feature code, store page, sprites, enemy and boss code) so each agent owns one slice with no overlap. Six or more recon agents is normal for a large subject.
-- Judgment calls (animator research, direction pitches, hero scenes, restyled assets, critics) omit `model`, so they run on `CLAUDE_CODE_SUBAGENT_MODEL` when set, else the session model. Honor explicit user model choices.
+- Judgment calls (animator research, direction pitches, hero scenes, restyled assets, critics) omit `model`, so they run on `CLAUDE_CODE_SUBAGENT_MODEL` when set, else the session model. If that would be Haiku, pass `model: "sonnet"`. Honor explicit user model choices.
 - Steps 2 and 3 start together. Director pitches run in parallel. Build modules with disjoint files run in parallel. Critics of one wow-loop round run in parallel.
 - Serialize only what must be: one writer per file set, one owner per browser profile, performance measurements, and anything that needs a prior result.
 - The orchestrator stays free: it merges reports, keeps `facts.md` and state current, and dispatches the next wave; it does not do recon itself.
@@ -70,7 +70,7 @@ Subagents never see this skill. Paste these into each brief that renders, captur
 - Every on-screen string and number comes from `facts.md`. No periods in display text. On-screen copy passes the `writing` skill (no em dashes, no puffery).
 - Flash limits per motion-design. Reduced motion only when the owner asks.
 - No audio of any kind unless the user's notes asked for sound. When they did, paste the rules from [score.md](references/score.md) into every brief that writes or reviews audio.
-- Model: the session model or Sonnet; never Haiku.
+- Model: the default subagent model or Sonnet; never Haiku (pass `model: "sonnet"` when the default would be Haiku).
 
 ## Pitfalls
 
