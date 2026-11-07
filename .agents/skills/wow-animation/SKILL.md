@@ -33,7 +33,7 @@ Ground every frame in the real thing: real assets restyled, real product strings
 | No MP4 or video export until every wow-loop round passes; export is the last step | "export a draft now" |
 | One approval checkpoint: beat sheet plus animatic, then run to the end | "autonomous" skips it; "check in after each scene" adds more |
 | Maximum parallel fan-out (see Parallelize) | "no subagents", "keep it small" |
-| `$opus-fullreview` after each major step; `$claude-review` (Opus) before any merge | "skip review" (the before-merge review stays: `AGENTS.md`) |
+| `$opus-fullreview` after each major step; the `AGENTS.md` Opus review before any merge | "skip review" (the before-merge review stays: `AGENTS.md`) |
 | Games: trailer structure per motion-design (gameplay fast, hook early, logo on end slate), real enemies, bosses and systems | "teaser only", "no bosses" |
 | Commit and push on a feature branch, open a PR when done | "local only" |
 
@@ -59,7 +59,7 @@ Speed comes from fan-out.
 5. **Build.** Scene modules with disjoint files, one writer each; strongest model on hero scenes and restyled assets. `$opus-fullreview` on the build.
 6. **Wow loop.** Run `$wow-loop` (absent → say so and run motion-design's verification by hand). Seed its contract from the four brief goals plus the defaults above as named checks, including one "stranger test" check: after one natural playback a critic states what the subject is and why to use it, and it matches `facts.md`. Add the critique questions for the `BRIEF.md` type as checks, with the scripted reading-time check and the protected strongest moment, per motion-design's `references/critique.md`. The stranger test doubles as its blind `q-point`: that critic gets no kickoff brief, `BRIEF.md` or contract text for the check, and its sentence must match both `facts.md` and the feeling-and-job line. Critics judge the live JS animation at natural speed, plus stills and contact sheets. Rounds continue until the contract passes or the budget runs out. `$opus-fullreview` after the loop.
 7. **Export last.** Video per motion-design's `references/verify-export.md`, only after the loop passes. Silent run: confirm with ffprobe that the file has no audio stream before calling the export done.
-8. **Ship.** Commit, push, PR (`gh pr create --head <branch>`), `$claude-review` with Opus per `AGENTS.md`, fix surviving findings.
+8. **Ship.** Commit, push, PR (`gh pr create --head <branch>`), the Opus review per `AGENTS.md`, fix surviving findings.
 
 `$opus-fullreview` needs an authenticated Claude CLI; unavailable → run `$impartial-review` and say which ran (it needs fresh independent agents or an authenticated Codex CLI; never substitute a self-review). Claude CLI unavailable for the before-merge review → say so, stop before merge.
 
