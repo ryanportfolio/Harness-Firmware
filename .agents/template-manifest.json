@@ -63,14 +63,18 @@
     "dependencies": {
       "astra-fullreview": ["codex-fullreview", "impartial-review"],
       "astra-review": ["codex-review", "external-review"],
+      "babysit-ci": ["fable-mode"],
       "caveman": ["why"],
       "climb-loop": ["codex-review", "astra-review", "claude-review"],
       "codex-fullreview": ["impartial-review"],
       "codex-review": ["external-review"],
       "conversion-ux": ["ui-quality"],
+      "dare": ["fable-mode"],
       "deep-plan": ["why"],
       "design-prototypes": ["codex-image-gen"],
       "gauntlet": ["dare", "why", "arena", "merge", "addskill", "writing"],
+      "long-horizon": ["fable-mode"],
+      "long-horizon-workflows": ["fable-mode"],
       "merge": ["codex-fullreview", "codex-review", "opus-fullreview", "claude-review"],
       "opus-fullreview": ["impartial-review"],
       "product-walkthrough": ["motion-design"],
@@ -82,7 +86,7 @@
     },
     "presets": {
       "minimal": {
-        "omit": ["advocate", "enhance-prompt", "fable-mode", "forge-repo-ui-skill", "handoff-audit", "lab"]
+        "omit": ["advocate", "enhance-prompt", "forge-repo-ui-skill", "handoff-audit", "lab"]
       }
     }
   }
