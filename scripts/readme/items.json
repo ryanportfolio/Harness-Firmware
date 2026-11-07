@@ -80,6 +80,11 @@
       "group": "discipline"
     },
     {
+      "name": "untangle",
+      "label": "Untangle",
+      "group": "discipline"
+    },
+    {
       "name": "long-horizon",
       "label": "Long horizon",
       "group": "discipline"

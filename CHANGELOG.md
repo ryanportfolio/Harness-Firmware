@@ -13,6 +13,18 @@ condensed.
 
 ### Added
 
+- `untangle` for Claude and Codex. It surveys a codebase for structure that
+  makes changes harder: code that must change together but doesn't show it,
+  code tied together that changes for different reasons, code with no reason
+  of its own to exist, and special cases. Every problem cites `path:line` and
+  evidence, including `scripts/co-change.mjs`, which lists files that keep
+  changing in the same commits. Problems are grouped under the fix that removes
+  several, fresh critics try to refute each fix, and the run stops at a ranked
+  decision log. Only the fixes the owner picks go to `long-horizon`, with a
+  behavior baseline recorded first. Idea from caldoai/skills
+  `untangle-codebase`, which refactors the whole codebase with no
+  approval step.
+
 - `climb-loop` for Claude and Codex. It hill-climbs a target round after round.
   For UI, Opus, the newest Sol and Astra each rank our screens blind against
   frozen captures of reference apps the user names, per category, until every

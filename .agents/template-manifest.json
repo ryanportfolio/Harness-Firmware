@@ -50,7 +50,7 @@
         "id": "discipline",
         "label": "Quality disciplines",
         "description": "Planning, review, and dependable long-form execution",
-        "skills": ["brainstorming", "deep-plan", "writing-plans", "impartial-review", "perf-loop", "climb-loop", "security-loop", "long-horizon", "long-horizon-workflows", "babysit-ci", "codex-review", "external-review", "astra-review", "codex-fullreview", "opus-fullreview", "astra-fullreview", "merge", "claude-review", "dare", "gauntlet"]
+        "skills": ["brainstorming", "deep-plan", "writing-plans", "impartial-review", "perf-loop", "climb-loop", "security-loop", "untangle", "long-horizon", "long-horizon-workflows", "babysit-ci", "codex-review", "external-review", "astra-review", "codex-fullreview", "opus-fullreview", "astra-fullreview", "merge", "claude-review", "dare", "gauntlet"]
       },
       {
         "id": "specialist",
@@ -76,6 +76,7 @@
       "product-walkthrough": ["motion-design"],
       "security-loop": ["claude-review", "codex-review"],
       "seo-loop": ["writing"],
+      "untangle": ["long-horizon"],
       "wow-animation": ["motion-design", "wow-loop", "writing", "codex-fullreview", "codex-review", "opus-fullreview", "claude-review"],
       "wrapup": ["servers"]
     },
