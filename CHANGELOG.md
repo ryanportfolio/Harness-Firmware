@@ -331,6 +331,12 @@ condensed.
 
 ### Fixed
 
+- The `minimal` skill preset no longer drops `fable-mode`. `long-horizon`,
+  `long-horizon-workflows`, `babysit-ci` and `dare` hand work to it, so a
+  minimal project had those hand-offs pointing at a missing skill. The four
+  hand-offs are now listed under `skills.dependencies`, so `apply-firmware`
+  reports a gap when a project records `fable-mode` as removed.
+
 - `sync-codex-skills.mjs` no longer crashes on a directory link that loops
   back into the skill folder it sits in. When it walks a folder on disk (a
   checkout that is not a git root, or a link git lists as one entry, as git
