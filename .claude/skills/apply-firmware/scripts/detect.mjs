@@ -271,7 +271,12 @@ for (const p of layerFiles(target).filter((f) => !tplSet.has(f))) {
 // ---- skill dependencies ----
 // The project's skills once applied: present, plus ADD, minus SKIPPED. Each skills.dependencies
 // need missing from that set is a gap, and so is a required skill the project recorded as removed
-// (it is kept or added anyway, so the record is wrong).
+// (it is kept or added anyway, so the record is wrong). A skill turned "off" in the project's
+// .claude/settings.json skillOverrides cannot run, so it counts as missing for a skill that needs
+// it, and a dependent that is itself off is skipped; .claude/scripts/removed-skills.mjs applies
+// the same rule.
+const turnedOff = new Set(Object.entries(readJson(join(target, '.claude/settings.json'))?.skillOverrides ?? {})
+  .filter(([, value]) => value === 'off').map(([name]) => name));
 const SKILL_MD = /^\.(?:claude|agents)\/skills\/([^/]+)\/SKILL\.md$/;
 const present = ['.claude/skills', '.agents/skills'].flatMap((r) =>
   existsSync(join(target, r)) ? readdirSync(join(target, r)).filter((n) => existsSync(join(target, r, n, 'SKILL.md'))) : []);
@@ -279,9 +284,9 @@ const skipped = new Set(report.removed.map((p) => p.split('/')[2]));
 const finalSkills = new Set([...present, ...report.add.map((p) => p.match(SKILL_MD)?.[1]).filter(Boolean)]
   .filter((n) => !skipped.has(n)));
 report.dependencyGaps = {
-  missing: Object.entries(manifest?.skills?.dependencies ?? {}).filter(([s]) => finalSkills.has(s))
-    .flatMap(([skill, needs]) => needs.filter((n) => !finalSkills.has(n))
-      .map((need) => ({ skill, need, recordedRemoved: recorded.includes(need) }))),
+  missing: Object.entries(manifest?.skills?.dependencies ?? {}).filter(([s]) => finalSkills.has(s) && !turnedOff.has(s))
+    .flatMap(([skill, needs]) => needs.filter((n) => !finalSkills.has(n) || turnedOff.has(n))
+      .map((need) => ({ skill, need, recordedRemoved: recorded.includes(need), turnedOff: finalSkills.has(need) }))),
   requiredRemoved: [...required].filter((n) => recorded.includes(n)),
 };
 
@@ -336,7 +341,7 @@ console.log(`\nSKIPPED (skill recorded in .agents/removed-skills.json): ${report
 bySkill(report.removed).forEach(line);
 const gaps = report.dependencyGaps;
 console.log(`\nDEPENDENCY GAPS (a skill the project will have needs one it will not): ${gaps.missing.length + gaps.requiredRemoved.length}`);
-gaps.missing.forEach((g) => line(`${g.skill} needs ${g.need}${g.recordedRemoved ? ' (recorded as removed)' : ''}`));
+gaps.missing.forEach((g) => line(`${g.skill} needs ${g.need}${g.recordedRemoved ? ' (recorded as removed)' : ''}${g.turnedOff ? ' (turned off in .claude/settings.json skillOverrides)' : ''}`));
 gaps.requiredRemoved.forEach((n) => line(`${n} is required but recorded in .agents/removed-skills.json; it is kept or added anyway, so drop it from the record`));
 console.log(`\nOK (identical, or kept project knowledge): ${report.ok.length}`);
 console.log(`PROJECT-ONLY firmware-layer files (keep): ${report.localOnly.length}`);
