@@ -22,7 +22,8 @@ condensed.
   several, fresh critics try to refute each fix, and the run stops at a ranked
   decision log. Only the fixes the owner picks go to `long-horizon`, with a
   behavior baseline recorded first. Idea from caldoai/skills
-  `untangle-codebase`, which refactors in one unattended pass.
+  `untangle-codebase`, which refactors the whole codebase with no
+  approval step.
 
 - `climb-loop` for Claude and Codex. It hill-climbs a target round after round.
   For UI, Opus, the newest Sol and Astra each rank our screens blind against
