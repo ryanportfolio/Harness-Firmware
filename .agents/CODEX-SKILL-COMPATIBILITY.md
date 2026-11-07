@@ -50,7 +50,7 @@ for comparison, backup, reconciliation, and discovery checks.
 
 `security-loop` is a standalone Codex skill that needs exposed agent tools for every hunter, critic, and verifier; without them it stops after collecting signals rather than substituting self-review. Its cross-vendor check runs through Claude CLI under `claude-review`'s fail-closed subscription preflight and is reported as unavailable when that preflight fails. Owner-local checks run only first-party code in a fresh worktree with an empty environment; untrusted code stays source-only on this machine.
 
-`untangle` is a standalone Codex skill that only reports: it never edits the target and hands the owner's picked fixes to `$long-horizon`. Its fix critics need exposed agent tools; without them the Manager may survey areas itself, but every fix is marked uncritiqued and the handover says so. `scripts/co-change.mjs` needs Node and Git only.
+`untangle` is a standalone Codex skill that only reports: the survey never edits the target, and the owner's picked fixes go to `$long-horizon` (or run in the session when they need fewer than 3 steps). Its fix critics need exposed agent tools; without them the Manager may survey areas itself, but every fix is marked uncritiqued and the handover says so. `scripts/co-change.mjs` needs Node and Git only.
 
 `cache-loop` can inspect build output and HTTP responses without a browser. Claims about browser reuse require a working measurement method for the stated browser. It keeps browser and CDN evidence separate and does not authorize publishing, deployment, or destructive cache purges.
 
