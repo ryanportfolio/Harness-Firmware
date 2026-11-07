@@ -340,6 +340,16 @@ condensed.
   `check-template-manifest.mjs` now fails when a preset omits a skill that a
   kept skill depends on, so this cannot come back unnoticed.
 
+- `apply-firmware` also reports a dependency turned `off` in the project's
+  `skillOverrides`, which it used to miss because it only checked for skill
+  folders; `removed-skills.mjs` already warned about it. Bringing back a skill
+  the project removed or turned off is asked per item and now actually copies
+  it back and clears the record entry or `off` override; the "leave it out"
+  choice no longer applies to required skills, which are restored anyway. The
+  manifest now also lists the review, planning and pitfall skills that
+  `long-horizon`, `long-horizon-workflows`, `dare` and `babysit-ci` hand off
+  to, and `long-horizon-workflows` needs `long-horizon`.
+
 - `sync-codex-skills.mjs` no longer crashes on a directory link that loops
   back into the skill folder it sits in. When it walks a folder on disk (a
   checkout that is not a git root, or a link git lists as one entry, as git
