@@ -275,7 +275,11 @@ for (const p of layerFiles(target).filter((f) => !tplSet.has(f))) {
 // .claude/settings.json skillOverrides cannot run, so it counts as missing for a skill that needs
 // it, and a dependent that is itself off is skipped; .claude/scripts/removed-skills.mjs applies
 // the same rule.
-const turnedOff = new Set(Object.entries(readJson(join(target, '.claude/settings.json'))?.skillOverrides ?? {})
+const targetSettingsFile = join(target, '.claude/settings.json');
+const targetSettings = readJson(targetSettingsFile);
+// An unreadable file would otherwise look like "nothing turned off"; the report says so instead.
+const overridesUnreadable = existsSync(targetSettingsFile) && targetSettings === null;
+const turnedOff = new Set(Object.entries(targetSettings?.skillOverrides ?? {})
   .filter(([, value]) => value === 'off').map(([name]) => name));
 const SKILL_MD = /^\.(?:claude|agents)\/skills\/([^/]+)\/SKILL\.md$/;
 const present = ['.claude/skills', '.agents/skills'].flatMap((r) =>
@@ -288,6 +292,7 @@ report.dependencyGaps = {
     .flatMap(([skill, needs]) => needs.filter((n) => !finalSkills.has(n) || turnedOff.has(n))
       .map((need) => ({ skill, need, recordedRemoved: recorded.includes(need), turnedOff: finalSkills.has(need) }))),
   requiredRemoved: [...required].filter((n) => recorded.includes(n)),
+  overridesUnreadable,
 };
 
 // ---- output ----
@@ -340,7 +345,7 @@ bySkill(report.retired).forEach(line);
 console.log(`\nSKIPPED (skill recorded in .agents/removed-skills.json): ${report.removed.length}`);
 bySkill(report.removed).forEach(line);
 const gaps = report.dependencyGaps;
-console.log(`\nDEPENDENCY GAPS (a skill the project will have needs one it will not): ${gaps.missing.length + gaps.requiredRemoved.length}`);
+console.log(`\nDEPENDENCY GAPS (a skill the project will have needs one it will not): ${gaps.missing.length + gaps.requiredRemoved.length}${gaps.overridesUnreadable ? ' (.claude/settings.json unreadable: skills turned off there were not checked)' : ''}`);
 gaps.missing.forEach((g) => line(`${g.skill} needs ${g.need}${g.recordedRemoved ? ' (recorded as removed)' : ''}${g.turnedOff ? ' (turned off in .claude/settings.json skillOverrides)' : ''}`));
 gaps.requiredRemoved.forEach((n) => line(`${n} is required but recorded in .agents/removed-skills.json; it is kept or added anyway, so drop it from the record`));
 console.log(`\nOK (identical, or kept project knowledge): ${report.ok.length}`);

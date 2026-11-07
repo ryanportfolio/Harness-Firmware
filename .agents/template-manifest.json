@@ -74,7 +74,7 @@
       "design-prototypes": ["codex-image-gen"],
       "gauntlet": ["dare", "why", "arena", "merge", "addskill", "writing"],
       "long-horizon": ["fable-mode", "codex-fullreview", "codex-review", "opus-fullreview", "claude-review"],
-      "long-horizon-workflows": ["fable-mode", "codex-fullreview", "codex-review"],
+      "long-horizon-workflows": ["long-horizon", "fable-mode", "codex-fullreview", "codex-review"],
       "merge": ["codex-fullreview", "codex-review", "opus-fullreview", "claude-review"],
       "opus-fullreview": ["impartial-review"],
       "product-walkthrough": ["motion-design"],
