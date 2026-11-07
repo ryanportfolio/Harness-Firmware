@@ -9,7 +9,8 @@
 // - an entry that matches no file, a nested or repeated entry, or a malformed path;
 // - a required file that is missing, or that sits under a templateOnly entry;
 // - a skill folder that is in no group or in two, or a group naming a folder that does not exist;
-// - a name in skills.required, skills.dependencies or skills.presets that is not a skill folder.
+// - a name in skills.required, skills.dependencies or skills.presets that is not a skill folder;
+// - a preset that omits a skill another skill it keeps depends on.
 //
 // Repository files are the tracked files plus untracked files Git does not ignore, limited to
 // files still on disk, so an added or deleted file counts before it is committed. Outside a Git
@@ -195,6 +196,15 @@ export function checkManifest(manifest, { files, skills, isFile }) {
       for (const name of value.omit) {
         known(`skills.presets.${preset}.omit`, name);
         if (isStringArray(rules.required) && rules.required.includes(name)) errors.push(`skills.presets.${preset}.omit: ${name} is a required skill`);
+      }
+      // A kept skill that hands work to an omitted one would point at a missing skill.
+      if (isObject(rules.dependencies)) {
+        for (const [name, needs] of Object.entries(rules.dependencies)) {
+          if (value.omit.includes(name) || !isStringArray(needs)) continue;
+          for (const need of needs.filter((n) => value.omit.includes(n))) {
+            errors.push(`skills.presets.${preset}.omit: ${need} is needed by ${name}, which the preset keeps`);
+          }
+        }
       }
     }
   }
