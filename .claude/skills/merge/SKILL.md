@@ -129,7 +129,7 @@ Inspect **all PR checks**: `gh pr checks <number> --json name,bucket,state,workf
 
 1. Re-read PR head. ≠ head where loop + CI both passed → back to Step 3; verdict covers only head it saw.
 2. Base drift: `git fetch origin <target>`; `gh pr view <number> --json mergeStateStatus`. `DIRTY` → Step 1.3. Files target changed since branch point (`git diff --name-only <merge-base> origin/<target>`, merge-base = `git merge-base origin/<target> <head>`) overlap PR's files (`git diff --name-only <merge-base> <head>`) → review + CI never saw that combination: `git merge origin/<target>` into branch (never rebase: force-push not authorized), local checks, push → back to Step 3 (`/codex-review` rerun, same budget) + Step 4. No overlap → continue.
-3. Review gate: a Codex review (`/codex-fullreview` or `/codex-review`) must have run at `<verified-head>`, or the user must have skipped Codex for this PR by number. Neither → stop, report; never merge. A skip given for another PR does not carry over.
+3. Review gate: latest Codex round that counted under Step 3 (`/codex-fullreview` or `/codex-review`, completed, verified scope identity, full PR diff from merge-base) ran at `<verified-head>` and passed per Loop end. Self-review, a failed or incomplete run, or a narrower scope does not count. None → stop, report; never merge.
 4. Squash unless user/repo says otherwise: `gh pr merge <number> --squash --match-head-commit <verified-head>`. No head guard available → say so, use guarded API or hold; never merge unreviewed commits.
 5. Confirm PR merged, fetch target, see merge commit. Keep branch unless user asked cleanup. Next change → new task branch from updated target, keep uncommitted work.
 

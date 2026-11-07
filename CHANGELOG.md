@@ -215,6 +215,11 @@ condensed.
 
 ### Changed
 
+- `merge` checks for a counted review right before merging. Step 5 now stops
+  unless the latest review round that counted under Step 3 ran at the head
+  being merged and passed. A failed or incomplete run, a self-review, or a
+  review narrower than the full PR diff does not satisfy it. The Codex copy
+  applies the same gate to its Opus rounds.
 - `seo-loop` now works the way people think about SEO: keywords, the pages
   that answer them, and whether AI answers mention the site. Parallel subagents
   study the site (offer, audience, what sets it apart, every page, the facts it
