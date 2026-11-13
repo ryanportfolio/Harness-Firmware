@@ -350,6 +350,11 @@ condensed.
   `long-horizon`, `long-horizon-workflows`, `dare` and `babysit-ci` hand off
   to, and `long-horizon-workflows` needs `long-horizon`.
 
+- `apply-firmware`'s `detect.mjs` reported `turnedOff: false` for a dependency
+  that the project both recorded as removed and turned `off` in
+  `skillOverrides`, so the text report left out the "turned off" label. The
+  flag now reads the overrides themselves.
+
 - `sync-codex-skills.mjs` no longer crashes on a directory link that loops
   back into the skill folder it sits in. When it walks a folder on disk (a
   checkout that is not a git root, or a link git lists as one entry, as git
