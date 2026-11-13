@@ -49,6 +49,9 @@ Keep the inventory with the task or page decisions. An inaccessible fixture or m
 ## 4. Build with the relevant rules
 
 - Use native elements and existing components. Read Reach and Operate in [rules.md](rules.md) for keyboard behavior, names and state. Custom controls need equivalent semantics and keyboard operation.
+- Before hand-rolling a composite widget (RC14, OP16), check the manifest for a headless behavior library the project already uses, such as React Aria, Radix, Headless UI, Ark or Zag, Melt or Bits, or ui-sdk, and build on it. Adding one is a dependency decision for the owner.
+- Style a state from the attribute that announces it (`[aria-expanded="true"]`, `[aria-selected="true"]`, `[aria-pressed="true"]`, `:disabled`) or the component's own `data-` state attribute, not from a class set beside it. Then what the screen shows and what a screen reader hears cannot drift apart.
+- Test the wiring you added, not the library under it: press Space on every switch and checkbox you placed, press every button in each dialog (Cancel too), close each menu and dialog, and check where focus lands after each.
 - Forms need visible associated labels, hints, suitable `autocomplete`, usable validation and input preserved after failure. Keep paste and password managers available. Read OP1 through OP6 and OP14.
 - Read Read and Stability for responsive content, text resizing and space reserved for late data. Choose pagination or virtualization only when the actual content and performance need it; preserve keyboard and screen reader access.
 - Read Motion when anything animates. Implement the reduced-motion behavior and keep the resulting content available. For the motion itself (easing, duration, press feedback, popovers, gestures, jank), read the `motion-design` skill's `references/ui-components.md` when that skill is installed.
