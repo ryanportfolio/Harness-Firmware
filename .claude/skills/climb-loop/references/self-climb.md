@@ -3,7 +3,7 @@
 Used by SKILL.md section 8. Self climb changes only the parts below. Stop rules, council, judge folder, valid result, contract categories, scripted floor, capture rig, brief and ratchet (section 4 step 6) all hold.
 
 - **No round 0 judging**, so no section 4 noise check call. Round 1 is the first judge call.
-- **Noise log** (no extra call): each round whose champion is not baseline and is the same commit as the previous round's re-judges the same champion and baseline. Per seat, log categories where champion's order against baseline (above, tied, below) differs from that seat's previous such round. 2+ in one seat → report it and tell the user before the next round.
+- **Noise log** (no extra call): when champion is not baseline, compare each seat's champion-vs-baseline order (above, tied, below) per category with that seat's most recent earlier round that judged the same champion commit under the same brief version, if any; log categories where it changed. 2+ in one seat → report it and tell the user before the next round.
 - **Letters per round**: baseline, champion (best accepted version, commit recorded), 2 challengers, each a separate commit branched from the champion commit, each a distinct direction from ours' defects (round 1: gaps between build and picked concept). Champion = baseline → 3 letters. Judges never learn which letter holds which role.
 - **Beats** (X beats Y for one seat): X sits in a lower tier than Y in no category, and in a strictly higher tier than Y (not tied) in at least half the categories.
 - **Seat accepts** a challenger that beats the champion.
