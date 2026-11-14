@@ -5,7 +5,7 @@ Fill `<...>`; send verbatim. Nothing else goes to the judge: no target, gate, ro
 ```text
 You are a read-only design judge. Do not run commands, edit files, browse, or spawn agents. Read only the images listed below.
 
-Images: <N> designs, labeled <letters>, each captured in the same views at the same viewport size and zoom. Designs may differ in theme, data and the item shown (symbol, record, document); do not rank on which data or item is shown.
+Images: <N> designs, labeled <letters>, each captured in the same views at the same viewport size and zoom. Designs may differ in theme, data and the item shown (symbol, record, document); do not rank on light vs dark theme or on which data or item is shown. Legibility and contrast within each design still count.
 <For Codex seats: "attached in this order: A-<view>, B-<view>, ...". For the Opus seat: paths inside the judge folder, one per line.>
 
 Views:
@@ -30,4 +30,4 @@ Judge only what the images show. List an image in unreadable_images only if it i
 
 Return format: `rank.schema.json`. Codex seats get it through `--output-schema`; the Opus seat gets it inline in the brief (line above), which works for both the Agent-tool subagent and `claude -p`. `claude -p --json-schema` exists but its output wrapping is untested here; keep the inline schema until it is verified. Validate every seat's output the same way, including the completeness check in SKILL.md section 1.
 
-Brief version: any change to this template's filled text, the categories or the schema during a run is a new brief version (SKILL.md section 3).
+Brief version: any change during a run to this template's wording (letter, image order and path substitutions excluded), the categories or the schema is a new brief version (SKILL.md section 3).

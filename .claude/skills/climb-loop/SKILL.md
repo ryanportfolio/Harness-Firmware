@@ -65,13 +65,13 @@ Blinding limits to record: the Opus subagent loads project instructions (`CLAUDE
 Write `.tmp/climb-loop/<slug>/contract.md`:
 
 - **References**: 2+ products ours must beat, named by user. If the user named none, offer the section 8 options and wait for a pick before capturing.
-- **Views**: viewport and zoom identical for ours and every reference; theme (light and dark) matched where each product offers it. Ours uses one fixed data fixture, and the same route and screen state for a view at every viewport. Record every theme, data or item (symbol, record) difference with the references in `contract.md`; the brief tells judges not to rank on them. Name each view.
+- **Views**: viewport and zoom identical for ours and every reference; theme (light and dark) matched where each product offers it. Ours uses one fixed data fixture, and the same route and screen state for a view at every viewport. Record every theme, data or item difference with the references in `contract.md`; the brief tells judges not to rank on them. Name each view.
 - **Categories** (edit per product): hierarchy, typography, color and contrast, spacing and density, consistency (labels, radius, icons across surfaces), affordance (controls read as controls), iconography, states (status visible in the captures; focus, hover, empty or error only where a named view captures them). Measured contrast is the scripted floor's job, not the judges'. Every category must be judgeable from the views for every letter: the orchestrator checks this at contract time and drops or narrows any category that fails (example: overlay styling when a reference shows no overlays), recording the decision in `contract.md`.
 - **Seat counts a category**: one valid result from that seat with ours in `ranking[0]` of that category. Ties allowed, but a `ranking[0]` that holds every letter never counts.
 - **Category passes** in a round: a majority of the seats admitted that round count it. One seat admitted → that seat decides.
 - **Round passes**: every category passes.
 - **Gate**: a round passes with every council seat admitted, then a confirmation round (section 4) passes on the same commit. Council = Opus, Sol, Astra, or Sol + Astra only after the user agreed to continue without Opus.
-- **Strict gate** (user's choice at contract time, recorded): every admitted seat counts every category, ours alone in `ranking[0]` (no ties). Rarely reachable: in a live run one seat, rerun on identical captures with a reworded brief, moved ours' tier in 4 of 10 categories. The gate is chosen once and never loosened mid-run to get a pass.
+- **Strict gate** (user's choice at contract time, recorded): every admitted seat counts every category, ours alone in `ranking[0]` (no ties). Rarely reachable: a live-run seat, rerun on identical captures and brief, moved ours' tier in 2 of 10 categories. The gate is chosen once and never loosened mid-run to get a pass.
 - **Scripted floor**, after every edit, no judge call: axe-core clean on each view, WCAG AA contrast on text tokens, zero console errors, views outside the edit pixel-stable. If a gating floor check fails, do not run a judge round.
 - User names a numeric bar ("9/10") → record it in `state.json` only, translate to the gate above. A lower bar may relax the gate (top two tiers, fewer categories) only after the user confirms which.
 
@@ -83,7 +83,7 @@ Template: [references/judge-brief.md](references/judge-brief.md). Per seat per r
 
 Blinding limits → record in `contract.md`: recognizable rival chrome, product names or badges in ours ("Demo"), theme differences. Where ours' fixture allows, hide its name and badges in captures.
 
-Brief version: `state.json` records the version each round used. Any mid-run change to the filled brief, categories or schema → new version; rerun the baseline for the admitted seats under it (counts toward cap and budget). Tiers, gains and drift are never compared across versions.
+Brief version: `state.json` records the version each round used. Any mid-run change to the brief's wording (per-round letter and path fills excluded), the categories or the schema → new version; rerun the baseline for the admitted seats under it (counts toward cap and budget). Never compare tiers, gains or drift across versions.
 
 Output: [references/rank.schema.json](references/rank.schema.json). Ranking as tiers, best first; reason; up to 3 defects per letter (view, element, problem, measurable fix). Orchestrator maps letter → ours, keeps ours' defects, keeps rival defects only as rationale.
 
