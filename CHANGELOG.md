@@ -35,9 +35,10 @@ condensed.
   missing or unreadable image in its own field and other limits as a
   per-category caveat, so an honest caveat no longer voids a result. A one-call
   repeat after the baseline counts the categories where a judge's verdict on
-  ours moves on identical screenshots; self climb reads the same from rounds
-  where its champion held. A new brief version voids a pending confirmation
-  round. Sol judges alone until it puts ours first in every category,
+  ours moves on identical screenshots; self climb logs, per seat, the
+  categories where its champion's order against the baseline changed between
+  rounds that judged the same champion. A new brief version voids a pending
+  confirmation round and the passed round it would confirm. Sol judges alone until it puts ours first in every category,
   then Opus joins, then Astra, to save usage. A scripted mode turns past agent mistakes
   into an eval, climbs it to a perfect score, then cuts cost while staying
   perfect. With no reference app named, it suggests `redesign-concepts` on the
