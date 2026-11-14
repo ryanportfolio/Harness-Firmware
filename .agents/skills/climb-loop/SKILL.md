@@ -1,6 +1,6 @@
 ---
 name: climb-loop
-description: "Hill-climb a target round after round: Opus, Sol and Astra rank our UI blind against named reference apps (none → redesign-concepts, build the pick, climb past our own versions) until all rank ours first, or a scripted eval climbs to perfect. Use: 'make our UI beat <app>', 'climb our UI without a reference', 'hill climb this'."
+description: "Hill-climb a target round after round: Opus, Sol and Astra rank our UI blind against named reference apps (none → redesign-concepts, build the pick, climb past our own versions) until most judges rank ours first, or a scripted eval climbs to perfect. Use: 'make our UI beat <app>', 'climb our UI without a reference', 'hill climb this'."
 ---
 
 # Climb loop for Codex
@@ -72,7 +72,7 @@ cd "$JUDGE" && claude -p --model opus --effort high \
 
 Judge JSON = `result.json` `.result` text; `is_error` must be false. Attribute the model from `modelUsage`; if absent, mark the seat "requested opus, resolution unverified". A billing prompt or plan-limit message stops the Opus seat.
 
-**Valid result.** Exit 0 (Opus: `is_error` false, above). Same parse for every seat: strip one surrounding code fence, `JSON.parse`, check the schema's keys (Codex enforces the schema; Opus does not, so check it), match category names trimmed and case-insensitive. Then completeness: every contracted category exactly once; in each ranking every expected letter exactly once, no other letters, no empty tier; defect labels only expected letters; `unreadable_images` empty. A non-empty `caveat` never invalidates a result; report caveats with the tiers. Top tier = `ranking[0]`. A result that fails any of these is invalid for the round and is never counted toward a pass. Other failures: report once, ask before a retry; never swap model or effort silently.
+**Valid result.** Exit 0 (Opus: `is_error` false, above). Same parse for every seat: strip one surrounding code fence, `JSON.parse`, check every key and type in the schema, nested ones included (Codex enforces the schema; Opus does not, so check it), match category names trimmed and case-insensitive. Then completeness: every contracted category exactly once; in each ranking every expected letter exactly once, no other letters, no empty tier; defect labels only expected letters; `unreadable_images` empty. A non-empty `caveat` never invalidates a result; report caveats with the tiers. Top tier = `ranking[0]`. A result that fails any of these is invalid for the round and is never counted toward a pass. Other failures: report once, ask before a retry; never swap model or effort silently.
 
 ## 2. Contract (once, then frozen)
 
@@ -82,12 +82,12 @@ Write `.tmp/climb-loop/<slug>/contract.md`:
 - **Views**: viewport and zoom identical for ours and every reference; theme (light and dark) matched where each product offers it. Ours uses one fixed data fixture, and the same route and screen state for a view at every viewport. Record every theme, data or item difference with the references in `contract.md`; the brief tells judges not to rank on them. Name each view.
 - **Categories** (edit per product): hierarchy, typography, color and contrast, spacing and density, consistency (labels, radius, icons across surfaces), affordance (controls read as controls), iconography, states (status visible in the captures; focus, hover, empty or error only where a named view captures them). Measured contrast is the scripted floor's job, not the judges'. Every category must be judgeable from the views for every letter: the orchestrator checks this at contract time and drops or narrows any category that fails (example: overlay styling when a reference shows no overlays), recording the decision in `contract.md`.
 - **Seat counts a category**: one valid result from that seat with ours in `ranking[0]` of that category. Ties allowed, but a `ranking[0]` that holds every letter never counts.
-- **Category passes** in a round: a majority of the seats admitted that round count it. One seat admitted → that seat decides.
+- **Category passes** in a round: more than half the seats admitted that round count it (1 of 1, 2 of 2, 2 of 3).
 - **Round passes**: every category passes.
-- **Gate**: a round passes with every council seat admitted, then a confirmation round (section 4) passes on the same commit. Council = Opus, Sol, Astra, or Sol + Astra only after the user agreed to continue without Opus.
-- **Strict gate** (user's choice at contract time, recorded): every admitted seat counts every category, ours alone in `ranking[0]` (no ties). Rarely reachable: a live-run seat, rerun on identical captures and brief, moved ours' tier in 2 of 10 categories. The gate is chosen once and never loosened mid-run to get a pass.
+- **Gate**: a round passes with every council seat admitted, then a confirmation round (section 4) passes on the same commit. Both need a valid result from every council seat; an invalid one fails the round unless the user OKs a retry. Council = Opus, Sol, Astra, or Sol + Astra only after the user agreed to continue without Opus.
+- **Strict gate** (user's choice at contract time, recorded): every admitted seat counts every category, ours alone in `ranking[0]` (no ties); replaces Category passes, gate and confirmation unchanged. Rarely reachable: a live-run seat, rerun on identical captures and brief, moved ours' tier in 2 of 10 categories. The gate is chosen once and never loosened mid-run to get a pass.
 - **Scripted floor**, after every edit, no judge call: axe-core clean on each view, WCAG AA contrast on text tokens, zero console errors, views outside the edit pixel-stable. If a gating floor check fails, do not run a judge round.
-- User names a numeric bar ("9/10") → record it in `state.json` only, translate to the gate above. A lower bar may relax the gate (top two tiers, fewer categories) only after the user confirms which.
+- User names a numeric bar ("9/10") → record it in `state.json` only, translate to the default gate above. A lower bar may relax the gate (top two tiers, fewer categories) only after the user confirms which.
 
 Capture rig: headed Chrome on the real GPU via `launchPlacedChrome()` (`scripts/lib/launch-chrome.mjs`), never headless, never minimized, audio muted. Each parallel agent launches its own instance; an MCP browser server is shared by the whole session, one driver at a time. Captures go to the screenshot folder the user's instructions name, else `.tmp/climb-loop/<slug>/captures/`. Reference captures taken once in round 0, reused unchanged. Browser launches and the local server need process and network approval; without a browser, say the judged hill cannot run rather than judging from code.
 
@@ -97,15 +97,15 @@ Template: [references/judge-brief.md](references/judge-brief.md). Per seat per r
 
 Blinding limits → record in `contract.md`: recognizable rival chrome, product names or badges in ours ("Demo"), theme differences. Where ours' fixture allows, hide its name and badges in captures.
 
-Brief version: `state.json` records the version each round used. Any mid-run change to the brief's wording (per-round letter and path fills excluded), the categories or the schema → new version; rerun the baseline for the admitted seats under it (counts toward cap and budget). Never compare tiers, gains or drift across versions.
+Brief version: `state.json` records the version each round used. Any mid-run change to the brief's wording (per-round letter, order and path fills excluded), the categories or the schema → new version; changing categories mid-run needs the user's OK as a contract amendment. Admitted seats rerun the baseline (round-0 captures) under the new version (counts toward cap and budget). Never compare tiers, gains or drift across versions.
 
 Output: [references/rank.schema.json](references/rank.schema.json). Ranking as tiers, best first; reason; up to 3 defects per letter (view, element, problem, measurable fix). Orchestrator maps letter → ours, keeps ours' defects, keeps rival defects only as rationale.
 
 ## 4. Loop
 
 1. **Round 0 (baseline)**: capture all, every council seat judges untouched UI. Record start tiers. Then the **noise check** (one call, counts toward cap and budget): rerun the first seat in admission order on the round-0 captures, new shuffle, same brief version, and record in how many categories ours' tier moved. 2+ moved → state it in the report, claim no gain before a passed confirmation round, and offer the user more repeat calls per seat (a category then counts for a seat when most of its repeats count it).
-2. **Staged admission** (cost): only Sol judges until a round passes with Sol alone; then Opus joins; when a round passes with Sol and Opus, Astra joins. Without Opus: Sol, then Astra. Default order is the source run's (Astra in its third seat); user may reorder. The round right after an admission runs on the same commit with no build, and counts toward cap and budget. A round that passes while a seat is still waiting only admits the next seat; it never meets the gate. A seat that counted a category on a commit and drops it on the same commit is logged as noise; rerun it once only on the user's OK.
-3. **Build**: one writer, isolated worktree per `AGENTS.md`. Commit each build before the next round; judges only ever see a clean tree at a recorded commit. Before fixing, the builder checks each of ours' cited defects against the DOM or computed styles: measured values replace judge estimates; one that does not reproduce is dropped and logged; one caused by fixture, demo data or the capture rig goes on the rig and fixture fix list in `state.json`, never into product code. Fix the confirmed defects ordered by seats citing them, then category where ours ranks lowest. Scripted floor after each edit.
+2. **Staged admission** (cost): only Sol judges until every category is counted by at least one admitted seat; then Opus joins; when that holds again with Sol and Opus, Astra joins. Without Opus: Sol, then Astra. Default order is the source run's (Astra in its third seat); user may reorder. The round right after an admission runs on the same commit with no build, and counts toward cap and budget. Meeting that bar while a seat is still waiting only admits the next seat; it never meets the gate.
+3. **Build**: one writer, isolated worktree per `AGENTS.md`. Commit each build before the next round; judges only ever see a clean tree at a recorded commit. Before fixing, the builder checks each of ours' cited defects against the DOM or computed styles: measured values replace judge estimates; a defect with no DOM or style value (icon metaphor, hierarchy) is checked against ours' capture instead; one that does not reproduce is dropped and logged; one caused by fixture, demo data or the capture rig goes on the rig and fixture fix list in `state.json`, never into product code. Show the list to the user each round; applying an item needs the user's OK, then re-capture baseline and ours under the new rig or fixture as a new brief version. Fix the confirmed defects ordered by seats citing them, then category where ours ranks lowest. Scripted floor after each edit.
 4. **Next round**: new captures of ours, new shuffle, new judge folders, fresh judge processes. Never resume a judge session.
 5. **Confirmation round**: after a round that passes with every council seat admitted, run one more round on the same commit with no build in between: new shuffle, new judge folders, fresh judges. Passes → gate met. Fails → back to step 3.
 6. **Ratchet**: gate met and change is mergeable → open PR per `AGENTS.md` (its review gate applies). Further climbing (stricter gate, more references, more views) goes on a stacked branch in a new worktree; the mergeable PR stays intact.
@@ -116,13 +116,13 @@ If two build rounds in a row bring no tier gain in any category, stop, write one
 
 ## 5. Report
 
-- PR body (normal prose): history table rounds × seat × category, ours' tier, brief version per round; drift row: changes in reference-only order, ours removed (expected none); noise check result (categories moved on the rerun); gate used (default or strict); caveats seats raised.
+- PR body (normal prose): history table rounds × seat × category, ours' tier, brief version per round; drift row: changes in reference-only order, ours removed (expected none); noise check result (categories moved on the rerun); gate used (default or strict); caveats seats raised; rig and fixture fix list.
 - Per shipped change: annotated before/after (arrow + one line) so the user can see subtle diffs.
 - Attribution: seats that ran, observed model/effort per seat (or requested, resolution unverified), rounds where a seat sat out and why (staged, quota, failure), blinding limits, total judge calls.
 
 ## 6. Resume
 
-`state.json` exists for `<slug>` → reload contract, mapping history and last commit. Commit changed since last round → re-capture ours, rerun admitted seats before building more.
+`state.json` exists for `<slug>` → reload contract, mapping history, last commit, brief version, spend, admitted seats, fix list and any pending confirmation round. Brief template or schema changed since → new brief version (section 3). Commit changed since last round → re-capture ours, rerun admitted seats before building more.
 
 ## 7. Scripted climb
 
@@ -142,18 +142,6 @@ User declines the redesign, or it cannot run (no Codex login or image tool) → 
 
 Concept images are builder targets only. Never give one to a judge as a letter: judges would rank render style (mockup vs live capture), not the design.
 
-Self climb changes only these parts. Stop rules, council, judge folder, valid result, contract categories, scripted floor, capture rig, brief and ratchet (section 4 step 6) all hold.
-
-- **No round 0 judging.** Round 1 is the first judge call.
-- **Letters per round**: baseline, champion (best accepted version, commit recorded), 2 challengers, each a separate commit branched from the champion commit, each a distinct direction from ours' defects (round 1: gaps between build and picked concept). Champion = baseline → 3 letters. Judges never learn which letter holds which role.
-- **Beats** (X beats Y for one seat): X sits in a lower tier than Y in no category, and in a strictly higher tier than Y (not tied) in at least half the categories.
-- **Seat accepts** a challenger that beats the champion.
-- **Short-circuit** (replaces staged admission): seats judge one at a time in section 4 step 2 order on the same captures (without Opus: Sol, then Astra). After each seat, keep only challengers every seat so far accepted; none left → round over, remaining seats skip.
-- **Champion change**: only a challenger every seat accepted. Two left → more categories in a strictly higher tier than champion, summed over seats; tie → smaller diff. Losing challengers stay on their commits, unmerged.
-- **Regression**: 2+ seats in one round put baseline in a higher tier than champion in a category → stop and tell the user before another round (the redesign may be worse there). One seat alone = noise, logged.
-- **Gate (plateau)**: two build rounds in a row with no champion change; replaces section 4's no-gain stop. Champion still = baseline → no confirmation round; report no gain, ask the user. Else one confirmation round, champion vs baseline only, fresh shuffle and judges: champion beats baseline for every seat. Fail → report, ask the user.
-- **Taste**: no rival sets the bar → show the user each new champion; their notes become contract amendments (section 4 step 7).
-- **`state.json`** adds role per letter, champion commit, challenger commits, plateau count. Resume (section 6) reruns the seats of the interrupted round.
-- **Report**: only after a passed confirmation round, state that ours beat its own baseline, with no outside bar. Cap, budget, regression stop or failed confirmation → report "not shown better than baseline". Never claim it beats or matches other products. History table: round × seat × challenger, accepted or not, champion commit; each picked concept named.
+Self climb keeps sections 1–6 except where [references/self-climb.md](references/self-climb.md) says otherwise (letters, beats, short-circuit, champion, regression, plateau gate, taste, state, report). Read it before round 1.
 
 Source: Theo, "Agents Sucked At UI (Until Today)", 2026-11-03, https://www.youtube.com/watch?v=xq0eB8vxeqk. Figures above are that one run's, not benchmarks.

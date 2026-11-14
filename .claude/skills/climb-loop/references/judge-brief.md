@@ -22,9 +22,9 @@ Categories:
 - states: the status the images show (selected, active, disabled, loading, warnings, and any focus, hover, empty or error view listed above) is visible and coherent.
 <edit categories to match the contract; each category must be judgeable from these views for every design>
 
-For each category: rank every letter best first as tiers (letters in one tier are tied), give a one-line reason, and list up to 3 defects per letter. Each defect names the view, the element, the problem, and a measurable fix (size, color value, spacing, contrast ratio). Put any limit on judging that category from still images (a state no view shows, a value estimated from pixels, a feature one design lacks) in that category's caveat; use an empty string when there is none.
+For each category: rank every letter best first as tiers (letters in one tier are tied), give a one-line reason, and list up to 3 defects per letter. Each defect names the view, the element, the problem, and a measurable fix (size, color value, spacing, contrast ratio). Use each category name exactly as listed above. Put any limit on judging that category from still images (a state no view shows, a value estimated from pixels, a feature one design lacks) in that category's caveat; use an empty string when there is none.
 
-Judge only what the images show. List an image in unreadable_images only if it is missing or cannot be read, instead of guessing; otherwise leave unreadable_images empty. Never put caveats there.
+Judge only what the images show. List an image in unreadable_images only if it is missing or cannot be read, instead of guessing; otherwise leave unreadable_images empty. Never put caveats there, and never report an image you cannot read only as a caveat.
 <For the Opus seat only, add: "Return only JSON matching this schema, with no text before or after it:" followed by the full contents of rank.schema.json.>
 ```
 
