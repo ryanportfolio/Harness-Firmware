@@ -22,6 +22,7 @@ Neighbors: `wow-loop` = written quality contract, binary checks, own critics, on
 - Never tell a judge the target, gate, round number, prior ranks, builder notes or which letter is ours.
 - Never weaken a check, edit an eval case, or drop a reference to get a pass.
 - If Codex is unavailable, say so and stop the judged hill. Never fill a seat with another Claude subagent and call the council cross-vendor.
+- If the Opus seat fails or stops mid-loop, say so and ask the user before continuing with Sol and Astra only. Report that gate as "Sol + Astra only" and never call it cross-vendor.
 - Reference-product captures stay local in the screenshot folder. Never commit them to the repository.
 
 ## Why rank, not score
@@ -53,19 +54,24 @@ codex exec -C "$JUDGE" --skip-git-repo-check --ephemeral \
   < "$JUDGE/brief.md" > "$JUDGE/run.log" 2>&1
 ```
 
-Opus seat: Agent tool, same brief, image paths inside `$JUDGE` only, returns the same JSON as its final message. The subagent still loads project instructions (`CLAUDE.md`); record that as a blinding limit.
+Opus seat: Agent tool, same brief, image paths inside `$JUDGE` only, returns the same JSON as its final message. Orchestrator writes that returned message to `$RUN/out.json` right away; never rely on the subagent's transcript file (came back empty in a live run). Effort: record the one the Agent call set, else "inherited, unverified".
 
-**Valid result.** Exit 0, then `JSON.parse` succeeds and the object has the schema's keys (Codex enforces the schema; Opus does not, so check it). Then completeness: every contracted category exactly once; in each ranking every expected letter exactly once, no other letters, no empty tier; defect labels only expected letters; `gaps` empty. Top tier = `ranking[0]`. A result that fails any of these is invalid for the round and is never counted as a pass. Other failures: report once, ask before a retry; never swap model or effort silently.
+Blinding limits to record: the Opus subagent loads project instructions (`CLAUDE.md`); Codex judges load the user's `config.toml` and run user hooks.
+
+**Valid result.** Codex seat exit 0; Opus seat's Agent call returned a final message. Same parse for every seat: strip one surrounding code fence, `JSON.parse`, check the schema's keys (Codex enforces the schema; Opus does not, so check it), match category names trimmed and case-insensitive. Then completeness: every contracted category exactly once; in each ranking every expected letter exactly once, no other letters, no empty tier; defect labels only expected letters; `unreadable_images` empty. A non-empty `caveat` never invalidates a result; report caveats with the tiers. Top tier = `ranking[0]`. A result that fails any of these is invalid for the round and is never counted toward a pass. Other failures: report once, ask before a retry; never swap model or effort silently.
 
 ## 2. Contract (once, then frozen)
 
 Write `.tmp/climb-loop/<slug>/contract.md`:
 
 - **References**: 2+ products ours must beat, named by user. If the user named none, offer the section 8 options and wait for a pick before capturing.
-- **Views**: states captured identically for ours and every reference: viewport, theme (light and dark), data fixture, zoom. Name each view.
-- **Categories** (edit per product): hierarchy, typography, color and contrast, spacing and density, consistency (labels, radius, icons across surfaces), affordance (controls read as controls), iconography, states (focus, hover, empty, error).
-- **Seat pass**: one valid result from one seat with ours alone in `ranking[0]` of every category.
-- **Gate**: all three seats pass in the same round, then all three pass again in a confirmation round (section 4) on the same commit.
+- **Views**: viewport and zoom identical for ours and every reference; theme (light and dark) matched where each product offers it. Ours uses one fixed data fixture, and the same route and screen state for a view at every viewport. Record every theme, data or item (symbol, record) difference with the references in `contract.md`; the brief tells judges not to rank on them. Name each view.
+- **Categories** (edit per product): hierarchy, typography, color and contrast, spacing and density, consistency (labels, radius, icons across surfaces), affordance (controls read as controls), iconography, states (status visible in the captures; focus, hover, empty or error only where a named view captures them). Measured contrast is the scripted floor's job, not the judges'. Every category must be judgeable from the views for every letter: the orchestrator checks this at contract time and drops or narrows any category that fails (example: overlay styling when a reference shows no overlays), recording the decision in `contract.md`.
+- **Seat counts a category**: one valid result from that seat with ours in `ranking[0]` of that category. Ties allowed, but a `ranking[0]` that holds every letter never counts.
+- **Category passes** in a round: a majority of the seats admitted that round count it. One seat admitted → that seat decides.
+- **Round passes**: every category passes.
+- **Gate**: a round passes with every council seat admitted, then a confirmation round (section 4) passes on the same commit. Council = Opus, Sol, Astra, or Sol + Astra only after the user agreed to continue without Opus.
+- **Strict gate** (user's choice at contract time, recorded): every admitted seat counts every category, ours alone in `ranking[0]` (no ties). Rarely reachable: in a live run one seat, rerun on identical captures with a reworded brief, moved ours' tier in 4 of 10 categories. The gate is chosen once and never loosened mid-run to get a pass.
 - **Scripted floor**, after every edit, no judge call: axe-core clean on each view, WCAG AA contrast on text tokens, zero console errors, views outside the edit pixel-stable. If a gating floor check fails, do not run a judge round.
 - User names a numeric bar ("9/10") → record it in `state.json` only, translate to the gate above. A lower bar may relax the gate (top two tiers, fewer categories) only after the user confirms which.
 
@@ -73,26 +79,30 @@ Capture rig: headed Chrome on the real GPU via `launchPlacedChrome()` (`scripts/
 
 ## 3. Judge brief
 
-Template: [references/judge-brief.md](references/judge-brief.md). Per seat per round: reshuffle letter mapping; keep mapping in `state.json`, never in the judge folder. Recognizable rival chrome limits blinding → record it.
+Template: [references/judge-brief.md](references/judge-brief.md). Per seat per round: reshuffle letter mapping; keep mapping in `state.json`, never in the judge folder.
+
+Blinding limits → record in `contract.md`: recognizable rival chrome, product names or badges in ours ("Demo"), theme differences. Where ours' fixture allows, hide its name and badges in captures.
+
+Brief version: `state.json` records the version each round used. Any mid-run change to the filled brief, categories or schema → new version; rerun the baseline for the admitted seats under it (counts toward cap and budget). Tiers, gains and drift are never compared across versions.
 
 Output: [references/rank.schema.json](references/rank.schema.json). Ranking as tiers, best first; reason; up to 3 defects per letter (view, element, problem, measurable fix). Orchestrator maps letter → ours, keeps ours' defects, keeps rival defects only as rationale.
 
 ## 4. Loop
 
-1. **Round 0 (baseline)**: capture all, all three seats judge untouched UI. Record start tiers.
-2. **Staged admission** (cost): only Sol judges until Sol passes; then Opus joins; when Opus passes, Astra joins. Default order Sol, Opus, Astra (the source run's order, Astra in its third seat); user may reorder. A pass while a seat is still waiting only admits the next seat; it never meets the gate.
-3. **Build**: one writer, isolated worktree per project rules. Commit each build before the next round; judges only ever see a clean tree at a recorded commit. Fix ours' defects ordered by seats citing them, then category where ours ranks lowest. Scripted floor after each edit.
+1. **Round 0 (baseline)**: capture all, every council seat judges untouched UI. Record start tiers. Then the **noise check** (one call, counts toward cap and budget): rerun the first seat in admission order on the round-0 captures, new shuffle, same brief version, and record in how many categories ours' tier moved. 2+ moved → state it in the report, claim no gain before a passed confirmation round, and offer the user more repeat calls per seat (a category then counts for a seat when most of its repeats count it).
+2. **Staged admission** (cost): only Sol judges until a round passes with Sol alone; then Opus joins; when a round passes with Sol and Opus, Astra joins. Without Opus: Sol, then Astra. Default order Sol, Opus, Astra (the source run's order, Astra in its third seat); user may reorder. The round right after an admission runs on the same commit with no build, and counts toward cap and budget. A round that passes while a seat is still waiting only admits the next seat; it never meets the gate. A seat that counted a category on a commit and drops it on the same commit is logged as noise; rerun it once only on the user's OK.
+3. **Build**: one writer, isolated worktree per project rules. Commit each build before the next round; judges only ever see a clean tree at a recorded commit. Before fixing, the builder checks each of ours' cited defects against the DOM or computed styles: measured values replace judge estimates; one that does not reproduce is dropped and logged; one caused by fixture, demo data or the capture rig goes on the rig and fixture fix list in `state.json`, never into product code. Fix the confirmed defects ordered by seats citing them, then category where ours ranks lowest. Scripted floor after each edit.
 4. **Next round**: new captures of ours, new shuffle, new judge folders, fresh judge contexts. Never reuse a judge thread.
-5. **Confirmation round**: after a round where all three seats pass, run one more round on the same commit with no build in between: new shuffle, new judge folders, fresh judges. All pass → gate met. Any seat fails → back to step 3.
+5. **Confirmation round**: after a round that passes with every council seat admitted, run one more round on the same commit with no build in between: new shuffle, new judge folders, fresh judges. Passes → gate met. Fails → back to step 3.
 6. **Ratchet**: gate met and change is mergeable → open PR per project rules (its review gate applies). Further climbing (stricter gate, more references, more views) goes on a stacked branch in a new worktree; the mergeable PR stays intact.
 7. **User taste** ("too grayscale"): append a named, versioned contract amendment; builder gets it, judges never see it as a goal.
-8. Save `state.json` (round, seats admitted, mapping, tiers, commit, spend) after every round.
+8. Save `state.json` (round, seats admitted, mapping, tiers, caveats, brief version, commit, spend, rig and fixture fix list) after every round.
 
 If two build rounds in a row bring no tier gain in any category, stop, write one sentence on the assumption both rounds shared, and test it before another round. Confirmation rounds do not count toward this.
 
 ## 5. Report
 
-- PR body (normal prose): history table rounds × seat × category, ours' tier; drift row: changes in reference-only order, ours removed (expected none).
+- PR body (normal prose): history table rounds × seat × category, ours' tier, brief version per round; drift row: changes in reference-only order, ours removed (expected none); noise check result (categories moved on the rerun); gate used (default or strict); caveats seats raised.
 - Per shipped change: annotated before/after (arrow + one line) so the user can see subtle diffs.
 - Attribution: seats that ran, observed model/effort per seat, rounds where a seat sat out and why (staged, quota, failure), blinding limits, total judge calls.
 
@@ -102,15 +112,7 @@ If two build rounds in a row bring no tier gain in any category, stop, write one
 
 ## 7. Scripted climb
 
-Fuzzy problem → eval → climb. Fits skill descriptions, kernel size, MCP or tool text, prompt behavior.
-
-1. Mine own history for cases where agents did the wrong thing (session transcripts, review findings, `pitfalls.md`). Categorize.
-2. Each case → eval with a programmatic pass condition. Run current state on every target model; record baseline (source run: about 60 of 88).
-3. Climb to perfect on every target model. Commit; freeze cases.
-4. Flip objective: cut cost (source run: tool descriptions to a third of their size) while staying perfect. Mid-climb regressions are expected (66 → 63 of 85); recover by changing the subject, never the cases.
-5. Commit the eval with the change → later edits stay testable. Source run result: 52% fewer tokens, 78% with tool search on.
-
-No council needed here; the project's normal PR review still applies.
+Fuzzy problem → eval → climb (skill descriptions, kernel size, MCP or tool text, prompt behavior). Steps: [references/scripted-climb.md](references/scripted-climb.md). No council; the project's normal PR review still applies.
 
 ## 8. No reference
 
