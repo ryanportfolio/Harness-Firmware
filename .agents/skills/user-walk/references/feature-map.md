@@ -1,10 +1,10 @@
 # Feature map
 
-Same entry format and citation rules as `product-walkthrough`'s `references/inventory.md`, so one inventory serves a tour and a walk. Tour-only fields (Non-obvious, Demo idea) dropped; walk fields (Goal, Start, Known path, Known steps) added. Rules repeated here so this skill works without the other installed.
+Same entry format and citation rules as `product-walkthrough`'s `references/inventory.md`. Tour-only fields (Non-obvious, Demo idea) dropped; walk fields (Goal, Start, Known path, Known steps) added. A tour can start from this map once those two fields are added back. Rules repeated here so this skill works without the other installed.
 
 ## File
 
-`map.md` in run folder. Header: date, commit read (`git rev-parse --short origin/<default>` after fetch), URL to walk, account or seeded data used. Then one entry per feature:
+`map.md` in run folder. Header: date, commit read (the one the target serves, preconditions 1; say so when it is not `origin/<default>`), URL to walk, account or seeded data used. Then one entry per feature:
 
 ```markdown
 #### 4. Keep a copy of your audit
@@ -37,4 +37,4 @@ Same entry format and citation rules as `product-walkthrough`'s `references/inve
 
 Committed shared vocabulary, so sessions and owner call features by same names. Table columns: Feature, What it does, Where (route or screen). Never step counts, walk results or `file:line`: they change with every UI edit and live in run output.
 
-Each run: diff map against it. Add new features, fix renamed or moved ones, remove gone ones; keep owner's wording where still true. Edit only rows the map changed. List changed rows in report. This edit is part of a user-walk request; commit follows repo git rules.
+File missing (repos that took this skill through `sync-starter`) → create it with the template's header and table. Each run: diff map against it. Replace the "none yet" placeholder row on the first run. Add new features, fix renamed or moved ones, remove gone ones; keep owner's wording where still true. Edit only rows the map changed. List changed rows in report. This edit is part of a user-walk request; commit follows repo git rules.

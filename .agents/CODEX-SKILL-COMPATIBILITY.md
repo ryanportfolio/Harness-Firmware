@@ -34,7 +34,7 @@ for comparison, backup, reconciliation, and discovery checks.
 
 `conversion-ux` audits need a way to render the screen at phone and desktop widths and capture it; without one, audit from supplied screenshots or code and list what could not be seen, never claim a visual verdict.
 
-`user-walk` needs exposed agent tools for its walkers, because a walker must start with no knowledge of the code and the main session has read it; without them it says so and stops, and it never walks a goal in the main thread. Walkers drive headed Chrome through the skill's own driver, which needs Node with `playwright-core` installable and process and network approval for the browser and the local driver port.
+`user-walk` needs exposed agent tools for its walkers, because a walker must start with no knowledge of the code and the main session has read it; without them it says so and stops, and it never walks a goal in the main thread. Its `check-walker` command reads a walker's rollout to prove the walker used only the driver. Walkers drive headed Chrome through the skill's own driver, which needs Node with `playwright-core` installable and process and network approval for the browser and the local driver port.
 
 `ui-quality` audits need headed Chrome and Node with `axe-core` and `playwright-core` installable for the probe; without them, audit from code and supplied screenshots, label each finding as not measured, and list what could not be checked.
 

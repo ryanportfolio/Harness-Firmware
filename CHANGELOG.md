@@ -20,13 +20,20 @@ condensed.
   the map gets only a goal in the user's words ("save the results as a
   document you can keep") and tries it in headed Chrome through the skill's
   driver, `scripts/walk.mjs`. The driver logs every action, refuses controls
-  on a skip list (deletes, payments, sending), blocks navigation and writes to
-  other sites, and caps the actions per goal. The report ranks features by
+  whose text or label is on a skip list (deletes, payments, sending,
+  sharing), accepts navigation keys only, undoes any step that lands on
+  another site, blocks writes to other sites, redacts secret fields, requires
+  a control to be on screen before it is used, and caps the actions per goal.
+  Its `check-walker` command reads a walker's transcript to prove it used only
+  the driver. The skill runs only on the owner's own apps. The report ranks features by
   wasted steps (backtracks, dead ends, extra screens), not raw clicks, and
   names the skill to run next for each finding: `climb-loop` for the look,
   `ui-quality` for accessibility and states, `conversion-ux` for sign-up and
   checkout. Feature names and locations go in a new committed
-  `.claude/reference/features.md`, empty in the template. Idea from Lauren
+  `.claude/reference/features.md`, empty in the template, listed in the
+  kernel's reference table and checked by `doctor`; `AGENTS.md` lets a
+  `$user-walk` run refresh it. `ui-quality`, `product-walkthrough` and
+  `conversion-ux` descriptions now route friction requests here. Idea from Lauren
   Tan's talk "All Code Is Slop (Except Mine)" (AI Engineer).
 
 - `untangle` for Claude and Codex. It surveys a codebase for structure that
