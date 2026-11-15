@@ -484,7 +484,9 @@ const NAMES = (node) => {
     if (!el || el.nodeType !== 1) return;
     add(el.getAttribute('aria-label'));
     add(el.getAttribute('title'));
-    for (const id of (el.getAttribute('aria-labelledby') || '').split(/\s+/)) add(id && document.getElementById(id)?.textContent);
+    // labels resolve in the control's own document or shadow root, not the top page
+    const root = el.getRootNode?.() ?? el.ownerDocument;
+    for (const id of (el.getAttribute('aria-labelledby') || '').split(/\s+/)) add(id && (root.getElementById?.(id) ?? el.ownerDocument.getElementById(id))?.textContent);
     add(el.innerText ?? el.textContent);
     // what someone typed into a secret field is never collected: it would land in a refusal reason
     const secretField = el.type === 'password' || /pass|secret|token|otp|one-time|key|pin|ssn|iban|cc-|card|cvc|cvv/i.test(`${el.name || ''} ${el.id || ''} ${el.autocomplete || ''}`);
@@ -563,6 +565,33 @@ const VISIBLE = (el) => {
   return box.bottom - box.top > 1 && box.right - box.left > 1;
 };
 
+// blank (on) or restore (off) every secret field's value, in shadow roots and same-origin frames too
+const MASK = (on) => {
+  const stash = (window.__userWalkMask ??= new Map());
+  if (!on) {
+    for (const [el, v] of stash) el.value = v;
+    stash.clear();
+    return 0;
+  }
+  const scan = (root) => {
+    for (const el of root.querySelectorAll('input, textarea')) {
+      const hint = `${el.name || ''} ${el.id || ''} ${el.autocomplete || ''} ${el.getAttribute('aria-label') || ''}`;
+      if (el.value && (el.type === 'password' || /pass|secret|token|otp|one-time|key|pin|ssn|iban|cc-|card|cvc|cvv/i.test(hint))) {
+        stash.set(el, el.value);
+        el.value = '';
+      }
+    }
+    for (const host of root.querySelectorAll('*')) if (host.shadowRoot) scan(host.shadowRoot);
+    for (const f of root.querySelectorAll('iframe')) {
+      try {
+        if (f.contentDocument) scan(f.contentDocument);
+      } catch { /* other-origin frame */ }
+    }
+  };
+  scan(document);
+  return stash.size;
+};
+
 // the area a wheel should turn: the page when it scrolls, else the largest scroll box in view
 const SCROLLER = () => {
   const se = document.scrollingElement || document.documentElement;
@@ -626,12 +655,37 @@ async function serve(dir) {
       viewport: { width: o.width, height: o.height },
       ...(o.storageState ? { storageState: o.storageState } : {}),
     });
-    await context.route('**/*', (route, req) => {
+    await context.route('**/*', async (route, req) => {
       let u;
       try {
         u = new URL(req.url());
       } catch {
         return route.continue();
+      }
+      const write = !['GET', 'HEAD', 'OPTIONS'].includes(req.method());
+      if (/^https?:$/.test(u.protocol) && allowed.has(u.origin) && write) {
+        // Playwright does not route redirect hops, and a 307/308 resends the body: fetch the write here
+        // without following redirects, and stop one that points outside the app
+        let resp;
+        try {
+          resp = await route.fetch({ maxRedirects: 0 });
+        } catch (err) {
+          events.push(`a request to the app failed: ${err.message.split('\n')[0]}`);
+          return route.abort('failed');
+        }
+        const loc = resp.headers().location;
+        if ([307, 308].includes(resp.status()) && loc) {
+          let to;
+          try {
+            to = new URL(loc, req.url());
+          } catch { /* unreadable target: let the browser handle it */ }
+          if (to && /^https?:$/.test(to.protocol) && !allowed.has(to.origin)) {
+            blocked(req.method(), to.href, 'write redirected to another origin');
+            events.push(`blocked: a form or request was redirected, with its data, to ${to.origin}`);
+            return route.abort('blockedbyclient');
+          }
+        }
+        return route.fulfill({ response: resp });
       }
       if (!/^https?:$/.test(u.protocol) || allowed.has(u.origin)) return route.continue();
       // while the start page loads, a script or meta-refresh redirect is the app's own (www to apex, app to sign-in)
@@ -640,7 +694,6 @@ async function serve(dir) {
       try {
         topNav = topNav && req.frame() === req.frame().page().mainFrame();
       } catch { /* a popup's first request has no frame yet: still a top-level navigation */ }
-      const write = !['GET', 'HEAD', 'OPTIONS'].includes(req.method());
       if (!topNav && !write) return route.continue();
       blocked(req.method(), req.url(), topNav ? 'left the app' : 'write to another origin');
       if (topNav) events.push(`blocked: the page tried to leave the app for ${u.origin}`);
@@ -746,26 +799,16 @@ async function serve(dir) {
   }
 
   async function look() {
-    let snap = await page.locator('body').ariaSnapshot({ mode: 'ai', timeout: 10000 });
-    // the snapshot prints field values; what was typed into a secret field must not reach the transcript
-    const secrets = await page.evaluate(() => {
-      const out = [];
-      const scan = (doc) => {
-        for (const el of doc.querySelectorAll('input, textarea')) {
-          const hint = `${el.name || ''} ${el.id || ''} ${el.autocomplete || ''} ${el.getAttribute('aria-label') || ''}`;
-          if (el.value && (el.type === 'password' || /pass|secret|token|otp|one-time|key|pin|ssn|iban|cc-|card|cvc|cvv/i.test(hint))) out.push(el.value);
-        }
-        for (const host of doc.querySelectorAll('*')) if (host.shadowRoot) scan(host.shadowRoot);
-        for (const f of doc.querySelectorAll('iframe')) {
-          try {
-            if (f.contentDocument) scan(f.contentDocument);
-          } catch { /* other-origin frame */ }
-        }
-      };
-      scan(document);
-      return out;
-    }).catch(() => []);
-    for (const s of secrets.sort((a, b) => b.length - a.length)) snap = snap.split(s).join('[redacted]');
+    // the snapshot prints field values, escaped (multi-line keys, quotes), so a text replace afterwards can
+    // miss them: blank secret fields in the page while the snapshot is taken, then put the values back.
+    // Setting .value fires no input event, so the app's own state is untouched.
+    const hidden = await page.evaluate(MASK, true).catch(() => 0);
+    let snap;
+    try {
+      snap = await page.locator('body').ariaSnapshot({ mode: 'ai', timeout: 10000 });
+    } finally {
+      await page.evaluate(MASK, false).catch(() => {});
+    }
     // link targets in the snapshot (/url: ...) can carry tokens: verification links, magic sign-in links
     snap = snap.replace(/^(\s*- \/url: )(.+)$/gm, (_, lead, url) => lead + cleanUrl(url.replace(/^"(.*)"$/, '$1')));
     refs = new Map();
@@ -788,6 +831,7 @@ async function serve(dir) {
       `Title: ${await page.title().catch(() => '')}`,
       `Screenshot of what is on screen now: ${file}`,
       `Scrolled ${pos.top ?? '?'} px of ${pos.height ?? '?'} px (${pos.page === false ? 'the main scroll area' : 'the page'}, ${pos.view ?? '?'} px in view)`,
+      ...(hidden ? [`${hidden} filled password or secret field${hidden > 1 ? 's are' : ' is'} shown empty here; the value is still in the page`] : []),
       '',
       body,
     ].join('\n');
