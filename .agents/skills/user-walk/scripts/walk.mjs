@@ -25,11 +25,15 @@
      node walk.mjs <dir|run dir> summary       per-goal counts from steps.jsonl (no browser needed)
 
    Guards, enforced here and not left to the walker's judgment:
-   - clicks and Enter on controls whose name matches the skip list are refused and logged
+   - clicks, Enter and Space on controls whose name matches the skip list are refused and logged
      (the default list covers deletes, payments and sending; --skip adds to it, never replaces it);
    - top-level navigation to another origin is aborted ("left the app"), popups to other
      origins are closed, and non-GET requests to other origins are aborted unless --origin
      allows that origin (the app's own API on another host, for example);
+   - a control must be on screen before click, hover, fill or select (refs cover the whole page,
+     a person has to scroll first), so walker and known-path replay count the same scrolls;
+   - values typed into password, one-time-code and card fields are logged as [redacted];
+   - downloads are saved to <dir>/downloads and reported only once finished or failed;
    - after --max-actions actions every command except note, end and stop is refused;
    - the server exits after 20 idle minutes so no browser is left behind.
 
@@ -164,7 +168,9 @@ function readSteps(dir) {
 function summarize(dir) {
   const o = existsSync(join(dir, 'options.json')) ? JSON.parse(readFileSync(join(dir, 'options.json'), 'utf8')) : {};
   const steps = readSteps(dir);
-  const acts = steps.filter((s) => ACTIONS.has(s.action) && !s.error && !s.blocked && !s.refused);
+  // every attempt the budget charged counts toward actions and waste: a failed click is still a step the user took
+  const attempts = steps.filter((s) => ACTIONS.has(s.action) && !s.refused);
+  const acts = attempts.filter((s) => !s.error && !s.blocked);
   let backtracks = 0;
   let deadEnds = 0;
   const screens = new Set([steps[0]?.screenBefore].filter(Boolean));
@@ -186,7 +192,7 @@ function summarize(dir) {
   const end = steps.findLast((s) => s.action === 'end');
   const first = steps[0]?.t;
   const last = steps.at(-1)?.t;
-  const n = acts.length;
+  const n = attempts.length;
   return {
     goal: o.goal || basename(dir),
     outcome: end ? end.arg : 'not ended',
@@ -292,6 +298,7 @@ async function serve(dir) {
   });
 
   const events = [];
+  const downloads = new Set();
   await context.route('**/*', (route, req) => {
     let u;
     try {
@@ -317,7 +324,16 @@ async function serve(dir) {
       events.push(`browser ${d.type()} dialog: "${d.message()}" (${d.type() === 'alert' ? 'accepted' : 'dismissed'})`);
       await (d.type() === 'alert' ? d.accept() : d.dismiss()).catch(() => {});
     });
-    p.on('download', (d) => events.push(`a file downloaded: ${d.suggestedFilename()}`));
+    p.on('download', (d) => {
+      // keep the file and wait for it to finish: a started download is not a saved one
+      const file = join(dir, 'downloads', d.suggestedFilename());
+      const done = d.saveAs(file)
+        .then(() => d.failure())
+        .then((fail) => events.push(fail ? `a download failed: ${d.suggestedFilename()} (${fail})` : `a file downloaded and saved: ${d.suggestedFilename()} (${file})`))
+        .catch((err) => events.push(`a download failed: ${d.suggestedFilename()} (${err.message.split('\n')[0]})`));
+      downloads.add(done);
+      done.finally(() => downloads.delete(done));
+    });
   };
   // copy buttons are features too; let them reach the clipboard instead of failing silently
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(o.url).origin }).catch(() => {});
@@ -350,16 +366,19 @@ async function serve(dir) {
   const settle = async () => {
     await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
     await page.waitForTimeout(700);
+    if (downloads.size) {
+      await Promise.race([Promise.allSettled([...downloads]), new Promise((r) => setTimeout(r, 20000))]);
+    }
   };
   const nameOf = (ref) => refs.get(ref) ?? '';
 
-  async function enterTargets() {
-    // what pressing Enter would trigger: the focused control and its form's submit buttons
-    return page.evaluate(() => {
+  async function keyTargets(withForm) {
+    // what an activation key would trigger: the focused control, plus its form's submit buttons for Enter
+    return page.evaluate((withForm) => {
       const el = document.activeElement;
-      if (!el) return [];
+      if (!el || el === document.body) return [];
       const names = [el.getAttribute('aria-label') || el.textContent || el.value || ''];
-      const form = el.form || el.closest?.('form');
+      const form = withForm && (el.form || el.closest?.('form'));
       if (form) {
         for (const b of form.querySelectorAll('button, input[type=submit]')) {
           if ((b.type || 'submit') === 'submit') names.push(b.getAttribute('aria-label') || b.textContent || b.value || '');
@@ -367,7 +386,27 @@ async function serve(dir) {
         names.push(form.getAttribute('action') || '');
       }
       return names.map((s) => s.trim()).filter(Boolean);
-    }).catch(() => []);
+    }, withForm).catch(() => []);
+  }
+
+  async function sensitive(loc) {
+    // passwords, one-time codes and card fields never reach the step log
+    return loc.evaluate((node) => {
+      // fill on a label or wrapper lands in the control inside it; judge that control
+      const el = node.control
+        || (node.matches('input, textarea, select, [contenteditable]') ? node : node.querySelector('input, textarea, [contenteditable]'))
+        || node;
+      const hint = `${el.type || ''} ${el.name || ''} ${el.id || ''} ${el.autocomplete || ''} ${el.getAttribute('aria-label') || ''} ${node.textContent || ''}`;
+      return el.type === 'password' || /pass|secret|token|otp|one-time|cc-|card|cvc|cvv/i.test(hint);
+    }).catch(() => true);
+  }
+
+  async function onScreen(loc) {
+    // a person cannot click what is not in view; refs cover the whole page, so check before acting
+    return loc.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth;
+    }).catch(() => true);
   }
 
   async function look() {
@@ -448,11 +487,20 @@ async function serve(dir) {
     if (needsRef && !refs.has(args[0] || '')) return { ok: false, text: `no ref ${args[0] || '(none)'} in the last look; run look and use a ref from it` };
     const before = page.url();
     const name = needsRef ? nameOf(args[0]) : '';
-    const base = { action: command, ref: args[0], name, arg: command === 'fill' || command === 'select' ? args.slice(1).join(' ') : args[0], screenBefore: screenOf(before) };
+    const loc = needsRef ? page.locator(`aria-ref=${args[0]}`) : null;
+    if (loc && !(await onScreen(loc))) {
+      return { ok: false, text: `${name || args[0]} is not on screen; scroll to it first (refs list the whole page, as a screen reader would)` };
+    }
+    let arg = command === 'fill' || command === 'select' ? args.slice(1).join(' ') : args[0];
+    if (command === 'fill' && (await sensitive(loc))) arg = '[redacted]';
+    const base = { action: command, ref: args[0], name, arg, screenBefore: screenOf(before) };
 
     let targets = [];
     if (command === 'click') targets = [name];
-    if (command === 'press' && args[0] === 'Enter') targets = await enterTargets();
+    // Enter and Space activate the focused control, with or without modifiers (Shift+Enter, Control+Space)
+    const key = command === 'press' ? String(args[0] || '').split('+').pop() : '';
+    if (/^(Enter|NumpadEnter)$/.test(key)) targets = await keyTargets(true);
+    else if (key === 'Space' || key === ' ' || args[0] === ' ') targets = await keyTargets(false);
     const hit = targets.find((t) => skip.test(t));
     if (hit) {
       record({ ...base, refused: `on the skip list (${hit})` });

@@ -34,7 +34,7 @@ node .claude/skills/user-walk/scripts/walk.mjs .tmp/user-walk/<run>/known-4 star
 
 then `look` + one action per step, `end found`, `stop`. Two checks on the last screen, both from the screenshot and page text:
 
-- scroll until the control or answer is on screen, counting each `scroll` (walkers scroll like users; trial: a 1-click path really took 1 click + 5 scrolls);
+- scroll until the control or answer is on screen, counting each `scroll` (driver refuses off-screen controls for walker and replay alike; trial: a 1-click path really took 1 click + 5 scrolls);
 - read it: does it complete the goal? A page whose heading matches is not enough (trial: "What happens to your data?" never said whether submitted URLs are kept). No answer anywhere → Known steps `none`, a content finding; still walk it, to see where users look.
 
 Result:

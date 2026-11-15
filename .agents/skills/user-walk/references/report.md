@@ -4,7 +4,7 @@ Run `node <walk.mjs> <run> summary` → `summary.json` (one row per goal folder)
 
 ## What counts
 
-- **Wasted steps** = walker actions − known steps (floor 0), broken into backtracks (`back`, `home`, return to a screen seen earlier), dead ends (screen entered then left by going back with nothing done there), extra screens (visited, not on known path's screens). Count these, not raw clicks.
+- **Wasted steps** = walker actions (every attempt the budget charged, failed ones included) − known steps (floor 0), broken into backtracks (`back`, `home`, return to a screen seen earlier), dead ends (screen entered then left by going back with nothing done there), extra screens (visited, not on known path's screens). Count these, not raw clicks.
 - Shorter path than known that skipped a needed confirmation, undo or review step → finding, not a win. Destructive or costly step with no confirmation or undo (from map) → finding.
 - Hesitations and misread labels from walker notes + reply, even with 0 wasted steps.
 - `found` checked against map's end state. Wrong end state → outcome `wrong end`.
@@ -49,7 +49,7 @@ Commit <sha> · <URL> · <test account / signed out> · <n> walkers (fresh agent
 
 ## Not walked and limits
 <skip-list paths, role-gated features, missing data, driver or walker failures>
-Walkers read the whole page's text at once, as a screen reader would; a sighted visitor scans and scrolls. Friction below the fold and from visual prominence is under-counted. Viewport <w × h>; no touch emulation.
+Walkers read the whole page's text at once, as a screen reader would; a sighted visitor scans and scrolls. The driver makes them scroll before acting on a control, but they can read text below the fold without scrolling, so friction from finding an answer lower on the page and from visual prominence is under-counted. Viewport <w × h>; no touch emulation.
 
 ## Feature names changed
 <rows added, renamed or removed in .claude/reference/features.md>

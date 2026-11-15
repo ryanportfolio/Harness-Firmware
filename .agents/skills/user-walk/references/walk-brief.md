@@ -28,7 +28,7 @@ Commands:
   end gave-up <sentence>    you would quit here as a real visitor; say where you looked
 
 Rules:
-- Use only that command. Do not read, open or search any file except screenshot paths that look gives you. Do not type URLs, use a search engine, or run any other command. Refs change after every look; use refs from the latest look.
+- Use only that command. Do not read, open or search any file except screenshot paths that look gives you. Do not type URLs, use a search engine, or run any other command. Refs change after every look; use refs from the latest look. A control must be on screen before you can use it; scroll to it.
 - When a field needs input the goal does not give, use an obvious test value (example.com, "test").
 - Act like a real first-time visitor: look, then do what such a person would try next. Read the screenshot when you need to know what is visible or prominent on screen.
 - Some controls are refused (deleting, paying, sending messages, leaving the site). Never try to get around a refusal. If the refused control was the goal, end found and say so.
@@ -40,6 +40,6 @@ Reply with: outcome (found or gave up), your path in plain words, each hesitatio
 
 ## After walker returns
 
-- Main session: `stop` that driver, then check `found` against map's end state (screenshot + last `steps.jsonl` rows). Walker thinks done but isn't → outcome `wrong end`, a finding.
+- Main session: `stop` that driver, then check `found` against map's end state (screenshot, last `steps.jsonl` rows, saved file in `downloads/` for save goals). Walker thinks done but isn't → outcome `wrong end`, a finding.
 - Walker's reply shows it broke a rule (read files, searched the web, guessed URLs) → discard walk, rerun with fresh walker, note it in report. Separation rests on brief: agent tools cannot remove a walker's file tools.
 - Progress line to user.

@@ -28,7 +28,7 @@ Finds where first-time user wastes steps reaching each feature. Main session map
 
 ## Driver
 
-`.agents/skills/user-walk/scripts/walk.mjs`. Header comment = full command list. Main session: `start` (sets goal, `--known`, `--max-actions`, `--skip`, `--origin`, `--storage-state`, `--shots`), `save-state`, `stop`, `summary`. Walker: `look`, `click`, `fill`, `select`, `hover`, `press`, `scroll`, `back`, `home`, `note`, `end`. Every walker action → `steps.jsonl`; counts come from log, not walker's account. Driver refuses skip-list controls, aborts navigation and writes to other origins, enforces action budget, exits after 20 idle min.
+`.agents/skills/user-walk/scripts/walk.mjs`. Header comment = full command list. Main session: `start` (sets goal, `--known`, `--max-actions`, `--skip`, `--origin`, `--storage-state`, `--shots`), `save-state`, `stop`, `summary`. Walker: `look`, `click`, `fill`, `select`, `hover`, `press`, `scroll`, `back`, `home`, `note`, `end`. Every walker action → `steps.jsonl`; counts come from log, not walker's account. Driver refuses skip-list controls (click, Enter, Space), refuses off-screen targets until scrolled to, redacts password and card fields in the log, saves downloads to `<dir>/downloads`, aborts navigation and writes to other origins, enforces action budget, exits after 20 idle min.
 
 ## Hand-offs
 
