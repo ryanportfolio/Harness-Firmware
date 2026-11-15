@@ -161,7 +161,21 @@ function checkWalker(dir, transcript) {
     if (!m) return false;
     const [, d1, d2, g1, g2, sub, rest] = m;
     if (!isDriver(d1 ?? d2) || norm(g1 ?? g2) !== goalDir || !WALKER.has(sub)) return false;
-    return !/[;&|`$<>\r\n]|--from-file/.test(rest);
+    return plainArgs(rest) && !/(^|\s)--from-file(\s|$)/.test(rest);
+  };
+  // shell operators count only outside quotes; inside double quotes bash still expands $ and `
+  const plainArgs = (s) => {
+    let q = '';
+    for (const ch of s) {
+      if (q === "'") {
+        if (ch === "'") q = '';
+      } else if (q === '"') {
+        if (ch === '"') q = '';
+        else if (ch === '$' || ch === '`' || ch === '\\') return false;
+      } else if (ch === "'" || ch === '"') q = ch;
+      else if (/[;&|`$<>()\\\r\n]/.test(ch)) return false;
+    }
+    return q === '';
   };
   const okRead = (v) => {
     const n = norm(v);
@@ -193,11 +207,13 @@ const blank = (params, value) => {
 // URL as logged: secret-looking parameters blanked, in the query and in the hash (OAuth puts tokens there)
 function cleanUrl(url) {
   try {
-    const u = new URL(url);
+    // relative links (/verify?token=...) are cleaned against a dummy base and returned relative
+    const absolute = /^[a-z][a-z0-9+.-]*:/i.test(url);
+    const u = new URL(url, 'http://relative.invalid');
     blank(u.searchParams, '[redacted]');
     const { route, params } = hashParts(u.hash);
     if (params) u.hash = `${route}${route ? '?' : ''}${blank(params, '[redacted]')}`;
-    return u.href;
+    return absolute ? u.href : url.startsWith('/') ? u.pathname + u.search + u.hash : u.href.replace('http://relative.invalid/', '');
   } catch {
     return url;
   }
@@ -488,13 +504,17 @@ const NAMES = (node) => {
 const KEY_NAMES = (names, withEnter) => {
   let el = document.activeElement;
   let doc = document;
-  while (el && el.tagName === 'IFRAME') {
-    try {
-      doc = el.contentDocument;
-      el = doc.activeElement;
-    } catch {
-      break;
-    }
+  // focus can sit inside a same-origin frame or a shadow root; the outer activeElement is then only the host
+  for (;;) {
+    if (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement;
+    else if (el?.tagName === 'IFRAME') {
+      try {
+        doc = el.contentDocument;
+        el = doc.activeElement;
+      } catch {
+        break;
+      }
+    } else break;
   }
   if (!el || el === doc.body) return [];
   const out = names(el);
@@ -535,7 +555,8 @@ const VISIBLE = (el) => {
     box = { top: Math.max(box.top, c.top), left: Math.max(box.left, c.left), bottom: Math.min(box.bottom, c.bottom), right: Math.min(box.right, c.right) };
   };
   cut({ top: 0, left: 0, bottom: innerHeight, right: innerWidth });
-  for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+  const up = (n) => n.parentElement || n.getRootNode?.().host || null; // cross shadow-root boundaries
+  for (let p = up(el); p && p !== document.documentElement; p = up(p)) {
     const s = getComputedStyle(p);
     if (/(auto|scroll|hidden|clip)/.test(s.overflow + s.overflowX + s.overflowY)) cut(p.getBoundingClientRect());
   }
@@ -598,6 +619,7 @@ async function serve(dir) {
   let context;
   let page;
   let note = '';
+  let starting = true;
   const downloads = new Set();
   try {
     context = await browser.newContext({
@@ -612,6 +634,8 @@ async function serve(dir) {
         return route.continue();
       }
       if (!/^https?:$/.test(u.protocol) || allowed.has(u.origin)) return route.continue();
+      // while the start page loads, a script or meta-refresh redirect is the app's own (www to apex, app to sign-in)
+      if (starting && req.isNavigationRequest()) return route.continue();
       let topNav = req.isNavigationRequest();
       try {
         topNav = topNav && req.frame() === req.frame().page().mainFrame();
@@ -655,6 +679,8 @@ async function serve(dir) {
 
     await page.goto(o.url, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch((err) => events.push(`start page error: ${err.message.split('\n')[0]}`));
     await page.waitForTimeout(800);
+    await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
+    starting = false;
     // a start URL that redirects (www to apex, app to its sign-in host) makes the landing origin part of the app
     if (isHttp(page.url()) && !inApp(page.url())) {
       const landed = new URL(page.url()).origin;
@@ -729,6 +755,7 @@ async function serve(dir) {
           const hint = `${el.name || ''} ${el.id || ''} ${el.autocomplete || ''} ${el.getAttribute('aria-label') || ''}`;
           if (el.value && (el.type === 'password' || /pass|secret|token|otp|one-time|key|pin|ssn|iban|cc-|card|cvc|cvv/i.test(hint))) out.push(el.value);
         }
+        for (const host of doc.querySelectorAll('*')) if (host.shadowRoot) scan(host.shadowRoot);
         for (const f of doc.querySelectorAll('iframe')) {
           try {
             if (f.contentDocument) scan(f.contentDocument);
@@ -739,6 +766,8 @@ async function serve(dir) {
       return out;
     }).catch(() => []);
     for (const s of secrets.sort((a, b) => b.length - a.length)) snap = snap.split(s).join('[redacted]');
+    // link targets in the snapshot (/url: ...) can carry tokens: verification links, magic sign-in links
+    snap = snap.replace(/^(\s*- \/url: )(.+)$/gm, (_, lead, url) => lead + cleanUrl(url.replace(/^"(.*)"$/, '$1')));
     refs = new Map();
     for (const line of snap.split('\n')) {
       const m = line.match(/^\s*- (.*?)\s*\[ref=([a-z0-9]+)\]/);
