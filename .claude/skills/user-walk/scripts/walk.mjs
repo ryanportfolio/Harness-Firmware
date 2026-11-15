@@ -152,16 +152,18 @@ function checkWalker(dir, transcript) {
   }
   // the brief asks for exactly: node "<this driver>" "<this goal folder>" <walker command> [args], one per call
   const WALKER = new Set(['look', 'click', 'fill', 'select', 'hover', 'press', 'scroll', 'back', 'home', 'note', 'end']);
-  const isDriver = (p) => {
-    const n = norm(p);
-    return n.startsWith(`${repo}/`) && /\/skills\/user-walk\/scripts\/walk\.mjs$/.test(n);
-  };
+  // exactly this repo's driver (either runtime's copy); no prefix match, so "../" cannot point elsewhere
+  const drivers = new Set([norm(HERE), `${repo}/.claude/skills/user-walk/scripts/walk.mjs`, `${repo}/.agents/skills/user-walk/scripts/walk.mjs`]);
+  const isDriver = (p) => drivers.has(norm(p));
   const okCmd = (c) => {
-    const m = String(c ?? '').trim().match(/^node\s+(?:"([^"]+)"|(\S+))\s+(?:"([^"]+)"|(\S+))\s+(\S+)(.*)$/s);
+    const cmd = String(c ?? '').trim();
+    // the whole line, paths included, must be free of shell expansion: $(...) inside a quoted path runs too
+    if (!plainArgs(cmd)) return false;
+    const m = cmd.match(/^node\s+(?:"([^"]+)"|(\S+))\s+(?:"([^"]+)"|(\S+))\s+(\S+)(.*)$/s);
     if (!m) return false;
     const [, d1, d2, g1, g2, sub, rest] = m;
     if (!isDriver(d1 ?? d2) || norm(g1 ?? g2) !== goalDir || !WALKER.has(sub)) return false;
-    return plainArgs(rest) && !/(^|\s)--from-file(\s|$)/.test(rest);
+    return !/(^|\s)--from-file(\s|$)/.test(rest);
   };
   // shell operators count only outside quotes; inside double quotes bash still expands $ and `
   const plainArgs = (s) => {
@@ -664,26 +666,37 @@ async function serve(dir) {
       }
       const write = !['GET', 'HEAD', 'OPTIONS'].includes(req.method());
       if (/^https?:$/.test(u.protocol) && allowed.has(u.origin) && write) {
-        // Playwright does not route redirect hops, and a 307/308 resends the body: fetch the write here
-        // without following redirects, and stop one that points outside the app
+        // Playwright does not route redirect hops, and a 307/308 resends the body: follow the write's
+        // 307/308 chain here, one hop at a time, and stop at the first hop that points outside the app.
+        // Only the final response goes back to the browser, so no hop is sent twice. A 301/302/303 turns
+        // the write into a GET, which the browser follows itself (reads are allowed; landings are checked).
+        let url = req.url();
         let resp;
-        try {
-          resp = await route.fetch({ maxRedirects: 0 });
-        } catch (err) {
-          events.push(`a request to the app failed: ${err.message.split('\n')[0]}`);
-          return route.abort('failed');
-        }
-        const loc = resp.headers().location;
-        if ([307, 308].includes(resp.status()) && loc) {
+        for (let hop = 0; ; hop++) {
+          try {
+            resp = await route.fetch({ url, maxRedirects: 0 });
+          } catch (err) {
+            events.push(`a request to the app failed: ${err.message.split('\n')[0]}`);
+            return route.abort('failed');
+          }
+          const loc = resp.headers().location;
+          if (![307, 308].includes(resp.status()) || !loc) break;
           let to;
           try {
-            to = new URL(loc, req.url());
-          } catch { /* unreadable target: let the browser handle it */ }
-          if (to && /^https?:$/.test(to.protocol) && !allowed.has(to.origin)) {
+            to = new URL(loc, url);
+          } catch {
+            break; // unreadable target: hand the response to the browser as it is
+          }
+          if (!/^https?:$/.test(to.protocol) || !allowed.has(to.origin)) {
             blocked(req.method(), to.href, 'write redirected to another origin');
             events.push(`blocked: a form or request was redirected, with its data, to ${to.origin}`);
             return route.abort('blockedbyclient');
           }
+          if (hop >= 10) {
+            events.push('blocked: a form or request redirected more than 10 times');
+            return route.abort('failed');
+          }
+          url = to.href;
         }
         return route.fulfill({ response: resp });
       }
@@ -802,10 +815,14 @@ async function serve(dir) {
     // the snapshot prints field values, escaped (multi-line keys, quotes), so a text replace afterwards can
     // miss them: blank secret fields in the page while the snapshot is taken, then put the values back.
     // Setting .value fires no input event, so the app's own state is untouched.
+    // The screenshot is taken inside the same window: an API key or one-time code shows in plain pixels.
     const hidden = await page.evaluate(MASK, true).catch(() => 0);
     let snap;
+    shot++;
+    const file = join(o.shots, `${String(shot).padStart(3, '0')}.png`);
     try {
       snap = await page.locator('body').ariaSnapshot({ mode: 'ai', timeout: 10000 });
+      await page.screenshot({ path: file }).catch(() => {});
     } finally {
       await page.evaluate(MASK, false).catch(() => {});
     }
@@ -820,9 +837,6 @@ async function serve(dir) {
       if (name.startsWith("'")) name = name.slice(1).replace(/'$/, '').replace(/''/g, "'");
       refs.set(m[2], name.replace(/\\"/g, '"'));
     }
-    shot++;
-    const file = join(o.shots, `${String(shot).padStart(3, '0')}.png`);
-    await page.screenshot({ path: file }).catch(() => {});
     const pos = await page.evaluate(SCROLLER).catch(() => ({}));
     const max = 40000;
     const body = snap.length > max ? `${snap.slice(0, max)}\n... (page text cut at ${max} characters)` : snap;
