@@ -16,7 +16,7 @@
      node walk.mjs <dir> select <ref> <option label>
      node walk.mjs <dir> hover <ref>
      node walk.mjs <dir> press <key>           Enter, Space, Tab (each optionally Shift+), Escape, arrows, PageUp/PageDown, Home, End
-     node walk.mjs <dir> scroll <down|up>
+     node walk.mjs <dir> scroll <down|up> [ref]   the page (then the largest panel once the page ends), or the list or panel holding ref
      node walk.mjs <dir> back                  browser back
      node walk.mjs <dir> home                  reload the start page (counts as a backtrack)
      node walk.mjs <dir> note <text>           walker's remark: confusing label, unsure where to go
@@ -166,16 +166,25 @@ function checkWalker(dir, transcript) {
     return !/(^|\s)--from-file(\s|$)/.test(rest);
   };
   // shell operators count only outside quotes; inside double quotes bash still expands $ and `
+  // Windows paths keep their backslashes: inside double quotes bash treats \ as literal except before
+  // $ ` " \ (then the next character is literal); outside quotes \ makes the next character literal
   const plainArgs = (s) => {
     let q = '';
-    for (const ch of s) {
+    const chars = [...s];
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i];
       if (q === "'") {
         if (ch === "'") q = '';
       } else if (q === '"') {
-        if (ch === '"') q = '';
-        else if (ch === '$' || ch === '`' || ch === '\\') return false;
+        if (ch === '\\') {
+          if ('$`"\\'.includes(chars[i + 1] ?? '')) i++;
+        } else if (ch === '"') q = '';
+        else if (ch === '$' || ch === '`') return false;
+      } else if (ch === '\\') {
+        if (chars[i + 1] === '\r' || chars[i + 1] === '\n') return false;
+        i++;
       } else if (ch === "'" || ch === '"') q = ch;
-      else if (/[;&|`$<>()\\\r\n]/.test(ch)) return false;
+      else if (/[;&|`$<>()\r\n]/.test(ch)) return false;
     }
     return q === '';
   };
@@ -486,6 +495,7 @@ const NAMES = (node) => {
     if (!el || el.nodeType !== 1) return;
     add(el.getAttribute('aria-label'));
     add(el.getAttribute('title'));
+    add(el.getAttribute('alt')); // image buttons: <input type="image" alt="Delete">
     // labels resolve in the control's own document or shadow root, not the top page
     const root = el.getRootNode?.() ?? el.ownerDocument;
     for (const id of (el.getAttribute('aria-labelledby') || '').split(/\s+/)) add(id && (root.getElementById?.(id) ?? el.ownerDocument.getElementById(id))?.textContent);
@@ -525,7 +535,7 @@ const KEY_NAMES = (names, withEnter) => {
   if (withEnter) {
     const form = el.form || el.closest('form');
     if (form) {
-      for (const b of form.querySelectorAll('button, input[type=submit], input[type=image]')) if ((b.type || 'submit') === 'submit') out.push(...names(b));
+      for (const b of form.querySelectorAll('button, input[type=submit], input[type=image]')) if (['submit', 'image'].includes(b.type || 'submit')) out.push(...names(b));
       out.push(form.getAttribute('action') || '');
     } else if (el.matches('input, textarea, [contenteditable], [contenteditable] *')) {
       let box = el.parentElement;
@@ -578,7 +588,9 @@ const MASK = (on) => {
   const scan = (root) => {
     for (const el of root.querySelectorAll('input, textarea')) {
       const hint = `${el.name || ''} ${el.id || ''} ${el.autocomplete || ''} ${el.getAttribute('aria-label') || ''}`;
-      if (el.value && (el.type === 'password' || /pass|secret|token|otp|one-time|key|pin|ssn|iban|cc-|card|cvc|cvv/i.test(hint))) {
+      // fields filled with fill --from-file are secret whatever they are named
+      const marked = el.ownerDocument.defaultView?.__userWalkSecret?.has(el);
+      if (el.value && (marked || el.type === 'password' || /pass|secret|token|otp|one-time|key|pin|ssn|iban|cc-|card|cvc|cvv/i.test(hint))) {
         stash.set(el, el.value);
         el.value = '';
       }
@@ -594,28 +606,37 @@ const MASK = (on) => {
   return stash.size;
 };
 
-// the area a wheel should turn: the page when it scrolls, else the largest scroll box in view
-const SCROLLER = () => {
+// the area a wheel should turn. With an element (scroll <dir> <ref>): the nearest scroll box around it.
+// Without: the page while it can still move that way, then the largest scroll box in view that can.
+const SCROLLER = ({ dir, el } = {}) => {
   const se = document.scrollingElement || document.documentElement;
-  if (se.scrollHeight > innerHeight + 1 && getComputedStyle(document.body).overflowY !== 'hidden') {
-    return { x: innerWidth / 2, y: innerHeight / 2, top: Math.round(se.scrollTop), height: se.scrollHeight, view: innerHeight, page: true };
-  }
-  let best = null;
-  for (const el of document.querySelectorAll('body *')) {
-    if (el.scrollHeight <= el.clientHeight + 1) continue;
-    const s = getComputedStyle(el);
-    if (!/(auto|scroll)/.test(s.overflowY)) continue;
-    const r = el.getBoundingClientRect();
-    const area = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)) * Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0));
-    if (area > (best?.area ?? 0)) best = { el, r, area };
-  }
-  if (!best) return { x: innerWidth / 2, y: innerHeight / 2, top: Math.round(se.scrollTop), height: se.scrollHeight, view: innerHeight, page: true };
-  const { el, r } = best;
-  return {
-    x: (Math.max(r.left, 0) + Math.min(r.right, innerWidth)) / 2,
-    y: (Math.max(r.top, 0) + Math.min(r.bottom, innerHeight)) / 2,
-    top: Math.round(el.scrollTop), height: el.scrollHeight, view: el.clientHeight, page: false,
+  const pageInfo = { x: innerWidth / 2, y: innerHeight / 2, top: Math.round(se.scrollTop), height: se.scrollHeight, view: innerHeight, page: true };
+  const pageScrolls = se.scrollHeight > innerHeight + 1 && getComputedStyle(document.body).overflowY !== 'hidden';
+  const canMove = (top, height, view) => (dir === 'up' ? top > 0 : dir === 'down' ? top + view < height - 1 : true);
+  const boxInfo = (box) => {
+    const r = box.getBoundingClientRect();
+    return {
+      x: (Math.max(r.left, 0) + Math.min(r.right, innerWidth)) / 2,
+      y: (Math.max(r.top, 0) + Math.min(r.bottom, innerHeight)) / 2,
+      top: Math.round(box.scrollTop), height: box.scrollHeight, view: box.clientHeight, page: false,
+    };
   };
+  const scrolls = (box) => box.scrollHeight > box.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(box).overflowY);
+  if (el) {
+    for (let p = el; p && p !== document.documentElement && p !== document.body; p = p.parentElement || p.getRootNode?.().host) {
+      if (p.nodeType === 1 && scrolls(p)) return boxInfo(p);
+    }
+    return pageInfo;
+  }
+  if (pageScrolls && canMove(pageInfo.top, pageInfo.height, pageInfo.view)) return pageInfo;
+  let best = null;
+  for (const box of document.querySelectorAll('body *')) {
+    if (!scrolls(box) || !canMove(box.scrollTop, box.scrollHeight, box.clientHeight)) continue;
+    const r = box.getBoundingClientRect();
+    const area = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)) * Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0));
+    if (area > (best?.area ?? 0)) best = { box, area };
+  }
+  return best ? boxInfo(best.box) : pageInfo;
 };
 
 async function serve(dir) {
@@ -851,14 +872,23 @@ async function serve(dir) {
     ].join('\n');
   }
 
-  async function scroll(dir) {
+  async function scroll(dir, target) {
     // the wheel turns whatever is under the mouse: move it over the area that scrolls first
-    const s = await page.evaluate(SCROLLER);
+    const el = target ? await target.elementHandle({ timeout: 3000 }).catch(() => null) : null;
+    const s = await page.evaluate(SCROLLER, { dir, el });
     await page.mouse.move(s.x, s.y);
     await page.mouse.wheel(0, (dir === 'up' ? -1 : 1) * Math.round(s.view * 0.8));
     await page.waitForTimeout(400);
-    const after = await page.evaluate(SCROLLER);
-    return after.top !== s.top;
+    // measure the same area again: the page, or the scroll box under the point the wheel turned
+    const top = await page.evaluate(({ x, y, isPage }) => {
+      const se = document.scrollingElement || document.documentElement;
+      if (isPage) return se.scrollTop;
+      for (let p = document.elementFromPoint(x, y); p; p = p.parentElement) {
+        if (p.scrollHeight > p.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(p).overflowY)) return p.scrollTop;
+      }
+      return se.scrollTop;
+    }, { x: s.x, y: s.y, isPage: s.page });
+    return Math.round(top) !== s.top;
   }
 
   async function act(command, args, loc) {
@@ -867,7 +897,7 @@ async function serve(dir) {
     else if (command === 'fill') await loc.fill(args.slice(1).join(' '), { timeout: 5000 });
     else if (command === 'select') await loc.selectOption({ label: args.slice(1).join(' ') }, { timeout: 5000 }).catch(() => loc.selectOption(args.slice(1).join(' '), { timeout: 5000 }));
     else if (command === 'press') await page.keyboard.press(args[0]);
-    else if (command === 'scroll') return scroll(args[0]);
+    else if (command === 'scroll') return scroll(args[0], args[1] ? page.locator(`aria-ref=${args[1]}`) : null);
     else if (command === 'back') await page.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 });
     else if (command === 'home') await page.goto(o.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     return true;
@@ -921,6 +951,17 @@ async function serve(dir) {
 
     const needsRef = ['click', 'hover', 'fill', 'select'].includes(command);
     if (needsRef && !refs.has(args[0] || '')) return { ok: false, text: `no ref ${args[0] || '(none)'} in the last look; run look and use a ref from it` };
+    if (command === 'scroll') {
+      if (!['up', 'down'].includes(args[0])) return { ok: false, text: 'scroll takes up or down, then optionally a ref inside the list or panel to scroll' };
+      if (args[1] && !refs.has(args[1])) return { ok: false, text: `no ref ${args[1]} in the last look; run look and use a ref from it` };
+    }
+    if (secret) {
+      // remember the field, so later looks keep it masked whatever it is named
+      await page.locator(`aria-ref=${args[0]}`).evaluate((node) => {
+        const el = node.control || (node.matches('input, textarea') ? node : node.querySelector('input, textarea')) || node;
+        (window.__userWalkSecret ??= new WeakSet()).add(el);
+      }).catch(() => {});
+    }
     const before = page.url();
     seen.add(screenOf(before));
     const name = needsRef ? nameOf(args[0]) : '';

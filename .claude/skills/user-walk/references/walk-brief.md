@@ -20,7 +20,7 @@ Commands:
   select <ref> <option>     pick an option in a dropdown
   hover <ref>               point at something (menus that open on hover)
   press <key>               Enter, Space, Tab (Shift+ allowed), Escape, ArrowDown, PageDown ...
-  scroll <down|up>
+  scroll <down|up> [ref]    scroll the page; add a ref inside a list or side panel to scroll that instead
   back                      browser back button
   home                      reload the start page
   note <text>               say what confused you, the moment it happens
