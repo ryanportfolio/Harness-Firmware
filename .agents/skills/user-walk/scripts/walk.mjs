@@ -38,7 +38,8 @@
    - a control must be on screen, inside any scroll box or frame it sits in, before click, hover,
      fill or select (refs cover the whole page, a person has to scroll first);
    - values typed into password, one-time-code, key and card fields, and secret-looking URL
-     parameters, are logged as [redacted];
+     parameters (query and hash), are shown and logged as [redacted];
+   - the local port answers only the walk.mjs client (a per-driver token in driver.json), not web pages;
    - downloads are saved to <dir>/downloads and reported only once finished or failed;
    - after --max-actions actions every command except note, end and stop is refused;
    - the server exits after 20 idle minutes so no browser is left behind.
@@ -48,6 +49,7 @@
 */
 import http from 'node:http';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { dirname, join, resolve, basename } from 'node:path';
@@ -92,14 +94,19 @@ function checkWalker(dir, transcript) {
     return;
   }
   const o = existsSync(join(dir, 'options.json')) ? JSON.parse(readFileSync(join(dir, 'options.json'), 'utf8')) : {};
-  const shots = (o.shots || join(dir, 'shots')).replace(/\\/g, '/').toLowerCase();
+  const norm = (p) => String(p ?? '').replace(/\\\\/g, '/').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  const shots = norm(o.shots || join(dir, 'shots'));
+  const goalDir = norm(dir);
+  const repo = norm(REPO);
+  // every tool call is split into operations; a call passes only when each of its operations does
   const calls = [];
   const ids = new Set();
-  const push = (id, name, cmd, text) => {
+  const push = (id, name, ops, text) => {
     if (id && ids.has(id)) return;
     if (id) ids.add(id);
-    calls.push({ name, cmd, text });
+    calls.push({ name, ops, text });
   };
+  const unq = (s) => s.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
   for (const line of readFileSync(transcript, 'utf8').split(/\r?\n/)) {
     let j;
     try {
@@ -107,31 +114,62 @@ function checkWalker(dir, transcript) {
     } catch {
       continue;
     }
+    // Claude subagent transcript
     for (const c of Array.isArray(j.message?.content) ? j.message.content : []) {
-      if (c.type === 'tool_use') push(c.id, c.name, c.input?.command, JSON.stringify(c.input ?? {}));
+      if (c.type !== 'tool_use') continue;
+      const op = c.name === 'Bash' ? { kind: 'cmd', value: c.input?.command }
+        : c.name === 'Read' ? { kind: 'read', value: c.input?.file_path }
+        : { kind: 'other', value: c.name };
+      push(c.id, c.name, [op], JSON.stringify(c.input ?? {}));
     }
+    // Codex rollout: plain function calls, or a JavaScript cell that calls tools.*
     const p = j.payload;
     if (p?.type === 'function_call' || p?.type === 'custom_tool_call') {
       const text = String(p.arguments ?? p.input ?? '');
-      let cmd;
+      let ops = null;
       try {
         const a = JSON.parse(text);
-        cmd = Array.isArray(a.command) ? a.command.at(-1) : a.command ?? a.cmd;
-      } catch {
-        cmd = text.match(/cmd:\s*"((?:[^"\\]|\\.)*)"/)?.[1]?.replace(/\\"/g, '"');
+        if (/view_image/.test(p.name)) ops = [{ kind: 'read', value: a.path }];
+        else if (a.command ?? a.cmd) ops = [{ kind: 'cmd', value: Array.isArray(a.command) ? a.command.at(-1) : a.command ?? a.cmd }];
+      } catch { /* not JSON: a JavaScript cell */ }
+      if (!ops) {
+        ops = [];
+        const toolCalls = [...text.matchAll(/tools\.(\w+)\s*\(/g)].map((m) => m[1]);
+        const cmds = [...text.matchAll(/\bcmd\s*:\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => unq(m[1]));
+        const paths = [...text.matchAll(/\bpath\s*:\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => unq(m[1]));
+        const execs = toolCalls.filter((t) => t === 'exec_command').length;
+        const views = toolCalls.filter((t) => t === 'view_image').length;
+        for (const t of toolCalls) if (t !== 'exec_command' && t !== 'view_image') ops.push({ kind: 'other', value: `tools.${t}` });
+        // a command built at run time (a variable, a template) cannot be checked, so it fails
+        if (cmds.length !== execs || paths.length !== views) ops.push({ kind: 'other', value: 'tool arguments not written out literally' });
+        if (/\brequire\s*\(|\bimport\s*\(|\bprocess\.|\bfs\./.test(text)) ops.push({ kind: 'other', value: 'script code beyond tool calls' });
+        for (const c of cmds) ops.push({ kind: 'cmd', value: c });
+        for (const v of paths) ops.push({ kind: 'read', value: v });
+        if (!toolCalls.length) ops.push({ kind: 'other', value: p.name });
       }
-      push(p.call_id, p.name, cmd, text);
+      push(p.call_id, p.name, ops, text);
     }
   }
-  // the brief asks for exactly: node "<walk.mjs>" "<goal folder>" <command> [args], one per call
-  const DRIVER = /^node\s+"?[^"\s;&|`$<>]*walk\.mjs"?\s+"?[^"\s;&|`$<>]+"?\s+[a-z-]+(\s+[^;&|`$<>\r\n]*)?$/i;
-  const ok = (c) => {
-    if (typeof c.cmd === 'string' && DRIVER.test(c.cmd.trim())) return true;
-    const t = c.text.replace(/\\\\/g, '/').replace(/\\/g, '/').toLowerCase();
-    return /^(read|view_image)$/i.test(c.name) && /\.png/.test(t) && t.includes(shots);
+  // the brief asks for exactly: node "<this driver>" "<this goal folder>" <walker command> [args], one per call
+  const WALKER = new Set(['look', 'click', 'fill', 'select', 'hover', 'press', 'scroll', 'back', 'home', 'note', 'end']);
+  const isDriver = (p) => {
+    const n = norm(p);
+    return n.startsWith(`${repo}/`) && /\/skills\/user-walk\/scripts\/walk\.mjs$/.test(n);
   };
-  const bad = calls.filter((c) => !ok(c));
-  console.log(`${calls.length} tool calls, ${bad.length} outside the driver and its screenshots`);
+  const okCmd = (c) => {
+    const m = String(c ?? '').trim().match(/^node\s+(?:"([^"]+)"|(\S+))\s+(?:"([^"]+)"|(\S+))\s+(\S+)(.*)$/s);
+    if (!m) return false;
+    const [, d1, d2, g1, g2, sub, rest] = m;
+    if (!isDriver(d1 ?? d2) || norm(g1 ?? g2) !== goalDir || !WALKER.has(sub)) return false;
+    return !/[;&|`$<>\r\n]|--from-file/.test(rest);
+  };
+  const okRead = (v) => {
+    const n = norm(v);
+    return n.startsWith(`${shots}/`) && n.endsWith('.png');
+  };
+  const okOp = (op) => (op.kind === 'cmd' ? okCmd(op.value) : op.kind === 'read' ? okRead(op.value) : false);
+  const bad = calls.filter((c) => !c.ops.length || !c.ops.every(okOp));
+  console.log(`${calls.length} tool calls, ${bad.length} outside this driver, this goal's walker commands and its screenshots`);
   for (const c of bad) console.log(`  ${c.name}: ${c.text.slice(0, 200)}`);
   if (!calls.length) console.log('no tool calls found: wrong file, or a transcript format this check does not read; check by hand');
   process.exitCode = bad.length || !calls.length ? 1 : 0;
@@ -139,11 +177,26 @@ function checkWalker(dir, transcript) {
 
 /* ---------- shared ---------- */
 
-// URL as logged: secret-looking parameters blanked
+// a hash split into its route and its parameters: "#/x?token=1" and "#access_token=1&state=2" both carry parameters
+function hashParts(hash) {
+  const h = hash.replace(/^#/, '');
+  if (h.includes('?')) return { route: h.slice(0, h.indexOf('?')), params: new URLSearchParams(h.slice(h.indexOf('?') + 1)) };
+  if (/^[^/!]*=/.test(h)) return { route: '', params: new URLSearchParams(h) };
+  return { route: h, params: null };
+}
+
+const blank = (params, value) => {
+  for (const k of [...params.keys()]) if (SECRET_PARAM.test(k)) params.set(k, value);
+  return params;
+};
+
+// URL as logged: secret-looking parameters blanked, in the query and in the hash (OAuth puts tokens there)
 function cleanUrl(url) {
   try {
     const u = new URL(url);
-    for (const k of [...u.searchParams.keys()]) if (SECRET_PARAM.test(k)) u.searchParams.set(k, '[redacted]');
+    blank(u.searchParams, '[redacted]');
+    const { route, params } = hashParts(u.hash);
+    if (params) u.hash = `${route}${route ? '?' : ''}${blank(params, '[redacted]')}`;
     return u.href;
   } catch {
     return url;
@@ -157,7 +210,9 @@ function screenOf(url) {
     const q = [...u.searchParams].filter(([k]) => !TRACKING_PARAM.test(k)).map(([k, v]) => [k, SECRET_PARAM.test(k) ? '' : v]);
     q.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     const query = q.length ? `?${new URLSearchParams(q)}` : '';
-    const hash = /^#[/!]/.test(u.hash) ? u.hash : '';
+    const { route, params } = hashParts(u.hash);
+    let hash = '';
+    if (/^[/!]/.test(route)) hash = `#${route}${params ? `?${blank(params, '')}` : ''}`;
     return u.origin + u.pathname + query + hash;
   } catch {
     return url;
@@ -256,10 +311,10 @@ async function send(dir, command, args) {
     args = [args[0], readFileSync(args[2], 'utf8').replace(/\r?\n$/, '')];
     command = 'fill-secret';
   }
-  const { port } = JSON.parse(readFileSync(file, 'utf8'));
+  const { port, token } = JSON.parse(readFileSync(file, 'utf8'));
   const body = JSON.stringify({ cmd: command, args });
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/`, { method: 'POST', body, headers: { 'content-type': 'application/json' } });
+    const res = await fetch(`http://127.0.0.1:${port}/`, { method: 'POST', body, headers: { 'content-type': 'application/json', 'x-walk-token': token } });
     const out = await res.json();
     console.log(out.text);
     if (!out.ok) process.exitCode = 1;
@@ -381,7 +436,19 @@ async function launch() {
   if (!entry) throw new Error(`playwright-core not found; run: ${INSTALL}`);
   const mod = await import(pathToFileURL(entry).href);
   const chromium = mod.chromium ?? mod.default?.chromium;
-  const args = ['--window-position=-2400,-2400', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'];
+  // keep launchPlacedChrome()'s safeguard: two Autofill features make Chrome probe the Windows account
+  // with a blank password on every fresh profile (failed logon events, lockout risk). Chrome keeps only the
+  // last --disable-features switch, so send Playwright's own list plus those two, last.
+  let own = [];
+  try {
+    const core = createRequire(entry).resolve('playwright-core/lib/coreBundle');
+    const list = readFileSync(core, 'utf8').match(/disabledFeatures = \[([\s\S]*?)\n\s*\]/)?.[1] ?? '';
+    own = [...list.replace(/\/\/.*$/gm, '').matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  } catch {
+    console.warn("[walk] could not read Playwright's --disable-features list; only the two Autofill features are disabled");
+  }
+  const features = [...new Set([...own, 'AutofillAiWalletPrivatePasses', 'AutofillAmbientAutofill'])];
+  const args = ['--window-position=-2400,-2400', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', `--disable-features=${features.join(',')}`];
   try {
     return { browser: await chromium.launch({ headless: false, channel: 'chrome', args }), via: 'installed Chrome' };
   } catch {
@@ -403,7 +470,9 @@ const NAMES = (node) => {
     add(el.getAttribute('title'));
     for (const id of (el.getAttribute('aria-labelledby') || '').split(/\s+/)) add(id && document.getElementById(id)?.textContent);
     add(el.innerText ?? el.textContent);
-    add(el.value);
+    // what someone typed into a secret field is never collected: it would land in a refusal reason
+    const secretField = el.type === 'password' || /pass|secret|token|otp|one-time|key|pin|ssn|iban|cc-|card|cvc|cvv/i.test(`${el.name || ''} ${el.id || ''} ${el.autocomplete || ''}`);
+    if (!secretField && !/^(text|search|email|tel|url|number)$/i.test(el.type || '')) add(el.value);
     add(el.getAttribute('placeholder'));
     add(el.getAttribute('name'));
     for (const l of el.labels || []) add(l.textContent);
@@ -651,7 +720,25 @@ async function serve(dir) {
   }
 
   async function look() {
-    const snap = await page.locator('body').ariaSnapshot({ mode: 'ai', timeout: 10000 });
+    let snap = await page.locator('body').ariaSnapshot({ mode: 'ai', timeout: 10000 });
+    // the snapshot prints field values; what was typed into a secret field must not reach the transcript
+    const secrets = await page.evaluate(() => {
+      const out = [];
+      const scan = (doc) => {
+        for (const el of doc.querySelectorAll('input, textarea')) {
+          const hint = `${el.name || ''} ${el.id || ''} ${el.autocomplete || ''} ${el.getAttribute('aria-label') || ''}`;
+          if (el.value && (el.type === 'password' || /pass|secret|token|otp|one-time|key|pin|ssn|iban|cc-|card|cvc|cvv/i.test(hint))) out.push(el.value);
+        }
+        for (const f of doc.querySelectorAll('iframe')) {
+          try {
+            if (f.contentDocument) scan(f.contentDocument);
+          } catch { /* other-origin frame */ }
+        }
+      };
+      scan(document);
+      return out;
+    }).catch(() => []);
+    for (const s of secrets.sort((a, b) => b.length - a.length)) snap = snap.split(s).join('[redacted]');
     refs = new Map();
     for (const line of snap.split('\n')) {
       const m = line.match(/^\s*- (.*?)\s*\[ref=([a-z0-9]+)\]/);
@@ -772,8 +859,10 @@ async function serve(dir) {
     }
     const hit = targets.find((t) => skip.test(t));
     if (hit) {
-      record({ ...base, refused: `on the skip list (${hit.slice(0, 80)})` });
-      return { ok: false, text: `refused: "${hit.slice(0, 80)}" is on the skip list. Do not try to work around this.` };
+      // report the matched word only: the full text can hold what someone typed
+      const word = hit.match(skip)[0];
+      record({ ...base, refused: `on the skip list (${word})` });
+      return { ok: false, text: `refused: this control matches "${word}" on the skip list. Do not try to work around this.` };
     }
 
     count++;
@@ -830,7 +919,15 @@ async function serve(dir) {
   }
 
   let queue = Promise.resolve();
+  // only the walk.mjs client may drive this browser: a web page that finds the port cannot send the
+  // custom header without a CORS preflight, which this server never answers
+  const token = randomUUID();
   const server = http.createServer((req, res) => {
+    if (req.method !== 'POST' || req.headers['x-walk-token'] !== token || !/^127\.0\.0\.1:\d+$/.test(req.headers.host || '')) {
+      res.writeHead(403);
+      res.end();
+      return;
+    }
     let data = '';
     req.on('data', (c) => (data += c));
     req.on('end', () => {
@@ -849,7 +946,7 @@ async function serve(dir) {
     });
   });
   server.listen(0, '127.0.0.1', () => {
-    writeFileSync(join(dir, 'driver.json'), JSON.stringify({ port: server.address().port, pid: process.pid, launchedVia: via, ...(note ? { note } : {}) }));
+    writeFileSync(join(dir, 'driver.json'), JSON.stringify({ port: server.address().port, token, pid: process.pid, launchedVia: via, ...(note ? { note } : {}) }));
     touch();
   });
   browser.on('disconnected', () => {
