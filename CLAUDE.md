@@ -96,8 +96,9 @@ Topical reference lives in `.claude/reference/`. Consult it before non-trivial w
 | `commands.md` | Build / dev / test commands |
 | `tech-stack.md` | Non-default picks + why |
 | `deployment.md` | Deploy target, artifacts |
+| `features.md` | Feature names, what each does, where it lives |
 
-New quirk bites → save it to `.claude/reference/pitfalls.md` before the task ends, without asking, when it cost a retry, a backed-out change, or a user correction and its cause is confirmed. Amend an existing entry over adding one. Other reference edits stay behind `/recall save`.
+New quirk bites → save it to `.claude/reference/pitfalls.md` before the task ends, without asking, when it cost a retry, a backed-out change, or a user correction and its cause is confirmed. Amend an existing entry over adding one. Other reference edits stay behind `/recall save`; `features.md` is also refreshed by `/user-walk`.
 
 ## Codex compatibility
 

@@ -56,7 +56,7 @@
         "id": "specialist",
         "label": "Specialist tools",
         "description": "Focused modes for design, writing, critique, and delivery",
-        "skills": ["fable-mode", "wow-loop", "showpiece", "design-prototypes", "redesign-concepts", "conversion-ux", "ui-quality", "motion-design", "wow-animation", "product-walkthrough", "codex-image-gen", "arena", "lab", "advocate", "why", "enhance-prompt", "handoff-audit", "writing", "forge-repo-ui-skill", "caveman", "bro", "session-hub", "coordinate", "cache-loop", "seo-loop"]
+        "skills": ["fable-mode", "wow-loop", "showpiece", "design-prototypes", "redesign-concepts", "conversion-ux", "ui-quality", "user-walk", "motion-design", "wow-animation", "product-walkthrough", "codex-image-gen", "arena", "lab", "advocate", "why", "enhance-prompt", "handoff-audit", "writing", "forge-repo-ui-skill", "caveman", "bro", "session-hub", "coordinate", "cache-loop", "seo-loop"]
       }
     ],
     "required": ["external-review", "init-project"],

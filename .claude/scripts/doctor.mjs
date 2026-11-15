@@ -223,6 +223,7 @@ function checkReference() {
     "secrets.md",
     "tech-stack.md",
     "deployment.md",
+    "features.md",
   ];
   const missing = core.filter((file) => !exists(`.claude/reference/${file}`));
   if (missing.length) {
