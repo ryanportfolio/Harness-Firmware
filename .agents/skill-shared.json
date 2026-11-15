@@ -2,6 +2,7 @@
   "version": 1,
   "skills": {
     "climb-loop": ["references"],
-    "product-walkthrough": ["references", "templates"]
+    "product-walkthrough": ["references", "templates"],
+    "user-walk": ["references", "scripts"]
   }
 }

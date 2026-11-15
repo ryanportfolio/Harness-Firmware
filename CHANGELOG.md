@@ -13,6 +13,22 @@ condensed.
 
 ### Added
 
+- `user-walk` for Claude and Codex. It finds where a first-time user wastes
+  steps in a web app. The main session lists every feature from the code with
+  `file:line` citations and the shortest path to it, then replays each path in
+  the browser to confirm the count. A fresh agent that has not seen the code or
+  the map gets only a goal in the user's words ("save the results as a
+  document you can keep") and tries it in headed Chrome through the skill's
+  driver, `scripts/walk.mjs`. The driver logs every action, refuses controls
+  on a skip list (deletes, payments, sending), blocks navigation and writes to
+  other sites, and caps the actions per goal. The report ranks features by
+  wasted steps (backtracks, dead ends, extra screens), not raw clicks, and
+  names the skill to run next for each finding: `climb-loop` for the look,
+  `ui-quality` for accessibility and states, `conversion-ux` for sign-up and
+  checkout. Feature names and locations go in a new committed
+  `.claude/reference/features.md`, empty in the template. Idea from Lauren
+  Tan's talk "All Code Is Slop (Except Mine)" (AI Engineer).
+
 - `untangle` for Claude and Codex. It surveys a codebase for structure that
   makes changes harder: code that must change together but doesn't show it,
   code tied together that changes for different reasons, code with no reason
