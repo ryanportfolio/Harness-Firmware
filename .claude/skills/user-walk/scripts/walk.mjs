@@ -37,7 +37,7 @@
      are aborted unless --origin allows that origin (the app's own API on another host, say);
    - a write the app redirects with 307/308 is followed here one hop at a time and stopped at the first
      hop outside the app; a redirected form submit then loads the final URL, so the page and the log show
-     where the app sent it (fetch() callers still see the first URL as response.url);
+     where the app sent it (fetch() callers, and a form that opens a new tab, still see the first URL);
    - a control must be on screen, inside any scroll box or frame it sits in, before click, hover,
      fill or select (refs cover the whole page, a person has to scroll first);
    - values typed into password, one-time-code, key and card fields, and secret-looking URL
@@ -129,12 +129,22 @@ function checkWalker(dir, transcript) {
     if (p?.type === 'function_call' || p?.type === 'custom_tool_call') {
       const text = String(p.arguments ?? p.input ?? '');
       let ops = null;
+      let a;
       try {
-        const a = JSON.parse(text);
-        if (/view_image/.test(p.name)) ops = [{ kind: 'read', value: a.path }];
-        else if (a.command ?? a.cmd) ops = [{ kind: 'cmd', value: Array.isArray(a.command) ? a.command.at(-1) : a.command ?? a.cmd }];
+        a = JSON.parse(text);
       } catch { /* not JSON: a JavaScript cell */ }
-      if (!ops) {
+      if (a !== undefined) {
+        // exact tool names and known keys only: a stray `cmd` on another tool, or an extra key such as
+        // `shell` on exec_command, would let a call run something this check never reads
+        const keys = a && typeof a === 'object' && !Array.isArray(a) ? Object.keys(a) : null;
+        const only = (allowed) => keys && keys.every((k) => allowed.includes(k));
+        const argv = a?.command;
+        if (p.name === 'view_image' && only(['path']) && typeof a.path === 'string') ops = [{ kind: 'read', value: a.path }];
+        else if (p.name === 'exec_command' && only(['cmd', 'workdir', 'max_output_tokens', 'yield_time_ms']) && typeof a.cmd === 'string') ops = [{ kind: 'cmd', value: a.cmd }];
+        else if (p.name === 'shell' && only(['command', 'workdir', 'timeout_ms']) && Array.isArray(argv) && argv.length === 3 && typeof argv[2] === 'string'
+          && /^(bash|powershell(\.exe)?|pwsh(\.exe)?)$/i.test(String(argv[0]).split(/[\\/]/).pop()) && /^(-lc|-c|-Command)$/.test(argv[1])) ops = [{ kind: 'cmd', value: argv[2] }];
+        else ops = [{ kind: 'other', value: p.name }];
+      } else {
         ops = jsCell(text);
         if (!ops.length) ops.push({ kind: 'other', value: p.name });
       }
@@ -156,10 +166,13 @@ function checkWalker(dir, transcript) {
     if (!isDriver(d1 ?? d2) || norm(g1 ?? g2) !== goalDir || !WALKER.has(sub)) return false;
     return !/(^|\s)--from-file(\s|$)/.test(rest);
   };
-  // shell operators count only outside quotes; inside double quotes bash still expands $ and `
-  // Windows paths keep their backslashes: inside double quotes bash treats \ as literal except before
-  // $ ` " \ (then the next character is literal); outside quotes \ makes the next character literal
+  // shell operators count only outside quotes; inside double quotes both shells still expand $ and `.
+  // The line must mean the same in bash (Claude, Git Bash) and PowerShell (Codex on Windows), so anything
+  // the two read differently is refused: \ before a quote or a shell character (bash escapes it,
+  // PowerShell keeps the \ and the quote ends the string), '' (PowerShell's escaped quote) and typographic
+  // quotes (PowerShell quotes). Windows paths keep their plain backslashes.
   const plainArgs = (s) => {
+    if (/[\u2018-\u201f]/.test(s) || s.includes("''")) return false;
     let q = '';
     const chars = [...s];
     for (let i = 0; i < chars.length; i++) {
@@ -167,15 +180,14 @@ function checkWalker(dir, transcript) {
       if (q === "'") {
         if (ch === "'") q = '';
       } else if (q === '"') {
-        if (ch === '\\') {
-          if ('$`"\\'.includes(chars[i + 1] ?? '')) i++;
-        } else if (ch === '"') q = '';
+        if (ch === '\\' && chars[i + 1] === '\\') i++; // \\ ends up inside the string in both shells
+        else if (ch === '\\' && '$`"'.includes(chars[i + 1] ?? '')) return false;
+        else if (ch === '"') q = '';
         else if (ch === '$' || ch === '`') return false;
       } else if (ch === '\\') {
-        if (chars[i + 1] === '\r' || chars[i + 1] === '\n') return false;
-        i++;
+        if (!/[\w.:/\\-]/.test(chars[i + 1] ?? '')) return false;
       } else if (ch === "'" || ch === '"') q = ch;
-      else if (/[;&|`$<>()\r\n]/.test(ch)) return false;
+      else if (/[;&|`$<>(){}@#\r\n]/.test(ch)) return false;
     }
     return q === '';
   };
@@ -186,7 +198,10 @@ function checkWalker(dir, transcript) {
   const okOp = (op) => (op.kind === 'cmd' ? okCmd(op.value) : op.kind === 'read' ? okRead(op.value) : false);
   const bad = calls.filter((c) => !c.ops.length || !c.ops.every(okOp));
   console.log(`${calls.length} tool calls, ${bad.length} outside this driver, this goal's walker commands and its screenshots`);
-  for (const c of bad) console.log(`  ${c.name}: ${c.text.slice(0, 200)}`);
+  for (const c of bad) {
+    const why = c.ops.filter((op) => op.kind === 'other').map((op) => op.value);
+    console.log(`  ${c.name}${why.length ? ` (${why.join('; ')})` : ''}: ${c.text.slice(0, 200)}`);
+  }
   if (!calls.length) console.log('no tool calls found: wrong file, or a transcript format this check does not read; check by hand');
   process.exitCode = bad.length || !calls.length ? 1 : 0;
 }
@@ -201,7 +216,7 @@ function jsCell(src) {
   for (let i = 0; i < src.length;) {
     const ch = src[i];
     if (/\s/.test(ch)) { i++; continue; }
-    if (src.startsWith('//', i)) { const e = src.indexOf('\n', i); i = e < 0 ? src.length : e; continue; }
+    if (src.startsWith('//', i)) { const e = src.slice(i).search(/[\n\r\u2028\u2029]/); i = e < 0 ? src.length : i + e; continue; }
     if (src.startsWith('/*', i)) { const e = src.indexOf('*/', i + 2); if (e < 0) return fail('unterminated comment'); i = e + 2; continue; }
     if (ch === "'" || ch === '"' || ch === '`') {
       let v = '';
@@ -217,6 +232,8 @@ function jsCell(src) {
         const hex = (len) => { const h = src.slice(j + 1, j + 1 + len); if (!/^[0-9a-f]+$/i.test(h) || h.length !== len) return null; j += len; return String.fromCodePoint(parseInt(h, 16)); };
         let d;
         if (n === undefined) return fail('unterminated string');
+        // legacy octal (\73 is ";" outside strict mode): never needed, so never guessed at
+        else if (/[1-9]/.test(n) || (n === '0' && /[0-9]/.test(src[j + 1] ?? ''))) return fail('octal escape in a string');
         else if (n === 'x') d = hex(2);
         else if (n === 'u' && src[j + 1] === '{') { const e = src.indexOf('}', j); const h = src.slice(j + 2, e); d = e > 0 && /^[0-9a-f]{1,6}$/i.test(h) && parseInt(h, 16) <= 0x10ffff ? String.fromCodePoint(parseInt(h, 16)) : null; if (d !== null) j = e; }
         else if (n === 'u') d = hex(4);
@@ -236,26 +253,35 @@ function jsCell(src) {
     if ('(){}[].,;:='.includes(ch)) { toks.push({ t: 'p', v: ch }); i++; continue; }
     return fail(`unexpected ${JSON.stringify(ch)}`);
   }
-  // names a cell may use besides its own variables: printing results and waiting on several calls at once
-  const NAMES = new Set(['await', 'const', 'let', 'var', 'text', 'console', 'log', 'Promise', 'all', 'allSettled', 'forEach', 'output', 'image_url']);
+  // names a cell may use besides its own variables, for printing results and waiting on several calls at
+  // once; property names (after a dot) come from their own fixed list, never from the cell's variables
+  const NAMES = new Set(['await', 'const', 'let', 'var', 'text', 'console', 'Promise']);
+  const PROPS = new Set(['log', 'all', 'allSettled', 'forEach', 'output', 'exit_code', 'image_url']);
   const declared = new Set();
   toks.forEach((k, n) => {
     if (k.t === 'id' && ['const', 'let', 'var'].includes(k.v) && toks[n + 1]?.t === 'id' && toks[n + 2]?.v === '=') declared.add(toks[n + 1].v);
   });
-  const KEYS = { exec_command: { cmd: 'str', max_output_tokens: 'num', yield_time_ms: 'num' }, view_image: { path: 'str' } };
+  const KEYS = { exec_command: { cmd: 'str', workdir: 'str', max_output_tokens: 'num', yield_time_ms: 'num' }, view_image: { path: 'str' } };
   const ops = [];
   const is = (n, t, v) => toks[n]?.t === t && (v === undefined || toks[n].v === v);
   for (let n = 0; n < toks.length; n++) {
     const k = toks[n];
+    // [ only opens an array literal; after a name, ) or ] it would read a computed property (text['constructor'])
+    if (is(n, 'p', '[') && n > 0 && !'(,=[:;'.includes(toks[n - 1].t === 'p' ? toks[n - 1].v : 'x')) return fail('computed property access');
     if (k.t !== 'id') continue;
+    if (is(n - 1, 'p', '.')) {
+      if (PROPS.has(k.v)) continue;
+      return fail(`uses .${k.v}, which a walker cell does not need`);
+    }
     if (k.v === 'image') {
-      // image() shows a picture to the walker: only the image_url of a view_image result, never a path or URL
+      // image() shows a picture to the walker: one argument, the image_url of a view_image result, never a path or URL
       let depth = 0;
       let end = n + 1;
       if (!is(end, 'p', '(')) return fail('image used other than as a call');
       for (; end < toks.length; end++) {
-        if (is(end, 'p', '(')) depth++;
-        else if (is(end, 'p', ')') && --depth === 0) break;
+        if (is(end, 'p', '(') || is(end, 'p', '[') || is(end, 'p', '{')) depth++;
+        else if ((is(end, 'p', ')') || is(end, 'p', ']') || is(end, 'p', '}')) && --depth === 0) break;
+        else if (depth === 1 && is(end, 'p', ',')) return fail('image takes one argument');
       }
       if (!is(end - 2, 'p', '.') || !is(end - 1, 'id', 'image_url')) return fail('image shows only the image_url of a view_image result');
       continue;
@@ -770,12 +796,19 @@ async function serve(dir) {
   const downloads = new Set();
   // final responses of redirected form submits, waiting for the fresh navigation that shows them (see below)
   const replay = new Map();
+  // each frame's newest navigation request: a redirected submit must not override one that started after it
+  const latestNav = new WeakMap();
   try {
     context = await browser.newContext({
       viewport: { width: o.width, height: o.height },
       ...(o.storageState ? { storageState: o.storageState } : {}),
     });
     await context.route('**/*', async (route, req) => {
+      if (req.isNavigationRequest()) {
+        try {
+          latestNav.set(req.frame(), req);
+        } catch { /* a popup's first request has no frame yet */ }
+      }
       // requests carry no #fragment, so replay is keyed without it
       const key = req.url().split('#')[0];
       const waiting = req.method() === 'GET' && req.isNavigationRequest() ? replay.get(key) : null;
@@ -819,7 +852,7 @@ async function serve(dir) {
           }
           if (!/^https?:$/.test(to.protocol) || !allowed.has(to.origin)) {
             blocked(req.method(), to.href, 'write redirected to another origin');
-            events.push(`blocked: a form or request was redirected, with its data, to ${to.origin}`);
+            events.push(`blocked: a form or request was redirected, with its data, to ${to.origin === 'null' ? to.protocol : to.origin}`);
             return route.abort('blockedbyclient');
           }
           if (hop >= 10) {
@@ -833,9 +866,17 @@ async function serve(dir) {
           frame = url !== req.url() && req.isNavigationRequest() ? req.frame() : null;
         } catch { /* a popup's first request has no frame yet: hand it the final response as before */ }
         if (frame) {
-          replay.set(url.split('#')[0], { resp, at: Date.now() });
-          await route.abort('aborted');
-          frame.goto(url).catch(() => {}); // a download or a later navigation ends it early; settle() waits on the page
+          await route.abort('aborted').catch(() => {});
+          // the page moved on while the chain ran (a script navigation, the walker's next click): leave it there
+          if (latestNav.get(frame) !== req) return;
+          const target = url.split('#')[0];
+          const entry = { resp, at: Date.now() };
+          replay.set(target, entry);
+          // the same page plus a #fragment would be a jump within the page, which loads nothing: load the page
+          const same = frame.url().split('#')[0] === target;
+          frame.goto(same ? target : url)
+            .catch(() => {}) // a download ends it early; settle() waits on the page
+            .finally(() => replay.get(target) === entry && replay.delete(target));
           return;
         }
         return route.fulfill({ response: resp });
