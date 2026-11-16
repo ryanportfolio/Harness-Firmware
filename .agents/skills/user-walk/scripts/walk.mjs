@@ -139,7 +139,7 @@ function checkWalker(dir, transcript) {
         const keys = a && typeof a === 'object' && !Array.isArray(a) ? Object.keys(a) : null;
         const only = (allowed) => keys && keys.every((k) => allowed.includes(k));
         const argv = a?.command;
-        if (p.name === 'view_image' && only(['path']) && typeof a.path === 'string') ops = [{ kind: 'read', value: a.path }];
+        if (p.name === 'view_image' && only(['path', 'detail']) && typeof a.path === 'string') ops = [{ kind: 'read', value: a.path }];
         else if (p.name === 'exec_command' && only(['cmd', 'workdir', 'max_output_tokens', 'yield_time_ms']) && typeof a.cmd === 'string') ops = [{ kind: 'cmd', value: a.cmd }];
         else if (p.name === 'shell' && only(['command', 'workdir', 'timeout_ms']) && Array.isArray(argv) && argv.length === 3 && typeof argv[2] === 'string'
           && /^(bash|powershell(\.exe)?|pwsh(\.exe)?)$/i.test(String(argv[0]).split(/[\\/]/).pop()) && /^(-lc|-c|-Command)$/.test(argv[1])) ops = [{ kind: 'cmd', value: argv[2] }];
@@ -164,7 +164,8 @@ function checkWalker(dir, transcript) {
     if (!m) return false;
     const [, d1, d2, g1, g2, sub, rest] = m;
     if (!isDriver(d1 ?? d2) || norm(g1 ?? g2) !== goalDir || !WALKER.has(sub)) return false;
-    return !/(^|\s)--from-file(\s|$)/.test(rest);
+    // anywhere, quoted or not: the shell removes the quotes before the driver reads its arguments
+    return !rest.includes('--from-file');
   };
   // shell operators count only outside quotes; inside double quotes both shells still expand $ and `.
   // The line must mean the same in bash (Claude, Git Bash) and PowerShell (Codex on Windows), so anything
@@ -261,13 +262,16 @@ function jsCell(src) {
   toks.forEach((k, n) => {
     if (k.t === 'id' && ['const', 'let', 'var'].includes(k.v) && toks[n + 1]?.t === 'id' && toks[n + 2]?.v === '=') declared.add(toks[n + 1].v);
   });
-  const KEYS = { exec_command: { cmd: 'str', workdir: 'str', max_output_tokens: 'num', yield_time_ms: 'num' }, view_image: { path: 'str' } };
+  const KEYS = { exec_command: { cmd: 'str', workdir: 'str', max_output_tokens: 'num', yield_time_ms: 'num' }, view_image: { path: 'str', detail: 'str' } };
   const ops = [];
   const is = (n, t, v) => toks[n]?.t === t && (v === undefined || toks[n].v === v);
   for (let n = 0; n < toks.length; n++) {
     const k = toks[n];
     // [ only opens an array literal; after a name, ) or ] it would read a computed property (text['constructor'])
     if (is(n, 'p', '[') && n > 0 && !'(,=[:;'.includes(toks[n - 1].t === 'p' ? toks[n - 1].v : 'x')) return fail('computed property access');
+    // braces appear only around tool arguments (consumed below); a block would scope a variable that
+    // shadows a global (`{ let fetch = text; } fetch(...)`) and let the global through after it
+    if (is(n, 'p', '{') || is(n, 'p', '}')) return fail('a block or object outside tool arguments');
     if (k.t !== 'id') continue;
     if (is(n - 1, 'p', '.')) {
       if (PROPS.has(k.v)) continue;
@@ -795,7 +799,8 @@ async function serve(dir) {
   let starting = true;
   const downloads = new Set();
   // final responses of redirected form submits, waiting for the fresh navigation that shows them (see below)
-  const replay = new Map();
+  // keyed by the frame that submitted: only that frame's next load of the final URL gets the response
+  const replay = new WeakMap();
   // each frame's newest navigation request: a redirected submit must not override one that started after it
   const latestNav = new WeakMap();
   try {
@@ -804,17 +809,18 @@ async function serve(dir) {
       ...(o.storageState ? { storageState: o.storageState } : {}),
     });
     await context.route('**/*', async (route, req) => {
-      if (req.isNavigationRequest()) {
-        try {
-          latestNav.set(req.frame(), req);
-        } catch { /* a popup's first request has no frame yet */ }
-      }
-      // requests carry no #fragment, so replay is keyed without it
-      const key = req.url().split('#')[0];
-      const waiting = req.method() === 'GET' && req.isNavigationRequest() ? replay.get(key) : null;
-      if (waiting) {
-        replay.delete(key);
-        if (Date.now() - waiting.at < 30000) return route.fulfill({ response: waiting.resp });
+      let navFrame = null;
+      try {
+        navFrame = req.isNavigationRequest() ? req.frame() : null;
+      } catch { /* a popup's first request has no frame yet */ }
+      if (navFrame) {
+        latestNav.set(navFrame, req);
+        // any load in that frame ends its wait; requests carry no #fragment, so compare without it
+        const waiting = replay.get(navFrame);
+        replay.delete(navFrame);
+        if (waiting && req.method() === 'GET' && waiting.target === req.url().split('#')[0] && Date.now() - waiting.at < 30000) {
+          return route.fulfill({ response: waiting.resp });
+        }
       }
       let u;
       try {
@@ -870,13 +876,13 @@ async function serve(dir) {
           // the page moved on while the chain ran (a script navigation, the walker's next click): leave it there
           if (latestNav.get(frame) !== req) return;
           const target = url.split('#')[0];
-          const entry = { resp, at: Date.now() };
-          replay.set(target, entry);
+          const entry = { resp, target, at: Date.now() };
+          replay.set(frame, entry);
           // the same page plus a #fragment would be a jump within the page, which loads nothing: load the page
           const same = frame.url().split('#')[0] === target;
           frame.goto(same ? target : url)
             .catch(() => {}) // a download ends it early; settle() waits on the page
-            .finally(() => replay.get(target) === entry && replay.delete(target));
+            .finally(() => replay.get(frame) === entry && replay.delete(frame));
           return;
         }
         return route.fulfill({ response: resp });
