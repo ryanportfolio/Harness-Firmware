@@ -237,7 +237,7 @@ function jsCell(src) {
     return fail(`unexpected ${JSON.stringify(ch)}`);
   }
   // names a cell may use besides its own variables: printing results and waiting on several calls at once
-  const NAMES = new Set(['await', 'const', 'let', 'var', 'text', 'console', 'log', 'Promise', 'all', 'allSettled', 'forEach', 'output']);
+  const NAMES = new Set(['await', 'const', 'let', 'var', 'text', 'console', 'log', 'Promise', 'all', 'allSettled', 'forEach', 'output', 'image_url']);
   const declared = new Set();
   toks.forEach((k, n) => {
     if (k.t === 'id' && ['const', 'let', 'var'].includes(k.v) && toks[n + 1]?.t === 'id' && toks[n + 2]?.v === '=') declared.add(toks[n + 1].v);
@@ -248,6 +248,18 @@ function jsCell(src) {
   for (let n = 0; n < toks.length; n++) {
     const k = toks[n];
     if (k.t !== 'id') continue;
+    if (k.v === 'image') {
+      // image() shows a picture to the walker: only the image_url of a view_image result, never a path or URL
+      let depth = 0;
+      let end = n + 1;
+      if (!is(end, 'p', '(')) return fail('image used other than as a call');
+      for (; end < toks.length; end++) {
+        if (is(end, 'p', '(')) depth++;
+        else if (is(end, 'p', ')') && --depth === 0) break;
+      }
+      if (!is(end - 2, 'p', '.') || !is(end - 1, 'id', 'image_url')) return fail('image shows only the image_url of a view_image result');
+      continue;
+    }
     if (k.v !== 'tools') {
       if (NAMES.has(k.v) || declared.has(k.v)) continue;
       return fail(`uses ${k.v}, which a walker cell does not need`);
@@ -764,9 +776,11 @@ async function serve(dir) {
       ...(o.storageState ? { storageState: o.storageState } : {}),
     });
     await context.route('**/*', async (route, req) => {
-      const waiting = req.method() === 'GET' && req.isNavigationRequest() ? replay.get(req.url()) : null;
+      // requests carry no #fragment, so replay is keyed without it
+      const key = req.url().split('#')[0];
+      const waiting = req.method() === 'GET' && req.isNavigationRequest() ? replay.get(key) : null;
       if (waiting) {
-        replay.delete(req.url());
+        replay.delete(key);
         if (Date.now() - waiting.at < 30000) return route.fulfill({ response: waiting.resp });
       }
       let u;
@@ -819,7 +833,7 @@ async function serve(dir) {
           frame = url !== req.url() && req.isNavigationRequest() ? req.frame() : null;
         } catch { /* a popup's first request has no frame yet: hand it the final response as before */ }
         if (frame) {
-          replay.set(url, { resp, at: Date.now() });
+          replay.set(url.split('#')[0], { resp, at: Date.now() });
           await route.abort('aborted');
           frame.goto(url).catch(() => {}); // a download or a later navigation ends it early; settle() waits on the page
           return;
