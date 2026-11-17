@@ -258,6 +258,14 @@ condensed.
 
 ### Changed
 
+- `servers` records a verification browser without a full machine snapshot.
+  `launchPlacedChrome()` records every Chrome it starts through
+  `registerByMarker()`, which looked the process up in a snapshot that also ran
+  two connection queries. Those queries can take seconds each on Windows, and
+  the lookup never read their results. `snapshot({ net: false })` now asks for
+  processes only and returns empty port lists, and `registerByMarker()` uses
+  it, so each headed Chrome start returns sooner. Listing and closing in
+  `/servers` still take the full snapshot. The Codex copy has the same change.
 - `merge` checks for a counted review right before merging. Step 5 now stops
   unless the latest review round that counted under Step 3 ran at the head
   being merged and passed. A failed or incomplete run, a self-review, or a
