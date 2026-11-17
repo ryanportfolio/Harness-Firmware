@@ -258,6 +258,10 @@ condensed.
 
 ### Changed
 
+- Codex reviews pin `gpt-6.2-sol` in place of `gpt-6.1-sol`. That covers
+  `codex-review` and `codex-fullreview` (Manager and sub-reviewers), the Codex
+  example in `impartial-review`, the README skill list and the harness loop
+  diagram. Astra skills stay on `gpt-6-astra`.
 - `servers` records a verification browser without a full machine snapshot.
   `launchPlacedChrome()` records every Chrome it starts through
   `registerByMarker()`, which looked the process up in a snapshot that also ran
