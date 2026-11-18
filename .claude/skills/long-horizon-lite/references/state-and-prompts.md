@@ -9,7 +9,7 @@ After compaction or restart: read state, compare it w/ `git log`, `git branch --
 - `planned` (no worker recorded) → Branch;
 - `executing` → confirm the worker stopped (not established → pause that round), then Scope check;
 - `committed` → Gate;
-- `gated` → first look in `git log --merges` on the task branch for a merge of that round branch. Found → the merge already happened: record its SHA and go on from Merge step 3. Not found → Merge;
+- `gated` → first look in `git log --merges` on the task branch for a merge of that round branch. Not found → Merge. Found → the merge already happened: record its SHA, then look for its revert (`git log --grep "This reverts commit <merge SHA>"`). No revert → go on from Merge step 3. Reverted → Phase `closed`, step back to Remaining;
 - `merged` → waits for its Sol run;
 - `closed` → nothing to do: the round died, conflicted or was reverted, and its step is back in Remaining or in Dead ends.
 
@@ -17,11 +17,11 @@ Audit runs. A verdict already written to the Audit log stands; do not apply the 
 
 ## Check-only repair
 
-For a round Sol marked `blocked` where the planning subagent found the work right and only the done-check wrong. The Manager writes a new check file (the frozen one is never edited) and runs it in a detached worktree (`git worktree add --detach <path> <SHA>`) twice: at the Round SHA it must match, at the Round SHA's first parent it must fail. Both logs go under `evidence/round-<N>/`; the one from the Round SHA becomes the round's `done-check.log`. Then write that round a new audit section naming the new check, record both new hashes in its block, and remove the detached worktrees. A check that cannot be made to fail at the first parent is not a repair: plan a fix step instead.
+For a round Sol marked `blocked` where the planning subagent found the work right and only the done-check wrong. The Manager writes a new check file (the frozen one is never edited) and runs it in a detached worktree (`git worktree add --detach <path> <SHA>`) twice: at the Round SHA it must match, at the Round SHA's first parent it must fail. Both logs go under `evidence/round-<N>/` with new names (`repair-<k>-round.log`, `repair-<k>-parent.log`); the original `done-check.log` stays as it is, since the first Sol report cites it. Then write that round a new audit section naming the new check, record its two hashes and the new round log path in the block, and remove the detached worktrees. A check that cannot be made to fail at the first parent is not a repair: plan a fix step instead.
 
 ## Worktree cleanup
 
-For a worktree no round will reuse: list links under it (`find <path> -type l`, which also lists Windows junctions), remove each w/ Node's `fs.unlinkSync` (removes a junction or symlink without following it), and repeat until the list is empty. Stop every process the round started. Then `git worktree remove <path>`, never with `--force`: Git refuses when the worktree still holds uncommitted or untracked files, and forcing would delete them, or delete a shared target through a link that was missed. A refusal → show the user what is in it.
+For a merged or dead round's worktree. Remove each link the Manager made in it, the ones on the block's Links line and no others, w/ Node's `fs.unlinkSync` (removes a junction or symlink without following it). Leave every other link alone: a tracked symlink belongs to the repo, an unknown one may be the user's. Check with `find <path> -type l` (it also lists Windows junctions) that none of the recorded links is left. Stop every process the round started. Then `git worktree remove <path>`, never with `--force`: Git refuses when the worktree still holds uncommitted or untracked files, and forcing would delete them, or delete a shared target through a link that was missed. A refusal → show the user what is in it.
 
 ## State file
 
@@ -54,12 +54,13 @@ Round: <N>   Batch: <B>   Phase: planned | executing | committed | gated | merge
 Step: <the one Remaining step this round works>
 Branch: lh-lite/<task-slug>/r<N>
 Workspace: <absolute path of the round's worktree>   Cut SHA: <task branch tip the round branch was cut from>
+Links: <dependency links the Manager made in the worktree, or none>
 Done-check: <command, folder relative to the repo root, expected exit code, expected output line if any>; script sha256: <hash at Plan>; red first: <gate-0 log path, failed as required>
 Write scope: <paths the executor may change; test and gate definitions only if the step is about them>
 Audit section: <path, written at Plan, never edited> sha256: <hash at Plan>
 Worker: <agent ID, last observed status; empty until an executor is dispatched>
 Attempts: <commit SHA on the round branch per attempt, gate pass | fail>
-Round SHA: <the merge commit on the task branch; filled at Merge>
+Round SHA: <the merge commit on the task branch; filled at Merge>   Done-check log: <evidence/round-<N>/done-check.log, or the repair log that replaced it>
 
 # Audit runs  (one line per Codex run, written at launch)
 - Sol group <G>: rounds <N, N, N>, <run dir>, <process or task ID>, running | exited <code>, <verdict lines per round>
