@@ -95,7 +95,7 @@ Sources: W = "How We Built an Agent That Improves Itself" (Zubin Aysola, W&B), h
 - **Design:**
   - Optional `## Persona` section in a scenario: the user's goal, what they know, what they will and will not volunteer, when they correct the agent, and a stop condition. Frontmatter `turns` caps the exchange at 6 or fewer.
   - The session agent relays: the subject receives the Prompt through `claude -p` in its arm as P2 defines, with session persistence on and `--output-format json` so the session id is captured; each subject reply goes to a fresh persona agent that answers in character; the session agent sends the answer with `claude -p --resume <session-id>` from the same arm directory so the subject's context persists. The exchange ends at the stop condition or the turn cap. The judge receives the full exchange and the criteria. The persona agent follows the same model floor as every other agent. Teardown also deletes the transcript folders these runs created under the temp-path project names.
-  - Targets: behaviors a single prompt cannot test. refine's "The user said opposite things: Ask" row (`.claude/skills/refine/SKILL.md:33`) and fable-mode's ask-or-continue rule (`.claude/skills/fable-mode/SKILL.md:19-20`).
+  - Targets: behaviors a single prompt cannot test. refine's "The user said opposite things: Ask" row (`.claude/skills/refine/SKILL.md:33`) and fable-mode's ask-or-continue rule (`.claude/skills/fable-mode/SKILL.md:18`).
   - The relay procedure goes into `.claude/evals/README.md` (new) next to the replay procedure.
 - **Acceptance:**
   - `--check` accepts a persona scenario and rejects `turns` above 6 and a persona without a stop condition; the test file covers both.
@@ -114,7 +114,7 @@ Sources: W = "How We Built an Agent That Improves Itself" (Zubin Aysola, W&B), h
 - W7 (effort on scoring robustness and drift): covered by `.claude/skills/refine/references/evaluation.md:5-7` and `.claude/skills/long-horizon/SKILL.md:129-133`. P3 inherits these rules instead of restating them.
 - W8 (unattended self-review of rollouts): the trace-to-task link is adopted in P1, P2 and P4. The plan rejects an automatic loop that edits skills on its own: auto-selection does not authorize edits (`.claude/skills/refine/SKILL.md:52-54`), and every replay bills the user.
 - W9 (automation does not absolve the human): covered by authorization boundaries across skills; P2's calibration and publish questions keep the user on each verdict that reaches a PR.
-- I1 (signal and verifier quality): covered by `.claude/skills/fable-mode/SKILL.md:34-45` and `.claude/skills/long-horizon/SKILL.md:120-128`. The missing measurement of verifier agreement is P2's calibration step.
+- I1 (signal and verifier quality): covered by `.claude/skills/fable-mode/SKILL.md:29-48` and `.claude/skills/long-horizon/SKILL.md:120-128`. The missing measurement of verifier agreement is P2's calibration step.
 - I2 (loop-one artifacts feed loop two): partly adopted in P2, since committed scenarios cross worktrees. The plan defers making long-horizon, arena and wow-loop state readable across worktrees: that state is task-specific, and pitfalls plus scenarios carry the durable part.
 - I3 (distillation map): two of three routes exist in `.claude/skills/refine/SKILL.md:55-59`; P2 adds the failure-to-eval route.
 - I4 (versioned agent recipe): the firmware is the recipe for tweaks and taste; P2 adds the evals leg. Nothing else adopted.
