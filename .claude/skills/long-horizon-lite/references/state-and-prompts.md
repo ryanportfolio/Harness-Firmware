@@ -10,7 +10,15 @@ After compaction or restart: read state, compare it w/ `git log`, `git branch --
 - `executing` → confirm the worker stopped (not established → pause that round), then Scope check;
 - `committed` → Gate; `gated` → Merge; `merged` → waits for its Sol run.
 
-Audit runs recorded → look at each first: still running → wait; finished for its recorded SHAs → use it. A second paid run only when the recorded one failed.
+Audit runs recorded → look at each first: no `exit-code` file in its run dir → still running, wait; `exit-code` present → apply SKILL.md's Accept rule to it. A second paid run only when the recorded one failed.
+
+## Check-only repair
+
+For a round Sol marked `blocked` where the planning subagent found the work right and only the done-check wrong. The Manager writes a new check file (the frozen one is never edited) and runs it in a detached worktree (`git worktree add --detach <path> <SHA>`) twice: at the Round SHA it must match, at the Round SHA's first parent it must fail. Both logs go under `evidence/round-<N>/`; the one from the Round SHA becomes the round's `done-check.log`. Then write that round a new audit section naming the new check, record both new hashes in its block, and remove the detached worktrees. A check that cannot be made to fail at the first parent is not a repair: plan a fix step instead.
+
+## Worktree cleanup
+
+For a worktree no round will reuse: list links under it (`find <path> -type l`, which also lists Windows junctions), remove each w/ Node's `fs.unlinkSync` (removes a junction or symlink without following it), and repeat until the list is empty. Then `git worktree remove <path>`; add `--force` only once no link is left, b/c forcing through a link deletes its shared target.
 
 ## State file
 
@@ -20,8 +28,9 @@ Copy into `.tmp/long-horizon-lite/<task-slug>/state.md`.
 # Contract  (original retained; explicit user changes recorded as amendments)
 Goal: <one paragraph>
 Acceptance: <the checks that prove it done, as a numbered list>
-Sections: <S1: steps 1-3, acceptance checks 1-2; S2: ...>  (none named: one section, all steps)
+Sections: <S1: steps 1-3, acceptance checks 1-2, base <SHA of the task branch tip before its first round>; S2: ...>  (none named: one section, all steps)
 Task branch: <the branch this work ships from>   Task base: <SHA before round one>
+Waiting: <merge of <PR>, or nothing>
 User decisions: <dependencies, environment changes and other approvals given at Start>
 Version: <current contract version>
 
@@ -41,8 +50,8 @@ Version: <current contract version>
 Round: <N>   Batch: <B>   Phase: planned | executing | committed | gated | merged
 Step: <the one Remaining step this round works>
 Branch: lh-lite/<task-slug>/r<N>
-Workspace: <absolute path of the round's worktree>
-Done-check: <command, folder relative to the repo root, expected exit code, expected output line if any>; red first: <gate-0 log path, failed as required>
+Workspace: <absolute path of the round's worktree>   Cut SHA: <task branch tip the round branch was cut from>
+Done-check: <command, folder relative to the repo root, expected exit code, expected output line if any>; script sha256: <hash at Plan>; red first: <gate-0 log path, failed as required>
 Write scope: <paths the executor may change; test and gate definitions only if the step is about them>
 Audit section: <path, written at Plan, never edited> sha256: <hash at Plan>
 Worker: <agent ID, last observed status; empty until an executor is dispatched>
@@ -94,6 +103,7 @@ seen none of the author's explanations. Work read-only: no edits, no agents, no 
 
 Contract (version <version>):
 <goal paragraph>
+Recorded decisions: <user decisions and amendments from the state file, or none>
 
 Below are <k> rounds. Judge each one on its own; one round's result never excuses another's.
 
@@ -120,13 +130,15 @@ Per round, in order:
    not evidence.
 
 Open your answer with one block of exactly these five lines per round, in round order, and nothing
-between the blocks. The detail follows after the last block.
+between the blocks. Each line carries one value and nothing after it: write `STATUS: complete`,
+never the list of choices and never a comment on the same line. The detail follows after the last
+block.
 
 ROUND: <N>
-STATUS: complete | incomplete | blocked
-CHECK: sound | weak
-INTEGRITY: clean | suspect | violation
-CONTRACT: aligned | drifted
+STATUS: <complete, incomplete or blocked>
+CHECK: <sound or weak>
+INTEGRITY: <clean, suspect or violation>
+CONTRACT: <aligned or drifted>
 
 - STATUS is complete when the code does what the step says and no finding breaks the step's stated
   outcome or an acceptance check it serves. It is incomplete when such a finding exists, whether or
@@ -142,16 +154,17 @@ CONTRACT: aligned | drifted
 
 Then, per round:
 EVIDENCE: for each verdict, the `path:line` or the command and output you relied on.
-FAILING: numbered within the round. Findings that set a verdict above. Each: `path:line`, what is
-wrong, which stated outcome or acceptance check it breaks, and the observation that would show it
-fixed.
-NOTES: numbered within the round. Hardening and edge cases past what the contract names. Each:
-`path:line` and one line. These change no verdict.
+FAILING: numbered within the round. Only findings that make STATUS incomplete or blocked, INTEGRITY
+suspect or violation, or CONTRACT drifted. Each: `path:line`, what is wrong, which stated outcome or
+acceptance check it breaks, and the observation that would show it fixed. A round that is complete,
+clean and aligned has none.
+NOTES: numbered within the round. Everything else: what a weak check misses, hardening, and edge
+cases past what the contract names. Each: `path:line` and one line. These change no verdict.
 ```
 
 ## Section audit prompt (Astra)
 
-Write into the section's new run dir at section end, after the Manager ran each acceptance check listed for the section and saved each output under `evidence/section-<S>/`, one log per check. For the last section, list every acceptance check of the contract; its base is the task base, or its own section base when earlier sections shipped as PRs. A re-audit gets a new run dir and a new prompt with the new head commit.
+Write into the section's new run dir at section end, after the Manager ran each acceptance check listed for the section and saved each output in that same run dir, one log per check (a re-audit's logs then never overwrite the first run's). For the last section, list every acceptance check of the contract; its base is the task base, or its own section base when earlier sections shipped as PRs. A re-audit gets a new run dir and a new prompt with the new head commit.
 
 ```markdown
 You are the independent auditor for a finished section of a larger task. Another auditor judges
@@ -160,6 +173,7 @@ reviews.
 
 Contract (version <version>):
 <goal paragraph>
+Recorded decisions: <user decisions and amendments from the state file, or none>
 Acceptance checks for this section: <numbers and text>
 Steps in this section: <step texts>
 
@@ -177,10 +191,11 @@ Do this in order:
 Your sandbox is read-only and may lack the project's tools. A command you cannot run is not a
 finding: say so and rely on the log.
 
-Answer with exactly these two lines first, then the detail:
+Answer with exactly these two lines first, then the detail. Each line carries one value and nothing
+after it: write `SECTION: pass`, never the list of choices and never a comment on the same line.
 
-SECTION: pass | fail
-CONTRACT: aligned | drifted
+SECTION: <pass or fail>
+CONTRACT: <aligned or drifted>
 
 - SECTION is fail when a finding breaks the goal or an acceptance check, read as a careful engineer
   would read them, not against every input you can construct.
@@ -193,7 +208,7 @@ the observation that would show it fixed.
 NOTES: numbered. Hardening and edge cases past what the contract names; these change no verdict.
 ```
 
-A section passes only on `SECTION: pass` + `CONTRACT: aligned` from a run that meets the acceptance rule in SKILL.md, with every round of the section complete + clean + aligned in a Sol run. The pass belongs to the head commit in the prompt, not to a later one.
+A section passes only on `SECTION: pass` + `CONTRACT: aligned` from a run that meets SKILL.md's Accept rule, launched after every round of the section passed Sol or was closed by a fix round that passed. The pass belongs to the head commit in the prompt: a later merge into the section voids it.
 
 ## Launch
 
@@ -205,11 +220,11 @@ mkdir -p "$(dirname "$RUN")" && mkdir "$RUN"               # then write the prom
 ```
 
 ```bash
-test -s "$RUN/prompt.md" && test ! -e "$RUN/run.log" && codex exec -s read-only -m "$MODEL" -c model_reasoning_effort=high -o "$RUN/report.md" - < "$RUN/prompt.md" > "$RUN/run.log" 2>&1
+test -n "$MODEL" && test -s "$RUN/prompt.md" && test ! -e "$RUN/run.log" && { codex exec -s read-only -m "$MODEL" -c model_reasoning_effort=high -o "$RUN/report.md" - < "$RUN/prompt.md" > "$RUN/run.log" 2>&1; echo $? > "$RUN/exit-code"; }
 ```
 
-The two `test` guards keep Codex from starting without a prompt, or into a directory that already holds a run's log.
+Set `RUN` and `MODEL` in the same command: a new shell call does not keep them. The three `test` guards keep Codex from starting without a model id, without a prompt, or into a directory that already holds a run's log. `exit-code` is written when the run ends, so it survives a restart of the Manager: no file means still running, and the Accept rule reads its value.
 
-Launch each run as its own background process from the task branch checkout, at most 4 at a time; start the next as one exits. A foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Before launch record in `$RUN/meta.md`: workspace, the SHAs in the prompt, CLI version, command, requested model + effort, start time. After exit add: exit code, end time, and the `model:`, `reasoning effort:` and `session id:` lines from the `run.log` header. A header that does not show the model → report it as requested, resolution unverified.
+Launch each run as its own background process from the task branch checkout, at most 4 at a time; start the next as one exits. A foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Before launch record in `$RUN/meta.md`: workspace, the SHAs in the prompt, CLI version, command, requested model + effort, start time. After exit add the end time and the `model:`, `reasoning effort:` and `session id:` lines from the `run.log` header. A header that does not show the model → report it as requested, resolution unverified.
 
-Read only the verdict lines of each report into the Manager's context: the five-line block per round at the top of a Sol report, the first two lines of a section report. Ignore trailing whitespace and anything after the value on its line. Report bodies go to the subagent that plans fix steps, and to fix-round executors, by path.
+Read only the verdict lines of each report into the Manager's context: the five-line block per round at the top of a Sol report, the first two lines of a section report. Trim surrounding whitespace; each line must then be exactly a key and one allowed value. Anything else on a verdict line makes the report malformed, which is a failed run, never a pass. Report bodies go to the subagent that plans fix steps, and to fix-round executors, by path.
