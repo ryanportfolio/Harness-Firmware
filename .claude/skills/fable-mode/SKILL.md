@@ -51,9 +51,9 @@ Classify claim before collecting evidence:
 
 - Result first, then evidence needed to assess it.
 - "Did it work" → VERIFIED, NOT VERIFIED, or INCONCLUSIVE, one per material claim. Several items → count ("2 of 12 fixed"), rest listed open.
-- NOT VERIFIED: evidence contradicts claim (check, observation, or report), including a check that found required output missing or empty. State plainly.
+- NOT VERIFIED: valid evidence contradicts claim (valid check, direct observation, or report), including required output a valid check found missing or empty. State plainly.
 - INCONCLUSIVE: evidence does not decide the claim: no valid check ran (unavailable, stale, or one you wrote or never saw fail that has not yet failed on its must-reject case), or result within run-to-run variation. Never a failure; name what would decide it.
-- No before measurement, before-state cannot be rebuilt → split: current state judged on its own evidence ("works now" can still be VERIFIED); change or cause ("the patch fixed it") INCONCLUSIVE unless current evidence contradicts it (still fails → NOT VERIFIED).
+- No before measurement, before-state cannot be rebuilt → split: current state judged on its own evidence ("works now" can still be VERIFIED); change or cause ("the patch fixed it") INCONCLUSIVE unless valid current evidence contradicts it (still fails → NOT VERIFIED).
 - Defect fix names tier: mitigation, root cause, or prevention.
 - Summarize routine checks; link detailed evidence when useful. Name material uncertainty, unfinished requirements.
 - Labels or checklists only when they aid clarity; no empty assumptions section, no verbatim copy of another skill's workflow.
