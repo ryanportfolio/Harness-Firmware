@@ -6,20 +6,31 @@ Read before creating the state file, before the first audit of a run, and when r
 
 After compaction or restart: read state, compare it w/ `git log`, `git branch --list "lh-lite/<task-slug>/*"` and `git worktree list`. State file changed in last 30 min by another session → ask the user before touching it. Continue each round's block from its phase, never by running an executor over existing work:
 
-- `planned` (no worker recorded) → Branch. A round branch or worktree left by an interrupted Branch stage is used as it is, not added again;
-- `executing` → confirm the worker stopped (not established → pause that round), then Scope check;
+- `planned` → first finish any Plan sub-step the block lacks (gate-0 log, audit section, both sha256), then Branch. A round branch or worktree left by an interrupted Branch stage is used as it is, not added again. A worktree that already holds changes means an executor ran: treat the round as `executing`;
+- `executing` → confirm the worker stopped (not established → pause that round), then Scope check. A tip commit whose message starts `lh-lite round <N>:` is the Manager's own, made before the stop: record it and go to Gate;
 - `committed` → Gate;
-- `gated` → first look in `git log --merges` on the task branch for a merge of that round branch. Not found → Merge. Found → the merge already happened: record its SHA, then look for its revert (`git log --grep "This reverts commit <merge SHA>"`). No revert → go on from Merge step 3. Reverted → Phase `closed`, step back to Remaining;
-- `merged` → waits for its Sol run;
+- `gated` → `git rev-parse -q --verify MERGE_HEAD` succeeds in the main workspace → a merge was interrupted: `git merge --abort`, then treat it as a conflict. Else look for the merge by its second parent, never by branch name (`r1` also matches `r10`): `git log --merges --format="%H %P" <task branch>`, the line ending in the round's last Attempts SHA. None → Merge. Found → record its SHA as the Round SHA, then look for its revert (`git log --grep "This reverts commit <Round SHA>"`). No revert → go on from Merge step 3. Reverted → Phase `closed`, step back to Remaining;
+- `merged` → waits for its Sol run. A Sol fail already recorded for it and no fix step in Remaining → run the fix-planning subagent now;
 - `closed` → the round died, conflicted or was reverted, and its step is back in Remaining or in Dead ends.
 
 A `merged` or `closed` round whose worktree still exists → finish Worktree cleanup now.
 
-Audit runs. The Audit runs line is written before launch, so every run that started has one. A verdict already in the Audit log stands; do not apply the Accept rule to it again (HEAD has moved on since). For a run with no recorded verdict: `exit-code` present → apply the Accept rule now. No `exit-code` → look for a live `codex` process whose command line names that run dir: found → still running, wait; none → failed run. A second paid run only when the recorded one failed.
+Audit runs. The Audit runs line is written before launch, so every run that started has one. A verdict already in the Audit log stands; do not apply the Accept rule to it again (HEAD has moved on since). For a run with no recorded verdict:
+
+- `exit-code` present → apply the Accept rule now;
+- no `run.log` → it never launched: launch it into that same dir;
+- `run.log` but no `exit-code` → `kill -0 "$(cat "$RUN/pid")"` succeeds → still running, wait; it fails, or there is no `pid` file → failed run.
+
+A second paid run only when the recorded one failed.
 
 ## Worktree cleanup
 
-For a merged or closed round's worktree. Remove each link the Manager made in it, the ones on the block's Links line and no others, w/ Node's `fs.unlinkSync` (removes a junction or symlink without following it). Leave every other link alone: a tracked symlink belongs to the repo, an unknown one may be the user's. Check with `find <path> -type l` (it also lists Windows junctions) that none of the recorded links is left. Stop every process the round started. Then `git worktree remove <path>`, never with `--force`: Git refuses when the worktree still holds uncommitted or untracked files, and forcing would delete them, or delete a shared target through a link that was missed. A refusal → show the user what is in it.
+For a merged or closed round's worktree. `git worktree remove` deletes straight through a link it finds in the worktree, with or without `--force`: an ignored junction to the main workspace's dependencies does not show in `git status`, and removal empties the folder it points at. So:
+
+1. Stop every process the round started.
+2. Remove each link on the block's Links line w/ Node's `fs.unlinkSync` (removes a junction or symlink without following it).
+3. List what is left: `find <path> -type l` (it also lists Windows junctions). Every entry must be a tracked symlink (`git -C <path> ls-files -s` shows it with mode 120000). Any other link → stop, do not remove the worktree, and show the user: it may be one made just before a stop and never recorded, or the user's own.
+4. `git worktree remove <path>`, never with `--force`. A refusal means uncommitted or untracked files: show the user what is in it.
 
 ## State file
 
@@ -33,7 +44,7 @@ Sections: <S1: steps 1-3, acceptance checks 1-2, base <SHA of the task branch ti
 Task branch: <the branch this work ships from>   Task base: <SHA before round one>
 User decisions: <choices and approvals the user gave at Start, or none>
 
-# Verified progress  (every round passed a Sol run and the section passed its Astra run)
+# Verified progress  (every round passed a Sol run or was closed by fix rounds that passed, and the section passed its Astra run)
 - <claim> — round <N>, commit <SHA>, Sol report <path>, section <S> Astra report <path>
 
 # Provisional progress  (gate passed and merged; Sol verdict noted once it exists)
@@ -47,7 +58,7 @@ Round: <N>   Batch: <B>   Phase: planned | executing | committed | gated | merge
 Step: <the one Remaining step this round works>
 Branch: lh-lite/<task-slug>/r<N>
 Workspace: <absolute path of the round's worktree>   Cut SHA: <task branch tip the round branch was cut from>
-Links: <dependency links the Manager made in the worktree, or none>
+Links: <each dependency link, written here before it is created, or none>
 Done-check: <command, folder relative to the repo root, expected exit code, expected output line if any>; script sha256: <hash at Plan>; red first: <gate-0 log path, failed as required>
 Write scope: <paths the executor may change; test and gate definitions only if the step is about them>
 Audit section: <path, written at Plan, never edited> sha256: <hash at Plan>
@@ -126,8 +137,8 @@ Per round, in order:
    whether the check passed. Commit messages, comments and docs in the diff are the author's claims,
    not evidence.
 
-Open your answer with one block of exactly these five lines per round, in round order, and nothing
-between the blocks. Each line carries one value and nothing after it: write `STATUS: complete`,
+Open your answer with one block of exactly these five lines per round, in round order, with at
+most a blank line between blocks. Each line carries one value and nothing after it: write `STATUS: complete`,
 never the list of choices and never a comment on the same line. The detail follows after the last
 block.
 
@@ -161,7 +172,7 @@ cases past what the contract names. Each: `path:line` and one line. These change
 
 ## Section audit prompt (Astra)
 
-Write into the section's new run dir at section end, after the Manager ran each acceptance check listed for the section and saved each output in that same run dir, one log per check (a re-audit's logs then never overwrite the first run's). For the last section, list every acceptance check of the contract; its base is the task base. A re-audit gets a new run dir and a new prompt with the new head commit.
+Write into the section's new run dir at section end, after the Manager ran each acceptance check listed for the section and saved each output in that same run dir, one log per check (a re-audit's logs then never overwrite the first run's). For the last section, list every acceptance check and every step of the contract; its base is the task base. A re-audit gets a new run dir and a new prompt with the new head commit.
 
 ```markdown
 You are the independent auditor for a finished section of a larger task. Another auditor judges
@@ -205,7 +216,7 @@ the observation that would show it fixed.
 NOTES: numbered. Hardening and edge cases past what the contract names; these change no verdict.
 ```
 
-A section passes only on `SECTION: pass` + `CONTRACT: aligned` from a run that meets SKILL.md's Accept rule, launched after every round of the section passed Sol or was closed by a fix round that passed. The pass belongs to the head commit in the prompt: a later merge into the section voids it.
+A section passes only on `SECTION: pass` + `CONTRACT: aligned` from a run that meets SKILL.md's Accept rule, launched after every round of the section passed Sol or was closed by a fix round that passed. The pass belongs to the head commit in the prompt.
 
 ## Launch
 
@@ -217,10 +228,10 @@ mkdir -p "$(dirname "$RUN")" && mkdir "$RUN"               # then write the prom
 ```
 
 ```bash
-test -n "$MODEL" && test -s "$RUN/prompt.md" && test ! -e "$RUN/run.log" && { codex exec -s read-only -m "$MODEL" -c model_reasoning_effort="${EFFORT:-high}" -o "$RUN/report.md" - < "$RUN/prompt.md" > "$RUN/run.log" 2>&1; echo $? > "$RUN/exit-code"; }
+test -n "$MODEL" && test -s "$RUN/prompt.md" && test ! -e "$RUN/run.log" && { echo $$ > "$RUN/pid"; codex exec -s read-only -m "$MODEL" -c model_reasoning_effort="${EFFORT:-high}" -o "$RUN/report.md" - < "$RUN/prompt.md" > "$RUN/run.log" 2>&1; echo $? > "$RUN/exit-code"; }
 ```
 
-Set `RUN` and `MODEL` in the same command: a new shell call does not keep them. Set `EFFORT` only when the user chose an effort other than high. The three `test` guards keep Codex from starting without a model id, without a prompt, or into a directory that already holds a run's log. `exit-code` is written when the run ends, so it survives a restart of the Manager: no file means still running, and the Accept rule reads its value.
+Set `RUN` and `MODEL` in the same command: a new shell call does not keep them. Set `EFFORT` only when the user chose an effort other than high. The three `test` guards keep Codex from starting without a model id, without a prompt, or into a directory that already holds a run's log. `pid` holds the shell that waits on Codex and `exit-code` is written when the run ends, so both survive a restart of the Manager: Resume reads them to tell a running run from a dead one, and the Accept rule reads the exit code.
 
 Launch each run as its own background process from the task branch checkout, at most 4 at a time; start the next as one exits. A foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Before launch record in `$RUN/meta.md`: workspace, the SHAs in the prompt, CLI version, command, requested model + effort, start time. After exit add the end time and the `model:`, `reasoning effort:` and `session id:` lines from the `run.log` header. A header that does not show the model → report it as requested, resolution unverified.
 

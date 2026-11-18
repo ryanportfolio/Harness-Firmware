@@ -33,7 +33,8 @@ condensed.
   two rounds left over, and once every round has passed, one Astra run at high
   effort checks that the steps work together. On the last section it covers
   the whole task.
-  Audit findings become fix steps, which are audited in a later group. Work
+  Audit findings the code can close become fix steps, which are audited in a
+  later group; a finding that needs a contract change ends the run. Work
   that passed its checks but has not passed both audits is reported as
   provisional. The Manager reads exit codes, verdict lines and short executor
   reports; logs, diffs and report bodies pass between workers by file path,
