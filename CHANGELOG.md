@@ -32,15 +32,17 @@ condensed.
   loop can end. At the end of each major section a Sol run covers any one or
   two rounds left over, and once every round has passed, one Astra run at high
   effort checks that the steps work together. On the last section it covers
-  the whole task, unless earlier sections already shipped as pull requests.
+  the whole task.
   Audit findings become fix steps, which are audited in a later group. Work
   that passed its checks but has not passed both audits is reported as
   provisional. The Manager reads exit codes, verdict lines and short executor
   reports; logs, diffs and report bodies pass between workers by file path,
   which keeps the main session's context small. Typing `/long-horizon-lite` is the OK for those
-  Codex runs, and the skill reports how many it spent. Writes outside the
-  repo, runs without Codex, and tasks where every step must be audited before
-  the next go to `long-horizon`. User-invoked only; disabled for Codex, where
+  Codex runs, and the skill reports how many it spent. The contract is fixed
+  for a run and the whole task is one branch and one pull request. Steps that
+  write outside the repo or change dependencies, runs without Codex, sections
+  that must ship as separate pull requests, and tasks where every step must be
+  audited before the next go to `long-horizon`. User-invoked only; disabled for Codex, where
   a Codex auditor would share the author's vendor.
 
 - `user-walk` for Claude and Codex. It finds where a first-time user wastes

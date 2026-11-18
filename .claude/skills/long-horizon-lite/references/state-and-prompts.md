@@ -11,34 +11,27 @@ After compaction or restart: read state, compare it w/ `git log`, `git branch --
 - `committed` → Gate;
 - `gated` → first look in `git log --merges` on the task branch for a merge of that round branch. Not found → Merge. Found → the merge already happened: record its SHA, then look for its revert (`git log --grep "This reverts commit <merge SHA>"`). No revert → go on from Merge step 3. Reverted → Phase `closed`, step back to Remaining;
 - `merged` → waits for its Sol run;
-- `closed` → nothing to do: the round died, conflicted or was reverted, and its step is back in Remaining or in Dead ends.
+- `closed` → the round died, conflicted or was reverted, and its step is back in Remaining or in Dead ends.
 
-Audit runs. A verdict already written to the Audit log stands; do not apply the Accept rule to it again (HEAD has moved on since). For a run with no recorded verdict: `exit-code` present → apply the Accept rule now. No `exit-code` → look for the recorded process or task ID: alive → still running, wait; gone, or never recorded → failed run. A second paid run only when the recorded one failed.
+A `merged` or `closed` round whose worktree still exists → finish Worktree cleanup now.
 
-## Check-only repair
-
-For a round Sol marked `blocked` where the planning subagent found the work right and only the done-check wrong. The Manager writes a new check file (the frozen one is never edited) and runs it in a detached worktree (`git worktree add --detach <path> <SHA>`) twice: at the Round SHA it must match, at the Round SHA's first parent it must fail. Link the same dependencies into both worktrees first and unlink them before removal; the failure at the first parent must come from the missing outcome, not from a runner that cannot start. Both logs go under `evidence/round-<N>/` with new names (`repair-<k>-round.log`, `repair-<k>-parent.log`); the original `done-check.log` stays as it is, since the first Sol report cites it. Then write that round a new audit section naming the new check, record its two hashes and the new round log path in the block, and remove the detached worktrees. A check that cannot be made to fail at the first parent is not a repair: plan a fix step instead.
+Audit runs. The Audit runs line is written before launch, so every run that started has one. A verdict already in the Audit log stands; do not apply the Accept rule to it again (HEAD has moved on since). For a run with no recorded verdict: `exit-code` present → apply the Accept rule now. No `exit-code` → look for a live `codex` process whose command line names that run dir: found → still running, wait; none → failed run. A second paid run only when the recorded one failed.
 
 ## Worktree cleanup
 
-For a merged or dead round's worktree. Remove each link the Manager made in it, the ones on the block's Links line and no others, w/ Node's `fs.unlinkSync` (removes a junction or symlink without following it). Leave every other link alone: a tracked symlink belongs to the repo, an unknown one may be the user's. Check with `find <path> -type l` (it also lists Windows junctions) that none of the recorded links is left. Stop every process the round started. Then `git worktree remove <path>`, never with `--force`: Git refuses when the worktree still holds uncommitted or untracked files, and forcing would delete them, or delete a shared target through a link that was missed. A refusal → show the user what is in it.
+For a merged or closed round's worktree. Remove each link the Manager made in it, the ones on the block's Links line and no others, w/ Node's `fs.unlinkSync` (removes a junction or symlink without following it). Leave every other link alone: a tracked symlink belongs to the repo, an unknown one may be the user's. Check with `find <path> -type l` (it also lists Windows junctions) that none of the recorded links is left. Stop every process the round started. Then `git worktree remove <path>`, never with `--force`: Git refuses when the worktree still holds uncommitted or untracked files, and forcing would delete them, or delete a shared target through a link that was missed. A refusal → show the user what is in it.
 
 ## State file
 
 Copy into `.tmp/long-horizon-lite/<task-slug>/state.md`.
 
 ```markdown
-# Contract  (original retained; explicit user changes recorded as amendments)
+# Contract  (fixed for the run; a change to it ends the run)
 Goal: <one paragraph>
 Acceptance: <the checks that prove it done, as a numbered list>
 Sections: <S1: steps 1-3, acceptance checks 1-2, base <SHA of the task branch tip before its first round>; S2: ...>  (none named: one section, all steps)
 Task branch: <the branch this work ships from>   Task base: <SHA before round one>
-Waiting: <merge of <PR>, or nothing>
-User decisions: <dependencies, environment changes and other approvals given at Start>
-Version: <current contract version>
-
-# Amendments
-- <version, explicit user instruction, changed checks, affected steps and claims>
+User decisions: <choices and approvals the user gave at Start, or none>
 
 # Verified progress  (every round passed a Sol run and the section passed its Astra run)
 - <claim> — round <N>, commit <SHA>, Sol report <path>, section <S> Astra report <path>
@@ -59,10 +52,10 @@ Done-check: <command, folder relative to the repo root, expected exit code, expe
 Write scope: <paths the executor may change; test and gate definitions only if the step is about them>
 Audit section: <path, written at Plan, never edited> sha256: <hash at Plan>
 Worker: <agent ID, last observed status; empty until an executor is dispatched>
-Attempts: <commit SHA on the round branch per attempt, gate pass | fail>
-Round SHA: <the merge commit on the task branch; filled at Merge>   Done-check log: <evidence/round-<N>/done-check.log, or the repair log that replaced it>
+Attempts: <commit SHA on the round branch per attempt, gate pass | fail; the last one is the tip the scope check expects>
+Round SHA: <the merge commit on the task branch; filled at Merge>
 
-# Audit runs  (one line per Codex run, written at launch)
+# Audit runs  (one line per Codex run, written before launch)
 - Sol group <G>: rounds <N, N, N>, <run dir>, <process or task ID>, running | exited <code>, <verdict lines per round>
 - Astra section <S>: base <SHA>, head <SHA>, <run dir>, <process or task ID>, running | exited <code>, <verdict lines>
 
@@ -105,9 +98,9 @@ Build in the new run dir: the text below, then the copied and filled section of 
 You are the independent auditor for steps of a larger task. You did not write this code and have
 seen none of the author's explanations. Work read-only: no edits, no agents, no nested reviews.
 
-Contract (version <version>):
+Contract:
 <goal paragraph>
-Recorded decisions: <user decisions and amendments from the state file, or none>
+Recorded decisions: <the User decisions line of the state file, or none>
 
 Below are <k> rounds. Judge each one on its own; one round's result never excuses another's.
 
@@ -168,16 +161,16 @@ cases past what the contract names. Each: `path:line` and one line. These change
 
 ## Section audit prompt (Astra)
 
-Write into the section's new run dir at section end, after the Manager ran each acceptance check listed for the section and saved each output in that same run dir, one log per check (a re-audit's logs then never overwrite the first run's). For the last section, list every acceptance check of the contract; its base is the task base, or its own section base when earlier sections shipped as PRs. A re-audit gets a new run dir and a new prompt with the new head commit.
+Write into the section's new run dir at section end, after the Manager ran each acceptance check listed for the section and saved each output in that same run dir, one log per check (a re-audit's logs then never overwrite the first run's). For the last section, list every acceptance check of the contract; its base is the task base. A re-audit gets a new run dir and a new prompt with the new head commit.
 
 ```markdown
 You are the independent auditor for a finished section of a larger task. Another auditor judges
 each step on its own. You did not write this code. Work read-only: no edits, no agents, no nested
 reviews.
 
-Contract (version <version>):
+Contract:
 <goal paragraph>
-Recorded decisions: <user decisions and amendments from the state file, or none>
+Recorded decisions: <the User decisions line of the state file, or none>
 Acceptance checks for this section: <numbers and text>
 Steps in this section: <step texts>
 
