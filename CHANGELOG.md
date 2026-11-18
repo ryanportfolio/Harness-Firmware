@@ -314,11 +314,13 @@ condensed.
   claim: with no before measurement and no way to rebuild the before-state,
   "works now" can still be VERIFIED while "the patch fixed it" stays
   INCONCLUSIVE, unless the problem still shows, which makes it NOT VERIFIED.
-  Any valid contradicting evidence is NOT VERIFIED, including a valid check
-  that found the required output missing or empty; INCONCLUSIVE is for when
-  no valid evidence decides the claim, such as no valid check and nothing
-  observed against it (a check you wrote or never saw fail counts once it
-  has failed on its must-reject case), or a result within normal variation.
+  The three verdicts are now defined together by what valid evidence (a
+  valid check or a direct observation) settles: VERIFIED when it establishes
+  the claim, NOT VERIFIED when it contradicts it (including a valid check
+  that found the required output missing or empty), INCONCLUSIVE when it does
+  neither. A check you wrote or never saw fail counts as valid once it has
+  failed on its must-reject case, and a result within normal variation
+  settles nothing.
   The Claude and Codex copies are now the same text.
 - Codex reviews pin `gpt-6.2-sol` in place of `gpt-6.1-sol`. That covers
   `codex-review` and `codex-fullreview` (Manager and sub-reviewers), the Codex
