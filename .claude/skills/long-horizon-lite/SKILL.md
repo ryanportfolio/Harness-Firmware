@@ -119,4 +119,4 @@ Count from Audit log, never memory.
 
 ## Completion
 
-Answer from Verified progress alone, after the last section's audits pass. Provisional progress is unaudited or only partly audited: report it as such, never as done. Unfinished = valid report: verified + provisional + remaining + missing checks. Bind the result to the head SHA the last Astra run audited; later commits need revalidation. Report Sol + Astra run counts, observed model + effort per run (or "requested, resolution unverified"), the auditors' NOTES by report path, unmerged round branches, and evidence paths.
+Answer from Verified progress alone, after the last section's audits pass. Provisional progress is unaudited or only partly audited: report it as such, never as done. Unfinished = valid report: verified + provisional + remaining + missing checks. Bind the result to the head SHA the last Astra run audited; later commits need revalidation. Report Sol + Astra run counts, observed model + effort per run (or "requested, resolution unverified"), the auditors' NOTES and every `CHECK: weak` round by report path, unmerged round branches, and evidence paths.
