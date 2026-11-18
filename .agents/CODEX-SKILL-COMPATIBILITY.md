@@ -26,7 +26,7 @@ for comparison, backup, reconciliation, and discovery checks.
 | Adapted | `apply-firmware`, `astra-review`, `claude-review`, `codex-review`, `deep-plan`, `init-project`, `lab`, `optimize-context`, `opus-fullreview`, `sync-starter` |
 | Capability-gated | `advocate`, `arena`, `cache-loop`, `climb-loop`, `conversion-ux`, `dare`, `design-prototypes`, `impartial-review`, `long-horizon`, `motion-design`, `perf-loop`, `product-walkthrough`, `redesign-concepts`, `security-loop`, `seo-loop`, `ui-quality`, `untangle`, `user-walk`, `why`, `wow-animation`, `wow-loop` |
 | Dangerous | `adopt-repo`, `merge` |
-| Claude-only | `astra-fullreview`, `codex-fullreview`, `codex-image-gen`, `coordinate`, `gauntlet`, `long-horizon-workflows` |
+| Claude-only | `astra-fullreview`, `codex-fullreview`, `codex-image-gen`, `coordinate`, `gauntlet`, `long-horizon-lite`, `long-horizon-workflows` |
 
 `forge-repo-ui-skill`'s Codex copy keeps stricter gates than its Claude copy on purpose: commits, pushes and PRs need their own authorization, and a fresh agent needs the user's permission, because `AGENTS.md` has no commit-on-completion rule. Edits to those lines stay Claude-only.
 
@@ -51,6 +51,8 @@ for comparison, backup, reconciliation, and discovery checks.
 `seo-loop` needs Node 20 or newer, network access to the site and to the sites it compares against, and `npx` access to GitHub for willaicite. Its study and field steps run as parallel subagents and its build batches ship only after fresh independent integrity and regression reviewers; without agent tools it reports that gap and does not count self-review as the gate. The field spot checks need a web search tool; without one, it picks comparison sites from the owner and the study and says the searches were not run. Visual regression checks need headed Chrome; without it, say rendered pages were not checked.
 
 `security-loop` is a standalone Codex skill that needs exposed agent tools for every hunter, critic, and verifier; without them it stops after collecting signals rather than substituting self-review. Its cross-vendor check runs through Claude CLI under `claude-review`'s fail-closed subscription preflight and is reported as unavailable when that preflight fails. Owner-local checks run only first-party code in a fresh worktree with an empty environment; untrusted code stays source-only on this machine.
+
+`long-horizon-lite` is Claude-only: its auditors are Sol and Astra run through `codex exec`, so from Codex they would share the author's vendor and the audit would lose the independence the skill exists for. From Codex use `$long-horizon`.
 
 `untangle` is a standalone Codex skill that only reports: the survey never edits the target, and the owner's picked fixes go to `$long-horizon` (or run in the session when they need fewer than 3 steps). Its fix critics need exposed agent tools; without them the Manager may survey areas itself, but every fix is marked uncritiqued and the handover says so. `scripts/co-change.mjs` needs Node and Git only.
 

@@ -4,7 +4,7 @@
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/boot-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/boot-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/boot-dark.svg">
-<img alt="Harness Firmware boots with 55 skills, 7 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
+<img alt="Harness Firmware boots with 56 skills, 7 project-memory files, and 2 runtime boundaries ready." src="assets/readme/boot-light.svg" width="100%">
 </picture>
 
 A repository starter for **Claude Code and Codex**. Harness Firmware gives both agents versioned instructions, durable project memory, reusable skills, and workflows for testing and independent review.
@@ -72,19 +72,19 @@ The dotted branch is separate: after human review, `sync-starter` can move a gen
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/runtime-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/runtime-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/runtime-dark.svg">
-<img alt="55 Claude Code skills and 51 Codex skills share project memory. Codex has 51 native workflows." src="assets/readme/runtime-light.svg" width="100%">
+<img alt="56 Claude Code skills and 51 Codex skills share project memory. Codex has 51 native workflows." src="assets/readme/runtime-light.svg" width="100%">
 </picture>
 
-**55 Claude Code skills · 51 Codex skills · 51 native Codex workflows**
+**56 Claude Code skills · 51 Codex skills · 51 native Codex workflows**
 
 - **Claude Code:** reads `CLAUDE.md`, `.claude/skills/`, and hooks for canonical playbooks and Claude-specific startup behavior.
 - **Codex:** reads `AGENTS.md` and `.agents/skills/` for standalone Codex workflows with explicit capability and safety boundaries; every Claude skill has a maintained native Codex version or is disabled for Codex. [Skill ownership and personal copies](docs/codex-skills.md) explains how they are maintained.
 
 Both runtimes read the committed project topics under `.claude/reference/`. Shared workflows live under `.claude/skills/`; standalone Codex workflows live under `.agents/skills/`.
 
-## 55 workflows, loaded when called
+## 56 workflows, loaded when called
 
-**8 core · 19 discipline · 28 specialist**
+**8 core · 20 discipline · 28 specialist**
 
 Only names and routing descriptions sit in the repository's generated skill index. Full workflow bodies stay on demand. The diagram's byte figures are a repository source-file estimate, not total runtime context; [the guide documents the measurement](GUIDE.md#measure-the-always-loaded-layer).
 
@@ -95,13 +95,13 @@ Only names and routing descriptions sit in the repository's generated skill inde
 <source media="(max-width: 500px) and (prefers-color-scheme: dark)" srcset="assets/readme/skills-narrow-dark.svg">
 <source media="(max-width: 500px)" srcset="assets/readme/skills-narrow-light.svg">
 <source media="(prefers-color-scheme: dark)" srcset="assets/readme/skills-dark.svg">
-<img alt="A memory map of 55 on-demand workflows grouped into 8 core, 19 discipline, and 28 specialist skills." src="assets/readme/skills-light.svg" width="100%">
+<img alt="A memory map of 56 on-demand workflows grouped into 8 core, 20 discipline, and 28 specialist skills." src="assets/readme/skills-light.svg" width="100%">
 </picture>
 
 </details>
 
 <details>
-<summary><strong>Click to browse all 55 skills</strong></summary>
+<summary><strong>Click to browse all 56 skills</strong></summary>
 
 <!-- skill-list:start -->
 ### core workflows · 8
@@ -115,7 +115,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`adopt-repo`](.claude/skills/adopt-repo/SKILL.md) · Mirror external repo privately under user's account + overlay firmware: clone, strip template-only files, privacy-sweep, init-project. Use: /adopt-repo <url>, 'pull this repo into our firmware'.
 - [`apply-firmware`](.claude/skills/apply-firmware/SKILL.md) · /apply-firmware, or bring current folder (plain folder, existing repo, old or partial firmware copy) up to full Harness Firmware in place. Mirror external repo → adopt-repo.
 
-### quality disciplines · 19
+### quality disciplines · 20
 
 - [`brainstorming`](.claude/skills/brainstorming/SKILL.md) · Brainstorm or design product, interface, workflow, architecture, or behavior change with unresolved goals or material tradeoffs. Skip routine or fully specified work.
 - [`deep-plan`](.claude/skills/deep-plan/SKILL.md) · /deep-plan: interview a loose idea in short decision rounds; stop for explicit go before anything is built.
@@ -126,6 +126,7 @@ Only names and routing descriptions sit in the repository's generated skill inde
 - [`security-loop`](.claude/skills/security-loop/SKILL.md) · Whole-repo security audit or pen-test in independently verified runs → fix owner's picks → rerun until nothing new. Use: /security-loop, 'security-audit / pen-test this codebase'. One diff or question → security-review.
 - [`untangle`](.claude/skills/untangle/SKILL.md) · Whole-codebase structure survey: hidden links, needless links, surplus, special cases → decision log of fixes, each over the problems it solves → owner picks → long-horizon fixes. Report only. Use: /untangle [area], 'untangle this codebase', 'where is this codebase tangled'. One diff → simplify or impartial-review.
 - [`long-horizon`](.claude/skills/long-horizon/SKILL.md) · Work too big for one context window: long multi-step tasks, progress lost to compaction or failed retries, work spanning hours or sessions, /long-horizon, or 'run in verified rounds'.
+- [`long-horizon-lite`](.claude/skills/long-horizon-lite/SKILL.md) · long-horizon, lighter: one step per round, a commit per round as baseline, Codex auditors (Sol each round, Astra at the end of each major section). Use: /long-horizon-lite. Parallel rounds, writes outside the repo, or no Codex → long-horizon.
 - [`long-horizon-workflows`](.claude/skills/long-horizon-workflows/SKILL.md) · Long-horizon rounds via Workflow tool: 1 script per batch, fresh baseline, candidate executors, blind pick, independent judges each round, schema verdicts, run journal. Use: /long-horizon-workflows, big task in Workflow-audited rounds. Claude Code only.
 - [`babysit-ci`](.claude/skills/babysit-ci/SKILL.md) · Watch PR checks, fix failures. Use: /babysit-ci, 'watch CI', 'fix CI', 'get checks green', PR with failing or pending checks. Not a bare merge request.
 - [`codex-review`](.claude/skills/codex-review/SKILL.md) · Cross-vendor second opinion: Codex CLI (codex exec review, gpt-6.2-sol, high) over PR, branch, commit, or uncommitted diff, then each finding verified. Use: /codex-review, 'have Codex/Sol review this'.

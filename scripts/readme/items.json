@@ -90,6 +90,11 @@
       "group": "discipline"
     },
     {
+      "name": "long-horizon-lite",
+      "label": "Long horizon lite",
+      "group": "discipline"
+    },
+    {
       "name": "long-horizon-workflows",
       "label": "Long horizon workflows",
       "group": "discipline"
