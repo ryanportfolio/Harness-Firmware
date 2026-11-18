@@ -98,8 +98,9 @@ Contract (version <version>):
 Below are <k> rounds. Judge each one on its own; one round's result never excuses another's.
 
 Judge a step against what it says and what the acceptance checks it serves say, read as a careful
-engineer would read them. Do not judge it against every input you can construct. A gap the
-contract does not name goes under NOTES and changes no verdict.
+engineer would read them. Do not judge it against every input you can construct. A sweeping
+sentence in a step ("rejects everything that is not X") is bounded by the cases its acceptance
+checks name. A gap those cases do not name goes under NOTES and changes no verdict.
 
 Your sandbox is read-only and may lack the project's tools. A command you cannot run is not a
 finding: say so and rely on the log.

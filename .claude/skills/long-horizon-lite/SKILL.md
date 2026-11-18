@@ -40,7 +40,7 @@ Work happens in fresh contexts; this one stays small enough to last the whole ta
 ## Start
 
 1. Contract: goal, numbered acceptance checks, steps (each sized so one fresh ctx finishes it: one slice, one migration, one bug), major sections. Section = contract milestone, or unit the user wants shipped as one PR; none named → whole task = one section.
-   - Acceptance checks name their cases. An open-ended one ("rejects any bad input") has no end an auditor can reach, so each audit finds one more gap → ask the user to bound it before round one.
+   - Acceptance checks name their cases, and every step, fix steps included, states its outcome as those cases. An open-ended check or step ("rejects any bad input", "throws unless the input is X") has no end an auditor can reach, so each audit finds one more gap → bound it; an acceptance check only with the user's OK.
    - Ask now for every user decision the steps need: new dependencies, environment changes, anything repo rules gate.
    - A bad step is found at its Sol checkpoint, up to three rounds later: a step whose failure would strand much later work goes last in its group of three.
 2. Task branch = the branch this work ships from: the current one, or a new one cut per repo rules. Record it + Task base. The main workspace stays on it for the whole task and `git status --porcelain` there must print nothing before round one. Uncommitted user work → ask the user to commit it or set it aside; never stash, reset, or discard it yourself.
@@ -69,9 +69,9 @@ Run max safe rounds at once. Each Plan: list every ready step first, then give e
    1. Stop every process the round started. The main workspace passes Clean tree.
    2. `git merge --no-ff <round branch>` → the merge commit is the Round SHA. Conflict → `git merge --abort`; the step returns to Remaining as a new round from the new tip; not a Dead end.
    3. Done-check again on the task branch → `evidence/round-<N>/done-check.log` (the log the auditor gets), then Clean tree. `git diff --quiet <round branch> HEAD` exits 0 → same tree: copy the gate log, no rerun. Mismatch → `git revert -m 1 <Round SHA>`, step back to Remaining.
-   4. Match → Provisional progress w/ Round SHA + log path; `git branch -d <round branch>`. The block stays in Current rounds, phase `merged`, until its section is verified: audits need its section path, sha256 and Round SHA.
+   4. Match → Provisional progress w/ Round SHA + log path. The block stays in Current rounds, phase `merged`, until its section is verified: audits need its section path, sha256 and Round SHA.
    5. Three rounds in Provisional progress with no Sol run yet → Sol checkpoint (below).
-   6. A worktree no round will reuse: list links under it (`find <path> -type l`, junctions included), remove each w/ Node's `fs.unlinkSync` until the list is empty, then `git worktree remove <path>`, w/ `--force` only once no link is left, b/c forcing through a link deletes its shared target.
+   6. A worktree no round will reuse: list links under it (`find <path> -type l`, junctions included), remove each w/ Node's `fs.unlinkSync` until the list is empty, then `git worktree remove <path>`, w/ `--force` only once no link is left, b/c forcing through a link deletes its shared target. A merged round branch → `git branch -d` once no worktree has it checked out (Git refuses before that): after its worktree is removed or switched to the next round's branch.
 
 **Clean tree.** After every check the Manager runs (gate, merged, section acceptance) and before every merge, `git status --porcelain` in that checkout must print nothing. A check that changed or created non-ignored files = Plan defect: save `git diff` + the new files under `evidence/round-<N>/check-writes/`, restore the tree to its commit, correct the check at next Plan. Check output never gets a commit; generated files a step needs (snapshots, lockfiles) are the executor's work, inside Write scope. Stray files before a merge that no check made → show the user the paths; do not merge over them.
 
@@ -81,7 +81,7 @@ Run max safe rounds at once. Each Plan: list every ready step first, then give e
 
 **Section end.** Every step of a section in Provisional progress → on the task branch:
 
-1. Manager runs the section's acceptance checks → logs under `evidence/section-<S>/`, one per check, then Clean tree. Last section: every acceptance check of the contract.
+1. Manager runs the section's acceptance checks → logs under `evidence/section-<S>/`, one per check, then Clean tree. Last section: every acceptance check of the contract. A check that fails here → no section audit yet: plan a fix step from its log first.
 2. Write the Astra prompt over `<section base SHA>..HEAD`. Last section: `<task base SHA>..HEAD`, or its own section base when earlier sections shipped as PRs (the default branch has moved since the task base, so that diff would pull in unrelated merged work).
 3. Launch together: the Astra run, plus one Sol run for the section's leftover rounds (one or two rounds no checkpoint covered), if any. Wait for these and for any checkpoint still running.
 
@@ -100,7 +100,7 @@ Sol lists findings in two groups: FAILING (changes a verdict) and NOTES (hardeni
 
 A section's steps move to Verified progress, w/ report paths, only when every one of its rounds passed in a Sol run and its Astra run passed; then archive their blocks to the Audit log. A round or section that fails:
 
-- One fresh subagent reads the failing report and reproduces each FAILING finding before planning anything. Reproduced → a fix step, 6 lines or fewer: step, Write scope, done-check that fails on the current code, finding reference (`<report path>#<n>`). Not reproduced → it returns the finding w/ the output that contradicts it; the Manager cannot overrule the auditor: show the user both and let the user decide.
+- One fresh subagent reads the failing report and reproduces each FAILING finding before planning anything. Reproduced → a fix step, 6 lines or fewer: step (as named cases), Write scope (every file that documents or uses the behaviour the fix changes, docs included), done-check that fails on the current code, finding reference (`<report path>#<n>`). A weak check is replaced by a new check file that becomes the fix round's done-check; a frozen check is never edited, and a check alone is not a fix step. Not reproduced → it returns the finding w/ the output that contradicts it; the Manager cannot overrule the auditor: show the user both and let the user decide.
 - A finding that only a contract change can close (an acceptance check too weak or too broad) → stop. Show the user the proposed amendment and wait for the OK before planning any fix round.
 - Fix steps go to the front of that section's Remaining and run as normal rounds; each fix round's audit section cites its finding reference. Its Sol verdict comes from the checkpoint or leftover group it lands in. `blocked` → the fix is a corrected check: no code change needed → no executor; the Manager reruns the corrected done-check at HEAD, writes that round a new audit section, and it joins the next group.
 - A failed round is closed only by a later passing Sol verdict on its fix round, never by the Manager. Nothing that depends on a failed round starts until then.
