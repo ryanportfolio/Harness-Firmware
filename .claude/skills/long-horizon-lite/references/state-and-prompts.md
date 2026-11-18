@@ -26,20 +26,20 @@ Version: <current contract version>
 # Remaining
 1. <step sized for one fresh context>; section: <S>; depends on: <step numbers or none>; finding: <report path#n, for a fix step>
 
-# Current rounds  (one block per active round; scope and done-check fixed at Plan)
-Round: <N>   Batch: <B>   Phase: planned | executing | committed | checked | merged
+# Current rounds  (one block per round, kept until its section is audited; scope and done-check fixed at Plan)
+Round: <N>   Batch: <B>   Phase: planned | executing | committed | gated | merged
 Step: <the one Remaining step this round works>
+Branch: lh-lite/<task-slug>/r<N>
 Workspace: <absolute path; the main workspace for a batch of one>
-Branch: <task branch for a batch of one, else lh-lite/<task-slug>/r<N>>
-Step base: <SHA before this step's first attempt; a recovery round keeps it>
-Done-check: <command, cwd, expected exit code, expected output line if any>
+Done-check: <command, folder relative to the repo root, expected exit code, expected output line if any>
 Write scope: <paths the executor may change; test and gate definitions only if the step is about them>
-Audit prompt: <path, written at Plan> sha256: <hash at Plan, before the three facts are filled>
-Worker: <agent ID, last observed status>
-Round SHA: <filled after the commit>
+Audit prompt: <path, written at Plan, never edited> sha256: <hash at Plan>
+Worker: <agent ID, last observed status; empty until an executor is dispatched>
+Attempts: <commit SHA on the round branch per attempt, gate pass | fail>
+Round SHA: <the merge commit on the task branch; filled at Merge>
 
 # Section audits  (filled at section end)
-Section: <S>   Pass: 1 | 2   Head: <SHA>
+Section: <S>   Base: <SHA of the task branch tip before the section's first round>   Pass: 1 | 2   Head: <SHA>
 - round <N>: <run dir>, <process ID>, running | exited <code>, <verdict lines>
 - section: <run dir>, <process ID>, running | exited <code>, <verdict lines>
 
@@ -47,17 +47,17 @@ Section: <S>   Pass: 1 | 2   Head: <SHA>
 - <approach>: <why it failed, one line>
 
 # Audit log
-- round <N> (batch <B>): <step> — gate pass | fail, <log path>; merge <commit or "conflict, back to Remaining">
+- round <N> (batch <B>), attempt <k>: <step> — gate pass | fail, <log path>; merge <commit, "conflict, back to Remaining", or "reverted, back to Remaining">
 - section <S> pass <1|2>: round verdicts <N: status/integrity/contract, ...>, section <pass|fail>, <observed model and effort per run>
 - unmerged round branches: <branch, why it was left>
 
 # Codex runs
-Sol: <count>   Astra: <count>   Expected at start: <steps> + <sections>
+Sol: <count>   Astra: <count>   Expected minimum at start: <steps> + <sections>
 ```
 
 ## Round audit prompt (Sol)
 
-Write to `evidence/round-<N>/prompt.md` at Plan. Fill only from the contract and the round's block; a fix round also names its finding reference. It is dispatched at section end: fill the three `<at section end>` fields then and change nothing else.
+Write to `evidence/round-<N>/prompt.md` at Plan. Fill only from the contract and the round's block; a fix round also names its finding reference. This file is frozen: never edit it after Plan. At section end, copy it into the new run dir and fill the three `<at section end>` fields in the copy, changing nothing else.
 
 ```markdown
 You are the independent auditor for one step of a larger task. You did not write this code and
@@ -70,19 +70,20 @@ Acceptance checks this step serves: <numbers and text>
 Step: <step text>
 Finding this step must close: <report path#n, or none>
 Write scope: <paths>
-Done-check: <command>, run from <cwd>, expected: <exit code and output line>
+Done-check: <command>, run from <folder relative to the repository root>, expected: <exit code and output line>
 
-Base commit: <at section end: Step base SHA>
+Base commit: <at section end: first parent of the round commit>
 Round commit: <at section end: Round SHA>
 Done-check output, captured by the task manager at the round commit: <at section end: absolute log path>
 
-Your checkout may be at a later commit than the round commit, because other steps of the same
-section were committed after it. Judge this step by its own diff, and read a file as this step
+The round commit is the merge commit that brought this step into the task branch, and the base
+commit is its first parent. Your checkout may be at a later commit, because other steps of the
+same section were merged after it. Judge this step by its own diff, and read a file as this step
 left it with `git show <round>:<path>`.
 
 Do this in order:
 1. Read the change with `git diff <base> <round>` and `git diff --stat <base> <round>`. That diff is
-   the author's whole work for this step, every attempt included.
+   the author's whole work for this step, every attempt included, and no other step's work.
 2. Read the done-check log. Rerun the command only if it is safe to run without writing files, and
    say that a rerun reflects the later checkout, not the round commit.
 3. Read the changed code and its callers far enough to judge whether the step is done, not only
@@ -112,7 +113,7 @@ FINDINGS: numbered. Each: `path:line`, what is wrong, and the observation that w
 
 ## Section audit prompt (Astra)
 
-Write to `evidence/section-<S>/prompt.md` at section end, after the Manager ran each acceptance check listed for the section and saved each output under `evidence/section-<S>/`. For the last section, list every acceptance check and use the task base. A second pass gets its own prompt file (`prompt-2.md`) with the new head commit.
+Write into the section's new run dir at section end, after the Manager ran each acceptance check listed for the section and saved each output under `evidence/section-<S>/`. For the last section, list every acceptance check of the contract; its base is the task base, or its own section base when earlier sections shipped as PRs. A second pass gets a new run dir and a new prompt with the new head commit.
 
 ```markdown
 You are the independent auditor for a finished section of a larger task. Another auditor is judging
@@ -149,14 +150,21 @@ A section passes only on `SECTION: pass` + `CONTRACT: aligned` from a run that m
 
 ## Launch
 
-One new directory per run, never reused: a retry or a second pass takes the next free number (`audit-2`, `audit-3`). `mkdir` without `-p` fails on an existing directory, and `&&` then keeps Codex from starting and overwriting an earlier run's log. `$MODEL` = exact id resolved per SKILL.md Guardrails. Prompt goes on stdin (`-`), so no shell quoting touches it.
+One new directory per run, never reused: a retry or a second pass takes the next free number (`audit-2`, `audit-3`). `mkdir` without `-p` fails on an existing directory: stop there and take the next number. `$MODEL` = exact id resolved per SKILL.md Guardrails. Prompt goes on stdin (`-`), so no shell quoting touches it.
 
 ```bash
 EV=<absolute task dir>/evidence/round-<N>     # or evidence/section-<S>
 RUN="$EV/audit-1"
-mkdir "$RUN" && codex exec -s read-only -m "$MODEL" -c model_reasoning_effort=high -o "$RUN/report.md" - < "$EV/prompt.md" > "$RUN/run.log" 2>&1
+mkdir "$RUN" && cp "$EV/prompt.md" "$RUN/prompt.md"     # round audit: then fill the three facts in the copy with the file-edit tool
+                                                        # section audit: write the prompt straight into "$RUN/prompt.md"
 ```
+
+```bash
+test -s "$RUN/prompt.md" && test ! -e "$RUN/run.log" && codex exec -s read-only -m "$MODEL" -c model_reasoning_effort=high -o "$RUN/report.md" - < "$RUN/prompt.md" > "$RUN/run.log" 2>&1
+```
+
+The two `test` guards keep Codex from starting without a prompt, or into a directory that already holds a run's log.
 
 Launch a section's runs as separate background processes from the task branch checkout, at most 4 at a time; start the next as one exits. A foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Before launch record in `$RUN/meta.md`: workspace, the SHAs in the prompt, CLI version, command, requested model + effort, start time. After exit add: exit code, end time, and the `model:`, `reasoning effort:` and `session id:` lines from the `run.log` header. A header that does not show the model → report it as requested, resolution unverified.
 
-Read only the verdict lines of each report into the Manager's context (the first four lines of a round report, the first two of a section report). Report bodies go to the subagent that plans fix steps, and to fix-round executors, by path.
+Read only the verdict lines of each report into the Manager's context (the first four lines of a round report, the first two of a section report; ignore trailing whitespace, and a value may carry a suffix such as `blocked: invalid check`). Report bodies go to the subagent that plans fix steps, and to fix-round executors, by path.

@@ -17,9 +17,11 @@ condensed.
   come from Codex. It keeps the state file, a fresh executor per step, a
   done-check fixed before the executor starts, and parallel rounds for steps
   that do not touch the same files or resources. Git carries the bookkeeping:
-  each round is one commit in place of a hash manifest, and a parallel round
-  works on its own branch and worktree and is merged back, in place of copying
-  files by manifest. No audit runs in the middle of a section. A round passes
+  each round works on its own branch and enters the task branch as one merge
+  commit, in place of hash manifests and copying files by manifest. The audit
+  reads that merge commit against its first parent, which is the step's whole
+  change and no other step's. Parallel rounds each get a worktree. No audit
+  runs in the middle of a section. A round passes
   on its write-scope check and its done-check exit code, and at the end of each
   major section every audit launches together: Sol at high effort judges each
   round with the three verdicts (status, integrity, contract), and Astra at
