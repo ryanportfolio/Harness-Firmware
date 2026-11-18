@@ -26,12 +26,13 @@ Version: <current contract version>
 # Current round  (scope and done-check fixed at Plan)
 Round: <N>   Phase: planned | executing | awaiting-audit | audited
 Step: <the one Remaining step this round works>
-Base: <SHA before the executor ran>
+Step base: <SHA before this step's first attempt; a recovery round keeps it>
 Done-check: <command, cwd, expected result>
 Write scope: <paths the executor may change; test and gate definitions only if the step is about them>
 Audit prompt: <path, written at Plan>
 Worker: <agent ID, last observed status>
-Round SHA: <filled after Execute>
+Round SHA: <filled after Execute's commit>
+Audit run: <run dir, process ID, running | exited <code>; filled at launch>
 
 # Dead ends  (approaches that failed audit; do not retry without new evidence)
 - <approach>: <why it failed, one line>
@@ -60,13 +61,13 @@ Step: <step text>
 Write scope: <paths>
 Done-check: <command>, run from <cwd>, expected: <expected result>
 
-Base commit: <after Execute>
-Round commit: <after Execute>
+Base commit: <after Execute: Step base SHA>
+Round commit: <after Execute: Round SHA>
 Done-check output, captured by the task manager after the round commit: <after Execute: log path>
 
 Do this in order:
 1. Read the change with `git diff <base> <round>` and `git diff --stat <base> <round>`. That diff is
-   the author's whole work for this step.
+   the author's whole work for this step, every attempt included.
 2. Read the done-check log. If the command is safe to run without writing files, run it yourself
    and compare; if not, say that you relied on the log.
 3. Read the changed code and its callers far enough to judge whether the step is done, not only
@@ -128,17 +129,16 @@ FINDINGS: numbered. Each: `path:line`, what is wrong, which acceptance check or 
 the observation that would show it fixed. Report only what breaks the goal or an acceptance check.
 ```
 
-A section passes only on `SECTION: pass` + `CONTRACT: aligned`.
+A section passes only on `SECTION: pass` + `CONTRACT: aligned` from a run that meets the acceptance rule in SKILL.md (exit 0, non-empty, HEAD still equal to the head commit in the prompt). The pass belongs to that head commit, not to a later one.
 
 ## Launch
 
-One new directory per run, never reused; a retry gets `audit-2`. `mkdir` without `-p` fails on an existing directory, which is the uniqueness check. `$MODEL` = exact id resolved per SKILL.md Guardrails. Prompt goes on stdin (`-`), so no shell quoting touches it.
+One new directory per run, never reused: a retry or a re-audit takes the next free number (`audit-2`, `audit-3`). `mkdir` without `-p` fails on an existing directory, and `&&` then keeps Codex from starting and overwriting an earlier run's log. `$MODEL` = exact id resolved per SKILL.md Guardrails. Prompt goes on stdin (`-`), so no shell quoting touches it.
 
 ```bash
 EV=.tmp/long-horizon-lite/<task-slug>/evidence/round-<N>     # or evidence/section-<S>
 RUN="$EV/audit-1"
-mkdir "$RUN"
-codex exec -s read-only -m "$MODEL" -c model_reasoning_effort=high -o "$RUN/report.md" - < "$EV/prompt.md" > "$RUN/run.log" 2>&1
+mkdir "$RUN" && codex exec -s read-only -m "$MODEL" -c model_reasoning_effort=high -o "$RUN/report.md" - < "$EV/prompt.md" > "$RUN/run.log" 2>&1
 ```
 
 Run it in the background and poll `run.log` + exit status; a foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Before launch record in `$RUN/meta.md`: workspace, Base and round (or head) SHAs, CLI version, command, requested model + effort, start time. After exit add: exit code, end time, and the `model:`, `reasoning effort:` and `session id:` lines from the `run.log` header. A header that does not show the model → report it as requested, resolution unverified.
