@@ -37,7 +37,7 @@ Classify claim before collecting evidence:
 | Cause ("X did it") | Change evidence, plus X isolated by revert and reapply or controlled change; before/after gap alone shows change only |
 
 - Change or cause claim ahead → measure before first edit. Missed → check out pre-change commit or rebuild old failing repro.
-- Verify at claim's layer: command success, generated content, visible behavior, performance, live integration need different evidence. Passing low-level check does not establish behavior above it. Visual observation counts w/o textual output.
+- Verify at claim's layer: command success, generated content, visible behavior, performance, live integration need different evidence. Passing low-level check does not establish behavior above it. Visual observation counts without textual output.
 - Rendered evidence → first confirm page serves current build.
 - Reopen outputs, inspect relevant edge cases, check original acceptance criteria.
 - Consequential claim → keep exact commands, exit codes, artifact paths, or screenshots.
@@ -51,9 +51,9 @@ Classify claim before collecting evidence:
 
 - Result first, then evidence needed to assess it.
 - "Did it work" → VERIFIED, NOT VERIFIED, or INCONCLUSIVE, one per material claim. Several items → count ("2 of 12 fixed"), rest listed open.
-- NOT VERIFIED: valid check contradicts claim, including required output missing or empty. State plainly.
-- INCONCLUSIVE: evidence does not decide the claim: no valid check ran (unavailable, stale, or itself unproven), or result within run-to-run variation. Never a failure; name what would decide it.
-- Before-state gone, cannot be rebuilt → split: current state on its own evidence ("works now": VERIFIED), change or cause INCONCLUSIVE ("the patch fixed it").
+- NOT VERIFIED: evidence contradicts claim (check, observation, or report), including a check that found required output missing or empty. State plainly.
+- INCONCLUSIVE: evidence does not decide the claim: no valid check ran (unavailable, stale, or written for this task and never seen to fail), or result within run-to-run variation. Never a failure; name what would decide it.
+- Before-state gone, cannot be rebuilt → split: current state judged on its own evidence ("works now" can still be VERIFIED), change or cause INCONCLUSIVE ("the patch fixed it").
 - Defect fix names tier: mitigation, root cause, or prevention.
 - Summarize routine checks; link detailed evidence when useful. Name material uncertainty, unfinished requirements.
 - Labels or checklists only when they aid clarity; no empty assumptions section, no verbatim copy of another skill's workflow.

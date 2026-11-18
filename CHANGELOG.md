@@ -293,16 +293,18 @@ condensed.
 
 - `fable-mode` body rewritten in the terse style the repo uses for files only
   agents read, with the evidence each claim needs (current state, change,
-  cause) in a table. Three rules changed. After two fixes fail on the same
-  failure it now says to name the assumption both shared and test it before a
-  third, and never to switch to a weaker check. A check you wrote or never saw
-  fail gets run once on the failure it guards against (missing or empty
-  output, or a planted bad case). Verdicts are given per claim: when the
-  before-state cannot be rebuilt, "works now" can be VERIFIED while "the patch
-  fixed it" stays INCONCLUSIVE. A check that ran and found the required output
-  missing or empty is NOT VERIFIED; INCONCLUSIVE is for evidence that does not
-  decide the claim, such as no valid check or a result within normal
-  variation. The Claude and Codex copies are now the same text.
+  cause) in a table. After two fixes fail on the same failure it now says to
+  name the assumption both shared and test it before a third, and never to
+  switch to a weaker check. A check you wrote or never saw fail gets run once
+  on the failure it guards against: missing or empty output or, for a check
+  that looks for something absent, a planted bad case. A change or cause claim
+  gets its before measurement before the first edit. Verdicts are given per
+  claim: when the before-state cannot be rebuilt, "works now" can still be
+  VERIFIED while "the patch fixed it" stays INCONCLUSIVE. Any contradicting
+  evidence is NOT VERIFIED, including a check that found the required output
+  missing or empty; INCONCLUSIVE is for evidence that does not decide the
+  claim, such as no valid check or a result within normal variation. The
+  Claude and Codex copies are now the same text.
 - Codex reviews pin `gpt-6.2-sol` in place of `gpt-6.1-sol`. That covers
   `codex-review` and `codex-fullreview` (Manager and sub-reviewers), the Codex
   example in `impartial-review`, the README skill list and the harness loop
