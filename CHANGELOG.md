@@ -34,17 +34,29 @@ condensed.
   effort checks that the steps work together. On the last section it covers
   the whole task.
   Audit findings the code can close become fix steps, which are audited in a
-  later group; a finding that needs a contract change ends the run. Work
+  later group. A finding only a contract change can close goes to the user as
+  a proposed amendment. The contract changes only on the user's explicit OK:
+  it then carries a version that every audit prompt names, and rounds whose
+  acceptance cases changed lose their verdict and are audited again. Work
   that passed its checks but has not passed both audits is reported as
   provisional. The Manager reads exit codes, verdict lines and short executor
   reports; logs, diffs and report bodies pass between workers by file path,
   which keeps the main session's context small. Typing `/long-horizon-lite` is the OK for those
-  Codex runs, and the skill reports how many it spent. The contract is fixed
-  for a run and the whole task is one branch and one pull request. Steps that
-  write outside the repo or change dependencies, runs without Codex, sections
-  that must ship as separate pull requests, and tasks where every step must be
-  audited before the next go to `long-horizon`. User-invoked only; disabled for Codex, where
-  a Codex auditor would share the author's vendor.
+  Codex runs, and the skill reports how many it spent. Three more paths sit
+  in a second reference file with the contract amendment. A step that
+  installs or updates a dependency needs the user's OK for that exact command
+  and runs alone, in a round with its own dependency folder, because `npm ci`
+  over a linked folder emptied the main workspace's copy; after the merge the
+  main workspace is brought to the merged lockfile before the check runs
+  there. A round whose code is right and whose done-check is wrong gets a new
+  check, which must pass at the round's merge commit and fail at its first
+  parent, and is then audited again. A section can ship as its own pull
+  request: the next section runs on a new branch cut from the updated default
+  branch, because a squash merge leaves the old branch's commits out of it.
+  The skill needs Codex, a Git repo, and results a commit can hold; tasks
+  where every step must be audited before the next go to `long-horizon`.
+  User-invoked only; disabled for Codex, where a Codex auditor would share
+  the author's vendor.
 
 - `user-walk` for Claude and Codex. It finds where a first-time user wastes
   steps in a web app. The main session lists every feature from the code with
