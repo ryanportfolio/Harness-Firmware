@@ -41,7 +41,7 @@ Classify claim before collecting evidence:
 - Rendered evidence → first confirm page serves current build.
 - Reopen outputs, inspect relevant edge cases, check original acceptance criteria.
 - Consequential claim → keep exact commands, exit codes, artifact paths, or screenshots.
-- Checks fit the change. Check you wrote or never saw fail → run once on a case it must reject, watch it fail. No tests that merely restate implementation.
+- Checks fit the change. Check you wrote or never saw fail → run once on the failure it guards against (missing or empty output; planted bad case for a check that looks for something absent), watch it fail. No tests that merely restate implementation.
 - Required checks pass → broaden or repeat only after relevant changes, failures, or unresolved concerns; else continue toward completion.
 - Do not mark unavailable required checks passed or discard them to claim completion.
 - Blocker → finish independent authorized work meanwhile.
@@ -52,7 +52,7 @@ Classify claim before collecting evidence:
 - Result first, then evidence needed to assess it.
 - "Did it work" → VERIFIED, NOT VERIFIED, or INCONCLUSIVE, one per material claim. Several items → count ("2 of 12 fixed"), rest listed open.
 - NOT VERIFIED: valid check contradicts claim, including required output missing or empty. State plainly.
-- INCONCLUSIVE: no valid check ran (unavailable, stale, or itself unproven). Never a failure; name what would decide it.
+- INCONCLUSIVE: evidence does not decide the claim: no valid check ran (unavailable, stale, or itself unproven), or result within run-to-run variation. Never a failure; name what would decide it.
 - Before-state gone, cannot be rebuilt → split: current state on its own evidence ("works now": VERIFIED), change or cause INCONCLUSIVE ("the patch fixed it").
 - Defect fix names tier: mitigation, root cause, or prevention.
 - Summarize routine checks; link detailed evidence when useful. Name material uncertainty, unfinished requirements.
