@@ -303,10 +303,11 @@ condensed.
   "works now" can still be VERIFIED while "the patch fixed it" stays
   INCONCLUSIVE, unless the problem still shows, which makes it NOT VERIFIED.
   Any valid contradicting evidence is NOT VERIFIED, including a valid check
-  that found the required output missing or empty; INCONCLUSIVE is for
-  evidence that does not decide the claim, such as no valid check (a check
-  you wrote or never saw fail counts once it has failed on its must-reject
-  case) or a result within normal variation. The Claude and Codex copies are now the same text.
+  that found the required output missing or empty; INCONCLUSIVE is for when
+  no valid evidence decides the claim, such as no valid check and nothing
+  observed against it (a check you wrote or never saw fail counts once it
+  has failed on its must-reject case), or a result within normal variation.
+  The Claude and Codex copies are now the same text.
 - Codex reviews pin `gpt-6.2-sol` in place of `gpt-6.1-sol`. That covers
   `codex-review` and `codex-fullreview` (Manager and sub-reviewers), the Codex
   example in `impartial-review`, the README skill list and the harness loop
