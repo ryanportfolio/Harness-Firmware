@@ -92,12 +92,7 @@ Prompt templates, launch commands and the run-directory rule: reference file. Pr
 
 **Accept** a report only when its recorded exit code is 0, it is non-empty, it opens with every verdict line for every round it covers, each line is exactly `KEY: value` with one allowed value once surrounding whitespace is trimmed (anything more on the line, such as the template's own `a | b` list, makes the report malformed), its prompt names the current contract version, and its SHAs still hold: each Round SHA is still an ancestor of the task branch tip, and a section run's head SHA still equals HEAD. Accept is applied once, when the run is collected; a verdict already in the Audit log stands. Else failed run: one retry in a new run dir, same prompt, then stop.
 
-**Verdicts.** Sol judges each round of its group on its own, against what the step and the acceptance checks it serves say, not against every input it can construct:
-
-- `STATUS` complete / incomplete / blocked. incomplete = a finding breaks the step's stated outcome or one of those checks. blocked = Sol could not judge the step: its done-check cannot run as written, or tests something other than the step.
-- `CHECK` sound / weak. weak = the done-check passes while a failing finding is present, or would pass with the step undone. It fails no round by itself; a fix step's check must fail on its finding.
-- `INTEGRITY` clean / suspect / violation. Diff outside Write scope, or touching test or gate definitions the step didn't own → `suspect` at best.
-- `CONTRACT` aligned / drifted. drifted = the change contradicts the contract or a recorded decision. Falling short of it is `incomplete`, never drifted.
+**Verdicts.** Sol judges each round of its group on its own, against what the step and the acceptance checks it serves say, not against every input it can construct. Per round: `STATUS` complete / incomplete / blocked, `CHECK` sound / weak, `INTEGRITY` clean / suspect / violation, `CONTRACT` aligned / drifted; the prompt template defines each. Two points the Manager holds to: `CHECK: weak` fails no round by itself, and work that falls short of the contract is `incomplete`, never `drifted`.
 
 Sol lists FAILING findings (they set STATUS, INTEGRITY or CONTRACT) and NOTES (everything else; they change no verdict). Astra judges what a per-step audit cannot see: do the steps work together, did a later round regress an earlier one, did the work contradict the contract. Round passes = complete + clean + aligned. Section passes = `SECTION: pass` + `CONTRACT: aligned`.
 
