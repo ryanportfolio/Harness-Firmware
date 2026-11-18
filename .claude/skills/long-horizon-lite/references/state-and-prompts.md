@@ -14,7 +14,7 @@ Then continue each round's block from its phase, never by running an executor ov
 - `executing` → confirm the worker stopped (not established → pause that round), then Scope check. A tip commit whose message starts `lh-lite round <N>:` is the Manager's own, made before the stop: record it and go to Gate;
 - `committed` → Gate;
 - `gated` → `git rev-parse -q --verify MERGE_HEAD` in the main workspace prints the round's last Attempts SHA → this round's merge was interrupted: `git merge --abort`, then treat it as a conflict. It prints any other SHA → that merge is not this round's: stop and ask the user, abort nothing. It prints nothing → look for the merge by its second parent, never by branch name (`r1` also matches `r10`): `git log --merges --format="%H %P" <task branch>`, the line ending in the round's last Attempts SHA. None → Merge. Found → record its SHA as the Round SHA, then look for its revert (`git log --grep "This reverts commit <Round SHA>"`). No revert → go on from Merge step 3. Reverted → Phase `closed`, step back to Remaining;
-- `merged` → waits for its Sol run. A Sol fail already recorded for it, and nothing cites that report's findings yet (no fix step in Remaining and no fix round in Current rounds or Provisional progress w/ a finding reference into that report, no `Repair` line and no Amendments line that names one) → run the fix-planning subagent now;
+- `merged` → waits for its Sol run. A Sol fail already recorded for it, and nothing cites that report's findings yet (no fix step in Remaining and no fix round in Current rounds or Provisional progress w/ a finding reference into that report, and no `Repair` or Amendments line whose finding reference points into that same report; a line that cites an earlier report does not count) → run the fix-planning subagent now;
 - `closed` → the round died, conflicted or was reverted, and its step is back in Remaining or in Dead ends.
 
 A `merged` or `closed` round whose worktree still exists → finish Worktree cleanup now.
@@ -47,7 +47,7 @@ Goal: <one paragraph>
 Acceptance: <the checks that prove it done, as a numbered list>
 Sections: <S1: steps 1-3, acceptance checks 1-2, base <SHA of the task branch tip before its first round>, ships: with the task | own PR; S2: ...>  (none named: one section, all steps)
 Task branch: <the branch the current section ships from>   Task base: <SHA that branch had before its first round>
-Shipped: <per section already merged: section, its task branch, audited head SHA, PR, merge commit; or none>
+Shipped: <per merged PR: the sections it carried, its task branch, audited head SHA, PR, merge commit; or none>
 Waiting: <merge of <PR URL>, next branch <name>; or nothing>
 User decisions: <choices and approvals the user gave, each approved install as command + step; or none>
 
@@ -68,7 +68,7 @@ Round: <N>   Batch: <B>   Phase: planned | executing | committed | gated | merge
 Step: <the one Remaining step this round works>
 Branch: lh-lite/<task-slug>/r<N>
 Workspace: <absolute path of the round's worktree>   Cut SHA: <task branch tip the round branch was cut from>
-Links: <each dependency link, or `own dependency folder: <path>`, written here before it is created; or none>
+Links: <each dependency link w/ the entry count of the folder it points at, or `own dependency folder: <path>`, written here before it is created; or none>
 Install: <dependency round only: approved command; restore: <restore command>; main workspace: not yet | installed | restored after revert>
 Done-check: <command, folder relative to the repo root, expected exit code, expected output line if any>; script sha256: <hash at Plan>; red first: <gate-0 log path, failed as required>
 Write scope: <paths the executor may change; test and gate definitions only if the step is about them>
