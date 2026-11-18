@@ -29,7 +29,7 @@ Step: <the one Remaining step this round works>
 Step base: <SHA before this step's first attempt; a recovery round keeps it>
 Done-check: <command, cwd, expected result>
 Write scope: <paths the executor may change; test and gate definitions only if the step is about them>
-Audit prompt: <path, written at Plan>
+Audit prompt: <path, written at Plan> sha256: <hash at Plan, before the three facts are filled>
 Worker: <agent ID, last observed status>
 Round SHA: <filled after Execute's commit>
 Audit run: <run dir, process ID, running | exited <code>; filled at launch>
