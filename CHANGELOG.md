@@ -291,6 +291,16 @@ condensed.
 
 ### Changed
 
+- `fable-mode` body rewritten in the terse style the repo uses for files only
+  agents read, with the evidence each claim needs (current state, change,
+  cause) in a table. Three rules changed. After two fixes fail on the same
+  failure it now says to name the assumption both shared and test it before a
+  third, and never to switch to a weaker check. A check you wrote or never saw
+  fail gets run once on a case it must reject. Verdicts are given per claim:
+  when the before-state cannot be rebuilt, "works now" can be VERIFIED while
+  "the patch fixed it" stays INCONCLUSIVE. A check that ran and found the
+  required output missing or empty is NOT VERIFIED; INCONCLUSIVE means no
+  valid check ran. The Claude and Codex copies are now the same text.
 - Codex reviews pin `gpt-6.2-sol` in place of `gpt-6.1-sol`. That covers
   `codex-review` and `codex-fullreview` (Manager and sub-reviewers), the Codex
   example in `impartial-review`, the README skill list and the harness loop
