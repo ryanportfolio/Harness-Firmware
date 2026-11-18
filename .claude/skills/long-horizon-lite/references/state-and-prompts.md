@@ -6,7 +6,7 @@ Read before creating the state file, before the first audit of a run, and when r
 
 After compaction or restart: read state, compare it w/ `git log`, `git branch --list "lh-lite/<task-slug>/*"` and `git worktree list`. State file changed in last 30 min by another session → ask the user before touching it. Continue each round's block from its phase, never by running an executor over existing work:
 
-- `planned` (no worker recorded) → Branch;
+- `planned` (no worker recorded) → Branch. A round branch or worktree left by an interrupted Branch stage is used as it is, not added again;
 - `executing` → confirm the worker stopped (not established → pause that round), then Scope check;
 - `committed` → Gate;
 - `gated` → first look in `git log --merges` on the task branch for a merge of that round branch. Not found → Merge. Found → the merge already happened: record its SHA, then look for its revert (`git log --grep "This reverts commit <merge SHA>"`). No revert → go on from Merge step 3. Reverted → Phase `closed`, step back to Remaining;
@@ -17,7 +17,7 @@ Audit runs. A verdict already written to the Audit log stands; do not apply the 
 
 ## Check-only repair
 
-For a round Sol marked `blocked` where the planning subagent found the work right and only the done-check wrong. The Manager writes a new check file (the frozen one is never edited) and runs it in a detached worktree (`git worktree add --detach <path> <SHA>`) twice: at the Round SHA it must match, at the Round SHA's first parent it must fail. Both logs go under `evidence/round-<N>/` with new names (`repair-<k>-round.log`, `repair-<k>-parent.log`); the original `done-check.log` stays as it is, since the first Sol report cites it. Then write that round a new audit section naming the new check, record its two hashes and the new round log path in the block, and remove the detached worktrees. A check that cannot be made to fail at the first parent is not a repair: plan a fix step instead.
+For a round Sol marked `blocked` where the planning subagent found the work right and only the done-check wrong. The Manager writes a new check file (the frozen one is never edited) and runs it in a detached worktree (`git worktree add --detach <path> <SHA>`) twice: at the Round SHA it must match, at the Round SHA's first parent it must fail. Link the same dependencies into both worktrees first and unlink them before removal; the failure at the first parent must come from the missing outcome, not from a runner that cannot start. Both logs go under `evidence/round-<N>/` with new names (`repair-<k>-round.log`, `repair-<k>-parent.log`); the original `done-check.log` stays as it is, since the first Sol report cites it. Then write that round a new audit section naming the new check, record its two hashes and the new round log path in the block, and remove the detached worktrees. A check that cannot be made to fail at the first parent is not a repair: plan a fix step instead.
 
 ## Worktree cleanup
 
