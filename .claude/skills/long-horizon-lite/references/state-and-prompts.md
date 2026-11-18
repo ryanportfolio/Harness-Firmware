@@ -8,9 +8,12 @@ After compaction or restart: read state, compare it w/ `git log`, `git branch --
 
 - `planned` (no worker recorded) → Branch;
 - `executing` → confirm the worker stopped (not established → pause that round), then Scope check;
-- `committed` → Gate; `gated` → Merge; `merged` → waits for its Sol run.
+- `committed` → Gate;
+- `gated` → first look in `git log --merges` on the task branch for a merge of that round branch. Found → the merge already happened: record its SHA and go on from Merge step 3. Not found → Merge;
+- `merged` → waits for its Sol run;
+- `closed` → nothing to do: the round died, conflicted or was reverted, and its step is back in Remaining or in Dead ends.
 
-Audit runs recorded → look at each first: no `exit-code` file in its run dir → still running, wait; `exit-code` present → apply SKILL.md's Accept rule to it. A second paid run only when the recorded one failed.
+Audit runs. A verdict already written to the Audit log stands; do not apply the Accept rule to it again (HEAD has moved on since). For a run with no recorded verdict: `exit-code` present → apply the Accept rule now. No `exit-code` → look for the recorded process or task ID: alive → still running, wait; gone, or never recorded → failed run. A second paid run only when the recorded one failed.
 
 ## Check-only repair
 
@@ -18,7 +21,7 @@ For a round Sol marked `blocked` where the planning subagent found the work righ
 
 ## Worktree cleanup
 
-For a worktree no round will reuse: list links under it (`find <path> -type l`, which also lists Windows junctions), remove each w/ Node's `fs.unlinkSync` (removes a junction or symlink without following it), and repeat until the list is empty. Then `git worktree remove <path>`; add `--force` only once no link is left, b/c forcing through a link deletes its shared target.
+For a worktree no round will reuse: list links under it (`find <path> -type l`, which also lists Windows junctions), remove each w/ Node's `fs.unlinkSync` (removes a junction or symlink without following it), and repeat until the list is empty. Stop every process the round started. Then `git worktree remove <path>`, never with `--force`: Git refuses when the worktree still holds uncommitted or untracked files, and forcing would delete them, or delete a shared target through a link that was missed. A refusal → show the user what is in it.
 
 ## State file
 
@@ -44,10 +47,10 @@ Version: <current contract version>
 - <step> — round <N>, commit <SHA>, done-check log <path>, Sol: none yet | pass <report path> | fail <report path>
 
 # Remaining
-1. <step sized for one fresh context>; section: <S>; depends on: <step numbers or none>; finding: <report path#n, for a fix step>
+1. <step sized for one fresh context>; section: <S>; depends on: <step numbers or none>; finding: <report path#round.n, for a fix step>
 
 # Current rounds  (one block per round, kept until its section is verified; scope and done-check fixed at Plan)
-Round: <N>   Batch: <B>   Phase: planned | executing | committed | gated | merged
+Round: <N>   Batch: <B>   Phase: planned | executing | committed | gated | merged | closed (<dead end, conflict or reverted>)
 Step: <the one Remaining step this round works>
 Branch: lh-lite/<task-slug>/r<N>
 Workspace: <absolute path of the round's worktree>   Cut SHA: <task branch tip the round branch was cut from>
@@ -84,7 +87,7 @@ Write to `evidence/round-<N>/section.md` at Plan. Fill only from the contract an
 
 Acceptance checks this step serves: <numbers and text>
 Step: <step text>
-Finding this step must close: <report path#n, or none>
+Finding this step must close: <report path#round.n, or none>
 Write scope: <paths>
 Done-check: <command>, run from <folder relative to the repository root>, expected: <exit code and output line>
 
@@ -220,10 +223,10 @@ mkdir -p "$(dirname "$RUN")" && mkdir "$RUN"               # then write the prom
 ```
 
 ```bash
-test -n "$MODEL" && test -s "$RUN/prompt.md" && test ! -e "$RUN/run.log" && { codex exec -s read-only -m "$MODEL" -c model_reasoning_effort=high -o "$RUN/report.md" - < "$RUN/prompt.md" > "$RUN/run.log" 2>&1; echo $? > "$RUN/exit-code"; }
+test -n "$MODEL" && test -s "$RUN/prompt.md" && test ! -e "$RUN/run.log" && { codex exec -s read-only -m "$MODEL" -c model_reasoning_effort="${EFFORT:-high}" -o "$RUN/report.md" - < "$RUN/prompt.md" > "$RUN/run.log" 2>&1; echo $? > "$RUN/exit-code"; }
 ```
 
-Set `RUN` and `MODEL` in the same command: a new shell call does not keep them. The three `test` guards keep Codex from starting without a model id, without a prompt, or into a directory that already holds a run's log. `exit-code` is written when the run ends, so it survives a restart of the Manager: no file means still running, and the Accept rule reads its value.
+Set `RUN` and `MODEL` in the same command: a new shell call does not keep them. Set `EFFORT` only when the user chose an effort other than high. The three `test` guards keep Codex from starting without a model id, without a prompt, or into a directory that already holds a run's log. `exit-code` is written when the run ends, so it survives a restart of the Manager: no file means still running, and the Accept rule reads its value.
 
 Launch each run as its own background process from the task branch checkout, at most 4 at a time; start the next as one exits. A foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Before launch record in `$RUN/meta.md`: workspace, the SHAs in the prompt, CLI version, command, requested model + effort, start time. After exit add the end time and the `model:`, `reasoning effort:` and `session id:` lines from the `run.log` header. A header that does not show the model → report it as requested, resolution unverified.
 
