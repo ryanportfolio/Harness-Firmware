@@ -13,6 +13,39 @@ condensed.
 
 ### Added
 
+- `long-horizon-lite`, a lighter `long-horizon` for Claude Code whose audits
+  come from Codex. It keeps the state file, a fresh executor per step, a
+  done-check fixed before the executor starts, and parallel rounds for steps
+  that do not touch the same files or resources. Git carries the bookkeeping:
+  each round works on its own branch and enters the task branch as one merge
+  commit, in place of hash manifests and copying files by manifest. The audit
+  reads that merge commit against its first parent, which is the step's whole
+  change and no other step's. Every round gets a worktree, so the main
+  checkout stays on the task branch. A round passes on its write-scope check
+  and its done-check exit code, and the done-check must first fail on the code
+  before the work, because a check that already passes proves nothing. Audits
+  come in groups so a long task does not pay for one per round: one Sol run at
+  high effort judges three merged rounds at a time, each with its own verdicts
+  (status, check quality, integrity, contract), while the next rounds keep
+  going. The auditor judges a step against what the step and its acceptance
+  checks say and lists anything past that as notes that fail nothing, so the
+  loop can end. At the end of each major section a Sol run covers any one or
+  two rounds left over, and once every round has passed, one Astra run at high
+  effort checks that the steps work together. On the last section it covers
+  the whole task.
+  Audit findings the code can close become fix steps, which are audited in a
+  later group; a finding that needs a contract change ends the run. Work
+  that passed its checks but has not passed both audits is reported as
+  provisional. The Manager reads exit codes, verdict lines and short executor
+  reports; logs, diffs and report bodies pass between workers by file path,
+  which keeps the main session's context small. Typing `/long-horizon-lite` is the OK for those
+  Codex runs, and the skill reports how many it spent. The contract is fixed
+  for a run and the whole task is one branch and one pull request. Steps that
+  write outside the repo or change dependencies, runs without Codex, sections
+  that must ship as separate pull requests, and tasks where every step must be
+  audited before the next go to `long-horizon`. User-invoked only; disabled for Codex, where
+  a Codex auditor would share the author's vendor.
+
 - `user-walk` for Claude and Codex. It finds where a first-time user wastes
   steps in a web app. The main session lists every feature from the code with
   `file:line` citations and the shortest path to it, then replays each path in
