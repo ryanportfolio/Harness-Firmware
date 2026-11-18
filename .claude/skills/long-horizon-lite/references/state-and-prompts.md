@@ -9,8 +9,8 @@ After compaction or restart: read state, compare it w/ `git log`, `git branch --
 - `planned` → first finish any Plan sub-step the block lacks (gate-0 log, audit section, both sha256), then Branch. A round branch or worktree left by an interrupted Branch stage is used as it is, not added again. A worktree that already holds changes means an executor ran: treat the round as `executing`;
 - `executing` → confirm the worker stopped (not established → pause that round), then Scope check. A tip commit whose message starts `lh-lite round <N>:` is the Manager's own, made before the stop: record it and go to Gate;
 - `committed` → Gate;
-- `gated` → `git rev-parse -q --verify MERGE_HEAD` succeeds in the main workspace → a merge was interrupted: `git merge --abort`, then treat it as a conflict. Else look for the merge by its second parent, never by branch name (`r1` also matches `r10`): `git log --merges --format="%H %P" <task branch>`, the line ending in the round's last Attempts SHA. None → Merge. Found → record its SHA as the Round SHA, then look for its revert (`git log --grep "This reverts commit <Round SHA>"`). No revert → go on from Merge step 3. Reverted → Phase `closed`, step back to Remaining;
-- `merged` → waits for its Sol run. A Sol fail already recorded for it and no fix step in Remaining → run the fix-planning subagent now;
+- `gated` → `git rev-parse -q --verify MERGE_HEAD` in the main workspace prints the round's last Attempts SHA → this round's merge was interrupted: `git merge --abort`, then treat it as a conflict. It prints any other SHA → that merge is not this round's: stop and ask the user, abort nothing. It prints nothing → look for the merge by its second parent, never by branch name (`r1` also matches `r10`): `git log --merges --format="%H %P" <task branch>`, the line ending in the round's last Attempts SHA. None → Merge. Found → record its SHA as the Round SHA, then look for its revert (`git log --grep "This reverts commit <Round SHA>"`). No revert → go on from Merge step 3. Reverted → Phase `closed`, step back to Remaining;
+- `merged` → waits for its Sol run. A Sol fail already recorded for it, and nothing cites its findings yet (no fix step in Remaining, no fix round in Current rounds or Provisional progress) → run the fix-planning subagent now;
 - `closed` → the round died, conflicted or was reverted, and its step is back in Remaining or in Dead ends.
 
 A `merged` or `closed` round whose worktree still exists → finish Worktree cleanup now.
@@ -19,7 +19,7 @@ Audit runs. The Audit runs line is written before launch, so every run that star
 
 - `exit-code` present → apply the Accept rule now;
 - no `run.log` → it never launched: launch it into that same dir;
-- `run.log` but no `exit-code` → `kill -0 "$(cat "$RUN/pid")"` succeeds → still running, wait; it fails, or there is no `pid` file → failed run.
+- `run.log` but no `exit-code` → `kill -0 "$(cat "$RUN/pid")"` succeeds → still running, wait. It fails → look for `exit-code` once more, since the run may have ended between the two looks; present → apply the Accept rule. Still none, or no `pid` file → failed run.
 
 A second paid run only when the recorded one failed.
 
@@ -28,7 +28,7 @@ A second paid run only when the recorded one failed.
 For a merged or closed round's worktree. `git worktree remove` deletes straight through a link it finds in the worktree, with or without `--force`: an ignored junction to the main workspace's dependencies does not show in `git status`, and removal empties the folder it points at. So:
 
 1. Stop every process the round started.
-2. Remove each link on the block's Links line w/ Node's `fs.unlinkSync` (removes a junction or symlink without following it).
+2. For each path on the block's Links line: missing → already clean. `fs.lstatSync` says symbolic link (a junction reports as one) → remove it w/ Node's `fs.unlinkSync`, which does not follow it. Anything else at that path is not the link: leave it and show the user.
 3. List what is left: `find <path> -type l` (it also lists Windows junctions). Every entry must be a tracked symlink (`git -C <path> ls-files -s` shows it with mode 120000). Any other link → stop, do not remove the worktree, and show the user: it may be one made just before a stop and never recorded, or the user's own.
 4. `git worktree remove <path>`, never with `--force`. A refusal means uncommitted or untracked files: show the user what is in it.
 
@@ -228,10 +228,10 @@ mkdir -p "$(dirname "$RUN")" && mkdir "$RUN"               # then write the prom
 ```
 
 ```bash
-test -n "$MODEL" && test -s "$RUN/prompt.md" && test ! -e "$RUN/run.log" && { echo $$ > "$RUN/pid"; codex exec -s read-only -m "$MODEL" -c model_reasoning_effort="${EFFORT:-high}" -o "$RUN/report.md" - < "$RUN/prompt.md" > "$RUN/run.log" 2>&1; echo $? > "$RUN/exit-code"; }
+test -n "$MODEL" && test -s "$RUN/prompt.md" && test ! -e "$RUN/run.log" && { echo $BASHPID > "$RUN/pid"; codex exec -s read-only -m "$MODEL" -c model_reasoning_effort="${EFFORT:-high}" -o "$RUN/report.md" - < "$RUN/prompt.md" > "$RUN/run.log" 2>&1; echo $? > "$RUN/exit-code"; }
 ```
 
-Set `RUN` and `MODEL` in the same command: a new shell call does not keep them. Set `EFFORT` only when the user chose an effort other than high. The three `test` guards keep Codex from starting without a model id, without a prompt, or into a directory that already holds a run's log. `pid` holds the shell that waits on Codex and `exit-code` is written when the run ends, so both survive a restart of the Manager: Resume reads them to tell a running run from a dead one, and the Accept rule reads the exit code.
+Set `RUN` and `MODEL` in the same command: a new shell call does not keep them. Set `EFFORT` only when the user chose an effort other than high. The three `test` guards keep Codex from starting without a model id, without a prompt, or into a directory that already holds a run's log. `pid` holds the shell that waits on Codex (`$BASHPID`, which stays right when the block runs in the background; `$$` would name the parent shell) and `exit-code` is written when the run ends, so both survive a restart of the Manager: Resume reads them to tell a running run from a dead one, and the Accept rule reads the exit code.
 
 Launch each run as its own background process from the task branch checkout, at most 4 at a time; start the next as one exits. A foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Before launch record in `$RUN/meta.md`: workspace, the SHAs in the prompt, CLI version, command, requested model + effort, start time. After exit add the end time and the `model:`, `reasoning effort:` and `session id:` lines from the `run.log` header. A header that does not show the model → report it as requested, resolution unverified.
 
