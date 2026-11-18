@@ -448,8 +448,10 @@ condensed.
   `INCONCLUSIVE`. `NOT VERIFIED` now needs variation small enough to rule out
   meeting the threshold; variation wide enough that the result could meet or
   miss it, or left unmeasured on a noisy check, makes the result
-  `INCONCLUSIVE`. This matches `fable-mode` and `perf-loop`, which already
-  treat a within-noise result as inconclusive.
+  `INCONCLUSIVE`. `fable-mode` gets the matching fix: its `INCONCLUSIVE`
+  used to cover any "result within run-to-run variation", which could pull in
+  a well-measured null result that refutes the claim. It now covers variation
+  left unmeasured on a noisy check, or too wide to decide the claim.
 
 - The `minimal` skill preset no longer drops `fable-mode`. `long-horizon`,
   `long-horizon-workflows`, `babysit-ci` and `dare` hand work to it, so a
