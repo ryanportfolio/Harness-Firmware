@@ -443,6 +443,14 @@ condensed.
 
 ### Fixed
 
+- The evaluation record used by `addskill` and `refine` (`evaluation.md`) no
+  longer lets a result inside run-to-run variation fit both `NOT VERIFIED` and
+  `INCONCLUSIVE`. `NOT VERIFIED` now needs variation small enough to rule out
+  meeting the threshold; variation wide enough that the result could meet or
+  miss it, or left unmeasured on a noisy check, makes the result
+  `INCONCLUSIVE`. This matches `fable-mode` and `perf-loop`, which already
+  treat a within-noise result as inconclusive.
+
 - The `minimal` skill preset no longer drops `fable-mode`. `long-horizon`,
   `long-horizon-workflows`, `babysit-ci` and `dare` hand work to it, so a
   minimal project had those hand-offs pointing at a missing skill. The four
