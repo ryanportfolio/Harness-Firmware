@@ -20,15 +20,16 @@ condensed.
   each round works on its own branch and enters the task branch as one merge
   commit, in place of hash manifests and copying files by manifest. The audit
   reads that merge commit against its first parent, which is the step's whole
-  change and no other step's. Parallel rounds each get a worktree. No audit
-  runs in the middle of a section. A round passes
-  on its write-scope check and its done-check exit code, and at the end of each
-  major section every audit launches together: Sol at high effort judges each
-  round with the three verdicts (status, integrity, contract), and Astra at
-  high effort checks that the steps work together, covering the whole task on
-  the last section. Audit findings become fix steps, followed by one more
-  audit pass. Work that passed its checks but has not been audited is reported
-  as provisional. The Manager reads exit codes and verdict lines only; logs
+  change and no other step's. Parallel rounds each get a worktree. A round
+  passes on its write-scope check and its done-check exit code. Audits come in
+  groups so a long task does not pay for one per round: one Sol run at high
+  effort judges three merged rounds at a time, each with the three verdicts
+  (status, integrity, contract), while the next rounds keep going. At the end
+  of each major section one Astra run at high effort checks that the steps
+  work together, covering the whole task on the last section, and a Sol run
+  covers any one or two rounds left over. Audit findings become fix steps,
+  which are audited in a later group. Work that passed its checks but has not
+  passed both audits is reported as provisional. The Manager reads exit codes and verdict lines only; logs
   and report bodies pass between workers by file path, which keeps the main
   session's context small. Typing `/long-horizon-lite` is the OK for those
   Codex runs, and the skill reports how many it spent. Writes outside the
