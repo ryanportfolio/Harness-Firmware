@@ -290,7 +290,7 @@ const finalSkills = new Set([...present, ...report.add.map((p) => p.match(SKILL_
 report.dependencyGaps = {
   missing: Object.entries(manifest?.skills?.dependencies ?? {}).filter(([s]) => finalSkills.has(s) && !turnedOff.has(s))
     .flatMap(([skill, needs]) => needs.filter((n) => !finalSkills.has(n) || turnedOff.has(n))
-      .map((need) => ({ skill, need, recordedRemoved: recorded.includes(need), turnedOff: finalSkills.has(need) }))),
+      .map((need) => ({ skill, need, recordedRemoved: recorded.includes(need), turnedOff: turnedOff.has(need) }))),
   requiredRemoved: [...required].filter((n) => recorded.includes(n)),
   overridesUnreadable,
 };
