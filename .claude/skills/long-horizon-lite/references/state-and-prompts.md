@@ -1,6 +1,6 @@
 # long-horizon-lite: state file, audit prompts, launch
 
-Read before creating the state file and before the first audit of a run.
+Read before creating the state file and before a section's audits.
 
 ## State file
 
@@ -17,29 +17,39 @@ Version: <current contract version>
 # Amendments
 - <version, explicit user instruction, changed checks, affected steps and claims>
 
-# Verified progress
-- <claim> — round <N>, commit <SHA>, audit report <path>
+# Verified progress  (section audits passed)
+- <claim> — round <N>, commit <SHA>, Sol report <path>, section <S> Astra report <path>
+
+# Provisional progress  (gate passed, not audited yet)
+- <step> — round <N>, commit <SHA>, done-check log <path>
 
 # Remaining
-1. <step sized for one fresh context>; section: <S>; depends on: <step numbers or none>
+1. <step sized for one fresh context>; section: <S>; depends on: <step numbers or none>; finding: <report path#n, for a fix step>
 
-# Current round  (scope and done-check fixed at Plan)
-Round: <N>   Phase: planned | executing | awaiting-audit | audited
+# Current rounds  (one block per active round; scope and done-check fixed at Plan)
+Round: <N>   Batch: <B>   Phase: planned | executing | committed | checked | merged
 Step: <the one Remaining step this round works>
+Workspace: <absolute path; the main workspace for a batch of one>
+Branch: <task branch for a batch of one, else lh-lite/<task-slug>/r<N>>
 Step base: <SHA before this step's first attempt; a recovery round keeps it>
-Done-check: <command, cwd, expected result>
+Done-check: <command, cwd, expected exit code, expected output line if any>
 Write scope: <paths the executor may change; test and gate definitions only if the step is about them>
 Audit prompt: <path, written at Plan> sha256: <hash at Plan, before the three facts are filled>
 Worker: <agent ID, last observed status>
-Round SHA: <filled after Execute's commit>
-Audit run: <run dir, process ID, running | exited <code>; filled at launch>
+Round SHA: <filled after the commit>
 
-# Dead ends  (approaches that failed audit; do not retry without new evidence)
+# Section audits  (filled at section end)
+Section: <S>   Pass: 1 | 2   Head: <SHA>
+- round <N>: <run dir>, <process ID>, running | exited <code>, <verdict lines>
+- section: <run dir>, <process ID>, running | exited <code>, <verdict lines>
+
+# Dead ends  (approaches that failed their gate twice; do not retry without new evidence)
 - <approach>: <why it failed, one line>
 
 # Audit log
-- round <N>: <step> — <status>/<integrity>/<contract>, <report path>, <observed model and effort>
-- section <S>: <pass or fail>, <report path>, <observed model and effort>
+- round <N> (batch <B>): <step> — gate pass | fail, <log path>; merge <commit or "conflict, back to Remaining">
+- section <S> pass <1|2>: round verdicts <N: status/integrity/contract, ...>, section <pass|fail>, <observed model and effort per run>
+- unmerged round branches: <branch, why it was left>
 
 # Codex runs
 Sol: <count>   Astra: <count>   Expected at start: <steps> + <sections>
@@ -47,7 +57,7 @@ Sol: <count>   Astra: <count>   Expected at start: <steps> + <sections>
 
 ## Round audit prompt (Sol)
 
-Write to `evidence/round-<N>/prompt.md` at Plan. Fill only from the contract and the Current round block. After Execute, fill the three `<after Execute>` fields and change nothing else.
+Write to `evidence/round-<N>/prompt.md` at Plan. Fill only from the contract and the round's block; a fix round also names its finding reference. It is dispatched at section end: fill the three `<at section end>` fields then and change nothing else.
 
 ```markdown
 You are the independent auditor for one step of a larger task. You did not write this code and
@@ -58,18 +68,23 @@ Contract (version <version>):
 Acceptance checks this step serves: <numbers and text>
 
 Step: <step text>
+Finding this step must close: <report path#n, or none>
 Write scope: <paths>
-Done-check: <command>, run from <cwd>, expected: <expected result>
+Done-check: <command>, run from <cwd>, expected: <exit code and output line>
 
-Base commit: <after Execute: Step base SHA>
-Round commit: <after Execute: Round SHA>
-Done-check output, captured by the task manager after the round commit: <after Execute: log path>
+Base commit: <at section end: Step base SHA>
+Round commit: <at section end: Round SHA>
+Done-check output, captured by the task manager at the round commit: <at section end: absolute log path>
+
+Your checkout may be at a later commit than the round commit, because other steps of the same
+section were committed after it. Judge this step by its own diff, and read a file as this step
+left it with `git show <round>:<path>`.
 
 Do this in order:
 1. Read the change with `git diff <base> <round>` and `git diff --stat <base> <round>`. That diff is
    the author's whole work for this step, every attempt included.
-2. Read the done-check log. If the command is safe to run without writing files, run it yourself
-   and compare; if not, say that you relied on the log.
+2. Read the done-check log. Rerun the command only if it is safe to run without writing files, and
+   say that a rerun reflects the later checkout, not the round commit.
 3. Read the changed code and its callers far enough to judge whether the step is done, not only
    whether the check passed. Commit messages, comments and docs in the diff are the author's claims,
    not evidence.
@@ -97,11 +112,12 @@ FINDINGS: numbered. Each: `path:line`, what is wrong, and the observation that w
 
 ## Section audit prompt (Astra)
 
-Write to `evidence/section-<S>/prompt.md` when the section's last step enters Verified progress. The Manager first runs each acceptance check listed for the section and saves each output under `evidence/section-<S>/`. For the last section, list every acceptance check and use the task base.
+Write to `evidence/section-<S>/prompt.md` at section end, after the Manager ran each acceptance check listed for the section and saved each output under `evidence/section-<S>/`. For the last section, list every acceptance check and use the task base. A second pass gets its own prompt file (`prompt-2.md`) with the new head commit.
 
 ```markdown
-You are the independent auditor for a finished section of a larger task. Each step in it passed its
-own audit separately. You did not write this code. Work read-only: no edits, no agents, no nested reviews.
+You are the independent auditor for a finished section of a larger task. Another auditor is judging
+each step on its own at the same time. You did not write this code. Work read-only: no edits, no
+agents, no nested reviews.
 
 Contract (version <version>):
 <goal paragraph>
@@ -110,7 +126,7 @@ Steps in this section: <step texts>
 
 Base commit: <section base SHA, or task base SHA for the last section>
 Head commit: <HEAD SHA>
-Acceptance check outputs, captured by the task manager at the head commit: <log paths>
+Acceptance check outputs, captured by the task manager at the head commit: <absolute log paths>
 
 Do this in order:
 1. Read the change with `git diff <base> <head>` and `git diff --stat <base> <head>`.
@@ -129,16 +145,18 @@ FINDINGS: numbered. Each: `path:line`, what is wrong, which acceptance check or 
 the observation that would show it fixed. Report only what breaks the goal or an acceptance check.
 ```
 
-A section passes only on `SECTION: pass` + `CONTRACT: aligned` from a run that meets the acceptance rule in SKILL.md (exit 0, non-empty, HEAD still equal to the head commit in the prompt). The pass belongs to that head commit, not to a later one.
+A section passes only on `SECTION: pass` + `CONTRACT: aligned` from a run that meets the acceptance rule in SKILL.md, together with complete + clean + aligned from every round audit of that pass. The pass belongs to the head commit in the prompt, not to a later one.
 
 ## Launch
 
-One new directory per run, never reused: a retry or a re-audit takes the next free number (`audit-2`, `audit-3`). `mkdir` without `-p` fails on an existing directory, and `&&` then keeps Codex from starting and overwriting an earlier run's log. `$MODEL` = exact id resolved per SKILL.md Guardrails. Prompt goes on stdin (`-`), so no shell quoting touches it.
+One new directory per run, never reused: a retry or a second pass takes the next free number (`audit-2`, `audit-3`). `mkdir` without `-p` fails on an existing directory, and `&&` then keeps Codex from starting and overwriting an earlier run's log. `$MODEL` = exact id resolved per SKILL.md Guardrails. Prompt goes on stdin (`-`), so no shell quoting touches it.
 
 ```bash
-EV=.tmp/long-horizon-lite/<task-slug>/evidence/round-<N>     # or evidence/section-<S>
+EV=<absolute task dir>/evidence/round-<N>     # or evidence/section-<S>
 RUN="$EV/audit-1"
 mkdir "$RUN" && codex exec -s read-only -m "$MODEL" -c model_reasoning_effort=high -o "$RUN/report.md" - < "$EV/prompt.md" > "$RUN/run.log" 2>&1
 ```
 
-Run it in the background and poll `run.log` + exit status; a foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Before launch record in `$RUN/meta.md`: workspace, Base and round (or head) SHAs, CLI version, command, requested model + effort, start time. After exit add: exit code, end time, and the `model:`, `reasoning effort:` and `session id:` lines from the `run.log` header. A header that does not show the model → report it as requested, resolution unverified.
+Launch a section's runs as separate background processes from the task branch checkout, at most 4 at a time; start the next as one exits. A foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Before launch record in `$RUN/meta.md`: workspace, the SHAs in the prompt, CLI version, command, requested model + effort, start time. After exit add: exit code, end time, and the `model:`, `reasoning effort:` and `session id:` lines from the `run.log` header. A header that does not show the model → report it as requested, resolution unverified.
+
+Read only the verdict lines of each report into the Manager's context (the first four lines of a round report, the first two of a section report). Report bodies go to the subagent that plans fix steps, and to fix-round executors, by path.

@@ -14,19 +14,25 @@ condensed.
 ### Added
 
 - `long-horizon-lite`, a lighter `long-horizon` for Claude Code whose audits
-  come from Codex. It keeps the state file, a fresh executor per step and a
-  done-check fixed before the executor starts. It drops the hash manifests
-  (each round is one Git commit, and the audit reads the diff between two
-  commits), runs one round at a time with no round worktrees, and has no Claude
-  auditor. Sol at high effort audits every round and returns the same three
-  verdicts (status, integrity, contract). Astra at high effort runs only at the
-  end of each major section, checks that the steps work together, and covers
-  the whole task on the last section. The Manager runs the done-check and
-  saves its output, because the auditor's sandbox is read-only. Typing
-  `/long-horizon-lite` is the OK for those Codex runs, and the skill reports
-  how many it spent. It sends parallel rounds, writes outside the repo and
-  runs without Codex to `long-horizon`. User-invoked only; disabled for Codex,
-  where a Codex auditor would share the author's vendor.
+  come from Codex. It keeps the state file, a fresh executor per step, a
+  done-check fixed before the executor starts, and parallel rounds for steps
+  that do not touch the same files or resources. Git carries the bookkeeping:
+  each round is one commit in place of a hash manifest, and a parallel round
+  works on its own branch and worktree and is merged back, in place of copying
+  files by manifest. No audit runs in the middle of a section. A round passes
+  on its write-scope check and its done-check exit code, and at the end of each
+  major section every audit launches together: Sol at high effort judges each
+  round with the three verdicts (status, integrity, contract), and Astra at
+  high effort checks that the steps work together, covering the whole task on
+  the last section. Audit findings become fix steps, followed by one more
+  audit pass. Work that passed its checks but has not been audited is reported
+  as provisional. The Manager reads exit codes and verdict lines only; logs
+  and report bodies pass between workers by file path, which keeps the main
+  session's context small. Typing `/long-horizon-lite` is the OK for those
+  Codex runs, and the skill reports how many it spent. Writes outside the
+  repo, runs without Codex, and tasks where every step must be audited before
+  the next go to `long-horizon`. User-invoked only; disabled for Codex, where
+  a Codex auditor would share the author's vendor.
 
 - `user-walk` for Claude and Codex. It finds where a first-time user wastes
   steps in a web app. The main session lists every feature from the code with
