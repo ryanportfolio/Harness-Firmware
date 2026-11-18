@@ -1,6 +1,16 @@
-# long-horizon-lite: state file, audit prompts, launch
+# long-horizon-lite: state file, audit prompts, launch, resume
 
-Read before creating the state file and before the first audit of a run.
+Read before creating the state file, before the first audit of a run, and when resuming.
+
+## Resume
+
+After compaction or restart: read state, compare it w/ `git log`, `git branch --list "lh-lite/<task-slug>/*"` and `git worktree list`. State file changed in last 30 min by another session → ask the user before touching it. Continue each round's block from its phase, never by running an executor over existing work:
+
+- `planned` (no worker recorded) → Branch;
+- `executing` → confirm the worker stopped (not established → pause that round), then Scope check;
+- `committed` → Gate; `gated` → Merge; `merged` → waits for its Sol run.
+
+Audit runs recorded → look at each first: still running → wait; finished for its recorded SHAs → use it. A second paid run only when the recorded one failed.
 
 ## State file
 
@@ -11,7 +21,8 @@ Copy into `.tmp/long-horizon-lite/<task-slug>/state.md`.
 Goal: <one paragraph>
 Acceptance: <the checks that prove it done, as a numbered list>
 Sections: <S1: steps 1-3, acceptance checks 1-2; S2: ...>  (none named: one section, all steps)
-Task base: <SHA before round one>
+Task branch: <the branch this work ships from>   Task base: <SHA before round one>
+User decisions: <dependencies, environment changes and other approvals given at Start>
 Version: <current contract version>
 
 # Amendments
@@ -30,8 +41,8 @@ Version: <current contract version>
 Round: <N>   Batch: <B>   Phase: planned | executing | committed | gated | merged
 Step: <the one Remaining step this round works>
 Branch: lh-lite/<task-slug>/r<N>
-Workspace: <absolute path; the main workspace for a batch of one>
-Done-check: <command, folder relative to the repo root, expected exit code, expected output line if any>
+Workspace: <absolute path of the round's worktree>
+Done-check: <command, folder relative to the repo root, expected exit code, expected output line if any>; red first: <gate-0 log path, failed as required>
 Write scope: <paths the executor may change; test and gate definitions only if the step is about them>
 Audit section: <path, written at Plan, never edited> sha256: <hash at Plan>
 Worker: <agent ID, last observed status; empty until an executor is dispatched>
@@ -86,6 +97,13 @@ Contract (version <version>):
 
 Below are <k> rounds. Judge each one on its own; one round's result never excuses another's.
 
+Judge a step against what it says and what the acceptance checks it serves say, read as a careful
+engineer would read them. Do not judge it against every input you can construct. A gap the
+contract does not name goes under NOTES and changes no verdict.
+
+Your sandbox is read-only and may lack the project's tools. A command you cannot run is not a
+finding: say so and rely on the log.
+
 For each round, the round commit is the merge commit that brought that step into the task branch,
 and the base commit is its first parent. Your checkout may be at a later commit, because other
 steps were merged after it. Judge a step by its own diff, and read a file as that step left it
@@ -105,24 +123,29 @@ between the blocks. The detail follows after the last block.
 
 ROUND: <N>
 STATUS: complete | incomplete | blocked
-REPAIRABLE: yes | no | n/a
+CHECK: sound | weak
 INTEGRITY: clean | suspect | violation
 CONTRACT: aligned | drifted
 
-- STATUS is complete only if the done-check result matches the expected result and the code does
-  what the step says. Use `blocked: invalid check` when the check cannot run as written, passes
-  while the work is wrong, or fails while the work is right.
-- REPAIRABLE applies to incomplete only: yes for a mechanical fault the approach survives (build
-  error, missing dependency, harness failure), no when the approach itself failed.
+- STATUS is complete when the code does what the step says and no finding breaks the step's stated
+  outcome or an acceptance check it serves. It is incomplete when such a finding exists, whether or
+  not the done-check caught it. It is blocked only when you could not judge the step: the done-check
+  cannot run as written, or it tests something other than the step. Say which.
+- CHECK is weak when the done-check passes although a failing finding is present, or would pass
+  with the step undone. A weak check does not by itself make the step incomplete.
 - INTEGRITY is clean only if the diff touches nothing outside the write scope. A diff that changes
   test or gate definitions the step did not own is suspect at best: a passing check proves nothing
   if the author could edit it. Unclear evidence is suspect.
-- CONTRACT is drifted when the change conflicts with the goal or an acceptance check.
+- CONTRACT is drifted only when the change contradicts the goal, an acceptance check or a recorded
+  decision: it does something they rule out. Falling short of them is incomplete, not drifted.
 
 Then, per round:
 EVIDENCE: for each verdict, the `path:line` or the command and output you relied on.
-FINDINGS: numbered within the round. Each: `path:line`, what is wrong, and the observation that
-would show it fixed.
+FAILING: numbered within the round. Findings that set a verdict above. Each: `path:line`, what is
+wrong, which stated outcome or acceptance check it breaks, and the observation that would show it
+fixed.
+NOTES: numbered within the round. Hardening and edge cases past what the contract names. Each:
+`path:line` and one line. These change no verdict.
 ```
 
 ## Section audit prompt (Astra)
@@ -150,14 +173,23 @@ Do this in order:
    broke an earlier one, work that drifted from the contract, and acceptance checks that pass while
    the goal is not met.
 
+Your sandbox is read-only and may lack the project's tools. A command you cannot run is not a
+finding: say so and rely on the log.
+
 Answer with exactly these two lines first, then the detail:
 
 SECTION: pass | fail
 CONTRACT: aligned | drifted
 
+- SECTION is fail when a finding breaks the goal or an acceptance check, read as a careful engineer
+  would read them, not against every input you can construct.
+- CONTRACT is drifted only when the work contradicts the goal, an acceptance check or a recorded
+  decision. Falling short of them is a fail, not drifted.
+
 EVIDENCE: for each acceptance check, pass, fail or not run, with the log path or your own command and output.
-FINDINGS: numbered. Each: `path:line`, what is wrong, which acceptance check or step it breaks, and
-the observation that would show it fixed. Report only what breaks the goal or an acceptance check.
+FAILING: numbered. Each: `path:line`, what is wrong, which acceptance check or step it breaks, and
+the observation that would show it fixed.
+NOTES: numbered. Hardening and edge cases past what the contract names; these change no verdict.
 ```
 
 A section passes only on `SECTION: pass` + `CONTRACT: aligned` from a run that meets the acceptance rule in SKILL.md, with every round of the section complete + clean + aligned in a Sol run. The pass belongs to the head commit in the prompt, not to a later one.
@@ -179,4 +211,4 @@ The two `test` guards keep Codex from starting without a prompt, or into a direc
 
 Launch each run as its own background process from the task branch checkout, at most 4 at a time; start the next as one exits. A foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Before launch record in `$RUN/meta.md`: workspace, the SHAs in the prompt, CLI version, command, requested model + effort, start time. After exit add: exit code, end time, and the `model:`, `reasoning effort:` and `session id:` lines from the `run.log` header. A header that does not show the model → report it as requested, resolution unverified.
 
-Read only the verdict lines of each report into the Manager's context: the five-line block per round at the top of a Sol report, the first two lines of a section report. Ignore trailing whitespace; a value may carry a suffix such as `blocked: invalid check`. Report bodies go to the subagent that plans fix steps, and to fix-round executors, by path.
+Read only the verdict lines of each report into the Manager's context: the five-line block per round at the top of a Sol report, the first two lines of a section report. Ignore trailing whitespace and anything after the value on its line. Report bodies go to the subagent that plans fix steps, and to fix-round executors, by path.

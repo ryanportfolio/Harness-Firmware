@@ -20,11 +20,16 @@ condensed.
   each round works on its own branch and enters the task branch as one merge
   commit, in place of hash manifests and copying files by manifest. The audit
   reads that merge commit against its first parent, which is the step's whole
-  change and no other step's. Parallel rounds each get a worktree. A round
-  passes on its write-scope check and its done-check exit code. Audits come in
+  change and no other step's. Every round gets a worktree, so the main
+  checkout stays on the task branch. A round passes on its write-scope check
+  and its done-check exit code, and the done-check must first fail on the code
+  before the work, because a check that already passes proves nothing. Audits come in
   groups so a long task does not pay for one per round: one Sol run at high
-  effort judges three merged rounds at a time, each with the three verdicts
-  (status, integrity, contract), while the next rounds keep going. At the end
+  effort judges three merged rounds at a time, each with its own verdicts
+  (status, check quality, integrity, contract), while the next rounds keep
+  going. The auditor judges a step against what the step and its acceptance
+  checks say and lists anything past that as notes that fail nothing, so the
+  loop can end. At the end
   of each major section one Astra run at high effort checks that the steps
   work together, covering the whole task on the last section, and a Sol run
   covers any one or two rounds left over. Audit findings become fix steps,
