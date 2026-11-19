@@ -466,6 +466,7 @@ condensed.
 
 ### Fixed
 
+- `init-project`'s project brief no longer points at a missing claim or an already-shipped smallest version: part 1 marks a missing claim to settle before the first build, the proof-check line is left out once the smallest version shipped, and the `First build` line in `CLAUDE.md` stays until nothing in the brief is left to build.
 - The evaluation record used by `addskill` and `refine` (`evaluation.md`) no
   longer lets a result inside run-to-run variation fit both `NOT VERIFIED` and
   `INCONCLUSIVE`. `NOT VERIFIED` now needs variation small enough to rule out
