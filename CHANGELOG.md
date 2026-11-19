@@ -305,35 +305,16 @@ condensed.
 
 - `init-project` (Claude and Codex) now settles what a project is with six
   questions: what it is, who it is for, what it is not, what done looks like,
-  the smallest version that proves it, and the unbuilt features wanted, plus
-  an optional question about what it must never compromise on. It runs while
-  `What this project is` still has a FILL IN marker or when the user asks to
-  plan the project; narrow updates (CI only, a profile, prose mode) and the
-  template's own checkout skip it. It drafts answers from the README,
-  manifests, docs and code, shows inferred ones for confirmation, and asks the
-  user for the rest in one round with at most one follow-up. It never invents
-  an answer or guesses an order, and a skipped question is reported as unknown
-  without blocking setup. The first four answers fill `What this project is`
-  in `CLAUDE.md`, capped at about ten lines; confirmed answers are written and
-  a short FILL IN line names any that are missing, so the doctor check and
-  the next setup run still catch them. Every drafted answer, from code or
-  docs, is confirmed before it is written, and files copied from the template
-  are not used as sources. The last two go to
-  `docs/specs/YYYY-MM-DD-project-brief.md` for the first build session, only
-  when the user answered them in that run and something is left to build; a
-  later run updates the same brief in place. Setup writes the brief and builds
-  nothing. `apply-firmware` treats that brief as in scope, and `adopt-repo`
-  repeats its privacy sweep on everything `init-project` wrote. The brief lists what the smallest version must prove, the done
-  answer as rows someone can check (each required, later or unknown), and the
-  wanted features in the user's order, each in, out or unknown for that
-  version. The follow-up asks for one role when the audience is a crowd,
-  offers likely non-goals (including parts an existing service should cover)
-  when none were given, asks for things to open, click or run when done is
-  not checkable, and asks for the one feature that proves the idea when the
-  smallest version is as big as the feature list. `CLAUDE.md` points to the
-  brief with a line that says to delete it when the smallest version ships.
-  Template cleanup keeps the brief. The template's FILL IN note for the
-  section names the same items. Details are in the skill's new
+  the smallest version that proves it, and the unbuilt features wanted. It
+  runs while `What this project is` has a FILL IN marker or when the user asks
+  to plan; narrow updates skip it. Every answer drafted from the repo is
+  confirmed before it is written, the rest are asked in one round, and
+  nothing is invented; a FILL IN line names whatever stays unanswered. The
+  first four answers fill `What this project is`. The last two go to
+  `docs/specs/YYYY-MM-DD-project-brief.md`: what the smallest version must
+  prove, done checks as "do this, expect that" rows, and features in the
+  user's order. Setup writes the brief and builds nothing. `adopt-repo`
+  sweeps and shows that output before a shared push. Details:
   `references/memo.md`.
 - `coordinate` run with no session name now oversees the child sessions this
   session started. A child report that claims done or ready to ship gets a
