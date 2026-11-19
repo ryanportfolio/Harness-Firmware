@@ -307,17 +307,18 @@ condensed.
   fixed 180 ms after each Tab press and after each blur. It waits until the
   change is drawn and still: the page has not scrolled and the focused element
   has not moved for two frames in a row, and no finite animation is playing on
-  the element, inside it or on a box around it. The wait still ends at 180 ms,
-  so a page that keeps moving is measured as before. On a 13-stop page the
-  focus check went from about 24.4 s to 20.5 s (about 300 ms per stop), with
-  the same fail rows. A focus style that a script adds more than about two
-  frames after focus, or a script-driven effect that keeps moving after it, can
-  now land in the first screenshot; the effect is a `focus:unmeasured` review
-  row rather than a wrong result. A focus or blur handler that loads another
-  page during the measurement is now reported as `focus:navigated` instead of
-  erroring the check, and the probe's own Chrome launch (used when
-  `launchPlacedChrome()` is missing) adds
-  `--disable-backgrounding-occluded-windows`.
+  the element, inside it or on a box around it, across shadow roots and
+  frames. The wait still ends at 180 ms, so a page that keeps moving is
+  measured as before. When pixels that change in one state much more than in
+  the other stand in the way of a clear pass (a focus marker a script drew
+  late reads as motion), the stop
+  is measured again with the old 180 ms waits before it can read as
+  `focus:invisible`, `focus:weak` or `focus:unmeasured`. On a
+  13-stop page the focus check went from about 24.4 s to 20.5 s (about 300 ms
+  per stop), with the same fail rows. A page that navigates while the probe
+  blurs and refocuses a stop to measure it is now reported as
+  `focus:navigated`, on any stop including the last one, instead of erroring
+  the check or blaming the next Tab press.
 - `init-project` (Claude and Codex) now settles what a project is with six
   questions: what it is, who it is for, what it is not, what done looks like,
   the smallest version that proves it, and the unbuilt features wanted. It

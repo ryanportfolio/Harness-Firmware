@@ -106,7 +106,7 @@ async function launch() {
   // a CommonJS package imported by path exposes its exports on default
   const mod = await import(pathToFileURL(entry).href);
   const chromium = mod.chromium ?? mod.default?.chromium;
-  const args = ['--window-position=-2400,-2400', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'];
+  const args = ['--window-position=-2400,-2400', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'];
   try {
     launchedVia = 'installed Chrome';
     return await chromium.launch({ headless: false, channel: 'chrome', args });
@@ -307,14 +307,16 @@ const PIXELS = async ({ op, a, a2, b, b2, rect, rects, color, threshold }) => {
     // optional a2 and b2: second shots of a's and b's states. Pixels that differ within either pair change on their
     // own; they and the 2 px around them (where the motion may have been between the shots) are left out
     const still = new Uint8Array(n).fill(1);
-    const pairs = [[da, a2], [db, b2]].filter(([, s]) => s);
+    // pixels that differ within each pair, before the margin: motion in one state only suggests a late change there
+    const pairMoving = [0, 0];
+    const pairs = [[da, a2, 0], [db, b2, 1]].filter(([, s]) => s);
     if (pairs.length) {
       // the crop's width, as crop() computed it
       const w = Math.min(ca.canvas.width - Math.max(0, Math.floor(rect.x)), Math.ceil(rect.width));
       const motion = new Uint8Array(n);
-      for (const [x, s] of pairs) {
+      for (const [x, s, k] of pairs) {
         const y = crop(await load(s));
-        if (y) for (let i = 0; i < n; i++) if (differ(x, y, i * 4)) motion[i] = 1;
+        if (y) for (let i = 0; i < n; i++) if (differ(x, y, i * 4)) { motion[i] = 1; pairMoving[k]++; }
       }
       for (let i = 0; i < n; i++) {
         if (!motion[i]) continue;
@@ -330,7 +332,7 @@ const PIXELS = async ({ op, a, a2, b, b2, rect, rects, color, threshold }) => {
       if (!still[i]) moving++;
       else if (differ(da, db, i * 4)) changed++;
     }
-    return { changed, total: n, moving };
+    return { changed, total: n, moving, movingA: pairMoving[0], movingB: pairMoving[1] };
   }
   if (op === 'light') {
     // share of the shot that is near-white: every channel 235 or more
@@ -693,16 +695,19 @@ async function focusWalk(page, url) {
   // cannot hang the walk
   const settle = (blurred) => page.evaluate(([blurred, cap]) => new Promise((done) => {
     const el = blurred ? window.__uqLast : window.__uq.deepActive();
-    const around = new Set();
-    for (let x = el; x; x = window.__uq.up(x)) around.add(x);
-    const near = (t) => t && (around.has(t) || el.contains(t));
+    // the element and every box around it, across shadow roots and frames, and the documents and shadow roots that
+    // hold them (each lists only its own animations); an animation inside the element counts too
+    const around = new Set(), roots = new Set();
+    for (let x = el; x; x = window.__uq.up(x)) { around.add(x); roots.add(x.getRootNode()); }
+    if (el?.shadowRoot) roots.add(el.shadowRoot);
+    const near = (t) => { for (let x = t; x; x = window.__uq.up(x)) if (x === el) return true; return around.has(t); };
     let over = false, prev = null, still = 0;
     const end = setTimeout(() => { over = true; done(); }, cap);
     const tick = () => {
       if (over) return;
       const r = el?.isConnected ? window.__uq.topRect(el) : null;
       const at = `${scrollX},${scrollY} ${r ? `${r.left},${r.top},${r.width},${r.height}` : ''}`;
-      const playing = !!el && [...new Set([document, el.getRootNode()])].some((root) => root.getAnimations?.()
+      const playing = !!el && [...roots].some((root) => root.getAnimations?.()
         .some((a) => a.playState === 'running' && near(a.effect?.target) && Number.isFinite(a.effect.getComputedTiming().endTime)));
       still = at === prev && !playing ? still + 1 : 0;
       if (still >= 2) { clearTimeout(end); done(); return; }
@@ -721,12 +726,19 @@ async function focusWalk(page, url) {
   let ended = 'max-tabs';
   let last = null;
   let pressed = false;
-  // the page navigated while the stop it had just reached was being measured, not on the Tab press itself
-  let navOnStop = false;
+  // the probe's own blur and refocus of a stop can be followed by a navigation; say so without naming a cause
+  const blurredFor = (sel) => `after the probe blurred and refocused ${sel} to measure it, the page`;
+  const navRow = (what) => {
+    add({ check: 'focus:navigated', url, viewport: '1280', wcag: ['3.2.1'], level: 'A/AA', severity: 'review', selector: last || 'document', measured: `${what} loaded ${navigatedTo}; moving focus alone must not change the page (rule out a timer or load-time redirect)` });
+    notes.push(`${url}: focus walk stopped after ${order.length} stops because the page navigated; later checks reopened the page`);
+    ended = 'navigated';
+  };
   // elements hidden for the screenshots, to show again if a measurement throws
   let uncover = null;
   try {
     for (let i = 0; i < opts.maxTabs; i++) {
+      // a navigation that landed after the last measurement: report it before pressing Tab on the new page
+      if (navigatedTo) { navRow(blurredFor(last)); break; }
       // after leaving a cross-origin frame, focus already sits on the next stop
       if (!pressed) await page.keyboard.press('Tab');
       pressed = false;
@@ -789,12 +801,7 @@ async function focusWalk(page, url) {
         if (navigatedTo) return null;
         throw err;
       });
-      if (navigatedTo) {
-        add({ check: 'focus:navigated', url, viewport: '1280', wcag: ['3.2.1'], level: 'A/AA', severity: 'review', selector: last || 'document', measured: `${navOnStop ? `focusing ${last}` : `pressing Tab${last ? ` from ${last}` : ''}`} loaded ${navigatedTo}; moving focus alone must not change the page (rule out a timer or load-time redirect)` });
-        notes.push(`${url}: focus walk stopped after ${order.length} stops because the page navigated; later checks reopened the page`);
-        ended = 'navigated';
-        break;
-      }
+      if (navigatedTo) { navRow(`pressing Tab${last ? ` from ${last}` : ''}`); break; }
       if (!f) { if (i > 0) { ended = 'end'; break; } continue; }
       if (f.frameIdle) continue;
       if (f.crossFrame) {
@@ -836,21 +843,34 @@ async function focusWalk(page, url) {
       }, [hidden, on]);
       if (hidden.length) { await cover(true); uncover = () => cover(false); await page.waitForTimeout(50); }
       // focused vs unfocused pixels around the element; a second shot of each state shows what changes there on its own.
-      // Then put focus back for the next Tab
-      const on1 = await page.screenshot();
-      await page.waitForTimeout(180);
-      const on2 = await page.screenshot();
-      await navSafe(page.evaluate(() => { window.__uqLast = window.__uq.deepActive(); window.__uqLast.blur(); }));
-      if (!navigatedTo) await settle(true);
-      const off = await page.screenshot();
-      await page.waitForTimeout(180);
-      const off2 = await page.screenshot();
-      if (!navigatedTo) await navSafe(page.evaluate(() => window.__uqLast.focus({ preventScroll: true })));
-      // the next pass reports the navigation without pressing Tab on the new page
-      if (navigatedTo) { uncover = null; pressed = true; navOnStop = true; continue; }
-      if (uncover) { await uncover(); uncover = null; }
+      // Then put focus back for the next Tab. The first pass starts as soon as the change has settled. A marker a script
+      // draws later lands between the two shots and reads as motion, so when motion in one state only stands in the
+      // way of a clear pass, measure again with the full 180 ms wait before each state
       const b64 = (buf) => buf.toString('base64');
-      const d = await pixels({ op: 'diff', a: b64(on1), a2: b64(on2), b: b64(off), b2: b64(off2), rect: f.rect, threshold: 48 });
+      let d = null;
+      for (let full = false; ; full = true) {
+        if (full) await page.waitForTimeout(180);
+        const on1 = await page.screenshot();
+        await page.waitForTimeout(180);
+        const on2 = await page.screenshot();
+        await navSafe(page.evaluate(() => { window.__uqLast = window.__uq.deepActive(); window.__uqLast.blur(); }));
+        if (navigatedTo) break;
+        if (full) await page.waitForTimeout(180);
+        else await settle(true);
+        const off = await page.screenshot();
+        await page.waitForTimeout(180);
+        const off2 = await page.screenshot();
+        await navSafe(page.evaluate(() => window.__uqLast.focus({ preventScroll: true })));
+        if (navigatedTo) break;
+        d = await pixels({ op: 'diff', a: b64(on1), a2: b64(on2), b: b64(off), b2: b64(off2), rect: f.rect, threshold: 48 });
+        // a navigation the refocus started can land while the pixels are compared
+        if (navigatedTo || full || !d.moving || (d.moving <= d.total * 0.1 && d.changed >= f.perimeter)) break;
+        // steady motion around the element moves in both states alike; only a lopsided count points to a late change
+        const lopsided = (x, y) => x > y * 1.5 + 20;
+        if (!lopsided(d.movingA, d.movingB) && !lopsided(d.movingB, d.movingA)) break;
+      }
+      if (navigatedTo) { uncover = null; navRow(blurredFor(f.selector)); break; }
+      if (uncover) { await uncover(); uncover = null; }
       const how = `${hidden.length ? ` (measured with ${f.coveredBy} hidden)` : ''}${d.moving ? ` (${d.moving} px that change on their own left out)` : ''}`;
       if (d.moving > d.total * 0.1) {
         // an animation or video behind the element: the comparison cannot tell a marker from motion
