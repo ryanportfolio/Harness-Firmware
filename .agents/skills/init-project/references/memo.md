@@ -30,6 +30,8 @@ Push back once, only where an answer can't steer work:
 - 4 not checkable ("works well") → ask for the few things it must do every time, each something the user could open, click or run to check.
 - 5 as big as 6 → ask which one feature proves the idea can work if the rest never ships. Smallest version answers "can this be done?", not "is this ready for users?".
 
+The brief needs two choices the six answers may not give: feature priority order, and which done checks and features belong in the smallest version. Not given → ask in the same round. Still not given → write them as unknown in the brief; never guess an order or an assignment.
+
 User skips a question → leave it unknown, list it in the report, continue setup. A skipped question never blocks the other setup steps.
 
 ## Where answers go
@@ -56,8 +58,8 @@ User skips a question → leave it unknown, list it in the report, continue setu
 Brief: normal prose, the user's own words. Three parts:
 
 1. Smallest version: what it contains and the one claim it proves.
-2. Done checks: answer 4 split into rows, one checkable behavior per row, each marked required for the smallest version or later. Usually 5-10 rows; fewer is fine. Never pad the table with rows the user didn't give.
-3. Wanted features in priority order, one line each, each marked in or out of the smallest version. Parts the user chose to cover with an existing service or library are listed as such, with the service when named.
+2. Done checks: answer 4 split into rows, one checkable behavior per row, each marked required for the smallest version, later, or unknown. Usually 5-10 rows; fewer is fine. Never pad the table with rows the user didn't give.
+3. Wanted features in the user's priority order (order unknown → say so and keep the order given), one line each, each marked in, out, or unknown for the smallest version. Parts the user chose to cover with an existing service or library are listed as such, with the service when named.
 
 Don't repeat non-goals; don't add features the user didn't name. The first build session turns each done-check row into a test or check before calling that version done.
 

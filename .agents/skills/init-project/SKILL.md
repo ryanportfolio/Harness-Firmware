@@ -9,11 +9,12 @@ Run setup only when requested. FILL IN markers signal unknown facts, not authori
 
 Ask only for consequential facts that cannot be detected. Draft or apply the requested narrow configuration and reference changes. Preserve the separate Codex and Claude runtime boundaries; shared architecture and commands can remain shared references. Avoid deleting template/plugin directories or adding remotes without checking their actual use and authorization.
 
-Settle what the project is with the six [project memo](references/memo.md) questions: what it
-is, who it is for, what it is not, what done looks like, the smallest version that proves it,
+When `What this project is` still has its FILL IN marker, or the user asks to plan the
+project, settle it with the six [project memo](references/memo.md) questions: what it is,
+who it is for, what it is not, what done looks like, the smallest version that proves it,
 and the features wanted. Answer each from the repo first, ask the user only for the rest in
 one round, and never invent an answer. The first four fill `What this project is`; the last
-two become a first-build brief.
+two become a first-build brief. A narrow update (CI only, a profile, prose mode) skips the memo.
 
 For optional project profiles, full/minimal skill selection, prose defaults, template
 cleanup, or starter-remote wiring, use [setup profiles](references/profiles.md). Preserve
