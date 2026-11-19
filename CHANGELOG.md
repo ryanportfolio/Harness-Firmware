@@ -303,6 +303,16 @@ condensed.
 
 ### Changed
 
+- `coordinate` run with no session name now oversees the child sessions this
+  session started. A child report that claims done or ready to ship gets a
+  ship review by this session alone: it reads the diff and checks for one
+  recorded commit, tests the change's assumptions against the user's words,
+  sorts its main pieces into checked fact, convention or unknown, and looks
+  for cuts first. The verdict is Ship, Ship after fixes, Not yet or Rethink,
+  and goes back to the child with the commit it covers. Children with merging
+  or deploying in their brief wait for it. A Ship verdict is not merge
+  approval and does not replace the Codex review. Named-peer mode is
+  unchanged.
 - `fable-mode` body rewritten in the terse style the repo uses for files only
   agents read, with the evidence each claim needs (current state, change,
   cause) in a table. After two fixes fail on the same failure it now says to
