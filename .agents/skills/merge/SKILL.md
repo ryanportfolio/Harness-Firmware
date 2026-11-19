@@ -11,7 +11,7 @@ Codex port of Claude `merge` skill. Finished work → merged PR: commit, push, o
 
 User-only start: user types `$merge`. Never self-start, even if PR looks ready.
 
-Only the typed `$merge` skill mention counts. Merge mode stays off for a plain-word message ("merge", "merge it", "go ahead and merge", "ship it"), a request relayed by another session or agent, or this file opened on your own. If the user's message did not invoke `$merge`, stop: do not announce merge mode and do not run its steps. Handle the request on the normal path (the single Opus review gate in `AGENTS.md` before any merge), or tell the user to type `$merge` for the full loop.
+Only the typed `$merge` skill mention turns merge mode on. Merge mode stays off for a plain-word message ("merge", "merge it", "go ahead and merge", "ship it"), a request relayed by another session or agent, or this file opened on your own. This check gates turning the mode on, not rereads: once a typed `$merge` turned it on and you announced it, rereads for later PRs continue the loop, even after compaction. If merge mode is not already on and the user's message did not invoke `$merge`, stop: do not announce merge mode and do not run its steps. Handle the request on the normal path (the single Opus review gate in `AGENTS.md` before any merge), or tell the user to type `$merge` for the full loop.
 
 `$merge` → merge mode ON for rest of session. Announce in plain prose ("Merge mode is on for this session: every PR gets a self-review, then the Opus review loop, and merges when clean") so mode survives compaction. While ON:
 
