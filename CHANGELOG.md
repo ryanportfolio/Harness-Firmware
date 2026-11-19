@@ -305,22 +305,32 @@ condensed.
 
 - `init-project` (Claude and Codex) now settles what a project is with six
   questions: what it is, who it is for, what it is not, what done looks like,
-  the smallest version that proves it, and the features wanted. It drafts
-  answers from the README, manifests, docs and code, shows inferred ones for
-  confirmation, and asks the user for the rest in one round. It never invents
-  an answer, and a skipped question is reported as unknown without blocking
-  setup. The first four answers fill `What this project is` in `CLAUDE.md`,
-  capped at about ten lines. The last two go to
-  `docs/specs/YYYY-MM-DD-project-brief.md` as the input for the first build
-  session; setup writes the brief and builds nothing. The brief lists what the
-  smallest version must prove, the done answer as rows someone can check, and
-  the wanted features marked in or out of that version. Setup asks one
-  follow-up where an answer cannot steer work: a named person or role when the
-  audience is a crowd, likely non-goals (including parts an existing service
-  should cover) when none were given, and things to open, click or run when
-  done is not checkable. The template's FILL IN
-  note for that section now names the same four items. Details are in the
-  skill's new `references/memo.md`.
+  the smallest version that proves it, and the unbuilt features wanted, plus
+  an optional question about what it must never compromise on. It runs while
+  `What this project is` still has a FILL IN marker or when the user asks to
+  plan the project; narrow updates (CI only, a profile, prose mode) and the
+  template's own checkout skip it. It drafts answers from the README,
+  manifests, docs and code, shows inferred ones for confirmation, and asks the
+  user for the rest in one round with at most one follow-up. It never invents
+  an answer or guesses an order, and a skipped question is reported as unknown
+  without blocking setup. The first four answers fill `What this project is`
+  in `CLAUDE.md`, capped at about ten lines; while the first two are missing
+  the FILL IN marker stays, and a missing third or fourth keeps a short FILL
+  IN line, so the doctor check and the next setup run still catch it. The
+  last two go to `docs/specs/YYYY-MM-DD-project-brief.md` for the first build
+  session, unless nothing is left to build; setup writes the brief and builds
+  nothing. The brief lists what the smallest version must prove, the done
+  answer as rows someone can check (each required, later or unknown), and the
+  wanted features in the user's order, each in, out or unknown for that
+  version. The follow-up asks for one role when the audience is a crowd,
+  offers likely non-goals (including parts an existing service should cover)
+  when none were given, asks for things to open, click or run when done is
+  not checkable, and asks for the one feature that proves the idea when the
+  smallest version is as big as the feature list. `CLAUDE.md` points to the
+  brief with a line that says to delete it when the smallest version ships.
+  Template cleanup keeps the brief. The template's FILL IN note for the
+  section names the same items. Details are in the skill's new
+  `references/memo.md`.
 - `coordinate` run with no session name now oversees the child sessions this
   session started. A child report that claims done or ready to ship gets a
   ship review by this session alone: it reads the diff and checks for one
