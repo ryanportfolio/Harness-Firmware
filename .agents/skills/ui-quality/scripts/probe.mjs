@@ -106,7 +106,7 @@ async function launch() {
   // a CommonJS package imported by path exposes its exports on default
   const mod = await import(pathToFileURL(entry).href);
   const chromium = mod.chromium ?? mod.default?.chromium;
-  const args = ['--window-position=-2400,-2400', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'];
+  const args = ['--window-position=-2400,-2400', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'];
   try {
     launchedVia = 'installed Chrome';
     return await chromium.launch({ headless: false, channel: 'chrome', args });
@@ -685,11 +685,44 @@ async function focusWalk(page, url) {
   let navigatedTo = null;
   const onNav = (frame) => { if (frame === page.mainFrame() && !samePage(frame.url(), start)) navigatedTo = frame.url(); };
   page.on('framenavigated', onNav);
+  // wait until a focus change is drawn and still: the page has not scrolled and the element has not moved for two
+  // frames in a row (a script scrolling to it, a scroll layer easing after it, which can start a frame or two
+  // late) and no finite animation is playing (a ring that fades in by
+  // keyframes on it, inside it, or on a box around it). Animations elsewhere on the page do not hold it. Capped
+  // at 180 ms, so a style a timer adds later is still missed, as before, and a window whose frames are paused
+  // cannot hang the walk
+  const settle = (blurred) => page.evaluate(([blurred, cap]) => new Promise((done) => {
+    const el = blurred ? window.__uqLast : window.__uq.deepActive();
+    const around = new Set();
+    for (let x = el; x; x = window.__uq.up(x)) around.add(x);
+    const near = (t) => t && (around.has(t) || el.contains(t));
+    let over = false, prev = null, still = 0;
+    const end = setTimeout(() => { over = true; done(); }, cap);
+    const tick = () => {
+      if (over) return;
+      const r = el?.isConnected ? window.__uq.topRect(el) : null;
+      const at = `${scrollX},${scrollY} ${r ? `${r.left},${r.top},${r.width},${r.height}` : ''}`;
+      const playing = !!el && [...new Set([document, el.getRootNode()])].some((root) => root.getAnimations?.()
+        .some((a) => a.playState === 'running' && near(a.effect?.target) && Number.isFinite(a.effect.getComputedTiming().endTime)));
+      still = at === prev && !playing ? still + 1 : 0;
+      if (still >= 2) { clearTimeout(end); done(); return; }
+      prev = at;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }), [blurred, 180]).catch(() => {});
+  // a focus or blur handler that loads another page destroys the context mid-measurement
+  const navSafe = (p) => p.catch(async (err) => {
+    await page.waitForTimeout(500);
+    if (!navigatedTo) throw err;
+  });
   const order = [];
   // why the walk stopped: 'end' (focus left the page), 'cycle', 'loop', 'navigated', or the --max-tabs limit
   let ended = 'max-tabs';
   let last = null;
   let pressed = false;
+  // the page navigated while the stop it had just reached was being measured, not on the Tab press itself
+  let navOnStop = false;
   // elements hidden for the screenshots, to show again if a measurement throws
   let uncover = null;
   try {
@@ -697,7 +730,7 @@ async function focusWalk(page, url) {
       // after leaving a cross-origin frame, focus already sits on the next stop
       if (!pressed) await page.keyboard.press('Tab');
       pressed = false;
-      await page.waitForTimeout(180);
+      await settle(false);
       // focus has left the start marker; take it out before measuring, or selectors such as :first-child would stop matching
       if (i === 0 && !navigatedTo) await page.evaluate(() => { for (const r of window.__uq.roots()) r.querySelector('#__uq-start')?.remove(); }).catch(() => {});
       const f = navigatedTo ? null : await page.evaluate(() => {
@@ -757,7 +790,7 @@ async function focusWalk(page, url) {
         throw err;
       });
       if (navigatedTo) {
-        add({ check: 'focus:navigated', url, viewport: '1280', wcag: ['3.2.1'], level: 'A/AA', severity: 'review', selector: last || 'document', measured: `pressing Tab${last ? ` from ${last}` : ''} loaded ${navigatedTo}; moving focus alone must not change the page (rule out a timer or load-time redirect)` });
+        add({ check: 'focus:navigated', url, viewport: '1280', wcag: ['3.2.1'], level: 'A/AA', severity: 'review', selector: last || 'document', measured: `${navOnStop ? `focusing ${last}` : `pressing Tab${last ? ` from ${last}` : ''}`} loaded ${navigatedTo}; moving focus alone must not change the page (rule out a timer or load-time redirect)` });
         notes.push(`${url}: focus walk stopped after ${order.length} stops because the page navigated; later checks reopened the page`);
         ended = 'navigated';
         break;
@@ -807,12 +840,14 @@ async function focusWalk(page, url) {
       const on1 = await page.screenshot();
       await page.waitForTimeout(180);
       const on2 = await page.screenshot();
-      await page.evaluate(() => { window.__uqLast = window.__uq.deepActive(); window.__uqLast.blur(); });
-      await page.waitForTimeout(180);
+      await navSafe(page.evaluate(() => { window.__uqLast = window.__uq.deepActive(); window.__uqLast.blur(); }));
+      if (!navigatedTo) await settle(true);
       const off = await page.screenshot();
       await page.waitForTimeout(180);
       const off2 = await page.screenshot();
-      await page.evaluate(() => window.__uqLast.focus({ preventScroll: true }));
+      if (!navigatedTo) await navSafe(page.evaluate(() => window.__uqLast.focus({ preventScroll: true })));
+      // the next pass reports the navigation without pressing Tab on the new page
+      if (navigatedTo) { uncover = null; pressed = true; navOnStop = true; continue; }
       if (uncover) { await uncover(); uncover = null; }
       const b64 = (buf) => buf.toString('base64');
       const d = await pixels({ op: 'diff', a: b64(on1), a2: b64(on2), b: b64(off), b2: b64(off2), rect: f.rect, threshold: 48 });
