@@ -8,7 +8,7 @@ description: "Coordinate with other Claude Code sessions: a named peer (read its
 Two modes:
 
 - **Peer** (a session named in the request): you review its work, it reviews your review, you settle on one plan. Sections 1-6.
-- **Children** (`/coordinate` with no session named in the request, or `children`): this session started side sessions. Reports that claim done or ready to ship get a ship review (section 7) before you call them done; questions and decisions they ask for get a section 2 verdict. Stays on for the rest of this session, until the user says stop.
+- **Children** (`/coordinate` with no session named in the request, or `children`): this session started side sessions. Reports that claim done or ready to ship get a ship review (section 7) before you call them done; questions and decisions they ask for get a section 2 verdict. Stays on for the rest of this session, until the user says stop; on stop, name any child still waiting for a verdict and ask the user what to do with it (stopping is not a release).
 
 The user hears from you when everything is done or when only they can unblock a step.
 
@@ -56,7 +56,7 @@ Replies arrive as `<cross-session-message>` or `<side-sessions-event>` turns. Re
 
 ## 6. Done
 
-When it reports done, spot-check the claims that matter: PR merged at the stated SHA, CI result, deploy IDs, live checks. Children: the PR's head at merge and target (`gh pr view <n> --json headRefOid,baseRefName,mergeCommit`; a squash merge commit has its own SHA; no PR: the commit it pushed) must equal the SHA and target of your Ship verdict; otherwise review the commits in between before calling it done. Then update anything this session owns that depends on the result.
+When it reports done, spot-check the claims that matter: PR merged at the stated SHA, CI result, deploy IDs, live checks. Children: the PR's head at merge and target (`gh pr view <url> --json headRefOid,baseRefName,mergeCommit`; a squash merge commit has its own SHA; no PR: the commit it pushed) must equal the SHA and target of your Ship verdict; otherwise review the commits in between before calling it done. Then update anything this session owns that depends on the result.
 
 Ping the user only when:
 
@@ -73,13 +73,13 @@ Question per report: should this ship as is? You do it yourself: no extra models
 Your own bias is the risk: you wrote the child's brief, so you share its blind spots. Judge against what the user said, in this session and anything they typed in the child's own session, not against your brief; treat your brief as one more unchecked claim.
 
 1. **Lock the claim.** One line: what it says it did, what it asks for (merge, deploy, a decision). Quote the user's words it serves.
-2. **Ground it.** Record the head commit SHA first; read the PR diff and all its checks (`gh pr diff <n>`, `gh pr checks <n>`), then confirm `gh pr view <n> --json headRefOid,baseRefName` still shows that SHA and target; either moved → start over. No PR → `git diff <target>...<sha>` after a fetch. Retrospective → the landed change against its first parent (`git diff <merge commit>^1 <merge commit>`). Run or read what settles each load-bearing claim (a test, a grep, the live page). Mark each claim checked or unchecked. No code (research, a report) → judge its claims the same way, no SHA or CI.
+2. **Ground it.** Use the full PR URL in every `gh` call (a child may work in another repository). Record the head commit SHA first; it differs from the SHA or target the child asked about → that request is stale, ask for a fresh one. Read the PR diff and all its checks (`gh pr diff <url>`, `gh pr checks <url>`), then confirm `gh pr view <url> --json headRefOid,baseRefName` still shows that SHA and target; either moved → start over. No PR → `git -C <child repo> diff <target>...<sha>` after a fetch. Retrospective → the landed change against its first parent (`git diff <merge commit>^1 <merge commit>`). Run or read what settles each load-bearing claim (a test, a grep, the live page). Mark each claim checked or unchecked. No code (research, a report) → judge its claims the same way, no SHA or CI.
 3. **Challenge.** What does the change assume the user wants that their words don't say? What breaks if one simple premise flips? "No material assumption found" is valid.
 4. **Audit the blocks.** 3-7 load-bearing pieces, each: fact (checked), convention (done because it is usual here, checked against CLAUDE.md and pitfalls), or unknown. Unknowns the ship depends on get a cheap test or go to Open.
 5. **Blind spots.** Skipped edge cases, hidden costs (manual step, migration, perf, maintenance), when this is the wrong call.
 6. **Cut first.** Simpler way to the same goal? Dead code, duplicate text, extras nobody asked for? An addition makes the fix list only if it fixes a real bug or gap and the reason fits one plain line.
 7. **Verdict**, one of:
-   - **Ship**: every load-bearing claim checked, every expected check ran and passed for that SHA (no CI: the repo's local checks; no code: its claims), nothing open. Send it (section 3) with the SHA and target: the child may proceed under its own rules (Codex review, owner's go); a moved head or changed target voids the verdict; the SHA guards the merge, and a deploy after merge ships a clean checkout of the commit that landed.
+   - **Ship**: every load-bearing claim checked, every expected check ran and passed for that SHA (no CI: the repo's local checks; no code: its claims), nothing open. Send it (section 3) with the SHA and target: the child may proceed under its own rules (Codex review, owner's go); a moved head or changed target voids the verdict; the SHA guards the merge, and a deploy ships a clean checkout of the commit that landed (no merge: of that SHA).
    - **Ship after fixes**: numbered, concrete, checkable fixes. Send them (section 3); re-review the fix round (section 4).
    - **Not yet**: something the verdict needs is missing (checks pending, a claim you could not check, a question only the user can answer). Name it; the user's questions go to the user. Keep it open: recheck on your next wake or turn without waiting for a new report.
    - **Rethink**: the approach is wrong or misreads the user. If it changes what the user asked for, ask the user first and tell the child to pause; otherwise send why and what instead.
