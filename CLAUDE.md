@@ -74,7 +74,7 @@ Defaults until configured:
 Nothing merges until the PR has been through `/codex-review` (in merge mode: the `/merge` loop's `/codex-fullreview` round and any `/codex-review` reruns) and its surviving findings are fixed or explicitly waived by the user. This applies to every merge path: a manual merge, `/merge`, `gh pr merge`, and squash-merges done by agents.
 
 - **Run it automatically.** Opening or updating a PR is itself the trigger: run `/codex-review` in the same turn, without asking and without waiting for a merge request. Naming it as a next step and stopping does not count. In merge mode the `/merge` loop replaces this trigger; don't run a separate `/codex-review` on top of it.
-- Sequence: open PR → `/codex-review` on the full PR diff against the default branch → verify each finding → fix confirmed BLOCKING and SHOULD-FIX findings → push → merge. Rerun only on the user's OK, because each run bills their Codex subscription. Typing `/merge` is that OK for every PR in the rest of the session.
+- Sequence: open PR → `/codex-review` on the full PR diff against the default branch → verify each finding → fix confirmed BLOCKING and SHOULD-FIX findings → push → merge. Rerun only on the user's OK, because each run bills their Codex subscription. Typing `/merge` is that OK for every PR in the rest of the session. Only the typed `/merge` command turns merge mode on: a plain "merge" or "merge it" gets the normal path above, and never a Read of the `merge` skill file to start its loop.
 - If Codex is unavailable (not logged in, CLI broken), say so and stop before merging. Never substitute a self-review and call it done.
 - The review result goes in the handover: source attribution, findings that survived verification, and what was fixed.
 
