@@ -14,7 +14,9 @@ Use the full template when a project needs the rule kernel, hooks, committed mem
 
 Keep the extracted Windows launcher, PowerShell module, and `template/` folder together. The bundled snapshot supports local-only project creation without GitHub access.
 
-`/init-project` detects the stack, asks a short set of unresolved questions, fills the verification and deployment sections, seeds reference files, prunes irrelevant skills, removes spawn-only files, offers a `.github/workflows/ci.yml` that runs the detected stack's typecheck, test and build commands, and prepares the result for verification.
+`/init-project` detects the stack, asks a short set of unresolved questions, fills the project, verification and deployment sections, seeds reference files, prunes irrelevant skills, removes spawn-only files, offers a `.github/workflows/ci.yml` that runs the detected stack's typecheck, test and build commands, and prepares the result for verification.
+
+While the project section is unfilled, or when you ask setup to plan the project, it works through six questions: what the project is, who it is for, what it is not, what done looks like, the smallest version that proves it, and the features you want that aren't built yet. It answers what it can from the repository and asks you for the rest in one round, with at most one follow-up. The first four answers fill `What this project is` in `CLAUDE.md`. When something is left to build, the last two are saved as a first-build brief in `docs/specs/`. Setup stops there and builds nothing. A narrow update, such as adding CI, skips the questions.
 
 Two setup choices affect every later session:
 

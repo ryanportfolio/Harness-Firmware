@@ -6,7 +6,7 @@
 
 ## What this project is
 
-<!-- FILL IN (via /init-project): two or three sentences — what this is and who it serves; a short "won't compromise on" list; optional glossary of terms the team uses. Cap ~10 lines: this file loads every turn, and direction earns its weight only while it stays short. A model that knows what the product refuses to compromise on tests for it without being told. -->
+<!-- FILL IN (via /init-project): what this is and who it is for, in one or two sentences; what it is not; what done looks like; a short "won't compromise on" list; optional glossary of terms the team uses. Cap ~10 lines: this file loads every turn, and direction earns its weight only while it stays short. A model that knows what the product is not and what it refuses to compromise on tests for both without being told. -->
 
 ## Default prose mode: caveman ultra
 

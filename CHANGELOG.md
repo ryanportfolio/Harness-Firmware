@@ -303,6 +303,19 @@ condensed.
 
 ### Changed
 
+- `init-project` (Claude and Codex) now settles what a project is with six
+  questions: what it is, who it is for, what it is not, what done looks like,
+  the smallest version that proves it, and the unbuilt features wanted. It
+  runs while `What this project is` has a FILL IN marker or when the user asks
+  to plan; narrow updates skip it. Every answer drafted from the repo is
+  confirmed before it is written, the rest are asked in one round, and
+  nothing is invented; a FILL IN line names whatever stays unanswered. The
+  first four answers fill `What this project is`. The last two go to
+  `docs/specs/YYYY-MM-DD-project-brief.md`: what the smallest version must
+  prove, done checks as "do this, expect that" rows, and features in the
+  user's order. Setup writes the brief and builds nothing. `adopt-repo`
+  sweeps and shows that output before a shared push. Details:
+  `references/memo.md`.
 - `coordinate` run with no session name now oversees the child sessions this
   session started. A child report that claims done or ready to ship gets a
   ship review by this session alone: it reads the diff and checks for one
