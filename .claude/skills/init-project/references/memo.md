@@ -13,7 +13,7 @@ Six questions settle what the project is before config gets written. Repo answer
 
 Read-only sources: README, manifest `description`, the project's own `docs/` (not files copied from the template), a filled `What this project is` section, routes, commands, entry points. Draft one answer per question, with its source.
 
-- Section already filled and still matching the code → reuse it; ask nothing it answers. Never rewrite a filled section unless the user asked for that.
+- Section already filled and still matching the code → reuse it; ask nothing it answers. Never rewrite a filled section unless the user asked for that; a plan request that creates a brief still adds the `First build` line to it.
 - Existing code usually answers 1 and 2. 3, 4, 5 and 6 are intent and seldom in code → ask, unless a doc states them. Built features never count as answers to 6.
 - Empty or new repo → ask all six.
 
@@ -57,7 +57,7 @@ An answer the follow-up still couldn't make usable (done still not checkable, sa
 Brief: normal prose, the user's own words. Three parts:
 
 1. Smallest version: what it contains and the one claim it proves.
-2. Done checks: answer 4 split into rows, one behavior per row as what to do and what result to expect, each marked required for the smallest version, later, or unknown. Never pad the table with rows the user didn't give. End the part with this line, verbatim: "Before calling the smallest version done, check each required row by running, opening or clicking it; write a test only if the user asks."
+2. Done checks: answer 4 split into rows, one behavior per row as what to do and what result to expect, each marked required for the smallest version, later, or unknown. Never pad the table with rows the user didn't give. End the part with this line, verbatim: "Before calling the smallest version done, check each required row by running, opening or clicking it (no row required yet → first pick, with the user, one row that tests the proof claim); write a test only if the user asks."
 3. Wanted features in the user's priority order (order unknown → say so and keep the order given), one line each, each marked in, out, or unknown for the smallest version. Parts the user chose to cover with an existing service or library are listed as such, with the service when named.
 
 Don't repeat non-goals; don't add features the user didn't name.
