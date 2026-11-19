@@ -31,7 +31,7 @@ At most one follow-up round, only where an answer can't steer work:
 - 5 as big as 6 → ask which one feature proves the idea can work if the rest never ships. Smallest version answers "can this be done?", not "is this ready for users?".
 - Feature priority order, or which done checks and features belong in the smallest version, not given → ask. Still not given → write them as unknown in the brief; never guess an order or an assignment.
 
-User skips a question → leave it unknown, list it in the report, continue setup. A skipped question never blocks the other setup steps.
+An answer the follow-up still couldn't make usable (done still not checkable, say) counts as unanswered. User skips a question → leave it unknown, list it in the report, continue setup. A skipped question never blocks the other setup steps.
 
 ## Where answers go
 
@@ -65,6 +65,6 @@ Don't repeat non-goals; don't add features the user didn't name.
 - Brief feeds the first build session (`brainstorming`, `writing-plans`). Setup writes it and stops: answering the memo does not authorize building anything.
 - Nothing left to build (smallest version shipped, no unbuilt features wanted) → no brief, no `First build` line.
 - Write the brief only from answers to 5 or 6 the user gave in this run. That answer is the request for the file, also inside callers that keep `docs/specs` out of their own scope (`apply-firmware`).
-- A `First build` line already points to a brief → update that file in place, keeping the user's edits; never start a second dated brief.
+- A `First build` line already points to a brief → update that file in place, keeping the user's edits; never start a second dated brief. A file already at the new brief's path → ask before replacing or merging it.
 - `docs/specs` is a template-only path. Template cleanup removes only the template's own files there and never the brief.
 - Setup never edits `.claude/reference/features.md`; `user-walk` fills it with built features.
