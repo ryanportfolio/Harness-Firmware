@@ -303,6 +303,24 @@ condensed.
 
 ### Changed
 
+- `init-project` (Claude and Codex) now settles what a project is with six
+  questions: what it is, who it is for, what it is not, what done looks like,
+  the smallest version that proves it, and the features wanted. It drafts
+  answers from the README, manifests, docs and code, shows inferred ones for
+  confirmation, and asks the user for the rest in one round. It never invents
+  an answer, and a skipped question is reported as unknown without blocking
+  setup. The first four answers fill `What this project is` in `CLAUDE.md`,
+  capped at about ten lines. The last two go to
+  `docs/specs/YYYY-MM-DD-project-brief.md` as the input for the first build
+  session; setup writes the brief and builds nothing. The brief lists what the
+  smallest version must prove, the done answer as rows someone can check, and
+  the wanted features marked in or out of that version. Setup asks one
+  follow-up where an answer cannot steer work: a named person or role when the
+  audience is a crowd, likely non-goals (including parts an existing service
+  should cover) when none were given, and things to open, click or run when
+  done is not checkable. The template's FILL IN
+  note for that section now names the same four items. Details are in the
+  skill's new `references/memo.md`.
 - `coordinate` run with no session name now oversees the child sessions this
   session started. A child report that claims done or ready to ship gets a
   ship review by this session alone: it reads the diff and checks for one
