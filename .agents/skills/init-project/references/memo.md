@@ -57,7 +57,7 @@ An answer the follow-up still couldn't make usable (done still not checkable, sa
 Brief: normal prose, the user's own words. Three parts:
 
 1. Smallest version: what it contains and the one claim it proves.
-2. Done checks: answer 4 split into rows, one behavior per row as what to do and what result to expect, each marked required for the smallest version, later, or unknown. Never pad the table with rows the user didn't give. End the part with this line, verbatim: "Before calling the smallest version done, check each required row by running, opening or clicking it (no row required yet → first pick, with the user, one row that tests the proof claim); write a test only if the user asks."
+2. Done checks: answer 4 split into rows, one behavior per row as what to do and what result to expect, each marked required for the smallest version, later, or unknown. Never pad the table with rows the user didn't give. End the part with this line, verbatim: "Before calling the smallest version done, check each required row by running, opening or clicking it (no row required yet → first pick or define, with the user, one check that tests the proof claim); write a test only if the user asks."
 3. Wanted features in the user's priority order (order unknown → say so and keep the order given), one line each, each marked in, out, or unknown for the smallest version. Parts the user chose to cover with an existing service or library are listed as such, with the service when named.
 
 Don't repeat non-goals; don't add features the user didn't name.
