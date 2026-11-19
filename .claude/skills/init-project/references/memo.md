@@ -11,13 +11,13 @@ Six questions settle what the project is before config gets written. Repo answer
 
 ## Answer from the repo first
 
-Read-only sources: README, manifest `description`, `docs/`, a filled `What this project is` section, routes, commands, entry points, open issues when `gh` reaches them. Draft one answer per question, with its source.
+Read-only sources: README, manifest `description`, the project's own `docs/` (not files copied from the template), a filled `What this project is` section, routes, commands, entry points. Draft one answer per question, with its source.
 
 - Section already filled and still matching the code → reuse it; ask nothing it answers. Never rewrite a filled section unless the user asked for that.
 - Existing code usually answers 1 and 2. 3, 4, 5 and 6 are intent and seldom in code → ask, unless a doc states them. Built features never count as answers to 6.
 - Empty or new repo → ask all six.
 
-Never invent an answer. An answer inferred from code is a draft: show it to the user marked as inferred, and write it only after they confirm or correct it.
+Never invent an answer. Every drafted answer is a draft, whatever its source: show it to the user marked as inferred, and write it only after they confirm or correct it.
 
 ## Ask
 
@@ -51,8 +51,7 @@ User skips a question → leave it unknown, list it in the report, continue setu
 - First build: `docs/specs/<date>-project-brief.md` (delete this line in the change that ships the smallest version)
 ```
 
-- 1 or 2 unanswered → keep the FILL IN marker and write nothing else in the section.
-- 3 or 4 unanswered → write the rest and keep one `<!-- FILL IN (via /init-project): not / done -->` line naming what is missing. `doctor.mjs` keeps warning and the next setup run asks again.
+- Any of 1-4 unanswered → write the confirmed lines and keep one `<!-- FILL IN (via /init-project): <missing items> -->` line naming only what is missing. `doctor.mjs` keeps warning and the next setup run asks only for those.
 - Never-compromise line and glossary of team terms: only when the user gave them and the cap still holds.
 
 Brief: normal prose, the user's own words. Three parts:
@@ -65,5 +64,7 @@ Don't repeat non-goals; don't add features the user didn't name.
 
 - Brief feeds the first build session (`brainstorming`, `writing-plans`). Setup writes it and stops: answering the memo does not authorize building anything.
 - Nothing left to build (smallest version shipped, no unbuilt features wanted) → no brief, no `First build` line.
+- Write the brief only from answers to 5 or 6 the user gave in this run. That answer is the request for the file, also inside callers that keep `docs/specs` out of their own scope (`apply-firmware`).
+- A `First build` line already points to a brief → update that file in place, keeping the user's edits; never start a second dated brief.
 - `docs/specs` is a template-only path. Template cleanup removes only the template's own files there and never the brief.
 - Setup never edits `.claude/reference/features.md`; `user-walk` fills it with built features.

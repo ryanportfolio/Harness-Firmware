@@ -314,12 +314,16 @@ condensed.
   user for the rest in one round with at most one follow-up. It never invents
   an answer or guesses an order, and a skipped question is reported as unknown
   without blocking setup. The first four answers fill `What this project is`
-  in `CLAUDE.md`, capped at about ten lines; while the first two are missing
-  the FILL IN marker stays, and a missing third or fourth keeps a short FILL
-  IN line, so the doctor check and the next setup run still catch it. The
-  last two go to `docs/specs/YYYY-MM-DD-project-brief.md` for the first build
-  session, unless nothing is left to build; setup writes the brief and builds
-  nothing. The brief lists what the smallest version must prove, the done
+  in `CLAUDE.md`, capped at about ten lines; confirmed answers are written and
+  a short FILL IN line names any that are missing, so the doctor check and
+  the next setup run still catch them. Every drafted answer, from code or
+  docs, is confirmed before it is written, and files copied from the template
+  are not used as sources. The last two go to
+  `docs/specs/YYYY-MM-DD-project-brief.md` for the first build session, only
+  when the user answered them in that run and something is left to build; a
+  later run updates the same brief in place. Setup writes the brief and builds
+  nothing. `apply-firmware` treats that brief as in scope, and `adopt-repo`
+  repeats its privacy sweep on everything `init-project` wrote. The brief lists what the smallest version must prove, the done
   answer as rows someone can check (each required, later or unknown), and the
   wanted features in the user's order, each in, out or unknown for that
   version. The follow-up asks for one role when the audience is a crowd,
