@@ -56,7 +56,7 @@ An answer the follow-up still couldn't make usable (done still not checkable, sa
 
 Brief: normal prose, the user's own words. Three parts:
 
-1. Smallest version: what it contains and the one claim it proves. Already shipped → say so. Otherwise, no answer to 5 or no claim stated → write `unknown: settle the claim with the user before the first build and its proof check`.
+1. Smallest version: what it contains and the one claim it proves. Already shipped → say so. Otherwise, brief still without a smallest version or claim → write `unknown: settle the claim with the user before the first build and its proof check`.
 2. Done checks: answer 4 split into rows, one behavior per row as what to do and what result to expect, each marked required for the smallest version, later, or unknown. Never pad the table with rows the user didn't give. End the part with this line, verbatim, unless part 1 says the smallest version already shipped: "Before calling the smallest version done, run one check that would fail if the claim in part 1 were false (pick or define it with the user when no row does that), then check each required row by running, opening or clicking it; write a test only if the user asks."
 3. Wanted features in the user's priority order (order unknown → say so and keep the order given), one line each, each marked in, out, or unknown for the smallest version. Parts the user chose to cover with an existing service or library are listed as such, with the service when named.
 
