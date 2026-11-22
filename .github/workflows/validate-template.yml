@@ -8,7 +8,52 @@ on:
   push:
   pull_request:
 
+# Read-only token, whatever the repository default is. The About panel check
+# below only reads repository metadata.
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run. Pushes to a branch never
+# cancel each other, so a busy main still finishes every run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # The template is public and copied into every new project: what a push adds
+  # must name no home folder, transcript or agent scratch path, and hold no
+  # secret (scripts/public-guard.sh).
+  public-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks (pinned version and checksum)
+        run: |
+          v=8.30.1
+          sum=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          f=gitleaks_${v}_linux_x64.tar.gz
+          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/$f" "https://github.com/gitleaks/gitleaks/releases/download/v$v/$f"
+          echo "$sum  $RUNNER_TEMP/$f" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP" gitleaks
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      # Pull request: base..head. Push: before..after. A new branch (before is
+      # all zeros) or a force push (before no longer exists) is checked from
+      # where it leaves main.
+      - name: Commits add no private paths or secrets
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE=$(git merge-base origin/main "$HEAD_SHA")
+          fi
+          bash scripts/public-guard.sh range "$BASE..$HEAD_SHA"
+
   validate:
     runs-on: ubuntu-latest
     steps:
