@@ -60,7 +60,7 @@ It runs three `codex exec` jobs at a time (`-m gpt-6.2-astra`, medium reasoning,
 
 Read every image. Note real flaws: invented labels, a list that shows internal names, garbled text, a concept that copied the screenshot. Regenerate only a clear failure, by deleting its PNG and rerunning the batch, and say what changed.
 
-Send all the images in one go so they display together (in the Claude desktop app, one SendUserFile call with `display: "render"`; elsewhere, list the paths). Then give a numbered one-line summary per image, flag the ones that need new data, and recommend a set with a concrete reason tied to the problems from step 2.
+Always show the images inline, all in one reply; never hand over only paths or links. When the session has a file tool with `display: "render"` (SendUserFile), send them all in one call with it. Otherwise embed each one with markdown image syntax, `![NN name](<relative path>)`, under a bold numbered heading. The Claude desktop app opens only files inside the session's own folders, so when the outputs live elsewhere (another repo, a study folder), first copy them into a git-ignored folder in the session's working directory, for example `.tmp/<name>-concepts/`. If the images still do not show, say so and give the paths. Then give a numbered one-line summary per image, flag the ones that need new data, and recommend a set with a concrete reason tied to the problems from step 2.
 
 ## 6. Fold picks into the build
 

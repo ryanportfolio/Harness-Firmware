@@ -33,7 +33,7 @@ For each prompt without a valid `out/NN-name.png` (a PNG of 100 KB or more), cal
 
 ## 5. Review and present
 
-Look at every image and note real flaws (invented labels, internal names in lists, garbled text, a copy of the screenshot). Regenerate only clear failures and say what changed. Show all images together with stable numbers, a one-line summary each, which need new data, and a recommended set with a concrete reason tied to the step 2 problems.
+Look at every image and note real flaws (invented labels, internal names in lists, garbled text, a copy of the screenshot). Regenerate only clear failures and say what changed. Always show the images inline, all in one reply, never only as paths or links: use the runtime's image output or attachment mechanism when it has one; otherwise embed each with markdown image syntax, `![NN name](<path>)`, under a bold numbered heading (if the chat renders images only from the workspace, copy outputs from elsewhere into a git-ignored workspace folder first). If the images still do not show, say so and give the paths. Show all images together with stable numbers, a one-line summary each, which need new data, and a recommended set with a concrete reason tied to the step 2 problems.
 
 ## 6. Fold picks into the build
 
