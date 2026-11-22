@@ -13,10 +13,11 @@ on:
 permissions:
   contents: read
 
-# A new push to a pull request cancels its older run. Pushes to a branch never
-# cancel each other, so a busy main still finishes every run.
+# A new push to a pull request cancels its older run. Each push run gets a
+# group of its own: in a shared group GitHub drops a waiting run when a newer
+# one queues, and the public guard would never check that push's commits.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -42,15 +43,25 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
       # Pull request: base..head. Push: before..after. A new branch (before is
-      # all zeros) or a force push (before no longer exists) is checked from
-      # where it leaves main.
+      # all zeros) is checked from where it leaves main. A force push whose old
+      # tip can no longer be fetched falls back to the same on other branches,
+      # and fails on main, where that range would be empty.
       - name: Commits add no private paths or secrets
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
             BASE=$(git merge-base origin/main "$HEAD_SHA")
+          elif ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            git fetch --no-tags --quiet origin "$BASE" 2>/dev/null || true
+            if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+              if [[ "$GITHUB_REF" == refs/heads/main ]]; then
+                echo "::error::The commit before this push ($BASE) cannot be fetched, so this run cannot tell which commits the push added. Check them with scripts/public-guard.sh range <old>..$HEAD_SHA."
+                exit 1
+              fi
+              BASE=$(git merge-base origin/main "$HEAD_SHA")
+            fi
           fi
           bash scripts/public-guard.sh range "$BASE..$HEAD_SHA"
 
