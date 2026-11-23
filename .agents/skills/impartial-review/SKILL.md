@@ -80,17 +80,38 @@ Inherit the session model when suitable. Respect an explicitly required model or
 floor; do not silently downgrade. Native Codex reviewers provide independent context, not
 vendor independence.
 
-If native agents are unavailable, check authenticated Codex CLI and its current help.
-Run separate read-only `codex exec` processes with standalone prompts on stdin, unique
-output/log files, and bounded concurrency. Pass exact scope and forbid nested review.
-Track processes and wait for completion; stale files are not new results. Require a
-successful process exit and non-empty report in a newly created run directory, record
-report hash and observed model/effort, and recheck source identity. Missing required
-inspection remains incomplete coverage despite exit 0; unknown model resolution stays
-unverified. Model fallback or a usage-consuming retry requires existing explicit
-authorization or user agreement. Use supported
-options and authorized model settings. If neither route can supply independent context,
-report the gap; do not call Manager self-review an impartial review.
+If native agents are unavailable, use Codex CLI only through the repo's shared runner
+`node .claude/scripts/codex-run/codex-run.mjs`, run from the repo root (docs:
+`.claude/scripts/codex-run/README.md`); never a hand-built `codex exec` line. Readiness:
+`--preflight` (JSON; exit 1 = not ready: report the gap and stop the CLI route).
+Never change the provider, keys or paid credits yourself, and never print credentials.
+
+- One runner call per reviewer group: standalone prompt via `--prompt-file` (or stdin), its
+  own new `--out <run dir>/<group>` (an absolute path), `--sandbox read-only` explicit,
+  `--role sol` (pin only in `.claude/scripts/codex-run/models.json`; no model ids here),
+  `--timeout-min 30`. Explicit user model: `--model <id>` (plus `--effort`). Uncommitted or
+  branch scope: add `--expect-diff "BASE HEAD"` (or `"HEAD"` for uncommitted) to get
+  `evidence.diffReads`.
+- The prompt passes the exact scope, forbids nested review (no codex exec, no agents), and
+  forbids edits. Never pass `--ephemeral` (no rollout, so the model is unverified); never pass
+  `--keep-hooks`, `--keep-plugins` or `--keep-mcp`.
+- Bounded batches (for example 3 at once), each started as a background process with runner
+  stdout redirected to a log file; poll each `<out>/status.json` and wait for exit before the
+  next batch. Foreground shell calls may be killed before a run ends. Stale files are not new
+  results.
+- Accept a reviewer only when its `<out>/result.json` has `ok: true` (exit 0, non-empty
+  `last.md`, observed model/sandbox = requested). Record report hash, `observed`
+  model/effort/sandbox and `evidence.rollout`; recheck source identity. `observed` null means
+  the model is unverified. `evidence.spawnCalls` > 0 means the reviewer was not a leaf;
+  disclose it. Exit 0 with missing required inspection is incomplete coverage.
+- Failure by `reason`: `model_rejected` gets no automatic model fallback; ask the user (a
+  newer pin goes into `models.json` only with the user's OK). Other reasons (`timeout`,
+  `nonzero_exit`, `empty_report`, `*_mismatch`) get at most one retry with a new `--out`,
+  and only with existing explicit authorization or user agreement, because each retry
+  consumes usage. Second failure: stop and report both.
+
+If neither route can supply independent context, report the gap; do not call Manager
+self-review an impartial review.
 
 ## Reviewer evidence
 

@@ -1,0 +1,8 @@
+{
+  "_note": "One place for the Codex model pins every skill uses. Bump a model here, not in skills. Roles: sol = newest Sol (reviews, audits), sol-prev = previous Sol (jeeves seat), astra = newest Astra (images, judges, second reviewer).",
+  "roles": {
+    "sol": { "model": "gpt-6.2-sol", "effort": "high" },
+    "sol-prev": { "model": "gpt-6.1-sol", "effort": "high" },
+    "astra": { "model": "gpt-6.2-astra", "effort": "medium" }
+  }
+}

@@ -9,9 +9,10 @@ Critique an existing build from real screenshots and get generated redesigns of 
 
 Script paths below are from the repository root. When this skill came from a plugin or a personal skills folder, run the scripts from the `scripts/` folder in this skill's base directory instead. Either way, run them from the workspace root, because every path they write is relative to it.
 
-## 0. Preflight
+## 0. Preflight and cost
 
-- `codex --version && codex login status` must say `Logged in using ChatGPT`. Otherwise stop and ask the user to run `codex login` in their own terminal; never handle credentials.
+- `node .claude/scripts/codex-run/codex-run.mjs --preflight` (the shared Codex runner; docs in its `README.md`) must show `"chatgptLogin": true`, because the image tool needs a direct ChatGPT login. If it does not, stop and ask the user to run `codex login` in their own terminal; never handle credentials.
+- Each image costs about 60-70k Codex tokens on the user's subscription, so 10 images is roughly 700k. Say so before starting the batch.
 - Pick a fresh scratch dir inside the workspace that git ignores, for example `.tmp/redesign-<n>/`. Codex's `workspace-write` sandbox reads and writes only inside the workspace, so references and outputs both live there.
 - Load the project's own UI or art-direction skill or reference first, if it has one, and carry its constraints into the shared identity line.
 
@@ -54,7 +55,7 @@ For example, a light-themed admin app for non-technical staff, whose captures sh
 bash .claude/skills/redesign-concepts/scripts/run-batch.sh <scratch> 3
 ```
 
-It runs three `codex exec` jobs at a time (`-m gpt-6.2-astra`, medium reasoning, `-c model_provider=openai`, `-s workspace-write`, refs via `-i`, prompt on stdin), logs each to `logs/`, and accepts an output only if it is a PNG of 100 KB or more (smaller means drawn in code or cut short). Invalid outputs are moved to `out/NN-name.rejected.png`; valid ones are skipped on a rerun, so rerunning resumes and retries the failures. If a log shows `401 Unauthorized: Incorrect API key provided` while login status says ChatGPT, check https://status.openai.com before debugging auth; report an outage and stop.
+It runs three jobs at a time through the shared runner `.claude/scripts/codex-run/codex-run.mjs`, found from the git root (`--role astra` = model pin in its `models.json`, `--config model_provider=openai`, `--sandbox workspace-write`, refs via `--image`, prompt via `--prompt-file`, plugins, hooks and user MCP servers off, 20 minute cap per image). It checks `"chatgptLogin": true` with `--preflight` first. Runner output goes to `logs/NN-name.log`; each attempt gets its own run dir (`result.json`, `events.jsonl`, `stderr.log`) under `runs/`. It accepts an output only if it is a PNG of 100 KB or more (smaller means drawn in code or cut short). Invalid outputs are moved to `out/NN-name.rejected.png`; valid ones are skipped on a rerun, so rerunning resumes and retries the failures. A failure line names the runner's `reason`. On `model_rejected`, run `codex debug models`, tell the user about a newer Astra, and edit `models.json` only with the user's OK. If a run's `stderr.log` shows `401 Unauthorized: Incorrect API key provided` while preflight says ChatGPT, check https://status.openai.com before debugging auth; report an outage and stop.
 
 ## 5. Review and present
 

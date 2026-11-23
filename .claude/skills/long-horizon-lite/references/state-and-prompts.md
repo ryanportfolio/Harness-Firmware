@@ -22,8 +22,8 @@ A `merged` or `closed` round whose worktree still exists → finish Worktree cle
 Audit runs. The Audit runs line is written before launch, so every run that started has one. A verdict already in the Audit log stands; do not apply the Accept rule to it again (HEAD has moved on since). For a run with no recorded verdict:
 
 - `exit-code` present → apply the Accept rule now;
-- no `run.log` → it never launched: launch it into that same dir;
-- `run.log` but no `exit-code` → `kill -0 "$(cat "$RUN/pid")"` succeeds → still running, wait. It fails → look for `exit-code` once more, since the run may have ended between the two looks; present → apply the Accept rule. Still none, or no `pid` file → failed run.
+- no `$RUN/codex` dir → it never launched: launch it into that same dir;
+- `$RUN/codex` but no `exit-code` → `$RUN/codex/status.json` shows progress (`events`, `elapsedSec`, every 30 s); `kill -0 "$(cat "$RUN/pid")"` succeeds → still running, wait. It fails → look for `exit-code` once more, since the run may have ended between the two looks; present → apply the Accept rule. Still none, or no `pid` file → failed run.
 
 A second paid run only when the recorded one failed.
 
@@ -240,9 +240,9 @@ A section passes only on `SECTION: pass` + `CONTRACT: aligned` from a run that m
 
 ## Launch
 
-Preflight (login, exact model id) per `codex-review` Step 1, read against `codex exec --help`; model + effort from the `run.log` header and the retry rule per its Step 4.
+Every launch goes through the shared runner `.claude/scripts/codex-run/codex-run.mjs` (README beside it); never hand-build `codex exec`. Preflight: `node .claude/scripts/codex-run/codex-run.mjs --preflight` → exit 0 + JSON (CLI version, login or gateway, role pins); exit 1 → Codex unavailable, per Guardrails. Model pins = `models.json` roles: round auditor `ROLE=sol`, section auditor `ROLE=astra`. Both at effort high: `--effort` overrides astra role's medium default. Explicit user model or effort → below. Newer model in catalog → tell the user; update `models.json` only with the user's OK, never edit pins here.
 
-One new directory per run, never reused: `evidence/sol-group-<G>/audit-1`, `evidence/section-<S>/audit-1`; a retry or a re-audit takes the next free number. `mkdir` without `-p` fails on an existing directory: stop there and take the next number. `$MODEL` = exact id resolved per SKILL.md Guardrails. Prompt goes on stdin (`-`), so no shell quoting touches it.
+One new directory per run, never reused: `evidence/sol-group-<G>/audit-1`, `evidence/section-<S>/audit-1`; a retry or a re-audit takes the next free number. `mkdir` without `-p` fails on an existing directory: stop there and take the next number. Runner output goes to `$RUN/codex` (runner refuses an existing non-empty dir; `$RUN` already holds prompt, meta, check logs). Prompt via `--prompt-file` (runner pipes it to stdin `-`), so no shell quoting touches it.
 
 ```bash
 RUN=<absolute task dir>/evidence/sol-group-<G>/audit-1     # or evidence/section-<S>/audit-1
@@ -250,11 +250,13 @@ mkdir -p "$(dirname "$RUN")" && mkdir "$RUN"               # then write the prom
 ```
 
 ```bash
-test -n "$MODEL" && test -s "$RUN/prompt.md" && test ! -e "$RUN/run.log" && { echo $BASHPID > "$RUN/pid"; codex exec -s read-only -m "$MODEL" -c model_reasoning_effort="${EFFORT:-high}" -o "$RUN/report.md" - < "$RUN/prompt.md" > "$RUN/run.log" 2>&1; echo $? > "$RUN/exit-code"; }
+test -n "$ROLE" && test -s "$RUN/prompt.md" && test ! -e "$RUN/codex" && { echo $BASHPID > "$RUN/pid"; node .claude/scripts/codex-run/codex-run.mjs --out "$RUN/codex" --role "$ROLE" --effort "${EFFORT:-high}" --sandbox read-only --timeout-min 60 --label "lh-lite $RUN" --prompt-file "$RUN/prompt.md" > "$RUN/runner.log" 2>&1; echo $? > "$RUN/exit-code"; }
 ```
 
-Set `RUN` and `MODEL` in the same command: a new shell call does not keep them. Set `EFFORT` only when the user chose an effort other than high. The three `test` guards keep Codex from starting without a model id, without a prompt, or into a directory that already holds a run's log. `pid` holds the shell that waits on Codex (`$BASHPID`, which stays right when the block runs in the background; `$$` would name the parent shell) and `exit-code` is written when the run ends, so both survive a restart of the Manager: Resume reads them to tell a running run from a dead one, and the Accept rule reads the exit code.
+Set `RUN` and `ROLE` in the same command: a new shell call does not keep them. User named a model → `MODEL=<id>`, swap `ROLE` for `MODEL` in the first guard and `--role "$ROLE"` for `--model "$MODEL"`. Set `EFFORT` only when the user chose an effort other than high. The three `test` guards keep Codex from starting without a model, without a prompt, or into a directory that already holds a run. `pid` holds the shell that waits on the runner (`$BASHPID`, which stays right when the block runs in the background; `$$` would name the parent shell) and `exit-code` (runner: 0 ok, 1 run failed, 2 bad arguments) is written when the run ends, so both survive a restart of the Manager: Resume reads them to tell a running run from a dead one, and the Accept rule reads the exit code + `$RUN/codex/result.json`. `--timeout-min 60` = choice, not measured: runner kills the process tree, `reason: timeout`, a failed run.
 
-Launch each run as its own background process from the task branch checkout, at most 4 at a time; start the next as one exits. A foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Before launch record in `$RUN/meta.md`: workspace, the SHAs and the contract version in the prompt, CLI version, command, requested model + effort, start time. After exit add the end time and the `model:`, `reasoning effort:` and `session id:` lines from the `run.log` header. A header that does not show the model → report it as requested, resolution unverified.
+Launch each run as its own background process from the task branch checkout, at most 4 at a time; start the next as one exits. A foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Progress while out: `$RUN/codex/status.json` (`events`, `elapsedSec`). Before launch record in `$RUN/meta.md`: workspace, the SHAs and the contract version in the prompt, CLI version (preflight), command, requested role/model + effort, start time. After exit add the end time and, from `$RUN/codex/result.json`: `ok`, `reason`, `observed` model/effort/sandbox, `threadId`, `usage`. `observed` null or a `warnings` entry → report it as requested, resolution unverified.
 
-Read only the verdict lines of each report into the Manager's context: the five-line block per round at the top of a Sol report, the first two lines of a section report. Trim surrounding whitespace and skip blank lines; each line must then be exactly a key and one allowed value. Anything else on a verdict line makes the report malformed, which is a failed run, never a pass. Report bodies go to the subagent that plans fix steps, and to fix-round executors, by path.
+Map `reason` to SKILL.md Accept and Guardrails: `ok: true` → read verdict lines. `model_rejected` → never swap or drop the model; Sol → `codex-review` Step 4, Astra → report per `astra-review`. `model_mismatch`, `sandbox_mismatch`, `timeout`, `nonzero_exit`, `empty_report` → failed run: one retry in a new run dir, same prompt, then stop.
+
+Report = `$RUN/codex/last.md` (final message). Read only the verdict lines of each report into the Manager's context: the five-line block per round at the top of a Sol report, the first two lines of a section report. Trim surrounding whitespace and skip blank lines; each line must then be exactly a key and one allowed value. Anything else on a verdict line makes the report malformed, which is a failed run, never a pass. Report bodies go to the subagent that plans fix steps, and to fix-round executors, by path.
