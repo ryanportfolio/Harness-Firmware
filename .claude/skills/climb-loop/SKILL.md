@@ -39,11 +39,11 @@ Absolute 1–10 scores drift. Observed in the source run: in-thread judge called
 
 Sol + Astra share a vendor (OpenAI) → their agreement is weaker evidence than Opus + either. Report says so. User names other models → honor, record (Codex seat: `--model <id>`, plus `--effort` if given).
 
-**Launch Codex only through the runner** `node .claude/scripts/codex-run/codex-run.mjs`, run from the repo root (docs: `.claude/scripts/codex-run/README.md`). Never hand-build a `codex exec` line.
+**Launch Codex only through the runner** `node "$RUNNER"`, run from the repo root; resolve `$RUNNER` first per `references/codex-judge.md` (Runner lookup; docs: `README.md` beside it). Never hand-build a `codex exec` line.
 
-Preflight, no inference: `node .claude/scripts/codex-run/codex-run.mjs --preflight` → JSON {cli, login, chatgptLogin, gatewayProvider, ready, roles}. `ready` false (exit 1) → stop before inference and ask the user to log in. `cli` not 0.171.0 → flag check in `references/codex-judge.md` before launch. Do not probe models by spending usage.
+Preflight, no inference: `node "$RUNNER" --preflight` → JSON {cli, login, chatgptLogin, gatewayProvider, ready, roles}. `ready` false (exit 1) → stop before inference and ask the user to log in. `cli` not 0.171.0 → flag check in `references/codex-judge.md` before launch. Do not probe models by spending usage.
 
-Model pins live only in `.claude/scripts/codex-run/models.json` (`roles.sol`, `roles.astra`); never write model ids into this skill. `codex debug models` lists a newer Sol or Astra than its pin → tell the user the pin is stale. Update `models.json` only with the user's OK.
+Model pins live only in `models.json` next to the runner in use (`roles.sol`, `roles.astra`); never write model ids into this skill. `codex debug models` lists a newer Sol or Astra than its pin → tell the user the pin is stale. Update `models.json` only with the user's OK.
 
 **Judge folder.** Per seat per call, make a new empty folder outside the repository (`JUDGE=$(mktemp -d "${TMPDIR:-/tmp}/judge-XXXXXXXX")`). Copy in the filled brief and that seat's captures renamed `<letter>-<view>.png` under that seat's shuffle. Judges see only this folder: no repo, no project name, no slug in any path. Results go to `$RUN` = `.tmp/climb-loop/<slug>/round-<n>/<seat>/` (extra calls `$RUN/call-<k>/`): Codex runner writes there directly through `--out`; Opus result written there after the call.
 

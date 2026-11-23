@@ -34,16 +34,19 @@ No two workers share a writable path. The parent holds the letter-to-candidate m
 
 Never start a worker with `isolation: "worktree"`: where a hook rewrites `git` to `rtk git`, Claude Code refuses nearly every git command in an isolated agent. A candidate that needs no git writes only in its `cN/` folder. For one that needs git, the parent runs `git worktree add --detach <main checkout>/../_wt/<repo>/arena-<slug>-cN` before starting it, outside the repo folder because the desktop app refuses writes to other worktrees inside it. The worktree starts from the last commit, so the parent copies in every uncommitted file the brief depends on, and later merges kept results into its own files instead of copying over them. The brief gives that absolute path and says to use it on every call (`git -C <path>`, `cd <path> && ...`), because the Bash working directory resets between calls. A new worktree has no `node_modules`; the brief says to install them. After the verdict, the parent copies what it keeps and removes these worktrees.
 
-Mix vendors without asking. If Codex has an accepted route (a ChatGPT login or a `model_provider` gateway, as the `codex-review` preflight defines), one candidate and the judge run on Codex, role `sol`. `node .claude/scripts/codex-run/codex-run.mjs --preflight` reports the route (`ready`). Only the user's explicit request skips Codex. No accepted route: all workers run on Claude, noted; never switch Codex to an API key or paid credits.
+Mix vendors without asking. If Codex has an accepted route (a ChatGPT login or a `model_provider` gateway, as the `codex-review` preflight defines), one candidate and the judge run on Codex, role `sol`. `node "$RUNNER" --preflight` (runner lookup below) reports the route (`ready`). Only the user's explicit request skips Codex. No accepted route: all workers run on Claude, noted; never switch Codex to an API key or paid credits.
 
-Launch Codex workers only through the runner, never a hand-built `codex exec` line, and never bypass approvals or the sandbox. Run it from the repo root; it resolves `--out`, `--prompt-file`, `--schema` and `--image` against that cwd, not `--cd`. The model pin lives in `.claude/scripts/codex-run/models.json`; a user-chosen model goes in as `--model <id>`. Each run is one background Bash call; poll `<out>/status.json`, then read `<out>/result.json` (a foreground call dies at 10 minutes). `--out` must be a new folder outside every `cN/` and `judge/`, for example `.tmp/arena/<slug>/runs/<worker>`.
+Launch Codex workers only through the runner, never a hand-built `codex exec` line, and never bypass approvals or the sandbox. Run it from the repo root; it resolves `--out`, `--prompt-file`, `--schema` and `--image` against that cwd, not `--cd`. The model pin lives in `models.json` next to the runner in use; a user-chosen model goes in as `--model <id>`. Each run is one background Bash call; poll `<out>/status.json`, then read `<out>/result.json` (a foreground call dies at 10 minutes). `--out` must be a new folder outside every `cN/` and `judge/`, for example `.tmp/arena/<slug>/runs/<worker>`.
 
 ```bash
+# Resolve $RUNNER in the same shell call as each launch: repo runner, then the one shipped beside this skill, then the user install
+for RUNNER in .claude/scripts/codex-run/codex-run.mjs "<this skill's folder>/../../scripts/codex-run/codex-run.mjs" "$HOME/.claude/scripts/codex-run/codex-run.mjs" ""; do [ -f "$RUNNER" ] && break; done
+test -n "$RUNNER" || echo "codex-run runner not found: stop and tell the user"
 # Codex candidate: writes only inside its own folder or worktree (the sandbox enforces it)
-node .claude/scripts/codex-run/codex-run.mjs --out ".tmp/arena/<slug>/runs/cN" --role sol --sandbox workspace-write \
+node "$RUNNER" --out ".tmp/arena/<slug>/runs/cN" --role sol --sandbox workspace-write \
   --cd "<cN folder or worktree, absolute>" --prompt-file ".tmp/arena/<slug>/runs/cN-brief.md" --timeout-min 60 --label "arena cN"
 # Codex judge: read-only; its prompt file holds criteria.md plus the instruction to read only judge/
-node .claude/scripts/codex-run/codex-run.mjs --out ".tmp/arena/<slug>/runs/judge" --role sol --sandbox read-only \
+node "$RUNNER" --out ".tmp/arena/<slug>/runs/judge" --role sol --sandbox read-only \
   --cd "<absolute path to .tmp/arena/<slug>/judge>" --prompt-file ".tmp/arena/<slug>/runs/judge-prompt.md" --timeout-min 30 --label "arena judge"
 ```
 

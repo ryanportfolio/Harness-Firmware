@@ -30,18 +30,21 @@ No two workers share a writable path. The parent holds the letter-to-candidate m
 
 ## Workers
 
-**Candidates.** Three by default; more on request or when the options are many. Each brief names a different angle, such as minimal change, failure-proof, or end-user-first. Spawned Codex agents use the session's model; runner workers use role `sol`, pinned in `.claude/scripts/codex-run/models.json` (a user-chosen model goes in as `--model <id>`). Claude workers run on Opus, the latest Fable, or higher, never `sonnet` or `haiku`. A user-chosen model that meets that floor wins.
+**Candidates.** Three by default; more on request or when the options are many. Each brief names a different angle, such as minimal change, failure-proof, or end-user-first. Spawned Codex agents use the session's model; runner workers use role `sol`, pinned in `models.json` next to the runner in use (a user-chosen model goes in as `--model <id>`). Claude workers run on Opus, the latest Fable, or higher, never `sonnet` or `haiku`. A user-chosen model that meets that floor wins.
 
 Mix vendors without asking. One candidate and the judge run through the Claude CLI only when the `$claude-review` preflight proves subscription routing; never use API billing. Take flags from local `claude --help`, and never bypass permission checks. If the preflight fails, those workers run on Codex, noted.
 
-A Codex worker started as a separate process goes only through the runner, never a hand-built `codex exec` line, and never bypasses approvals or the sandbox. `node .claude/scripts/codex-run/codex-run.mjs --preflight` must report `ready` first. Run it from the repo root; it resolves `--out`, `--prompt-file`, `--schema` and `--image` against that cwd, not `--cd`. Start each run in the background, poll `<out>/status.json`, then read `<out>/result.json`. `--out` must be a new folder outside every `cN/` and `judge/`, for example `.tmp/arena/<slug>/runs/<worker>`.
+A Codex worker started as a separate process goes only through the runner, never a hand-built `codex exec` line, and never bypasses approvals or the sandbox. `node "$RUNNER" --preflight` (runner lookup below) must report `ready` first. Run it from the repo root; it resolves `--out`, `--prompt-file`, `--schema` and `--image` against that cwd, not `--cd`. Start each run in the background, poll `<out>/status.json`, then read `<out>/result.json`. `--out` must be a new folder outside every `cN/` and `judge/`, for example `.tmp/arena/<slug>/runs/<worker>`.
 
 ```bash
+# Resolve $RUNNER in the same shell call as each launch: repo runner, then the one shipped beside this skill, then the user install
+for RUNNER in .claude/scripts/codex-run/codex-run.mjs "<this skill's folder>/../../../.claude/scripts/codex-run/codex-run.mjs" "$HOME/.claude/scripts/codex-run/codex-run.mjs" ""; do [ -f "$RUNNER" ] && break; done
+test -n "$RUNNER" || echo "codex-run runner not found: stop and tell the user"
 # Codex candidate: writes only inside its own folder or worktree (the sandbox enforces it)
-node .claude/scripts/codex-run/codex-run.mjs --out ".tmp/arena/<slug>/runs/cN" --role sol --sandbox workspace-write \
+node "$RUNNER" --out ".tmp/arena/<slug>/runs/cN" --role sol --sandbox workspace-write \
   --cd "<cN folder or worktree, absolute>" --prompt-file ".tmp/arena/<slug>/runs/cN-brief.md" --timeout-min 60 --label "arena cN"
 # Codex judge: read-only; its prompt file holds criteria.md plus the instruction to read only judge/
-node .claude/scripts/codex-run/codex-run.mjs --out ".tmp/arena/<slug>/runs/judge" --role sol --sandbox read-only \
+node "$RUNNER" --out ".tmp/arena/<slug>/runs/judge" --role sol --sandbox read-only \
   --cd "<absolute path to .tmp/arena/<slug>/judge>" --prompt-file ".tmp/arena/<slug>/runs/judge-prompt.md" --timeout-min 30 --label "arena judge"
 ```
 

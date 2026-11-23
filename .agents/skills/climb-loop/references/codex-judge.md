@@ -2,10 +2,19 @@
 
 Loaded from SKILL.md section 1 before the first Codex judge call.
 
+## Runner lookup
+
+Resolve `$RUNNER` before preflight, in the same shell call as each runner command (shell variables do not carry over). Working directory stays the target repo root. Order: the repo's own runner; the runner shipped beside this skill (Claude skill: `$SKILL_DIR/../../scripts/`; Codex port: `$SKILL_DIR/../../../.claude/scripts/`); the user's install. None found → stop and tell the user. Model pins = `models.json` next to the runner in use.
+
+```bash
+for RUNNER in .claude/scripts/codex-run/codex-run.mjs "$SKILL_DIR/../../scripts/codex-run/codex-run.mjs" "$SKILL_DIR/../../../.claude/scripts/codex-run/codex-run.mjs" "$HOME/.claude/scripts/codex-run/codex-run.mjs" ""; do [ -f "$RUNNER" ] && break; done
+test -n "$RUNNER" || echo "codex-run runner not found: stop and tell the user"
+```
+
 Runner resolves `--out`, `--prompt-file`, `--schema`, `--image` against its own cwd (repo root), not `--cd`. `$ROLE` = seat's role from the table. `$SKILL_DIR` = absolute path of this active climb-loop skill folder (the one holding this file), so the schema loads wherever the skill is installed. Brief on stdin (or `--prompt-file`); runner places every `-i` before codex's `-` (stdin prompt), so multi-value `-i` cannot swallow it. `--image` order = attachment order the brief states. `--out` must be new or empty (`$RUN/codex`; extra calls `$RUN/call-<k>/codex`). Persisted run (no `--ephemeral`): runner then reads the rollout and verifies model, effort and sandbox; `--ephemeral` leaves all three unverified. Each call is still a new Codex thread, never resumed. Never pass `--keep-hooks`, `--keep-plugins` or `--keep-mcp` to a judge. Default `--timeout-min 30` (kills process tree, `reason: timeout`). Launch in the background (a foreground tool call can die at 10 min), poll `$RUN/codex/status.json` (first write after 30 s; `running` → `done`/`failed`):
 
 ```bash
-node .claude/scripts/codex-run/codex-run.mjs --cd "$JUDGE" --skip-git-repo-check \
+node "$RUNNER" --cd "$JUDGE" --skip-git-repo-check \
   --role "$ROLE" --sandbox read-only \
   --schema "$SKILL_DIR/references/rank.schema.json" \
   --out "$RUN/codex" \

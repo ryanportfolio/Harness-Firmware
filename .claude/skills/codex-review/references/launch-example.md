@@ -47,7 +47,7 @@ node "$RUNNER" --review --role sol --base origin/main \
 
 - Single commit: selector `--commit "$HEAD_SHA"`, `--expect-diff "$BASE $HEAD_SHA"` with `BASE` = parent or the empty tree for a root commit. Smoke-tested 2026-11-22 on codex-cli 0.171.0: `ok`, 1 review sibling, `exitedReviewMode` 1, `diffReads` 0 (the selector reviewer read the change with `git show <sha>`, so scope identity stays unverified on this path).
 - Uncommitted work: selector `--uncommitted`, `--expect-diff "$HEAD_SHA"` (one SHA means `git diff <head>`); the runner also sets `untrackedListed`.
-- Explicit user model or effort: replace `--role sol` with `--model <id>` and/or add `--effort <e>`.
+- Explicit user model or effort: keep `--role sol` and add `--model <id>`; add `--effort <e>` only when the user picks one.
 - Run the whole `node "$RUNNER" ...` line through Bash `run_in_background`; a foreground call dies at the 10-minute ceiling. Poll `cat "$RUN/codex/status.json"`; after exit read `$RUN/codex/result.json`, `$RUN/codex/review-output.json`, and `$RUN/codex/last.md`. `runner.log` holds only the 30 s progress lines and the final `OK` or `FAILED: <reason>` line. Redirect complete output to a file, never through `head` or `tail`.
 - PowerShell: `>` re-encodes native output (UTF-16 on Windows PowerShell 5.1), which breaks the runner copy; run the two `git show` lines through `cmd /c` or Git Bash. No `<` redirection and no heredoc. Write the prompt with the Write tool and pass `--prompt-file`. The runner sends the prompt to codex on stdin, so `$` and backticks in it are safe; only the shell that writes the file can expand `$`.
 

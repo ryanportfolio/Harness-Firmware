@@ -46,7 +46,9 @@ Preflight `gatewayProvider` = the provider Codex uses without `--profile`: top-l
 
 `observed` = null when no rollout settings found (ephemeral run, rollout missing, review without sibling): treat as unverified.
 
-Windows: runner starts Codex without a shell. `where.exe codex` walked in PATH order: real `.exe` runs directly (0-byte WindowsApps alias skipped); npm `codex.cmd` shim → `node <shim dir>/node_modules/@openai/codex/bin/codex.js`. `run.json` `command` shows what ran.
+Programs (`codex`, `git`, `taskkill`) start by absolute path, never bare name: Windows would also search the current folder, i.e. the checkout under review. PATH walked in order; relative entries and entries inside the git checkout holding the current folder or `--cd` (e.g. its `node_modules/.bin`) skipped. No codex outside them → refused.
+
+Windows: runner starts Codex without a shell. PATH walked in order: real `.exe` runs directly (0-byte WindowsApps alias skipped); npm `codex.cmd` shim → `node <shim dir>/node_modules/@openai/codex/bin/codex.js`. `run.json` `command` shows what ran.
 
 `reason` values: `mcp_isolation_failed` (`codex mcp list` failed or unreadable, so the user's MCP servers could not be turned off; Codex not started; `--keep-mcp` runs anyway), `prompt_not_delivered` (Codex closed stdin before reading the whole prompt), `timeout`, `model_rejected`, `nonzero_exit`, `empty_report`, `schema_output_not_json`, `review_not_finished`, `model_mismatch`, `sandbox_mismatch`, `effort_mismatch` (each mismatch checked only when the rollout records the value). Exit 0 = ok, 1 = run failed, 2 = bad arguments.
 

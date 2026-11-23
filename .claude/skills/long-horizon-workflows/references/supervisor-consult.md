@@ -8,7 +8,7 @@ Either trigger may escalate to cross-vendor supervisor. Manager, executor, audit
 family, never saw this session:
 
 ```bash
-node .claude/scripts/codex-run/codex-run.mjs --preflight
+node "$RUNNER" --preflight   # $RUNNER: lookup under Launch
 ```
 
 Exit 0 (`ready`: ChatGPT login, or a `model_provider` gateway set in `config.toml` in
@@ -20,10 +20,10 @@ Exit 1 (not ready), or run fails per Launch: skip; rewrite rules above stand alo
 
 ## Launch
 
-Every launch goes through the shared runner `.claude/scripts/codex-run/codex-run.mjs`
-(README beside it); never hand-build `codex exec`. Preflight above → JSON (CLI version, login
-or gateway, role pins). Model: `ROLE=sol` (newest Sol; role default effort high). Pins live
-only in `.claude/scripts/codex-run/models.json`. Newer model in catalog → tell the user;
+Every launch goes through the shared runner `$RUNNER` (lookup below; README beside it);
+never hand-build `codex exec`. Preflight above → JSON (CLI version, login or gateway, role
+pins). Model: `ROLE=sol` (newest Sol; role default effort high). Pins live
+only in `models.json` next to the runner in use. Newer model in catalog → tell the user;
 update `models.json` only with the user's OK, never edit pins here. An explicit user model or
 effort choice wins (`--model`, `--effort`). Never drop `--role`/`--model`.
 
@@ -39,14 +39,21 @@ RUN=<absolute task dir>/evidence/codex-consult-1     # or evidence/round-<N>/dra
 mkdir -p "$(dirname "$RUN")" && mkdir "$RUN"          # then write the prompt to "$RUN/prompt.md"
 ```
 
+`$RUNNER` lookup, in the same command as preflight and every launch (working directory stays the target repo): the repo's own runner, then the one shipped beside this skill, then the user install. None found → tell the user; Codex unavailable.
+
 ```bash
-test -n "$ROLE" && test -s "$RUN/prompt.md" && test ! -e "$RUN/codex" && { echo $BASHPID > "$RUN/pid"; node .claude/scripts/codex-run/codex-run.mjs --out "$RUN/codex" --role "$ROLE" --effort "${EFFORT:-high}" --sandbox read-only --timeout-min 30 --label "long-horizon-workflows $RUN" --prompt-file "$RUN/prompt.md" > "$RUN/runner.log" 2>&1; echo $? > "$RUN/exit-code"; }
+for RUNNER in .claude/scripts/codex-run/codex-run.mjs "<this skill's folder>/../../scripts/codex-run/codex-run.mjs" "$HOME/.claude/scripts/codex-run/codex-run.mjs" ""; do [ -f "$RUNNER" ] && break; done
+test -n "$RUNNER" || echo "codex-run runner not found: tell the user"
 ```
 
-Set `RUN` and `ROLE` in the same command: a new shell call does not keep them. User named a
+```bash
+test -n "$RUNNER" && test -n "$ROLE" && test -s "$RUN/prompt.md" && test ! -e "$RUN/codex" && { echo $BASHPID > "$RUN/pid"; node "$RUNNER" --out "$RUN/codex" --role "$ROLE" --effort "${EFFORT:-high}" --sandbox read-only --timeout-min 30 --label "long-horizon-workflows $RUN" --prompt-file "$RUN/prompt.md" > "$RUN/runner.log" 2>&1; echo $? > "$RUN/exit-code"; }
+```
+
+Set `RUN`, `ROLE` and `RUNNER` in the same command: a new shell call does not keep them. User named a
 model → `MODEL=<id>`, swap `ROLE` for `MODEL` in the first guard and `--role "$ROLE"` for
-`--model "$MODEL"`. Set `EFFORT` only when the user chose an effort other than high. Three
-`test` guards keep Codex from starting without a model, without a prompt, or into a directory
+`--model "$MODEL"`. Set `EFFORT` only when the user chose an effort other than high. Four
+`test` guards keep Codex from starting without a runner, without a model, without a prompt, or into a directory
 already holding a run. `pid` = shell waiting on runner (`$BASHPID`, right in background; `$$`
 names parent shell); `exit-code` (runner: 0 ok, 1 run failed, 2 bad arguments) written at end,
 so restarted Manager tells running from dead: no `exit-code` + `kill -0 "$(cat "$RUN/pid")"`

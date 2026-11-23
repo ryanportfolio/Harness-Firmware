@@ -38,11 +38,11 @@ Absolute 1–10 scores drift. Observed in the source run: in-thread judge called
 
 From Codex, Sol and Astra share this session's vendor; each child is still a fresh context. Opus is the only cross-vendor seat. Report says so. User names other models → honor, record (Codex seat: `--model <id>`, plus `--effort` if given).
 
-Launch Codex seats only through the runner `node .claude/scripts/codex-run/codex-run.mjs`, run from the repo root (docs: `.claude/scripts/codex-run/README.md`). Never hand-build a `codex exec` line. Model pins live only in `.claude/scripts/codex-run/models.json` (`roles.sol`, `roles.astra`); never write model ids into this skill. `codex debug models` lists a newer Sol or Astra than its pin → tell the user the pin is stale; update `models.json` only with the user's OK.
+Launch Codex seats only through the runner `node "$RUNNER"`, run from the repo root; resolve `$RUNNER` first per `references/codex-judge.md` (Runner lookup). Never hand-build a `codex exec` line. Model pins live only in `models.json` next to the runner in use (`roles.sol`, `roles.astra`); never write model ids into this skill. `codex debug models` lists a newer Sol or Astra than its pin → tell the user the pin is stale; update `models.json` only with the user's OK.
 
 Preflight, no inference:
 
-- `node .claude/scripts/codex-run/codex-run.mjs --preflight` → JSON {cli, login, chatgptLogin, gatewayProvider, ready, roles}. `ready` false (exit 1) → stop before inference and ask the user to log in.
+- `node "$RUNNER" --preflight` → JSON {cli, login, chatgptLogin, gatewayProvider, ready, roles}. `ready` false (exit 1) → stop before inference and ask the user to log in.
 - `cli` not 0.171.0 → flag check in `references/codex-judge.md` before launch.
 - Opus seat: run the fail-closed preflight from `$claude-review` section 1 (subscription route proven, no API or provider variables), and also require `ANTHROPIC_DEFAULT_OPUS_MODEL` to be absent from the child environment (check presence only, never print the value). Stop the Opus seat if any check fails. Never accept or enable paid credits for the user.
 - Do not probe models by spending usage.

@@ -19,26 +19,48 @@ const CODEX_HOME = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
 const SANDBOXES = ["read-only", "workspace-write", "danger-full-access"];
 const MODEL_REJECTED = /model_not_found|unknown provider for model|\bmodel\b.*?\b(is not|isn't) (supported|available)|does not exist or you do not have access/i;
 
-// How to start Codex without a shell. On Windows Node cannot spawn a .cmd/.bat shim without one,
-// and a global npm install exposes Codex only as `codex.cmd`. So walk `where.exe codex` in PATH
-// order: a real .exe/.com (0-byte WindowsApps aliases skipped) runs directly; an npm shim runs as
-// `node <shim dir>/node_modules/@openai/codex/bin/codex.js`.
-function resolveCodex() {
-  if (process.platform !== "win32") return { cmd: "codex", pre: [] };
-  const w = spawnSync("where.exe", ["codex"], { encoding: "utf8", windowsHide: true });
-  for (const hit of (w.stdout || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean)) {
-    try {
-      if (/\.(exe|com)$/i.test(hit) && fs.statSync(hit).size > 0) return { cmd: hit, pre: [] };
-      if (/\.(cmd|bat)$/i.test(hit)) {
-        const js = path.join(path.dirname(hit), "node_modules", "@openai", "codex", "bin", "codex.js");
-        if (fs.existsSync(js)) return { cmd: process.execPath, pre: [js] };
-      }
-    } catch {}
+// Programs are started by absolute path found on PATH, never by bare name: Windows (and a PATH
+// holding "." or a relative entry) would also search the current folder, which for a review is the
+// checkout under review, so a planted codex.exe or git.exe there could run before any sandbox.
+// PATH entries that are relative, or inside the git checkout holding the current folder or --cd
+// (e.g. a checkout's node_modules/.bin), are skipped. Found by walking up to a `.git`, no git exec.
+const checkoutRoot = (dir) => {
+  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, ".git"))) return d;
+    if (path.dirname(d) === d) return null;
   }
-  return { cmd: "codex", pre: [] };
+};
+const checkouts = (...dirs) => [...new Set(dirs.map(checkoutRoot).filter(Boolean))];
+const WIN = process.platform === "win32";
+const norm = (p) => (WIN ? path.resolve(p).toLowerCase() : path.resolve(p));
+const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+const inside = (child, root) => {
+  const rel = path.relative(norm(real(root)), norm(real(child)));
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+};
+function findOnPath(name, exts, exclude) {
+  for (const dir of (process.env.PATH || "").split(path.delimiter)) {
+    if (!dir || !path.isAbsolute(dir) || exclude.some((root) => inside(dir, root))) continue;
+    for (const ext of exts) {
+      const file = path.join(dir, name + ext);
+      try { if (fs.statSync(file).isFile() && fs.statSync(file).size > 0) return file; } catch {}
+    }
+  }
+  return null;
 }
-const CODEX = resolveCodex();
+// Node cannot spawn a .cmd/.bat shim without a shell, and a global npm install exposes Codex only as
+// `codex.cmd`: that shim runs as `node <shim dir>/node_modules/@openai/codex/bin/codex.js`.
+// 0-byte WindowsApps aliases are skipped by the size check.
+function resolveCodex(exclude) {
+  const hit = findOnPath("codex", WIN ? [".exe", ".com", ".cmd", ".bat"] : [""], exclude);
+  if (!hit) return null;
+  if (!/\.(cmd|bat)$/i.test(hit)) return { cmd: hit, pre: [] };
+  const js = path.join(path.dirname(hit), "node_modules", "@openai", "codex", "bin", "codex.js");
+  return fs.existsSync(js) ? { cmd: process.execPath, pre: [js] } : null;
+}
+let CODEX = null;
 const runCodex = (args, opts) => spawnSync(CODEX.cmd, [...CODEX.pre, ...args], opts);
+const SYSTEM32 = path.join(process.env.SystemRoot || "C:\\Windows", "System32");
 
 const fail = (msg) => {
   console.error(`[codex-run] ${msg}`);
@@ -96,6 +118,12 @@ function activeProvider(toml) {
 }
 
 function preflight() {
+  CODEX = resolveCodex(checkouts(process.cwd()));
+  if (!CODEX) {
+    console.log(JSON.stringify({ cli: "codex not found on PATH outside the current git checkout", ready: false }, null, 2));
+    process.exitCode = 1;
+    return;
+  }
   const run = (args) => runCodex(args, { encoding: "utf8", windowsHide: true });
   const v = run(["--version"]);
   const login = run(["login", "status"]);
@@ -159,7 +187,7 @@ function buildArgs(o, model, effort, mcp) {
 }
 
 function killTree(child) {
-  if (process.platform === "win32") spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true });
+  if (process.platform === "win32") spawnSync(path.join(SYSTEM32, "taskkill.exe"), ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true });
   else child.kill("SIGKILL");
 }
 
@@ -228,10 +256,12 @@ function evidence(o, threadId, started) {
     const wanted = head ? [`git diff ${base} ${head}`, `git diff ${base}..${head}`] : [`git diff ${base}`];
     // `git show <head>` prints the requested patch only for a single-commit scope (base = head's
     // parent), and never as `git show <head>:<path>`, which prints a file, not a diff.
-    const parent = head ? spawnSync("git", ["rev-parse", `${head}^`], { cwd: o.cd || process.cwd(), encoding: "utf8", windowsHide: true }).stdout?.trim() : "";
+    const git = findOnPath("git", WIN ? [".exe", ".com"] : [""], checkouts(process.cwd(), o.cd || process.cwd()));
+    const runGit = (args) => (git ? spawnSync(git, args, { cwd: o.cd || process.cwd(), encoding: "utf8", windowsHide: true }) : { status: 1, stdout: "" });
+    const parent = head ? runGit(["rev-parse", `${head}^`]).stdout?.trim() : "";
     // Only the plain form `git show <head>` (no options, nothing after) on a non-merge commit:
     // options like --no-patch or --stat, or a merge's combined diff, can omit the patch.
-    const merge = head ? spawnSync("git", ["rev-parse", "--verify", "-q", `${head}^2`], { cwd: o.cd || process.cwd(), windowsHide: true }).status === 0 : true;
+    const merge = head ? runGit(["rev-parse", "--verify", "-q", `${head}^2`]).status === 0 : true;
     const showRe = parent && parent === base && !merge ? new RegExp(`git show\\s+${head}(?=\\s*(?:$|["'\`|;&)]))`, "m") : null;
     ev.diffReads = texts.filter((t) => wanted.some((w) => t.includes(w)) || (showRe && showRe.test(t))).length;
     ev.untrackedListed = texts.some((t) => t.includes("--untracked-files=all"));
@@ -274,6 +304,8 @@ async function main() {
   }
 
   const cwd = path.resolve(o.cd || process.cwd());
+  CODEX = resolveCodex(checkouts(process.cwd(), cwd));
+  if (!CODEX) return fail("codex not found on PATH outside the git checkouts of the current and --cd folders (a copy inside them is never run)");
   const mcp = o.keepMcp ? { names: [] } : enabledMcpServers(cwd);
   if (mcp.error) {
     // Fail closed: without the server list the run would keep the user's MCP tools the caller turned off.

@@ -16,7 +16,7 @@ Read `.claude/skills/codex-review/SKILL.md` and follow its complete execution co
 
 Commands are the ones in codex-review's [launch example](../codex-review/references/launch-example.md), with `--role astra` in place of `--role sol` and the `astra-review` run directory prefix. Commit and uncommitted prompts, the root-commit and dirty-tree rules, the skill-load and scope-identity checks, and path attribution follow `codex-review`. `$ARGUMENTS` carries scope as in `codex-review`.
 
-Skip the newest-Sol check in `codex-review` Step 1; this entrypoint never swaps Astra for Sol. Check for a newer Astra instead: when `codex debug models` lists an Astra slug newer than `roles.astra.model`, run with `--model <newer id> --effort medium` and tell the user the pin is stale. Update `models.json` only with the user's OK. Honor an explicit user model/effort choice (`--model`, `--effort`). A model identifier in `models.json` is not proof of availability.
+Skip the newest-Sol check in `codex-review` Step 1; this entrypoint never swaps Astra for Sol. Check for a newer Astra instead: when `codex debug models` lists an Astra slug newer than `roles.astra.model`, run with `--role astra --model <newer id>` (the role keeps effort medium) and tell the user the pin is stale. Update `models.json` only with the user's OK. Honor an explicit user model choice: keep `--role astra --model <id>`; add `--effort` only when the user picks one. A model identifier in `models.json` is not proof of availability.
 
 Distinct prefixes do not prevent collisions between two Astra invocations; every run directory must still be new.
 

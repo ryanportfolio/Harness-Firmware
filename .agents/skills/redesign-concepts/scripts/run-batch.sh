@@ -2,7 +2,8 @@
 # Generates every concept image written by make-prompts.mjs, a few at a time, through the shared
 # Codex runner (.claude/scripts/codex-run/codex-run.mjs in this repo; docs in its README.md).
 # Usage (from the workspace root): bash run-batch.sh <scratch dir> [parallel, default 3]
-# Reruns skip images that are already valid, so a failed or interrupted batch resumes where it stopped.
+# Reruns skip images this script already accepted (out/<name>.png.ok marker), so a failed or interrupted
+# batch resumes where it stopped.
 set -u
 
 dir=${1:?usage: run-batch.sh <scratch dir> [parallel]}
@@ -41,13 +42,24 @@ valid() {
   [ "$(wc -c < "$1" | tr -d ' ')" -ge 100000 ]
 }
 
+# Accepted = valid and marked: the marker is written only after the runner reported ok and the PNG
+# passed. A valid PNG without it may come from a failed or unchecked run (e.g. an interrupted batch).
+accepted() { valid "$1" && [ -f "$1.ok" ]; }
+
 run_one() {
   local prompt=$1 name out ref code run reason
   name=$(basename "$prompt" .txt)
   out="$dir/out/$name.png"
-  if valid "$out"; then echo "skip $name (already generated)"; return 0; fi
-  # An invalid leftover is kept for inspection but moved aside so this run regenerates it.
-  [ -e "$out" ] && mv -f "$out" "$dir/out/$name.rejected.png"
+  if accepted "$out"; then echo "skip $name (already generated)"; return 0; fi
+  # A stale marker must not outlive the attempt it belonged to.
+  rm -f "$out.ok"
+  # A leftover is kept for inspection but moved aside so this run regenerates it.
+  if valid "$out"; then
+    mv -f "$out" "$dir/out/$name.unconfirmed.png"
+    echo "retry $name: valid PNG without an acceptance marker (unchecked run), moved to out/$name.unconfirmed.png"
+  elif [ -e "$out" ]; then
+    mv -f "$out" "$dir/out/$name.rejected.png"
+  fi
   local args=()
   # Strip \r: a refs file edited on a CRLF checkout would otherwise pass "path\r" to codex.
   while IFS= read -r ref || [ -n "$ref" ]; do
@@ -68,6 +80,7 @@ run_one() {
   # A valid PNG from a run the runner failed (model or sandbox mismatch, timeout) is not accepted.
   ok=no; grep -q '"ok": *true' "$run/result.json" 2>/dev/null && ok=yes
   if [ "$ok" = yes ] && valid "$out"; then
+    : > "$out.ok"
     echo "done $name ($(wc -c < "$out" | tr -d ' ') bytes)"
   elif [ -e "$out" ]; then
     mv -f "$out" "$dir/out/$name.rejected.png"
@@ -88,7 +101,7 @@ wait
 
 missing=0
 for prompt in "$dir"/prompts/*.txt; do
-  valid "$dir/out/$(basename "$prompt" .txt).png" || missing=$((missing + 1))
+  accepted "$dir/out/$(basename "$prompt" .txt).png" || missing=$((missing + 1))
 done
 if [ "$missing" -eq 0 ]; then echo "All images generated in $dir/out."
 else echo "$missing image(s) missing or invalid; rerun the same command to retry them."; exit 1; fi

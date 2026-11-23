@@ -20,7 +20,7 @@ The commands are codex-fullreview's `references/launch-prompts.md` with three sw
 - `--role astra` in place of `--role sol`, and `--label astra-fullreview`
 - prompt text `reasoning_effort medium` in place of `reasoning_effort high`
 
-Skip the newest-Sol check in `codex-fullreview` Step 1; this entrypoint never swaps Astra for Sol. Check for a newer Astra instead: when `codex debug models` lists an Astra slug newer than `roles.astra.model`, run with `--model <newer id> --effort medium` and the same id in the prompt, and tell the user the pin is stale. Update `models.json` only with the user's OK. Honor an explicit user model/effort choice (`--model`, `--effort`, same values in the prompt). A model id in `models.json` is not proof of availability. `$ARGUMENTS` carries scope as in `codex-fullreview`.
+Skip the newest-Sol check in `codex-fullreview` Step 1; this entrypoint never swaps Astra for Sol. Check for a newer Astra instead: when `codex debug models` lists an Astra slug newer than `roles.astra.model`, run with `--role astra --model <newer id>` (the role keeps effort medium) and the same id in the prompt, and tell the user the pin is stale. Update `models.json` only with the user's OK. Honor an explicit user model choice: keep `--role astra --model <id>`; add `--effort` only when the user picks one (same values in the prompt). A model id in `models.json` is not proof of availability. `$ARGUMENTS` carries scope as in `codex-fullreview`.
 
 Commit and uncommitted prompts, the root-commit base, the file-named skill invocation, the session-file checks for skill load and spawned children, the scope-line check, and attribution follow `codex-fullreview`. Zero spawned children is reported as "no sub-reviewers ran", never hidden.
 

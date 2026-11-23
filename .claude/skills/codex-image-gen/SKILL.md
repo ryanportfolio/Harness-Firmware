@@ -7,14 +7,19 @@ description: "Image asset needed (icon, sprite, texture, splash, logo, marketing
 
 ## Overview
 
-Codex CLI runs on the user's ChatGPT/Codex subscription and its agent carries an `image_gen` tool. Claude Code cannot generate images itself, but it can drive Codex non-interactively through the shared runner `.claude/scripts/codex-run/codex-run.mjs` (docs: its `README.md`). The prompt tells Codex to generate and save a PNG into the workspace. Never hand-build `codex exec` lines. No API key; billing rides the user's subscription.
+Codex CLI runs on the user's ChatGPT/Codex subscription and its agent carries an `image_gen` tool. Claude Code cannot generate images itself, but it can drive Codex non-interactively through the shared runner `codex-run.mjs` (docs: the `README.md` beside it). The prompt tells Codex to generate and save a PNG into the workspace. Never hand-build `codex exec` lines. No API key; billing rides the user's subscription.
 
-Run every command below from the repository root: the runner path is repo-relative.
+Run every command below from the repository root, with `$RUNNER` resolved in the same shell call: the repo's own runner, then the one shipped beside this skill, then the user install.
+
+```bash
+for RUNNER in .claude/scripts/codex-run/codex-run.mjs "<this skill's folder>/../../scripts/codex-run/codex-run.mjs" "$HOME/.claude/scripts/codex-run/codex-run.mjs" ""; do [ -f "$RUNNER" ] && break; done
+test -n "$RUNNER" || echo "codex-run runner not found: stop and tell the user"
+```
 
 ## Preflight
 
 ```bash
-node .claude/scripts/codex-run/codex-run.mjs --preflight
+node "$RUNNER" --preflight
 ```
 
 - Expect `"chatgptLogin": true`. The image tool needs a direct ChatGPT login; a gateway login alone does not expose it. If it is false, stop and ask the user to run `codex login` (browser OAuth) in their own terminal. Never handle credentials yourself.
@@ -23,7 +28,7 @@ node .claude/scripts/codex-run/codex-run.mjs --preflight
 ## Recipe
 
 ```bash
-node .claude/scripts/codex-run/codex-run.mjs --out .tmp/img-run-<name>-<n> --role astra \
+node "$RUNNER" --out .tmp/img-run-<name>-<n> --role astra \
   --sandbox workspace-write --config model_provider=openai \
   --image ref1.png --image ref2.png --timeout-min 9 <<'PROMPT'
 Use your image generation tool (image_gen) to create ONE image and save it to <scratch-dir>/<name>-raw.png in this workspace. Do nothing else - no code changes. If image_gen is not available, say so and stop; do not draw the image any other way.
@@ -44,7 +49,7 @@ Then read `<out>/result.json`: `ok`, `reason`, and the `observed` model, effort 
 Hard rules:
 
 - `--out` is a new or empty dir per run; the runner refuses a non-empty one. A retry gets a new `--out`.
-- `--role astra` picks the model pin in `.claude/scripts/codex-run/models.json` (the agent model that drives `image_gen`; the image model itself is chosen by Codex's backend). Never hard-code a model id in a skill or command.
+- `--role astra` picks the model pin in `models.json` next to the runner in use (the agent model that drives `image_gen`; the image model itself is chosen by Codex's backend). Never hard-code a model id in a skill or command.
 - `--sandbox workspace-write`: the default `read-only` sandbox blocks the save.
 - `--config model_provider=openai` forces direct ChatGPT login for this run only. A proxy/gateway `model_provider` in `~/.codex/config.toml` (e.g. CLIProxyAPI) does not expose `image_gen`: Codex answers "image_gen is not available" and makes nothing. The config file stays untouched.
 - Plugins, apps, user hooks and user MCP servers stay off (the runner's default). The image tool works with them off (tested 2026-11-22: `image_gen` call made, PNG saved), so do not pass `--keep-plugins`.

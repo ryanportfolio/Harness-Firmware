@@ -240,7 +240,7 @@ A section passes only on `SECTION: pass` + `CONTRACT: aligned` from a run that m
 
 ## Launch
 
-Every launch goes through the shared runner `.claude/scripts/codex-run/codex-run.mjs` (README beside it); never hand-build `codex exec`. Preflight: `node .claude/scripts/codex-run/codex-run.mjs --preflight` → exit 0 + JSON (CLI version, login or gateway, role pins); exit 1 → Codex unavailable, per Guardrails. Model pins = `models.json` roles: round auditor `ROLE=sol`, section auditor `ROLE=astra`. Both at effort high: `--effort` overrides astra role's medium default. Explicit user model or effort → below. Newer model in catalog → tell the user; update `models.json` only with the user's OK, never edit pins here.
+Every launch goes through the shared runner `$RUNNER` (lookup below; README beside it); never hand-build `codex exec`. Preflight: `node "$RUNNER" --preflight` → exit 0 + JSON (CLI version, login or gateway, role pins); exit 1 → Codex unavailable, per Guardrails. Model pins = roles in `models.json` next to the runner in use: round auditor `ROLE=sol`, section auditor `ROLE=astra`. Both at effort high: `--effort` overrides astra role's medium default. Explicit user model or effort → below. Newer model in catalog → tell the user; update `models.json` only with the user's OK, never edit pins here.
 
 One new directory per run, never reused: `evidence/sol-group-<G>/audit-1`, `evidence/section-<S>/audit-1`; a retry or a re-audit takes the next free number. `mkdir` without `-p` fails on an existing directory: stop there and take the next number. Runner output goes to `$RUN/codex` (runner refuses an existing non-empty dir; `$RUN` already holds prompt, meta, check logs). Prompt via `--prompt-file` (runner pipes it to stdin `-`), so no shell quoting touches it.
 
@@ -249,11 +249,18 @@ RUN=<absolute task dir>/evidence/sol-group-<G>/audit-1     # or evidence/section
 mkdir -p "$(dirname "$RUN")" && mkdir "$RUN"               # then write the prompt to "$RUN/prompt.md"
 ```
 
+`$RUNNER` lookup, in the same command as preflight and every launch (working directory stays the target repo): the repo's own runner, then the one shipped beside this skill, then the user install. None found → tell the user; Codex unavailable.
+
 ```bash
-test -n "$ROLE" && test -s "$RUN/prompt.md" && test ! -e "$RUN/codex" && { echo $BASHPID > "$RUN/pid"; node .claude/scripts/codex-run/codex-run.mjs --out "$RUN/codex" --role "$ROLE" --effort "${EFFORT:-high}" --sandbox read-only --timeout-min 60 --label "lh-lite $RUN" --prompt-file "$RUN/prompt.md" > "$RUN/runner.log" 2>&1; echo $? > "$RUN/exit-code"; }
+for RUNNER in .claude/scripts/codex-run/codex-run.mjs "<this skill's folder>/../../scripts/codex-run/codex-run.mjs" "$HOME/.claude/scripts/codex-run/codex-run.mjs" ""; do [ -f "$RUNNER" ] && break; done
+test -n "$RUNNER" || echo "codex-run runner not found: tell the user"
 ```
 
-Set `RUN` and `ROLE` in the same command: a new shell call does not keep them. User named a model → `MODEL=<id>`, swap `ROLE` for `MODEL` in the first guard and `--role "$ROLE"` for `--model "$MODEL"`. Set `EFFORT` only when the user chose an effort other than high. The three `test` guards keep Codex from starting without a model, without a prompt, or into a directory that already holds a run. `pid` holds the shell that waits on the runner (`$BASHPID`, which stays right when the block runs in the background; `$$` would name the parent shell) and `exit-code` (runner: 0 ok, 1 run failed, 2 bad arguments) is written when the run ends, so both survive a restart of the Manager: Resume reads them to tell a running run from a dead one, and the Accept rule reads the exit code + `$RUN/codex/result.json`. `--timeout-min 60` = choice, not measured: runner kills the process tree, `reason: timeout`, a failed run.
+```bash
+test -n "$RUNNER" && test -n "$ROLE" && test -s "$RUN/prompt.md" && test ! -e "$RUN/codex" && { echo $BASHPID > "$RUN/pid"; node "$RUNNER" --out "$RUN/codex" --role "$ROLE" --effort "${EFFORT:-high}" --sandbox read-only --timeout-min 60 --label "lh-lite $RUN" --prompt-file "$RUN/prompt.md" > "$RUN/runner.log" 2>&1; echo $? > "$RUN/exit-code"; }
+```
+
+Set `RUN`, `ROLE` and `RUNNER` in the same command: a new shell call does not keep them. User named a model → `MODEL=<id>`, swap `ROLE` for `MODEL` in the first guard and `--role "$ROLE"` for `--model "$MODEL"`. Set `EFFORT` only when the user chose an effort other than high. The four `test` guards keep Codex from starting without a runner, without a model, without a prompt, or into a directory that already holds a run. `pid` holds the shell that waits on the runner (`$BASHPID`, which stays right when the block runs in the background; `$$` would name the parent shell) and `exit-code` (runner: 0 ok, 1 run failed, 2 bad arguments) is written when the run ends, so both survive a restart of the Manager: Resume reads them to tell a running run from a dead one, and the Accept rule reads the exit code + `$RUN/codex/result.json`. `--timeout-min 60` = choice, not measured: runner kills the process tree, `reason: timeout`, a failed run.
 
 Launch each run as its own background process from the task branch checkout, at most 4 at a time; start the next as one exits. A foreground tool call dies at the harness's 10-minute ceiling and takes the audit with it. Progress while out: `$RUN/codex/status.json` (`events`, `elapsedSec`). Before launch record in `$RUN/meta.md`: workspace, the SHAs and the contract version in the prompt, CLI version (preflight), command, requested role/model + effort, start time. After exit add the end time and, from `$RUN/codex/result.json`: `ok`, `reason`, `observed` model/effort/sandbox, `threadId`, `usage`. `observed` null or a `warnings` entry → report it as requested, resolution unverified.
 
