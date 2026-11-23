@@ -13,6 +13,24 @@ condensed.
 
 ### Added
 
+- `.claude/scripts/codex-run/`, one launcher for every skill that runs the
+  Codex CLI. Skills no longer type their own `codex exec` lines. The runner
+  passes the prompt on stdin, so `$` and backticks reach Codex unchanged. It
+  sets the sandbox explicitly on every run and turns off the user's Codex
+  hooks, plugins and MCP servers for that run. It stops a run that passes its
+  time limit (30 minutes unless the skill sets another) and prints progress
+  every 30 seconds. It then reads the session's own rollout file to confirm
+  the model, effort and sandbox Codex actually used; before, skills read them
+  from log header lines. Model ids live only in `models.json` as roles (`sol`,
+  `sol-prev`, `astra`), so a new model means editing one file. Each run writes
+  `result.json` with `ok`, a failure `reason` (`timeout`, `model_rejected`,
+  `model_mismatch`, `sandbox_mismatch` and others), token usage and review
+  evidence. `codex-review`, `astra-review`, `codex-fullreview`,
+  `astra-fullreview`, `impartial-review`, `long-horizon`, `long-horizon-lite`,
+  `long-horizon-workflows`, `arena`, `climb-loop`, `security-loop`,
+  `codex-image-gen` and `redesign-concepts` launch Codex only through it, in
+  both their Claude and Codex versions. The pattern follows how T3 Code runs
+  one-shot Codex jobs. Checked on codex-cli 0.171.0.
 - `long-horizon-lite`, a lighter `long-horizon` for Claude Code whose audits
   come from Codex. It keeps the state file, a fresh executor per step, a
   done-check fixed before the executor starts, and parallel rounds for steps
