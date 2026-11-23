@@ -15,10 +15,11 @@ The requested review does not authorize fixes, publication, machine configuratio
 The reviewed change can edit the runner, and the runner executes with your permissions before Codex's read-only sandbox exists. Never run the reviewed checkout's `.claude/scripts/codex-run/codex-run.mjs` unless the user confirms the change is their own trusted work. Resolve `$RUNNER` first, in this order (commands: [references/launch-example.md](references/launch-example.md)):
 
 1. Default branch: create this invocation's run directory (`RUN=$(mktemp -d .tmp/codex-review-XXXXXXXX)`, new per invocation, never reused), `git fetch origin <default-branch>`, and copy `codex-run.mjs` and `models.json` (the runner reads `models.json` from its own folder) from `origin/<default-branch>`, not HEAD, into `$RUN/runner`. Both copies must be non-empty: Git Bash can mangle the `rev:path` argument and leave an empty file. `RUNNER="$RUN/runner/codex-run.mjs"`; `--out` stays `$RUN/codex`, so the copy sits outside it.
-2. No runner on the default branch (a repo without one, or the change that adds it): the user's own install, `RUNNER="$HOME/.claude/scripts/codex-run/codex-run.mjs"`, when that file exists.
-3. Neither: stop and tell the user. Only if the user confirms the reviewed change is their own trusted work may the checkout's copy run, and the report must say so.
+2. No runner on the default branch (a repo without one, or the change that adds it): the runner installed beside this skill, `<this skill's folder>/../../scripts/codex-run/` (plugin cache or user-level install). Use it only when its resolved absolute path is outside the reviewed checkout (`git rev-parse --show-toplevel`) and both files are non-empty; the check is in the launch example. A skill folder inside the reviewed checkout is the untrusted copy: never use its runner.
+3. Neither: the user's own install, `RUNNER="$HOME/.claude/scripts/codex-run/codex-run.mjs"`, when that file exists.
+4. None of these: stop and tell the user. Only if the user confirms the reviewed change is their own trusted work may the checkout's copy run, and the report must say so.
 
-Record the runner source (default branch with its SHA, user install, or reviewed checkout on the user's confirmation) in the manifest and the report. Every runner call, `--preflight` and the selector path included, uses `node "$RUNNER"`.
+Record the runner source (default branch with its SHA, installed skill's runner with its path, user install, or reviewed checkout on the user's confirmation) in the manifest and the report. Every runner call, `--preflight` and the selector path included, uses `node "$RUNNER"`.
 
 ## Step 1: Preflight
 

@@ -19,6 +19,27 @@ const CODEX_HOME = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
 const SANDBOXES = ["read-only", "workspace-write", "danger-full-access"];
 const MODEL_REJECTED = /model_not_found|unknown provider for model|\bmodel\b.*?\b(is not|isn't) (supported|available)|does not exist or you do not have access/i;
 
+// How to start Codex without a shell. On Windows Node cannot spawn a .cmd/.bat shim without one,
+// and a global npm install exposes Codex only as `codex.cmd`. So walk `where.exe codex` in PATH
+// order: a real .exe/.com (0-byte WindowsApps aliases skipped) runs directly; an npm shim runs as
+// `node <shim dir>/node_modules/@openai/codex/bin/codex.js`.
+function resolveCodex() {
+  if (process.platform !== "win32") return { cmd: "codex", pre: [] };
+  const w = spawnSync("where.exe", ["codex"], { encoding: "utf8", windowsHide: true });
+  for (const hit of (w.stdout || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean)) {
+    try {
+      if (/\.(exe|com)$/i.test(hit) && fs.statSync(hit).size > 0) return { cmd: hit, pre: [] };
+      if (/\.(cmd|bat)$/i.test(hit)) {
+        const js = path.join(path.dirname(hit), "node_modules", "@openai", "codex", "bin", "codex.js");
+        if (fs.existsSync(js)) return { cmd: process.execPath, pre: [js] };
+      }
+    } catch {}
+  }
+  return { cmd: "codex", pre: [] };
+}
+const CODEX = resolveCodex();
+const runCodex = (args, opts) => spawnSync(CODEX.cmd, [...CODEX.pre, ...args], opts);
+
 const fail = (msg) => {
   console.error(`[codex-run] ${msg}`);
   process.exitCode = 2;
@@ -55,24 +76,27 @@ function loadRoles() {
 
 // The provider Codex uses without --profile: top-level `model_provider`, overridden by the
 // `[profiles.<name>]` table of a top-level `profile = "<name>"`. Other tables don't apply.
+// Keys may be bare, quoted or dotted (`"model_provider"`, `profiles.gw.model_provider`); every
+// assignment is flattened to its full dotted path. Inline tables are not read.
+const KEY = `(?:"[^"]*"|'[^']*'|[A-Za-z0-9_-]+)`;
+const normalizeKey = (k) => (k.match(new RegExp(KEY, "g")) || []).map((s) => s.replace(/^["']|["']$/g, "")).join(".");
 function activeProvider(toml) {
-  const top = {}, tables = {};
+  const flat = {};
   let table = null;
   for (const raw of toml.split(/\r?\n/)) {
     const line = raw.replace(/\s+#.*$/, "").trim();
-    const head = line.match(/^\[\s*([^\]]+?)\s*\]$/);
-    if (head) { table = head[1].replace(/["']/g, ""); continue; }
-    const kv = line.match(/^([A-Za-z0-9_.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/);
+    const head = line.match(/^\[\s*([^\[\]]+?)\s*\]$/);
+    if (head) { table = normalizeKey(head[1]); continue; }
+    const kv = line.match(new RegExp(`^(${KEY}(?:\\s*\\.\\s*${KEY})*)\\s*=\\s*(?:"([^"]*)"|'([^']*)')`));
     if (!kv) continue;
-    const target = table === null ? top : (tables[table] ??= {});
-    target[kv[1]] = kv[2] ?? kv[3];
+    flat[(table === null ? "" : `${table}.`) + normalizeKey(kv[1])] = kv[2] ?? kv[3];
   }
-  const fromProfile = top.profile ? tables[`profiles.${top.profile}`]?.model_provider : undefined;
-  return fromProfile ?? top.model_provider ?? null;
+  const profile = flat.profile;
+  return (profile ? flat[`profiles.${profile}.model_provider`] : undefined) ?? flat.model_provider ?? null;
 }
 
 function preflight() {
-  const run = (args) => spawnSync("codex", args, { encoding: "utf8", windowsHide: true });
+  const run = (args) => runCodex(args, { encoding: "utf8", windowsHide: true });
   const v = run(["--version"]);
   const login = run(["login", "status"]);
   let provider = null;
@@ -93,7 +117,7 @@ function preflight() {
 }
 
 function enabledMcpServers(cwd) {
-  const r = spawnSync("codex", ["-c", "features.plugins=false", "-c", "features.apps=false", "mcp", "list", "--json"], {
+  const r = runCodex(["-c", "features.plugins=false", "-c", "features.apps=false", "mcp", "list", "--json"], {
     cwd, encoding: "utf8", timeout: 15000, windowsHide: true,
   });
   if (r.status !== 0) return { error: `codex mcp list failed (${r.error?.code || `exit ${r.status}`})` };
@@ -118,7 +142,8 @@ function buildArgs(o, model, effort, mcp) {
   // Review mode has no -s flag; the config key sets the same policy.
   if (o.review) args.push("-c", `sandbox_mode="${o.sandbox}"`);
   else args.push("-s", o.sandbox);
-  if (o.cd && !o.review) args.push("-C", o.cd);
+  // Absolute: the child already starts in the resolved --cd, so a relative -C would resolve twice.
+  if (o.cd && !o.review) args.push("-C", path.resolve(o.cd));
   for (const d of o.addDir) args.push("--add-dir", d);
   if (o.skipGit) args.push("--skip-git-repo-check");
   if (o.ephemeral) args.push("--ephemeral");
@@ -204,7 +229,10 @@ function evidence(o, threadId, started) {
     // `git show <head>` prints the requested patch only for a single-commit scope (base = head's
     // parent), and never as `git show <head>:<path>`, which prints a file, not a diff.
     const parent = head ? spawnSync("git", ["rev-parse", `${head}^`], { cwd: o.cd || process.cwd(), encoding: "utf8", windowsHide: true }).stdout?.trim() : "";
-    const showRe = parent && parent === base ? new RegExp(`git show\\b[^|;&\\n]*\\b${head}(?![:^~\\w])`) : null;
+    // Only the plain form `git show <head>` (no options, nothing after) on a non-merge commit:
+    // options like --no-patch or --stat, or a merge's combined diff, can omit the patch.
+    const merge = head ? spawnSync("git", ["rev-parse", "--verify", "-q", `${head}^2`], { cwd: o.cd || process.cwd(), windowsHide: true }).status === 0 : true;
+    const showRe = parent && parent === base && !merge ? new RegExp(`git show\\s+${head}(?=\\s*(?:$|["'\`|;&)]))`, "m") : null;
     ev.diffReads = texts.filter((t) => wanted.some((w) => t.includes(w)) || (showRe && showRe.test(t))).length;
     ev.untrackedListed = texts.some((t) => t.includes("--untracked-files=all"));
   }
@@ -264,13 +292,13 @@ async function main() {
   const meta = {
     label: o.label ?? null, startedAt: started.toISOString(), cwd, requested: { model, effort, sandbox: o.sandbox, role: o.role ?? null },
     review: Boolean(o.review), selector: o.base ? `--base ${o.base}` : o.commit ? `--commit ${o.commit}` : o.uncommitted ? "--uncommitted" : null,
-    mcpDisabled: mcp.names, command: ["codex", ...args],
+    mcpDisabled: mcp.names, command: [CODEX.cmd, ...CODEX.pre, ...args],
   };
   fs.writeFileSync(path.join(o.out, "run.json"), JSON.stringify(meta, null, 2));
 
   const events = fs.createWriteStream(path.join(o.out, "events.jsonl"));
   const errLog = fs.createWriteStream(path.join(o.out, "stderr.log"));
-  const child = spawn("codex", args, { cwd, stdio: [prompt === null ? "ignore" : "pipe", "pipe", "pipe"], windowsHide: true });
+  const child = spawn(CODEX.cmd, [...CODEX.pre, ...args], { cwd, stdio: [prompt === null ? "ignore" : "pipe", "pipe", "pipe"], windowsHide: true });
   fs.writeFileSync(path.join(o.out, "pid"), String(child.pid ?? ""));
   // Codex can exit before reading the whole prompt; an unhandled stdin error would kill the
   // runner before it writes result.json, so record it and let the exit path report the failure.
@@ -330,7 +358,9 @@ async function main() {
 
   if (threadId && !o.ephemeral) {
     result.evidence = evidence(o, threadId, started);
-    result.observed = { model: result.evidence.model, effort: result.evidence.effort, sandbox: result.evidence.sandbox };
+    const { model: m, effort: e, sandbox: s } = result.evidence;
+    // null, not an object of nulls, so callers take their "unverified" path.
+    result.observed = m || e || s ? { model: m ?? null, effort: e ?? null, sandbox: s ?? null } : null;
   }
   if (o.schema && last.trim()) {
     try {

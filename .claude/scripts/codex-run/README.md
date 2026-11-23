@@ -42,7 +42,11 @@ Run from target repo root (or pass `--cd`). Long runs: start in background, poll
 
 `usage` = tokens from `turn.completed`. Review mode: Codex reports all zeros there (reviewer runs in sibling thread), so treat review `usage` as unknown, not free. `--expect-diff BASE HEAD` also counts `git show HEAD` only when BASE is HEAD's parent (single-commit scope), never `git show HEAD:<path>`. Review mode: `observed` comes only from the single review sibling; no sibling → `observed` null (unverified), never the launcher's settings.
 
-Preflight `gatewayProvider` = the provider Codex uses without `--profile`: top-level `model_provider`, or the `[profiles.<name>]` one when top-level `profile = "<name>"`; other profiles ignored.
+Preflight `gatewayProvider` = the provider Codex uses without `--profile`: top-level `model_provider`, or the `[profiles.<name>]` one when top-level `profile = "<name>"`; other profiles ignored. Bare, quoted and dotted keys read; inline tables not.
+
+`observed` = null when no rollout settings found (ephemeral run, rollout missing, review without sibling): treat as unverified.
+
+Windows: runner starts Codex without a shell. `where.exe codex` walked in PATH order: real `.exe` runs directly (0-byte WindowsApps alias skipped); npm `codex.cmd` shim → `node <shim dir>/node_modules/@openai/codex/bin/codex.js`. `run.json` `command` shows what ran.
 
 `reason` values: `mcp_isolation_failed` (`codex mcp list` failed or unreadable, so the user's MCP servers could not be turned off; Codex not started; `--keep-mcp` runs anyway), `prompt_not_delivered` (Codex closed stdin before reading the whole prompt), `timeout`, `model_rejected`, `nonzero_exit`, `empty_report`, `schema_output_not_json`, `review_not_finished`, `model_mismatch`, `sandbox_mismatch`, `effort_mismatch` (each mismatch checked only when the rollout records the value). Exit 0 = ok, 1 = run failed, 2 = bad arguments.
 

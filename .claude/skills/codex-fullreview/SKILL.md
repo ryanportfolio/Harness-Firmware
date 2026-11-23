@@ -5,13 +5,13 @@ description: "Full multi-agent Codex review: Codex (via the codex-run runner, ro
 
 # Codex full review: multi-agent second opinion
 
-Run one Codex CLI process in which Codex runs the repository's `impartial-review` skill as Manager: it spawns fresh-context sub-reviewers over an exact scope, verifies their findings, and writes one report. Then verify every finding locally. From Claude this supplies a cross-vendor review; from Codex it supplies fresh context, not vendor independence. `codex-review` is the single-context alternative; keep the two entrypoints separate. This one defaults to Sol/high, and `astra-fullreview` supplies Astra/medium. Honor explicit user model and effort choices rather than silently replacing them.
+Run one Codex CLI process in which Codex runs the repository's `impartial-review` skill as Manager: it spawns fresh-context sub-reviewers over an exact scope, verifies their findings, and writes one report. Then verify every finding locally. From Claude this supplies a cross-vendor review; from Codex it supplies fresh context, not vendor independence. `codex-review` is the single-context alternative; keep the two entrypoints separate. This one defaults to Sol/high, and `astra-fullreview` supplies Astra/medium.
 
 The requested review does not authorize fixes, publication, machine configuration changes, or paid credit purchases.
 
 ## Step 1: Preflight
 
-Launch only through a trusted runner, `node "$RUNNER"` from the repository root; never hand-build a `codex exec` line. The reviewed change can edit the checkout's runner, which runs with your permissions outside Codex's sandbox. Never run the checkout's runner unless the user confirms the change is their own trusted work, and then the report must say so. After creating the run directory (Step 3), resolve `$RUNNER` per [references/launch-prompts.md](references/launch-prompts.md): the default branch's copy, else the user's install, else stop and tell the user. Record the runner source in the run metadata and the report.
+Launch only through a trusted runner, `node "$RUNNER"` from the repository root; never hand-build a `codex exec` line. The reviewed change can edit the checkout's runner, which runs with your permissions outside Codex's sandbox. Never run the checkout's runner unless the user confirms the change is their own trusted work, and then the report must say so. After creating the run directory (Step 3), resolve `$RUNNER` per [references/launch-prompts.md](references/launch-prompts.md): the default branch's copy, else the installed skill's runner when it sits outside the reviewed checkout, else the user's install, else stop and tell the user. Record the runner source in the run metadata and the report.
 
 Preflight: `node "$RUNNER" --preflight` prints JSON (`cli`, `login`, `chatgptLogin`, `gatewayProvider`, `ready`, `roles`); exit 1 means not ready. Record `cli` and the route. Checked on codex-cli 0.171.0; on another version, note it and check `codex exec --help` if a run fails on flags. Never probe models by spending usage.
 

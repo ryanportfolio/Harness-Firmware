@@ -91,8 +91,13 @@ and `MSYS_NO_PATHCONV=1 git show origin/<default>:.claude/scripts/codex-run/code
 "$RUN/runner/codex-run.mjs"`, the same for `models.json` (the runner reads it from its own
 folder); `$RUN/runner` sits outside every `--out`; both files must be non-empty, since
 Git Bash can mangle `rev:path` and leave an empty file; (2) no runner on the default branch:
-the user's install `~/.claude/scripts/codex-run/codex-run.mjs`; (3) neither: stop and tell
-the user. Record the runner source in the report. Readiness: `node "$RUNNER" --preflight`
+the runner installed beside this skill, `<skill folder>/../../../.claude/scripts/codex-run/`
+(plugin cache or user-level install), only when both files are non-empty and its resolved
+absolute path (`cd <dir> && pwd -P`) does not start with the reviewed checkout's root
+(`git rev-parse --show-toplevel`, compared case-insensitively on Windows); a skill folder
+inside the reviewed checkout is the untrusted copy, so never use its runner; (3) else the
+user's install `~/.claude/scripts/codex-run/codex-run.mjs`; (4) none of these: stop and tell
+the user. Record the runner source (installed skill's runner: with its path) in the report. Readiness: `node "$RUNNER" --preflight`
 (JSON; exit 1 = not ready: report the gap and stop the CLI route).
 Never change the provider, keys or paid credits yourself, and never print credentials.
 

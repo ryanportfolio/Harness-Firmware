@@ -114,8 +114,9 @@ After Step 6 passes, if any `confirmed` record has severity `high` or `critical`
 Launch Codex only through a trusted copy of the shared runner (docs: `.claude/scripts/codex-run/README.md`). Never hand-build a `codex exec` line. The audit tree is untrusted: never run a runner from it, and never run a working-tree runner unless the user confirms it is their own trusted work, and then the report must say so. The runner runs with your permissions before Codex's read-only sandbox exists. `--cd` points at the audit tree, so call the runner by an absolute path, `<runner>` below, resolved in this order:
 
 - Default branch of the checkout this session runs in, not its HEAD: `git -C "<repo root>" fetch origin <default>`, then `mkdir -p "<output>/codex/runner" && MSYS_NO_PATHCONV=1 git -C "<repo root>" show origin/<default>:.claude/scripts/codex-run/codex-run.mjs > "<output>/codex/runner/codex-run.mjs"`, and the same for `models.json` (the runner reads it from its own folder). Both files must be non-empty (Git Bash can mangle `rev:path` and leave an empty file). `<runner>` = `<output>/codex/runner/codex-run.mjs`, outside `--out`.
-- No runner on that default branch: the user's install `~/.claude/scripts/codex-run/codex-run.mjs`, as an absolute path.
-- Neither: record "cross-vendor check unavailable: no trusted runner", tell the user, and continue.
+- No runner on that default branch: the runner installed beside this skill, `<security-loop skill folder>/../../scripts/codex-run/` (plugin cache or user-level install), only when both files are non-empty and its resolved absolute path (`cd <dir> && pwd -P`) starts with neither the audit tree's root nor `<repo root>` (compare case-insensitively on Windows). A skill folder inside either tree is an untrusted copy: never use its runner. Record it as "installed skill's runner" with its path.
+- Else the user's install `~/.claude/scripts/codex-run/codex-run.mjs`, as an absolute path.
+- None of these: record "cross-vendor check unavailable: no trusted runner", tell the user, and continue.
 
 Record the runner source in the run report.
 

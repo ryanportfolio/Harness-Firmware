@@ -12,8 +12,17 @@ git fetch origin main
 # Trusted runner (SKILL.md Step 0): default branch copy, never the reviewed HEAD
 mkdir -p "$RUN/runner" && MSYS_NO_PATHCONV=1 git show origin/main:.claude/scripts/codex-run/codex-run.mjs > "$RUN/runner/codex-run.mjs"
 MSYS_NO_PATHCONV=1 git show origin/main:.claude/scripts/codex-run/models.json > "$RUN/runner/models.json"
+# Installed skill's runner (plugin cache, user-level install). Codex ports in .agents/skills/ use ../../../.claude/scripts/codex-run
+SKILL_DIR="<absolute folder holding this SKILL.md>"
+# Trusted only outside the reviewed checkout (case-insensitive prefix check: Windows paths keep the typed case)
+SKILL_RUNNER=$(cd "$SKILL_DIR/../../scripts/codex-run" 2>/dev/null && pwd -P)
+REPO_TOP=$(cd "$(git rev-parse --show-toplevel)" && pwd -P)
+lc() { printf '%s/' "$1" | tr '[:upper:]' '[:lower:]'; }
+case "$(lc "$SKILL_RUNNER")" in "$(lc "$REPO_TOP")"*) SKILL_RUNNER= ;; esac
 if [ -s "$RUN/runner/codex-run.mjs" ] && [ -s "$RUN/runner/models.json" ]; then
   RUNNER="$RUN/runner/codex-run.mjs"   # manifest: runner = origin/main $(git rev-parse origin/main)
+elif [ -n "$SKILL_RUNNER" ] && [ -s "$SKILL_RUNNER/codex-run.mjs" ] && [ -s "$SKILL_RUNNER/models.json" ]; then
+  RUNNER="$SKILL_RUNNER/codex-run.mjs"   # manifest: runner = installed skill's runner, $SKILL_RUNNER
 elif [ -s "$HOME/.claude/scripts/codex-run/codex-run.mjs" ]; then
   RUNNER="$HOME/.claude/scripts/codex-run/codex-run.mjs"   # manifest: runner = user install
 else

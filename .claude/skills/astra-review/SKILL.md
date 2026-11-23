@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Astra review
 
-Read `.claude/skills/codex-review/SKILL.md` and follow its complete execution contract: runner `--preflight`, exact scope, unique run directory, source manifest, launch path (external-review first, selector fallback), background launch with `status.json` polling, `result.json` evidence, finding verification, and honest attribution. Launch Codex only through the trusted runner `node "$RUNNER"` that codex-review Step 0 resolves (default branch copy, else the user's install, never the reviewed checkout's copy without the user's confirmation), run from the repository root; never hand-build a `codex exec` line. This entrypoint changes only the defaults:
+Read `.claude/skills/codex-review/SKILL.md` and follow its complete execution contract: runner `--preflight`, exact scope, unique run directory, source manifest, launch path (external-review first, selector fallback), background launch with `status.json` polling, `result.json` evidence, finding verification, and honest attribution. Launch Codex only through the trusted runner `node "$RUNNER"` that codex-review Step 0 resolves (default branch copy, else the installed skill's runner outside the reviewed checkout, else the user's install, never the reviewed checkout's copy without the user's confirmation), run from the repository root; never hand-build a `codex exec` line. This entrypoint changes only the defaults:
 
 | Setting | Astra default |
 |---|---|
