@@ -11,7 +11,8 @@ Script paths below are from the repository root. When this skill came from a plu
 
 ## 0. Preflight and cost
 
-- `node .claude/scripts/codex-run/codex-run.mjs --preflight` (the shared Codex runner; docs in its `README.md`) must show `"chatgptLogin": true`, because the image tool needs a direct ChatGPT login. If it does not, stop and ask the user to run `codex login` in their own terminal; never handle credentials.
+- Find the shared Codex runner the way `scripts/run-batch.sh` does: `.claude/scripts/codex-run/codex-run.mjs` in the git root, else `<this skill's folder>/../../scripts/codex-run/codex-run.mjs` (plugin installs). Neither found → stop and tell the user the runner is missing (not a login problem).
+- `node "<runner>" --preflight` (docs in the runner's `README.md`) must show `"chatgptLogin": true`, because the image tool needs a direct ChatGPT login. If it does not, stop and ask the user to run `codex login` in their own terminal; never handle credentials.
 - Each image costs about 60-70k Codex tokens on the user's subscription, so 10 images is roughly 700k. Say so before starting the batch.
 - Pick a fresh scratch dir inside the workspace that git ignores, for example `.tmp/redesign-<n>/`. Codex's `workspace-write` sandbox reads and writes only inside the workspace, so references and outputs both live there.
 - Load the project's own UI or art-direction skill or reference first, if it has one, and carry its constraints into the shared identity line.

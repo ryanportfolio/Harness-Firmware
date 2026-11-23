@@ -38,25 +38,32 @@ const inside = (child, root) => {
   const rel = path.relative(norm(real(root)), norm(real(child)));
   return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
 };
-function findOnPath(name, exts, exclude) {
+// A file counts only when its real path (links followed) is also outside every excluded checkout.
+const trusted = (file, exclude) => !exclude.some((root) => inside(real(file), root));
+// Every usable candidate in PATH order, so a caller can skip one it cannot use and keep looking.
+function candidatesOnPath(name, exts, exclude) {
+  const found = [];
   for (const dir of (process.env.PATH || "").split(path.delimiter)) {
     if (!dir || !path.isAbsolute(dir) || exclude.some((root) => inside(dir, root))) continue;
     for (const ext of exts) {
       const file = path.join(dir, name + ext);
-      try { if (fs.statSync(file).isFile() && fs.statSync(file).size > 0) return file; } catch {}
+      try { if (fs.statSync(file).isFile() && fs.statSync(file).size > 0 && trusted(file, exclude)) found.push(file); } catch {}
     }
   }
-  return null;
+  return found;
 }
+const findOnPath = (name, exts, exclude) => candidatesOnPath(name, exts, exclude)[0] ?? null;
 // Node cannot spawn a .cmd/.bat shim without a shell, and a global npm install exposes Codex only as
 // `codex.cmd`: that shim runs as `node <shim dir>/node_modules/@openai/codex/bin/codex.js`.
-// 0-byte WindowsApps aliases are skipped by the size check.
+// 0-byte WindowsApps aliases are skipped by the size check. A shim without that entry point, or
+// one whose entry point resolves into an excluded checkout, is skipped and the search goes on.
 function resolveCodex(exclude) {
-  const hit = findOnPath("codex", WIN ? [".exe", ".com", ".cmd", ".bat"] : [""], exclude);
-  if (!hit) return null;
-  if (!/\.(cmd|bat)$/i.test(hit)) return { cmd: hit, pre: [] };
-  const js = path.join(path.dirname(hit), "node_modules", "@openai", "codex", "bin", "codex.js");
-  return fs.existsSync(js) ? { cmd: process.execPath, pre: [js] } : null;
+  for (const hit of candidatesOnPath("codex", WIN ? [".exe", ".com", ".cmd", ".bat"] : [""], exclude)) {
+    if (!/\.(cmd|bat)$/i.test(hit)) return { cmd: hit, pre: [] };
+    const js = path.join(path.dirname(hit), "node_modules", "@openai", "codex", "bin", "codex.js");
+    if (fs.existsSync(js) && trusted(js, exclude)) return { cmd: process.execPath, pre: [js] };
+  }
+  return null;
 }
 let CODEX = null;
 const runCodex = (args, opts) => spawnSync(CODEX.cmd, [...CODEX.pre, ...args], opts);
@@ -196,14 +203,18 @@ const readJsonl = (f) =>
     try { return l ? [JSON.parse(l)] : []; } catch { return []; }
   });
 
+// "" for a file that vanished or can't be read: an unrelated session must not abort the result.
 const firstLine = (f) => {
-  const fd = fs.openSync(f, "r");
+  let fd;
   try {
+    fd = fs.openSync(f, "r");
     const b = Buffer.alloc(65536);
     const n = fs.readSync(fd, b, 0, b.length, 0);
     const i = b.subarray(0, n).indexOf(10);
     return b.subarray(0, i < 0 ? n : i).toString("utf8");
-  } finally { fs.closeSync(fd); }
+  } catch {
+    return "";
+  } finally { if (fd !== undefined) fs.closeSync(fd); }
 };
 
 function rolloutFiles(since) {
@@ -289,6 +300,7 @@ async function main() {
   if (!model) return fail("pass --role or --model (never run on the config.toml default)");
   const selector = o.base || o.commit || o.uncommitted;
   if (selector && !o.review) return fail("--base/--commit/--uncommitted need --review");
+  if (o.review && o.ephemeral) return fail("--review needs the session rollout for its findings; drop --ephemeral");
   if (o.review && selector) o.noPrompt = true; // the CLI rejects a selector plus a custom prompt
   if (!(o.timeoutMin > 0)) return fail("--timeout-min must be a positive number");
 
@@ -389,7 +401,12 @@ async function main() {
   };
 
   if (threadId && !o.ephemeral) {
-    result.evidence = evidence(o, threadId, started);
+    try {
+      result.evidence = evidence(o, threadId, started);
+    } catch (e) {
+      // Evidence is incomplete, not the run: model, sandbox and review checks stay unverified.
+      result.evidence = { rollout: null, note: `evidence read failed (${e.code || e.message}); model, effort, sandbox and review evidence unverified` };
+    }
     const { model: m, effort: e, sandbox: s } = result.evidence;
     // null, not an object of nulls, so callers take their "unverified" path.
     result.observed = m || e || s ? { model: m ?? null, effort: e ?? null, sandbox: s ?? null } : null;
