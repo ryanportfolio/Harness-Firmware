@@ -1,18 +1,30 @@
 # Codex CLI dispatch commands
 
-Loaded from `SKILL.md` Step 3 when reviewers run as Codex CLI processes (no multi-agent tools). Launch only through the repo's shared runner `node .claude/scripts/codex-run/codex-run.mjs` (docs: `.claude/scripts/codex-run/README.md`); never a hand-built `codex exec` line.
+Loaded from `SKILL.md` Step 3 when reviewers run as Codex CLI processes (no multi-agent tools). Launch only through a trusted copy of the shared runner, `node "$RUNNER"` (docs: `.claude/scripts/codex-run/README.md`); never a hand-built `codex exec` line.
+
+The change under review can edit `.claude/scripts/codex-run/`, and the runner runs with your permissions before Codex's read-only sandbox exists. Never run the reviewed checkout's runner unless the user confirms the change is their own trusted work, and then the report must say so. Resolve `$RUNNER` first, in order: (1) `codex-run.mjs` and `models.json` from `origin/<default-branch>`, not HEAD, copied into `$RUN/runner` (outside every `--out`; the runner reads `models.json` from its own folder), both non-empty (Git Bash can mangle `rev:path` and leave an empty file); (2) no runner on the default branch: the user's install `~/.claude/scripts/codex-run/codex-run.mjs`; (3) neither: stop and tell the user. Record the runner source in the report.
 
 ```bash
-node .claude/scripts/codex-run/codex-run.mjs --preflight   # JSON; exit 1 = not ready: report the gap, stop the CLI route
 mkdir -p .tmp
 RUN=$(mktemp -d "$PWD/.tmp/impartial-review-XXXXXXXX")
+git fetch origin main
+mkdir -p "$RUN/runner" && MSYS_NO_PATHCONV=1 git show origin/main:.claude/scripts/codex-run/codex-run.mjs > "$RUN/runner/codex-run.mjs"
+MSYS_NO_PATHCONV=1 git show origin/main:.claude/scripts/codex-run/models.json > "$RUN/runner/models.json"
+if [ -s "$RUN/runner/codex-run.mjs" ] && [ -s "$RUN/runner/models.json" ]; then
+  RUNNER="$RUN/runner/codex-run.mjs"   # report: runner = origin/main $(git rev-parse origin/main)
+elif [ -s "$HOME/.claude/scripts/codex-run/codex-run.mjs" ]; then
+  RUNNER="$HOME/.claude/scripts/codex-run/codex-run.mjs"   # report: runner = user install
+else
+  echo "No trusted runner: stop and ask the user"; exit 1
+fi
+node "$RUNNER" --preflight   # JSON; exit 1 = not ready: report the gap, stop the CLI route
 # write $RUN/prompt-A.txt (standalone bucket prompt), then, Bash run_in_background: true:
-node .claude/scripts/codex-run/codex-run.mjs --out "$RUN/A" --role sol --sandbox read-only \
+node "$RUNNER" --out "$RUN/A" --role sol --sandbox read-only \
   --prompt-file "$RUN/prompt-A.txt" --timeout-min 30 --label impartial-review-A > "$RUN/A.log" 2>&1
 ```
 
 - Run from the target repo root (or pass `--cd <repo>`). Use an absolute `$RUN` path: the Bash cwd may reset between calls.
-- One runner call per reviewer group: its own new `--out "$RUN/<group>"` (the runner refuses a non-empty directory), `--sandbox read-only` explicit, `--role sol`. The pin lives only in `.claude/scripts/codex-run/models.json`; no model ids here. Explicit user model: `--model <id>` (plus `--effort`).
+- One runner call per reviewer group: its own new `--out "$RUN/<group>"` (the runner refuses a non-empty directory), `--sandbox read-only` explicit, `--role sol`. The pin lives only in `models.json` beside the runner; no model ids here. Explicit user model: `--model <id>` (plus `--effort`).
 - Prompt via `--prompt-file` (or stdin). The runner always feeds Codex on stdin, so diffs, backticks and `$` stay intact; never pass the prompt as an argument.
 - Uncommitted or branch scope: add `--expect-diff "BASE HEAD"` (or `"HEAD"` for uncommitted) to get `evidence.diffReads`.
 - The prompt passes the exact scope, forbids nested review (no codex exec, no agents), and forbids edits.

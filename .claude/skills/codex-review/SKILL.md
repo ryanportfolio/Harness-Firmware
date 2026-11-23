@@ -8,11 +8,21 @@ Run one fresh Codex CLI review and verify every finding locally. From Claude thi
 
 The requested review does not authorize fixes, publication, machine configuration changes, or paid credit purchases.
 
-**Launch Codex only through the runner**: `node .claude/scripts/codex-run/codex-run.mjs`, run from the repository root (docs: `.claude/scripts/codex-run/README.md`). Never hand-build a `codex exec` or `codex exec review` line.
+**Launch Codex only through the trusted runner** `node "$RUNNER"` from Step 0, run from the repository root (docs: `.claude/scripts/codex-run/README.md`). Never hand-build a `codex exec` or `codex exec review` line.
+
+## Step 0: Trusted runner
+
+The reviewed change can edit the runner, and the runner executes with your permissions before Codex's read-only sandbox exists. Never run the reviewed checkout's `.claude/scripts/codex-run/codex-run.mjs` unless the user confirms the change is their own trusted work. Resolve `$RUNNER` first, in this order (commands: [references/launch-example.md](references/launch-example.md)):
+
+1. Default branch: create this invocation's run directory (`RUN=$(mktemp -d .tmp/codex-review-XXXXXXXX)`, new per invocation, never reused), `git fetch origin <default-branch>`, and copy `codex-run.mjs` and `models.json` (the runner reads `models.json` from its own folder) from `origin/<default-branch>`, not HEAD, into `$RUN/runner`. Both copies must be non-empty: Git Bash can mangle the `rev:path` argument and leave an empty file. `RUNNER="$RUN/runner/codex-run.mjs"`; `--out` stays `$RUN/codex`, so the copy sits outside it.
+2. No runner on the default branch (a repo without one, or the change that adds it): the user's own install, `RUNNER="$HOME/.claude/scripts/codex-run/codex-run.mjs"`, when that file exists.
+3. Neither: stop and tell the user. Only if the user confirms the reviewed change is their own trusted work may the checkout's copy run, and the report must say so.
+
+Record the runner source (default branch with its SHA, user install, or reviewed checkout on the user's confirmation) in the manifest and the report. Every runner call, `--preflight` and the selector path included, uses `node "$RUNNER"`.
 
 ## Step 1: Preflight
 
-Run `node .claude/scripts/codex-run/codex-run.mjs --preflight`. It prints JSON {cli, login, chatgptLogin, gatewayProvider, ready, roles} and costs no usage. Do not probe models by spending usage.
+Run `node "$RUNNER" --preflight`. It prints JSON {cli, login, chatgptLogin, gatewayProvider, ready, roles} and costs no usage. Do not probe models by spending usage.
 
 - `ready` true means a ChatGPT login, or `config.toml` in `$CODEX_HOME` (default `~/.codex`) sets `model_provider` to a gateway, for example a CLIProxyAPI gateway over subscription accounts. Both are normal; record which one ran in the manifest and add no caveat. When a gateway is set it carries the requests, whatever the login line says.
 - `ready` false (exit 1): stop before inference and ask the user to log in through their own terminal.
@@ -35,7 +45,7 @@ For a branch diff, fetch first (`git fetch origin <default-branch>`) and use the
 
 ## Step 3: Launch the review
 
-Run from the repository root (or pass `--cd <repo>`). Create a new run directory atomically per invocation (`RUN=$(mktemp -d .tmp/codex-review-XXXXXXXX)`); never reuse one from an earlier invocation. The runner writes into a new subdirectory, `--out "$RUN/codex"`, and refuses a non-empty one; the manifest and prompt live in `$RUN`, outside `--out`. Record the resolved scope in the manifest (below) before choosing the launch path.
+Run from the repository root (or pass `--cd <repo>`). Use the run directory Step 0 created; never reuse one from an earlier invocation. The runner writes into a new subdirectory, `--out "$RUN/codex"`, and refuses a non-empty one; the manifest and prompt live in `$RUN`, outside `--out`. Record the resolved scope in the manifest (below) before choosing the launch path.
 
 **Pick the launch path.** The CLI rejects a scope selector combined with a custom prompt, and the runner enforces it (a selector means no prompt), so each run uses exactly one of these:
 

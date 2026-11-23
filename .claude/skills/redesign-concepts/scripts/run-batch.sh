@@ -65,11 +65,13 @@ run_one() {
     "${args[@]}" --prompt-file "$prompt" > "$dir/logs/$name.log" 2>&1
   code=$?
   reason=$(grep -o '"reason": *"[^"]*"' "$run/result.json" 2>/dev/null | sed 's/.*"\([^"]*\)"$/\1/')
-  if valid "$out"; then
+  # A valid PNG from a run the runner failed (model or sandbox mismatch, timeout) is not accepted.
+  ok=no; grep -q '"ok": *true' "$run/result.json" 2>/dev/null && ok=yes
+  if [ "$ok" = yes ] && valid "$out"; then
     echo "done $name ($(wc -c < "$out" | tr -d ' ') bytes)"
   elif [ -e "$out" ]; then
     mv -f "$out" "$dir/out/$name.rejected.png"
-    echo "FAILED $name: output is not a valid PNG of 100 KB or more (runner exit $code${reason:+, $reason}), moved to out/$name.rejected.png; see $dir/logs/$name.log and $run"
+    echo "FAILED $name: runner did not report ok, or output is not a valid PNG of 100 KB or more (runner exit $code${reason:+, $reason}), moved to out/$name.rejected.png; see $dir/logs/$name.log and $run"
     return 1
   else
     echo "FAILED $name: no image (runner exit $code${reason:+, $reason}), see $dir/logs/$name.log and $run"

@@ -53,14 +53,31 @@ function loadRoles() {
   return JSON.parse(fs.readFileSync(path.join(HERE, "models.json"), "utf8")).roles;
 }
 
+// The provider Codex uses without --profile: top-level `model_provider`, overridden by the
+// `[profiles.<name>]` table of a top-level `profile = "<name>"`. Other tables don't apply.
+function activeProvider(toml) {
+  const top = {}, tables = {};
+  let table = null;
+  for (const raw of toml.split(/\r?\n/)) {
+    const line = raw.replace(/\s+#.*$/, "").trim();
+    const head = line.match(/^\[\s*([^\]]+?)\s*\]$/);
+    if (head) { table = head[1].replace(/["']/g, ""); continue; }
+    const kv = line.match(/^([A-Za-z0-9_.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/);
+    if (!kv) continue;
+    const target = table === null ? top : (tables[table] ??= {});
+    target[kv[1]] = kv[2] ?? kv[3];
+  }
+  const fromProfile = top.profile ? tables[`profiles.${top.profile}`]?.model_provider : undefined;
+  return fromProfile ?? top.model_provider ?? null;
+}
+
 function preflight() {
   const run = (args) => spawnSync("codex", args, { encoding: "utf8", windowsHide: true });
   const v = run(["--version"]);
   const login = run(["login", "status"]);
   let provider = null;
   try {
-    const m = fs.readFileSync(path.join(CODEX_HOME, "config.toml"), "utf8").match(/^\s*model_provider\s*=\s*"([^"]+)"/m);
-    provider = m ? m[1] : null;
+    provider = activeProvider(fs.readFileSync(path.join(CODEX_HOME, "config.toml"), "utf8"));
   } catch {}
   const loginLine = `${login.stdout || ""}${login.stderr || ""}`.split(/\r?\n/).find((l) => /logged|not/i.test(l)) || "";
   const report = {
@@ -79,11 +96,11 @@ function enabledMcpServers(cwd) {
   const r = spawnSync("codex", ["-c", "features.plugins=false", "-c", "features.apps=false", "mcp", "list", "--json"], {
     cwd, encoding: "utf8", timeout: 15000, windowsHide: true,
   });
-  if (r.status !== 0) return { names: [], warning: "codex mcp list failed; user MCP servers stay on" };
+  if (r.status !== 0) return { error: `codex mcp list failed (${r.error?.code || `exit ${r.status}`})` };
   try {
     return { names: JSON.parse(r.stdout).filter((s) => s.enabled).map((s) => s.name) };
   } catch {
-    return { names: [], warning: "codex mcp list output unreadable; user MCP servers stay on" };
+    return { error: "codex mcp list output unreadable" };
   }
 }
 
@@ -168,7 +185,10 @@ function evidence(o, threadId, started) {
     ev.exitedReviewMode = exited.length;
     if (exited.length) fs.writeFileSync(path.join(o.out, "review-output.json"), JSON.stringify(exited.at(-1), null, 2));
   }
-  const turn = recs.find((j) => j.type === "turn_context")?.payload ?? ownRecs.find((j) => j.type === "turn_context")?.payload ?? {};
+  // Review mode: only the single review sibling's settings describe the reviewer; the parent's
+  // turn holds the launcher's settings, so they are never reported as the reviewer's.
+  const turnSource = o.review ? (ev.reviewRollout ? recs : []) : ownRecs;
+  const turn = turnSource.find((j) => j.type === "turn_context")?.payload ?? {};
   ev.model = turn.model ?? null;
   ev.effort = turn.effort ?? turn.reasoning_effort ?? null;
   ev.sandbox = turn.sandbox_policy?.type ?? null;
@@ -180,9 +200,12 @@ function evidence(o, threadId, started) {
   ev.spawnCalls = recs.filter((j) => j.payload?.type === "function_call" && j.payload.name === "spawn_agent").length;
   if (o.expectDiff) {
     const [base, head] = o.expectDiff.split(/[ ,]+/);
-    // `git show <head>` prints the same diff when base is head's parent (single-commit scope).
-    const wanted = head ? [`git diff ${base} ${head}`, `git diff ${base}..${head}`, `git show ${head}`] : [`git diff ${base}`];
-    ev.diffReads = texts.filter((t) => wanted.some((w) => t.includes(w))).length;
+    const wanted = head ? [`git diff ${base} ${head}`, `git diff ${base}..${head}`] : [`git diff ${base}`];
+    // `git show <head>` prints the requested patch only for a single-commit scope (base = head's
+    // parent), and never as `git show <head>:<path>`, which prints a file, not a diff.
+    const parent = head ? spawnSync("git", ["rev-parse", `${head}^`], { cwd: o.cd || process.cwd(), encoding: "utf8", windowsHide: true }).stdout?.trim() : "";
+    const showRe = parent && parent === base ? new RegExp(`git show\\b[^|;&\\n]*\\b${head}(?![:^~\\w])`) : null;
+    ev.diffReads = texts.filter((t) => wanted.some((w) => t.includes(w)) || (showRe && showRe.test(t))).length;
     ev.untrackedListed = texts.some((t) => t.includes("--untracked-files=all"));
   }
   if (o.expectRead) {
@@ -224,12 +247,24 @@ async function main() {
 
   const cwd = path.resolve(o.cd || process.cwd());
   const mcp = o.keepMcp ? { names: [] } : enabledMcpServers(cwd);
+  if (mcp.error) {
+    // Fail closed: without the server list the run would keep the user's MCP tools the caller turned off.
+    const failed = { ok: false, reason: "mcp_isolation_failed", exitCode: null, timedOut: false, durationSec: 0, threadId: null,
+      requested: { model, effort, sandbox: o.sandbox, role: o.role ?? null }, observed: null, usage: null,
+      errors: [`${mcp.error}; Codex not started. Pass --keep-mcp to run with the user's MCP servers on.`], notices: [],
+      reportPath: null, reportBytes: 0, outputJson: null, evidence: null };
+    fs.writeFileSync(path.join(o.out, "result.json"), JSON.stringify(failed, null, 2));
+    fs.writeFileSync(path.join(o.out, "status.json"), JSON.stringify({ state: "failed", reason: failed.reason }));
+    console.log(`[codex-run] FAILED: mcp_isolation_failed (${mcp.error}) -> ${path.join(o.out, "result.json")}`);
+    process.exitCode = 1;
+    return;
+  }
   const args = buildArgs(o, model, effort, mcp.names);
   const started = new Date();
   const meta = {
     label: o.label ?? null, startedAt: started.toISOString(), cwd, requested: { model, effort, sandbox: o.sandbox, role: o.role ?? null },
     review: Boolean(o.review), selector: o.base ? `--base ${o.base}` : o.commit ? `--commit ${o.commit}` : o.uncommitted ? "--uncommitted" : null,
-    mcpDisabled: mcp.names, warnings: mcp.warning ? [mcp.warning] : [], command: ["codex", ...args],
+    mcpDisabled: mcp.names, command: ["codex", ...args],
   };
   fs.writeFileSync(path.join(o.out, "run.json"), JSON.stringify(meta, null, 2));
 
@@ -237,7 +272,13 @@ async function main() {
   const errLog = fs.createWriteStream(path.join(o.out, "stderr.log"));
   const child = spawn("codex", args, { cwd, stdio: [prompt === null ? "ignore" : "pipe", "pipe", "pipe"], windowsHide: true });
   fs.writeFileSync(path.join(o.out, "pid"), String(child.pid ?? ""));
-  if (prompt !== null) child.stdin.end(prompt);
+  // Codex can exit before reading the whole prompt; an unhandled stdin error would kill the
+  // runner before it writes result.json, so record it and let the exit path report the failure.
+  const stdinErrors = [];
+  if (prompt !== null) {
+    child.stdin.on("error", (e) => stdinErrors.push(`prompt write failed: ${e.code || e.message}`));
+    child.stdin.end(prompt);
+  }
 
   let threadId = null, count = 0, lastType = "", usage = null, buf = "";
   const errors = [], notices = [];
@@ -283,7 +324,7 @@ async function main() {
   const stderr = fs.readFileSync(path.join(o.out, "stderr.log"), "utf8");
   const result = {
     ok: false, reason: null, exitCode, timedOut, durationSec: Math.round((Date.now() - started) / 1000),
-    threadId, requested: meta.requested, observed: null, usage, errors, notices: notices.slice(0, 10),
+    threadId, requested: meta.requested, observed: null, usage, errors: [...stdinErrors, ...errors], notices: notices.slice(0, 10),
     reportPath: lastPath, reportBytes: Buffer.byteLength(last), outputJson: null, evidence: null,
   };
 
@@ -300,6 +341,7 @@ async function main() {
 
   const obs = result.observed;
   if (timedOut) result.reason = "timeout";
+  else if (stdinErrors.length) result.reason = "prompt_not_delivered";
   else if (MODEL_REJECTED.test(`${stderr}\n${errors.join("\n")}`)) result.reason = "model_rejected";
   else if (exitCode !== 0) result.reason = "nonzero_exit";
   else if (!last.trim()) result.reason = "empty_report";

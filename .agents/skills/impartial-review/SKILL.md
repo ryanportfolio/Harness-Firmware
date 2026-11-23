@@ -80,15 +80,25 @@ Inherit the session model when suitable. Respect an explicitly required model or
 floor; do not silently downgrade. Native Codex reviewers provide independent context, not
 vendor independence.
 
-If native agents are unavailable, use Codex CLI only through the repo's shared runner
-`node .claude/scripts/codex-run/codex-run.mjs`, run from the repo root (docs:
-`.claude/scripts/codex-run/README.md`); never a hand-built `codex exec` line. Readiness:
-`--preflight` (JSON; exit 1 = not ready: report the gap and stop the CLI route).
+If native agents are unavailable, use Codex CLI only through a trusted copy of the shared
+runner, `node "$RUNNER"`, run from the repo root (docs:
+`.claude/scripts/codex-run/README.md`); never a hand-built `codex exec` line. The change
+under review can edit the runner, which runs with your permissions before Codex's read-only
+sandbox exists. Never run the reviewed checkout's runner unless the user confirms the change
+is their own trusted work, and then the report must say so. Resolve `$RUNNER` in order:
+(1) default branch, not HEAD: `git fetch origin <default>`, then `mkdir -p "$RUN/runner"`
+and `MSYS_NO_PATHCONV=1 git show origin/<default>:.claude/scripts/codex-run/codex-run.mjs >
+"$RUN/runner/codex-run.mjs"`, the same for `models.json` (the runner reads it from its own
+folder); `$RUN/runner` sits outside every `--out`; both files must be non-empty, since
+Git Bash can mangle `rev:path` and leave an empty file; (2) no runner on the default branch:
+the user's install `~/.claude/scripts/codex-run/codex-run.mjs`; (3) neither: stop and tell
+the user. Record the runner source in the report. Readiness: `node "$RUNNER" --preflight`
+(JSON; exit 1 = not ready: report the gap and stop the CLI route).
 Never change the provider, keys or paid credits yourself, and never print credentials.
 
 - One runner call per reviewer group: standalone prompt via `--prompt-file` (or stdin), its
   own new `--out <run dir>/<group>` (an absolute path), `--sandbox read-only` explicit,
-  `--role sol` (pin only in `.claude/scripts/codex-run/models.json`; no model ids here),
+  `--role sol` (pin only in `models.json` beside the runner; no model ids here),
   `--timeout-min 30`. Explicit user model: `--model <id>` (plus `--effort`). Uncommitted or
   branch scope: add `--expect-diff "BASE HEAD"` (or `"HEAD"` for uncommitted) to get
   `evidence.diffReads`.
