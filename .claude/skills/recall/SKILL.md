@@ -32,8 +32,11 @@ because a lookup found nothing. Stay within the requested project's history and 
 Pitfalls carry standing authorization. When a project quirk cost a wasted attempt, a
 backed-out change, or a user correction in this session, and its cause is confirmed rather
 than guessed, save it to the project's pitfalls reference before the task ends without
-asking. Waiting for an explicit save request is how quirks get lost. Every other durable
-fact saves only when the user requested or authorized capture. All saves need:
+asking. Waiting for an explicit save request is how quirks get lost. For each pitfall,
+record the confirmed cause, plus what was tried and failed (expected versus observed
+outcome) when an attempt occurred, the working fix when verified, and the model or runtime
+when the quirk is model-specific. Every other durable fact saves only when the user requested
+or authorized capture. All saves need:
 
 - The fact changes future decisions and cannot be recovered cheaply from the code.
 - It is a durable constraint, decision, or recurring pitfall, not a task status or PR event.
