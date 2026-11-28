@@ -321,6 +321,13 @@ condensed.
 
 ### Changed
 
+- `addskill`'s authoring guide (Claude and Codex) now lists the defect classes
+  that Codex reviews kept finding in workflow skills, to check before review:
+  reviews and merges bound to a fetched commit, state that survives a resume,
+  no deleted or overwritten user work, caps on paid runs, gates that fail on a
+  known-bad case, no secret values in output, and a next step for every
+  outcome.
+
 - `init-project` (Claude and Codex) now settles what a project is with six
   questions: what it is, who it is for, what it is not, what done looks like,
   the smallest version that proves it, and the unbuilt features wanted. It

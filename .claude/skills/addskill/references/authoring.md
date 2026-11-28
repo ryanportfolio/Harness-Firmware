@@ -21,6 +21,20 @@ template's own CI runs it): after compaction Claude Code re-attaches an invoked 
 about 20,000 characters and drops the rest. Put stop rules, caps, gates and verification
 steps early in the body; move rarely needed sections to references.
 
+Workflow skill (git, worktrees, paid runs, gates, merges)? Before review, check new text
+against defect classes reviews keep finding in such skills:
+- Refs: bind every review, verdict, merge or deploy to a fetched commit SHA; never a branch
+  name, the local checkout or a stale diff base.
+- Resume: state survives a crash between any two steps; paid run recorded before launch, so
+  none runs twice; no step silently skipped.
+- User data: never delete or overwrite dirty work, an existing file, or a shared folder
+  reached through a link.
+- Paid runs, installs: each has a cap, a stop and the authorization it needs.
+- Checks: each gate fails on a known-bad case; a skipped, failed or partial check never
+  counts as success.
+- Secrets: no value reaches logs, refusal text, reports or published output.
+- Branches: every outcome has a next step; a new rule does not contradict an existing one.
+
 Match specificity to risk. Give open-ended tasks room for judgment; prescribe exact steps
 for fragile mechanics and authorization boundaries. Preserve explicit user choices and
 already-authorized continuation. Creation never implies commit, push, global installation,
